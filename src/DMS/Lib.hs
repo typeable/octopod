@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module DMS.Lib
     ( runDMS
@@ -35,7 +35,7 @@ deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
 
 server :: Server DeploymentAPI
-server = list :<|> create :<|> edit :<|> destroy :<|> update
+server = list :<|> create :<|> get :<|> edit :<|> destroy :<|> update
 
 list :: Handler [Text]
 list = do
@@ -46,6 +46,12 @@ create :: Deployment -> Handler Text
 create d = do
   liftIO . putStrLn $ "deployment created, deployment: " ++ show d
   return ""
+
+get :: Text -> Handler Deployment
+get n = do
+  let d = Deployment n "someTemplate" ["SOME_KEY=SOME_VAL"]
+  liftIO . putStrLn $ "get deployment: " ++ show d
+  return d
 
 edit :: Text -> Deployment -> Handler Text
 edit n d = do
