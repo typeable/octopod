@@ -3,8 +3,5 @@ module Lib
     , runDMS
     ) where
 
-runDMC :: IO ()
-runDMC = putStrLn "dmc"
-
-runDMS :: IO ()
-runDMS = putStrLn "dms"
+import DMC.Lib (runDMC)
+import DMS.Lib (runDMS)
