@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 
 module DMC.Lib
@@ -46,23 +45,23 @@ getBaseUrl = do
 
 defaultBaseUrl = BaseUrl Http "localhost" 4000 ""
 
-handleCommand clientEnv (Create {name, template, envs}) = do
+handleCommand clientEnv Create {name, template, envs} = do
   res <- flip runClientM clientEnv $ create $ Deployment name template envs
   print res
 
 handleCommand clientEnv List = do
-  res <- flip runClientM clientEnv $ list
+  res <- runClientM list clientEnv
   print res
 
-handleCommand clientEnv (Edit {name}) = do
+handleCommand clientEnv Edit {name} = do
   res <- flip runClientM clientEnv $ edit name $ Deployment "n" "t" ["SOME_KEY=SOME_VAL"]
   print res
 
-handleCommand clientEnv (Destroy {name}) = do
+handleCommand clientEnv Destroy {name} = do
   res <- flip runClientM clientEnv $ destroy name
   print res
 
-handleCommand clientEnv (Update {name, template}) = do
+handleCommand clientEnv Update {name, template} = do
   res <- flip runClientM clientEnv $ update name $ Deployment name template ["SOME_KEY=SOME_VAL"]
   print res
 
