@@ -6,12 +6,17 @@ module DMC.Lib
     ( runDMC
     ) where
 
+import Control.Monad
 import Data.Proxy
+import Data.Text (pack, unpack)
 import Options.Generic
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Servant.API
 import Servant.Client
 import System.Environment (lookupEnv)
+import System.IO
+import System.IO.Temp
+import System.Process.Typed
 
 import API.Lib (Deployment(Deployment), DeploymentAPI)
 
@@ -54,8 +59,26 @@ handleCommand clientEnv List = do
   print res
 
 handleCommand clientEnv Edit {name} = do
-  res <- flip runClientM clientEnv $ edit name $ Deployment "n" "t" ["SOME_KEY=SOME_VAL"]
-  print res
+  editor <- lookupEnv "EDITOR"
+  case editor of
+    Just ed -> do
+      res <- flip runClientM clientEnv $ get name
+      case res of
+        Right ((Deployment _ t e):_) -> editEnvs ed e >>= sendUpdate t
+        Right [] -> print $ "deployment " ++ unpack name ++ " not found"
+        Left err -> print $ "request failed, reason: " ++ show err
+    Nothing -> print "environment variable $EDITOR not found"
+
+  where
+    editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
+      mapM_ (hPutStrLn h) (fmap unpack e)
+      hFlush h
+      withProcessWait_ (proc ed [p]) $ \_ -> print "sending update..."
+      fmap pack . lines <$> readFile p
+
+    sendUpdate t e = do
+      res <- flip runClientM clientEnv $ edit name $ Deployment name t e
+      print res
 
 handleCommand clientEnv Destroy {name} = do
   res <- flip runClientM clientEnv $ destroy name

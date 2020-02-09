@@ -70,8 +70,8 @@ create p d = do
   helm <- liftIO helmPath
   case helm of
     Just helm -> do
-      executeHelmCommand helm
       createDeployment d
+      executeHelmCommand helm
       liftIO . putStrLn $ "deployment created, deployment: " ++ show d
     Nothing -> liftIO . putStrLn $ "helm not found. qed"
   return ""
