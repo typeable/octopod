@@ -18,6 +18,8 @@ import Database.PostgreSQL.Simple
 import Options.Generic
 import Network.Wai.Handler.Warp
 import Servant
+import System.Directory (findExecutable)
+import System.Process.Typed
 
 import API.Lib (Deployment(Deployment), DeploymentAPI)
 
@@ -39,6 +41,9 @@ runDMS = do
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
+
+helmPath :: IO (Maybe FilePath)
+helmPath = findExecutable "helm"
 
 app :: PgPool -> Application
 app pool = serve deploymentAPI (server pool)
@@ -62,8 +67,13 @@ list p = do
 
 create :: PgPool -> Deployment -> Handler Text
 create p d = do
-  createDeployment d
-  liftIO . putStrLn $ "deployment created, deployment: " ++ show d
+  helm <- liftIO helmPath
+  case helm of
+    Just helm -> do
+      executeHelmCommand helm
+      createDeployment d
+      liftIO . putStrLn $ "deployment created, deployment: " ++ show d
+    Nothing -> liftIO . putStrLn $ "helm not found. qed"
   return ""
 
   where
@@ -71,6 +81,11 @@ create p d = do
     createDeployment (Deployment n t e) = liftIO $
       withResource p $ \conn ->
         execute conn "INSERT INTO deployments (name, template, envs) VALUES (?, ?, ?)" (n, t, unwords e)
+
+    executeHelmCommand :: String -> Handler ()
+    executeHelmCommand helm = liftIO . withProcessWait_ (proc helm ["version"]) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
 
 get :: PgPool -> Text -> Handler [Deployment]
 get p n = do
