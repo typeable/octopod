@@ -95,7 +95,6 @@ edit p n (Deployment _ _ e) = do
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unwords e, n)
 
-
 destroy :: PgPool -> Text -> Handler Text
 destroy p n = do
   deleteDeployment
@@ -107,7 +106,6 @@ destroy p n = do
     deleteDeployment = liftIO $
       withResource p $ \conn ->
         execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
-
 
 update :: PgPool -> Text -> Deployment -> Handler Text
 update p n (Deployment _ t _) = do
