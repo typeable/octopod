@@ -74,7 +74,7 @@ list :: ClientM [Text]
 
 create :: Deployment -> ClientM Text
 
-get :: Text -> ClientM Deployment
+get :: Text -> ClientM [Deployment]
 
 edit :: Text -> Deployment -> ClientM Text
 
