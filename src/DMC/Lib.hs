@@ -7,10 +7,12 @@ module DMC.Lib
     ) where
 
 import Control.Monad
+import Data.Maybe (fromMaybe)
 import Data.Proxy
 import Data.Text (pack, unpack)
 import Options.Generic
 import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.URI
 import Servant.API
 import Servant.Client
 import System.Environment (lookupEnv)
@@ -43,11 +45,20 @@ runDMC = do
 getBaseUrl :: IO BaseUrl
 getBaseUrl = do
   dmsURL <- lookupEnv "DMS_URL"
-  return $ case dmsURL of
-    Just _url -> defaultBaseUrl
-    Nothing -> defaultBaseUrl
+  return $ maybe defaultBaseUrl parseUrl dmsURL
 
-defaultBaseUrl = BaseUrl Http "localhost" 4000 ""
+  where
+    defaultBaseUrl = BaseUrl Https "dms.localdomain" 443 ""
+
+    parseUrl = fromMaybe defaultBaseUrl . parseUrl'
+
+    parseUrl' url = do
+      uri <- parseURI url
+      uriData <- uriAuthority uri
+      let s = if uriScheme uri == "https:" then Https else Http
+          h = uriRegName uriData
+          p = read . tail . uriPort $ uriData
+      return $ BaseUrl s h p ""
 
 handleCommand clientEnv Create {name, template, envs} = do
   res <- flip runClientM clientEnv $ create $ Deployment name template envs
