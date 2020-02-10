@@ -36,7 +36,6 @@ runDMC = do
   args <- getRecord "DMC"
   print (args :: Args)
 
-  let port = 4000
   manager <- newManager defaultManagerSettings
   env <- getBaseUrl
   handleCommand (mkClientEnv manager env) args

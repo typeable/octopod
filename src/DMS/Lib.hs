@@ -7,12 +7,12 @@ module DMS.Lib
     ( runDMS
     ) where
 
-import Prelude hiding (unwords, words)
+import Prelude hiding (unwords, lines, unlines)
 
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.Int (Int64)
-import Data.Text (unpack, unwords, words)
+import Data.Text (lines, unlines, unpack, unwords)
 import Data.Pool
 import Database.PostgreSQL.Simple
 import Options.Generic
@@ -80,7 +80,7 @@ create p d = do
     createDeployment :: Deployment -> Handler Int64
     createDeployment (Deployment n t e) = liftIO $
       withResource p $ \conn ->
-        execute conn "INSERT INTO deployments (name, template, envs) VALUES (?, ?, ?)" (n, t, unwords e)
+        execute conn "INSERT INTO deployments (name, template, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
     executeHelmCommand :: String -> Handler ()
     executeHelmCommand helm = liftIO . withProcessWait_ (proc helm ["version"]) $ \pr -> do
@@ -95,7 +95,7 @@ get p n = do
 
   where
     getDeployment :: Handler [Deployment]
-    getDeployment = fmap (fmap (\(n, t, e) -> Deployment n t $ words e)) . liftIO $
+    getDeployment = fmap (fmap (\(n, t, e) -> Deployment n t $ lines e)) . liftIO $
       withResource p $ \conn -> query conn "SELECT name, template, envs FROM deployments WHERE name = ?" (Only n)
 
 edit :: PgPool -> Text -> Deployment -> Handler Text
@@ -108,7 +108,7 @@ edit p n (Deployment _ _ e) = do
     updateDeployment :: Handler Int64
     updateDeployment = liftIO $
       withResource p $ \conn ->
-        execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unwords e, n)
+        execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unlines e, n)
 
 destroy :: PgPool -> Text -> Handler Text
 destroy p n = do
