@@ -25,11 +25,11 @@ import System.Process.Typed
 import API.Lib (Deployment(Deployment), DeploymentAPI)
 
 data Args
-  = Create { name :: Text, template :: Text, envs :: [Text] }
+  = Create { name :: Text, tag :: Text, envs :: [Text] }
   | List
   | Edit { name :: Text }
   | Destroy { name :: Text }
-  | Update { name :: Text, template :: Text }
+  | Update { name :: Text, tag :: Text }
   deriving (Generic, Show)
 
 instance ParseRecord Args where
@@ -61,8 +61,8 @@ getBaseUrl = do
           p = read . tail . uriPort $ uriData
       return $ BaseUrl s h p ""
 
-handleCommand clientEnv Create {name, template, envs}
-  = handleResponse =<< runClientM (create $ Deployment name template envs) clientEnv
+handleCommand clientEnv Create {name, tag, envs}
+  = handleResponse =<< runClientM (create $ Deployment name tag envs) clientEnv
 
 handleCommand clientEnv List = (\l -> handleResponse $ unlines <$> l) =<< runClientM list clientEnv
 
@@ -88,8 +88,8 @@ handleCommand clientEnv Edit {name} = do
 
 handleCommand clientEnv Destroy {name} = handleResponse =<< runClientM (destroy name) clientEnv
 
-handleCommand clientEnv Update {name, template}
-  = handleResponse =<< runClientM (update name $ Deployment name template envs) clientEnv
+handleCommand clientEnv Update {name, tag}
+  = handleResponse =<< runClientM (update name $ Deployment name tag envs) clientEnv
   where envs = ["UNUSED_KEY=UNUSED_VALUE"]
 
 deploymentAPI :: Proxy DeploymentAPI

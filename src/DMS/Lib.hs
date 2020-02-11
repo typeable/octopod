@@ -80,7 +80,7 @@ create p d = do
     createDeployment :: Deployment -> Handler Int64
     createDeployment (Deployment n t e) = liftIO $
       withResource p $ \conn ->
-        execute conn "INSERT INTO deployments (name, template, envs) VALUES (?, ?, ?)" (n, t, unlines e)
+        execute conn "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
     executeHelmCommand :: Deployment -> String -> Handler ()
     executeHelmCommand d helm = liftIO . withProcessWait_ (proc helm $ args d) $ \pr -> do
@@ -98,7 +98,7 @@ get p n = do
   where
     getDeployment :: Handler [Deployment]
     getDeployment = fmap (fmap (\(n, t, e) -> Deployment n t $ lines e)) . liftIO $
-      withResource p $ \conn -> query conn "SELECT name, template, envs FROM deployments WHERE name = ?" (Only n)
+      withResource p $ \conn -> query conn "SELECT name, tag, envs FROM deployments WHERE name = ?" (Only n)
 
 edit :: PgPool -> Text -> Deployment -> Handler Text
 edit p n (Deployment _ _ e) = do
@@ -139,11 +139,11 @@ destroy p n = do
 update :: PgPool -> Text -> Deployment -> Handler Text
 update p n (Deployment _ t _) = do
   updateDeployment
-  liftIO . putStrLn $ "deployment updated, name: " ++ unpack n ++ ", template: " ++ unpack t
+  liftIO . putStrLn $ "deployment updated, name: " ++ unpack n ++ ", tag: " ++ unpack t
   return ""
 
   where
     updateDeployment :: Handler Int64
     updateDeployment = liftIO $
       withResource p $ \conn ->
-        execute conn "UPDATE deployments SET template = ?, updated_at = now() WHERE name = ?" (t, n)
+        execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)

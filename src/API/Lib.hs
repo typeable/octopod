@@ -13,7 +13,7 @@ import Options.Generic
 import Servant.API
 
 data Deployment
-  = Deployment { name :: Text, template :: Text, envs :: [Text] }
+  = Deployment { name :: Text, tag :: Text, envs :: [Text] }
   deriving (Generic, Show)
 
 instance ToJSON Deployment

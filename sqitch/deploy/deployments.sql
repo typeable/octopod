@@ -5,7 +5,7 @@ BEGIN;
 CREATE TABLE deployments (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    template TEXT NOT NULL,
+    tag TEXT NOT NULL,
     envs TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
