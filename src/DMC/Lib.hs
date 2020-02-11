@@ -6,10 +6,12 @@ module DMC.Lib
     ( runDMC
     ) where
 
+import Prelude hiding (unlines)
+
 import Control.Monad
 import Data.Maybe (fromMaybe)
 import Data.Proxy
-import Data.Text (pack, unpack)
+import Data.Text (pack, unlines, unpack)
 import Options.Generic
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Network.URI
@@ -36,7 +38,6 @@ instance ParseRecord Args where
 runDMC :: IO ()
 runDMC = do
   args <- getRecord "DMC"
-  print (args :: Args)
 
   manager <- newManager defaultManagerSettings
   env <- getBaseUrl
@@ -60,13 +61,10 @@ getBaseUrl = do
           p = read . tail . uriPort $ uriData
       return $ BaseUrl s h p ""
 
-handleCommand clientEnv Create {name, template, envs} = do
-  res <- flip runClientM clientEnv $ create $ Deployment name template envs
-  print res
+handleCommand clientEnv Create {name, template, envs}
+  = handleResponse =<< runClientM (create $ Deployment name template envs) clientEnv
 
-handleCommand clientEnv List = do
-  res <- runClientM list clientEnv
-  print res
+handleCommand clientEnv List = (\l -> handleResponse $ unlines <$> l) =<< runClientM list clientEnv
 
 handleCommand clientEnv Edit {name} = do
   editor <- lookupEnv "EDITOR"
@@ -83,20 +81,16 @@ handleCommand clientEnv Edit {name} = do
     editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
       mapM_ (hPutStrLn h) (fmap unpack e)
       hFlush h
-      withProcessWait_ (proc ed [p]) $ \_ -> print "sending update..."
+      withProcessWait_ (proc ed [p]) $ \_ -> putStrLn "sending update..."
       fmap pack . lines <$> readFile p
 
-    sendUpdate t e = do
-      res <- flip runClientM clientEnv $ edit name $ Deployment name t e
-      print res
+    sendUpdate t e = handleResponse =<< runClientM (edit name $ Deployment name t e) clientEnv
 
-handleCommand clientEnv Destroy {name} = do
-  res <- flip runClientM clientEnv $ destroy name
-  print res
+handleCommand clientEnv Destroy {name} = handleResponse =<< runClientM (destroy name) clientEnv
 
-handleCommand clientEnv Update {name, template} = do
-  res <- flip runClientM clientEnv $ update name $ Deployment name template ["SOME_KEY=SOME_VAL"]
-  print res
+handleCommand clientEnv Update {name, template}
+  = handleResponse =<< runClientM (update name $ Deployment name template envs) clientEnv
+  where envs = ["UNUSED_KEY=UNUSED_VALUE"]
 
 deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
@@ -114,3 +108,6 @@ edit :: Text -> Deployment -> ClientM Text
 destroy :: Text -> ClientM Text
 
 update :: Text -> Deployment -> ClientM Text
+
+handleResponse (Right result) = putStrLn (unpack result) >> putStrLn "done"
+handleResponse (Left err) = putStrLn $ "command failed, reason: " ++ show err
