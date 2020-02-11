@@ -71,7 +71,7 @@ create p d = do
   case helm of
     Just helm -> do
       createDeployment d
-      executeHelmCommand helm
+      executeHelmCommand d helm
       liftIO . putStrLn $ "deployment created, deployment: " ++ show d
     Nothing -> liftIO . putStrLn $ "helm not found. qed"
   return ""
@@ -82,10 +82,12 @@ create p d = do
       withResource p $ \conn ->
         execute conn "INSERT INTO deployments (name, template, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
-    executeHelmCommand :: String -> Handler ()
-    executeHelmCommand helm = liftIO . withProcessWait_ (proc helm ["version"]) $ \pr -> do
+    executeHelmCommand :: Deployment -> String -> Handler ()
+    executeHelmCommand d helm = liftIO . withProcessWait_ (proc helm $ args d) $ \pr -> do
         print . getStdout $ pr
         print . getStderr $ pr
+
+    args (Deployment n _ (e:_)) =  ["install", "-n", unpack n, "--set", unpack e, "simple"]
 
 get :: PgPool -> Text -> Handler [Deployment]
 get p n = do
@@ -112,8 +114,13 @@ edit p n (Deployment _ _ e) = do
 
 destroy :: PgPool -> Text -> Handler Text
 destroy p n = do
-  deleteDeployment
-  liftIO . putStrLn $ "deployment destroyed, name: " ++ unpack n
+  helm <- liftIO helmPath
+  case helm of
+    Just helm -> do
+      executeHelmCommand n helm
+      deleteDeployment
+      liftIO . putStrLn $ "deployment destroyed, name: " ++ unpack n
+    Nothing -> liftIO . putStrLn $ "helm not found. qed"
   return ""
 
   where
@@ -121,6 +128,13 @@ destroy p n = do
     deleteDeployment = liftIO $
       withResource p $ \conn ->
         execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
+
+    executeHelmCommand :: Text -> String -> Handler ()
+    executeHelmCommand n helm = liftIO . withProcessWait_ (proc helm $ args n) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
+
+    args n = ["delete", unpack n, "--purge"]
 
 update :: PgPool -> Text -> Deployment -> Handler Text
 update p n (Deployment _ t _) = do
