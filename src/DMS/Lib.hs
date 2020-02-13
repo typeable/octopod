@@ -7,11 +7,13 @@ module DMS.Lib
     ( runDMS
     ) where
 
-import Prelude hiding (unwords, lines, unlines)
+import Prelude hiding (lines, unlines, unwords)
 
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader  (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Int (Int64)
+import Data.Monoid ((<>))
 import Data.Text (lines, unlines, unpack, unwords)
 import Data.Pool
 import Database.PostgreSQL.Simple
@@ -19,6 +21,7 @@ import Options.Generic
 import Network.Wai.Handler.Warp
 import Servant
 import System.Directory (findExecutable)
+import System.Log.FastLogger
 import System.Process.Typed
 
 import API.Lib (Deployment(Deployment), DeploymentAPI)
@@ -31,13 +34,20 @@ instance ParseRecord Args where
   parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 type PgPool = Pool Connection
+type Logger = TimedFastLogger
+type AppM = ReaderT State Handler
+
+data State
+  = State { pool :: PgPool, logger :: Logger }
 
 runDMS :: IO ()
 runDMS = do
+  timeCache <- newTimeCache "%Y-%m-%d %T%z"
+  (logger, cleanUp) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
+  logInfo logger "started"
   args <- getRecord "DMS"
-  print (args :: Args)
   pool <- initConnectionPool (db args) (dbPoolSize args)
-  run (port args) (app pool)
+  run (port args) (app $ State pool logger)
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
@@ -45,105 +55,126 @@ initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
 helmPath :: IO (Maybe FilePath)
 helmPath = findExecutable "helm"
 
-app :: PgPool -> Application
-app pool = serve deploymentAPI (server pool)
+nt :: State -> AppM a -> Handler a
+nt s x = runReaderT x s
+
+app :: State -> Application
+app s = serve deploymentAPI $ hoistServer deploymentAPI (nt s) server
 
 deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
 
-server :: PgPool -> Server DeploymentAPI
-server p = list p :<|> create p :<|> get p :<|> edit p :<|> destroy p :<|> update p
+server :: ServerT DeploymentAPI AppM
+server = list :<|> create :<|> get :<|> edit :<|> destroy :<|> update
 
-list :: PgPool -> Handler [Text]
-list p = do
-  ds <- getDeployments
-  liftIO . putStrLn $ "get deployments: " ++ show ds
+list :: AppM [Text]
+list = do
+  State{pool = p, logger = l} <- ask
+  ds <- getDeployments p
+  liftIO . logInfo l $ "get deployments: " ++ show ds
   return ds
 
   where
-    getDeployments :: Handler [Text]
-    getDeployments = fmap (fmap fromOnly) . liftIO $
+    getDeployments :: PgPool -> AppM [Text]
+    getDeployments p = fmap (fmap fromOnly) . liftIO $
       withResource p $ \conn -> query_ conn "SELECT name FROM deployments"
 
-create :: PgPool -> Deployment -> Handler Text
-create p d = do
+create :: Deployment -> AppM Text
+create d = do
+  State{pool = p, logger = l} <- ask
   helm <- liftIO helmPath
   case helm of
     Just helm -> do
-      createDeployment d
+      createDeployment p d
       executeHelmCommand d helm
-      liftIO . putStrLn $ "deployment created, deployment: " ++ show d
-    Nothing -> liftIO . putStrLn $ "helm not found. qed"
+      liftIO . logInfo l $ "deployment created, deployment: " ++ show d
+    Nothing -> liftIO . logWarn l $ "helm not found. qed"
   return ""
 
   where
-    createDeployment :: Deployment -> Handler Int64
-    createDeployment (Deployment n t e) = liftIO $
+    createDeployment :: PgPool -> Deployment -> AppM Int64
+    createDeployment p (Deployment n t e) = liftIO $
       withResource p $ \conn ->
         execute conn "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
-    executeHelmCommand :: Deployment -> String -> Handler ()
+    executeHelmCommand :: Deployment -> String -> AppM ()
     executeHelmCommand d helm = liftIO . withProcessWait_ (proc helm $ args d) $ \pr -> do
         print . getStdout $ pr
         print . getStderr $ pr
 
     args (Deployment n _ (e:_)) =  ["install", "-n", unpack n, "--set", unpack e, "simple"]
 
-get :: PgPool -> Text -> Handler [Deployment]
-get p n = do
-  d <- getDeployment
-  liftIO . putStrLn $ "get deployment: " ++ show d
+get :: Text -> AppM [Deployment]
+get n = do
+  State{pool = p, logger = l} <- ask
+  d <- getDeployment p
+  liftIO . logInfo l $ "get deployment: " ++ show d
   return d
 
   where
-    getDeployment :: Handler [Deployment]
-    getDeployment = fmap (fmap (\(n, t, e) -> Deployment n t $ lines e)) . liftIO $
+    getDeployment :: PgPool -> AppM [Deployment]
+    getDeployment p = fmap (fmap (\(n, t, e) -> Deployment n t $ lines e)) . liftIO $
       withResource p $ \conn -> query conn "SELECT name, tag, envs FROM deployments WHERE name = ?" (Only n)
 
-edit :: PgPool -> Text -> Deployment -> Handler Text
-edit p n (Deployment _ _ e) = do
-  updateDeployment
-  liftIO . putStrLn $ "deployment edited, name: " ++ unpack n ++ ", envs: " ++ (unpack . unwords $ e)
+edit :: Text -> Deployment -> AppM Text
+edit n (Deployment _ _ e) = do
+  State{pool = p, logger = l} <- ask
+  updateDeployment p
+  liftIO . logInfo l $ "deployment edited, name: " ++ unpack n ++ ", envs: " ++ (unpack . unwords $ e)
   return ""
 
   where
-    updateDeployment :: Handler Int64
-    updateDeployment = liftIO $
+    updateDeployment :: PgPool -> AppM Int64
+    updateDeployment p = liftIO $
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unlines e, n)
 
-destroy :: PgPool -> Text -> Handler Text
-destroy p n = do
+destroy :: Text -> AppM Text
+destroy n = do
+  State{pool = p, logger = l} <- ask
   helm <- liftIO helmPath
   case helm of
     Just helm -> do
       executeHelmCommand n helm
-      deleteDeployment
-      liftIO . putStrLn $ "deployment destroyed, name: " ++ unpack n
-    Nothing -> liftIO . putStrLn $ "helm not found. qed"
+      deleteDeployment p
+      liftIO . logInfo l $ "deployment destroyed, name: " ++ unpack n
+    Nothing -> liftIO . logWarn l $ "helm not found. qed"
   return ""
 
   where
-    deleteDeployment :: Handler Int64
-    deleteDeployment = liftIO $
+    deleteDeployment :: PgPool -> AppM Int64
+    deleteDeployment p = liftIO $
       withResource p $ \conn ->
         execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
 
-    executeHelmCommand :: Text -> String -> Handler ()
+    executeHelmCommand :: Text -> String -> AppM ()
     executeHelmCommand n helm = liftIO . withProcessWait_ (proc helm $ args n) $ \pr -> do
         print . getStdout $ pr
         print . getStderr $ pr
 
     args n = ["delete", unpack n, "--purge"]
 
-update :: PgPool -> Text -> Deployment -> Handler Text
-update p n (Deployment _ t _) = do
-  updateDeployment
-  liftIO . putStrLn $ "deployment updated, name: " ++ unpack n ++ ", tag: " ++ unpack t
+update :: Text -> Deployment -> AppM Text
+update n (Deployment _ t _) = do
+  State{pool = p, logger = l} <- ask
+  updateDeployment p
+  liftIO . logInfo l $ "deployment updated, name: " ++ unpack n ++ ", tag: " ++ unpack t
   return ""
 
   where
-    updateDeployment :: Handler Int64
-    updateDeployment = liftIO $
+    updateDeployment :: PgPool -> AppM Int64
+    updateDeployment p = liftIO $
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)
+
+
+logInfo :: TimedFastLogger -> String -> IO ()
+logInfo logger = logWithSeverity logger "INFO"
+
+logWarn :: TimedFastLogger -> String -> IO ()
+logWarn logger = logWithSeverity logger "WARN"
+
+logWithSeverity :: ToLogStr msg => TimedFastLogger -> ByteString -> msg -> IO ()
+logWithSeverity logger severity msg = logger $ \ft -> metadata ft <> message
+  where metadata ft = foldMap toLogStr ["[" :: ByteString, ft, " " :: ByteString, severity, "] " :: ByteString]
+        message = toLogStr msg <> toLogStr ("\n" :: ByteString)
