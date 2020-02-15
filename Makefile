@@ -1,4 +1,4 @@
-.PHONY: build
+.PHONY: build repl
 
 build: update-default-nix
 	nix-build release.nix
