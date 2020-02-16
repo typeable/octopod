@@ -1,8 +1,16 @@
 # DM
 
-Multi-staging Deployment Manager. Consists of the client (DMC) and server (DMS) parts.
+Multi-staging Deployment Manager (DM). MD consists of the client and server parts (DMC and DMS  accordingly).
 
 # Installation
+
+1. Install Nix
+
+```bash
+curl https://nixos.org/nix/install | sh
+```
+
+2. Build the project
 
 ```bash
 make build
