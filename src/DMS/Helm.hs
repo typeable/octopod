@@ -28,7 +28,7 @@ createAppArgs name = [
   , "--release-name", releaseName appChartName name
   , "--set", "'b2b-app.email_domain=" ++ name ++ ".staging.thebestagent.pro'"
   , "--set", "'b2b-app.domain=" ++ name ++ ".staging.thebestagent.pro'"
-  , "--set", "'b2b-app.connections.pg_instance=avia:avia@" ++ rn ++ "-postgres-0." ++ rn ++ "-postgres'"
+  , "--set", "'b2b-app.connections.pg_instance=avia:avia@" ++ rn ++ "-postgres-0." ++ rn ++ "-postgres." ++ namespace ++ ":5432'"
   , "--set", "'b2b-app.connections.elastic=http://" ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
   , "--set", "'b2b-app.connections.elasic_hosts=http://" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
   , "--set", "'b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379'"
@@ -41,7 +41,7 @@ createAppArgs name = [
 createInfraArgs name = [
     "-d", "deploy"
   , "--release-name", rn
-  , "--set", "'b2b-kafka-int.zk=" ++ rn ++ "-zk-0." ++ rn ++ "-zk." ++ namespace ++ "'"
+  , "--set", "'b2b-kafka-int.zk=" ++ rn ++ "-zk-0." ++ rn ++ "-zk." ++ namespace ++ "/int'"
   , "--set", "'b2b-elasticsearch.cluster_hosts=" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ "'"
   , "--set", "'b2b-postgres.postgres_db=" ++ rn_ ++ "'"
   , infraChartName

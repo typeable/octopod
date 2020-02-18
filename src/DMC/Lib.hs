@@ -13,7 +13,7 @@ import Data.Maybe (fromMaybe)
 import Data.Proxy
 import Data.Text (pack, unlines, unpack)
 import Options.Generic
-import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.HTTP.Client (defaultManagerSettings, managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.URI
 import Servant.API
 import Servant.Client
@@ -39,7 +39,7 @@ runDMC :: IO ()
 runDMC = do
   args <- getRecord "DMC"
 
-  manager <- newManager defaultManagerSettings
+  manager <- newManager defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro $ 20 * 60 * 10^6 }
   env <- getBaseUrl
   handleCommand (mkClientEnv manager env) args
 
