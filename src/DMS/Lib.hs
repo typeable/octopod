@@ -20,11 +20,11 @@ import Database.PostgreSQL.Simple
 import Options.Generic
 import Network.Wai.Handler.Warp
 import Servant
-import System.Directory (findExecutable)
 import System.Log.FastLogger
 import System.Process.Typed
 
 import API.Lib (Deployment(Deployment), DeploymentAPI)
+import DMS.Helm
 
 data Args
   = Args { port :: Int, db :: ByteString, dbPoolSize :: Int }
@@ -51,9 +51,6 @@ runDMS = do
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
-
-helmPath :: IO (Maybe FilePath)
-helmPath = findExecutable "helm"
 
 nt :: State -> AppM a -> Handler a
 nt s x = runReaderT x s
@@ -82,13 +79,14 @@ list = do
 create :: Deployment -> AppM Text
 create d = do
   State{pool = p, logger = l} <- ask
-  helm <- liftIO helmPath
-  case helm of
-    Just helm -> do
+  b2bHelm <- liftIO b2bHelmPath
+  case b2bHelm of
+    Just b2bHelm -> do
       createDeployment p d
-      executeHelmCommand d helm
+      createInfra d b2bHelm
+      createApp d b2bHelm
       liftIO . logInfo l $ "deployment created, deployment: " ++ show d
-    Nothing -> liftIO . logWarn l $ "helm not found. qed"
+    Nothing -> liftIO . logWarn l $ "b2b-helm not found. qed"
   return ""
 
   where
@@ -97,12 +95,15 @@ create d = do
       withResource p $ \conn ->
         execute conn "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
-    executeHelmCommand :: Deployment -> String -> AppM ()
-    executeHelmCommand d helm = liftIO . withProcessWait_ (proc helm $ args d) $ \pr -> do
+    createInfra :: Deployment -> String -> AppM ()
+    createInfra (Deployment n _ _) b2bHelm = liftIO . withProcessWait_ (proc b2bHelm $ createInfraArgs . unpack $ n) $ \pr -> do
         print . getStdout $ pr
         print . getStderr $ pr
 
-    args (Deployment n _ (e:_)) =  ["install", "-n", unpack n, "--set", unpack e, "simple"]
+    createApp :: Deployment -> String -> AppM ()
+    createApp (Deployment n _ _) b2bHelm = liftIO . withProcessWait_ (proc b2bHelm $ createAppArgs . unpack $ n) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
 
 get :: Text -> AppM [Deployment]
 get n = do
@@ -135,7 +136,8 @@ destroy n = do
   helm <- liftIO helmPath
   case helm of
     Just helm -> do
-      executeHelmCommand n helm
+      destroyApp n helm
+      destroyInfra n helm
       deleteDeployment p
       liftIO . logInfo l $ "deployment destroyed, name: " ++ unpack n
     Nothing -> liftIO . logWarn l $ "helm not found. qed"
@@ -147,12 +149,15 @@ destroy n = do
       withResource p $ \conn ->
         execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
 
-    executeHelmCommand :: Text -> String -> AppM ()
-    executeHelmCommand n helm = liftIO . withProcessWait_ (proc helm $ args n) $ \pr -> do
+    destroyApp :: Text -> String -> AppM ()
+    destroyApp n helm = liftIO . withProcessWait_ (proc helm $ destroyAppArgs . unpack $ n) $ \pr -> do
         print . getStdout $ pr
         print . getStderr $ pr
 
-    args n = ["delete", unpack n, "--purge"]
+    destroyInfra :: Text -> String -> AppM ()
+    destroyInfra n helm = liftIO . withProcessWait_ (proc helm $ destroyInfraArgs . unpack $ n) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
 
 update :: Text -> Deployment -> AppM Text
 update n (Deployment _ t _) = do
