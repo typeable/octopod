@@ -24,17 +24,17 @@ namespace = "staging"
 releaseName chartName name = chartName ++ "-" ++ namespace ++ "-" ++ name
 
 createAppArgs name = [
-      "-d", "deploy"
-    , "--release-name", releaseName appChartName name
-    , "--set", "'b2b-app.email_domain=" ++ name ++ ".staging.thebestagent.pro'"
-    , "--set", "'b2b-app.domain=" ++ name ++ ".staging.thebestagent.pro'"
-    , "--set", "'b2b-app.connections.pg_instance=avia:avia@" ++ rn ++ "-postgres-0." ++ rn ++ "-postgres'"
-    , "--set", "'b2b-app.connections.elastic=http://" ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
-    , "--set", "'b2b-app.connections.elasic_hosts=http://" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
-    , "--set", "'b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379'"
-    , "--set", "'b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
-    , "--set", "'b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
-    , appChartName
+    "-d", "deploy"
+  , "--release-name", releaseName appChartName name
+  , "--set", "'b2b-app.email_domain=" ++ name ++ ".staging.thebestagent.pro'"
+  , "--set", "'b2b-app.domain=" ++ name ++ ".staging.thebestagent.pro'"
+  , "--set", "'b2b-app.connections.pg_instance=avia:avia@" ++ rn ++ "-postgres-0." ++ rn ++ "-postgres'"
+  , "--set", "'b2b-app.connections.elastic=http://" ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
+  , "--set", "'b2b-app.connections.elasic_hosts=http://" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200'"
+  , "--set", "'b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379'"
+  , "--set", "'b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
+  , "--set", "'b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
+  , appChartName
   ]
   where rn = releaseName infraChartName name
 

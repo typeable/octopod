@@ -14,7 +14,7 @@ import Control.Monad.Trans.Reader  (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Int (Int64)
 import Data.Monoid ((<>))
-import Data.Text (lines, unlines, unpack, unwords)
+import Data.Text (lines, pack, unlines, unpack, unwords)
 import Data.Pool
 import Database.PostgreSQL.Simple
 import Options.Generic
@@ -34,11 +34,10 @@ instance ParseRecord Args where
   parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 type PgPool = Pool Connection
-type Logger = TimedFastLogger
 type AppM = ReaderT State Handler
 
 data State
-  = State { pool :: PgPool, logger :: Logger }
+  = State { pool :: PgPool, logger :: TimedFastLogger }
 
 runDMS :: IO ()
 runDMS = do
@@ -68,7 +67,7 @@ list :: AppM [Text]
 list = do
   State{pool = p, logger = l} <- ask
   ds <- getDeployments p
-  liftIO . logInfo l $ "get deployments: " ++ show ds
+  liftIO . logInfo l $ "get deployments: " <> (pack . show $ ds)
   return ds
 
   where
@@ -85,7 +84,7 @@ create d = do
       createDeployment p d
       createInfra d b2bHelm
       createApp d b2bHelm
-      liftIO . logInfo l $ "deployment created, deployment: " ++ show d
+      liftIO . logInfo l $ "deployment created, deployment: " <> (pack . show $ d)
     Nothing -> liftIO . logWarn l $ "b2b-helm not found. qed"
   return ""
 
@@ -109,7 +108,7 @@ get :: Text -> AppM [Deployment]
 get n = do
   State{pool = p, logger = l} <- ask
   d <- getDeployment p
-  liftIO . logInfo l $ "get deployment: " ++ show d
+  liftIO . logInfo l $ "get deployment: " <> (pack . show $ d)
   return d
 
   where
@@ -121,7 +120,7 @@ edit :: Text -> Deployment -> AppM Text
 edit n (Deployment _ _ e) = do
   State{pool = p, logger = l} <- ask
   updateDeployment p
-  liftIO . logInfo l $ "deployment edited, name: " ++ unpack n ++ ", envs: " ++ (unpack . unwords $ e)
+  liftIO . logInfo l $ "deployment edited, name: " <> n <> ", envs: " <> unwords e
   return ""
 
   where
@@ -139,7 +138,7 @@ destroy n = do
       destroyApp n helm
       destroyInfra n helm
       deleteDeployment p
-      liftIO . logInfo l $ "deployment destroyed, name: " ++ unpack n
+      liftIO . logInfo l $ "deployment destroyed, name: " <> n
     Nothing -> liftIO . logWarn l $ "helm not found. qed"
   return ""
 
@@ -163,7 +162,7 @@ update :: Text -> Deployment -> AppM Text
 update n (Deployment _ t _) = do
   State{pool = p, logger = l} <- ask
   updateDeployment p
-  liftIO . logInfo l $ "deployment updated, name: " ++ unpack n ++ ", tag: " ++ unpack t
+  liftIO . logInfo l $ "deployment updated, name: " <> n <> ", tag: " <> t
   return ""
 
   where
@@ -172,11 +171,10 @@ update n (Deployment _ t _) = do
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)
 
-
-logInfo :: TimedFastLogger -> String -> IO ()
+logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo logger = logWithSeverity logger "INFO"
 
-logWarn :: TimedFastLogger -> String -> IO ()
+logWarn :: TimedFastLogger -> Text -> IO ()
 logWarn logger = logWithSeverity logger "WARN"
 
 logWithSeverity :: ToLogStr msg => TimedFastLogger -> ByteString -> msg -> IO ()
