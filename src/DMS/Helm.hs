@@ -5,6 +5,8 @@ module DMS.Helm
   , b2bHelmPath
   , createAppArgs
   , createInfraArgs
+  , editAppArgs
+  , updateAppArgs
   , destroyAppArgs
   , destroyInfraArgs
   ) where
@@ -23,7 +25,7 @@ namespace = "staging"
 
 releaseName chartName name = chartName ++ "-" ++ namespace ++ "-" ++ name
 
-createAppArgs name = [
+createAppArgs name tag envs = [
     "-d", "deploy"
   , "--release-name", releaseName appChartName name
   , "--set", "'b2b-app.email_domain=" ++ name ++ ".staging.thebestagent.pro'"
@@ -34,7 +36,10 @@ createAppArgs name = [
   , "--set", "'b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379'"
   , "--set", "'b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
   , "--set", "'b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092'"
-  , appChartName
+  ]
+  ++ mconcat (fmap ((\a b -> [a, b]) "--set") envs)
+  ++ [
+    appChartName ++ ":" ++ tag
   ]
   where rn = releaseName infraChartName name
 
@@ -47,7 +52,10 @@ createInfraArgs name = [
   , infraChartName
   ]
   where rn = releaseName infraChartName name
-        rn_ = fmap (\c -> if c == '-' then '_' else c) rn
+
+editAppArgs = createAppArgs
+
+updateAppArgs = createAppArgs
 
 destroyAppArgs name = [releaseName appChartName name, "--purge"]
 
