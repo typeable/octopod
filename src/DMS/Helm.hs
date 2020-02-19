@@ -43,7 +43,7 @@ createInfraArgs name = [
   , "--release-name", rn
   , "--set", "'b2b-kafka-int.zk=" ++ rn ++ "-zk-0." ++ rn ++ "-zk." ++ namespace ++ "/int'"
   , "--set", "'b2b-elasticsearch.cluster_hosts=" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ "'"
-  , "--set", "'b2b-postgres.postgres_db=" ++ rn_ ++ "'"
+  , "--set", "'b2b-postgres.postgres_db=avia'"
   , infraChartName
   ]
   where rn = releaseName infraChartName name

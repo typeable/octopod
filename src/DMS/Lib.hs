@@ -20,6 +20,7 @@ import Database.PostgreSQL.Simple
 import Options.Generic
 import Network.Wai.Handler.Warp
 import Servant
+import System.Exit
 import System.Log.FastLogger
 import System.Process.Typed
 
@@ -37,7 +38,7 @@ type PgPool = Pool Connection
 type AppM = ReaderT State Handler
 
 data State
-  = State { pool :: PgPool, logger :: TimedFastLogger }
+  = State { pool :: PgPool, logger :: TimedFastLogger, helm :: FilePath, b2bHelm :: FilePath }
 
 runDMS :: IO ()
 runDMS = do
@@ -45,8 +46,14 @@ runDMS = do
   (logger, cleanUp) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
   logInfo logger "started"
   args <- getRecord "DMS"
-  pool <- initConnectionPool (db args) (dbPoolSize args)
-  run (port args) (app $ State pool logger)
+  helm <- helmPath
+  b2bHelm <- b2bHelmPath
+  case (helm, b2bHelm) of
+    (Just h, Just b) -> do
+      pool <- initConnectionPool (db args) (dbPoolSize args)
+      run (port args) (app $ State pool logger h b)
+    (Nothing, _) -> die "helm not found"
+    (_, _) -> die "b2b-helm not found"
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
@@ -77,15 +84,11 @@ list = do
 
 create :: Deployment -> AppM Text
 create d = do
-  State{pool = p, logger = l} <- ask
-  b2bHelm <- liftIO b2bHelmPath
-  case b2bHelm of
-    Just b2bHelm -> do
-      createDeployment p d
-      createInfra d b2bHelm
-      createApp d b2bHelm
-      liftIO . logInfo l $ "deployment created, deployment: " <> (pack . show $ d)
-    Nothing -> liftIO . logWarn l $ "b2b-helm not found. qed"
+  State{pool = p, logger = l, b2bHelm = b} <- ask
+  createDeployment p d
+  createInfra d b
+  createApp d b
+  liftIO . logInfo l $ "deployment created, deployment: " <> (pack . show $ d)
   return ""
 
   where
@@ -131,15 +134,11 @@ edit n (Deployment _ _ e) = do
 
 destroy :: Text -> AppM Text
 destroy n = do
-  State{pool = p, logger = l} <- ask
-  helm <- liftIO helmPath
-  case helm of
-    Just helm -> do
-      destroyApp n helm
-      destroyInfra n helm
-      deleteDeployment p
-      liftIO . logInfo l $ "deployment destroyed, name: " <> n
-    Nothing -> liftIO . logWarn l $ "helm not found. qed"
+  State{pool = p, logger = l, helm = h} <- ask
+  destroyApp n h
+  destroyInfra n h
+  deleteDeployment p
+  liftIO . logInfo l $ "deployment destroyed, name: " <> n
   return ""
 
   where
@@ -174,8 +173,8 @@ update n (Deployment _ t _) = do
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo logger = logWithSeverity logger "INFO"
 
-logWarn :: TimedFastLogger -> Text -> IO ()
-logWarn logger = logWithSeverity logger "WARN"
+logWarning :: TimedFastLogger -> Text -> IO ()
+logWarning logger = logWithSeverity logger "WARN"
 
 logWithSeverity :: ToLogStr msg => TimedFastLogger -> ByteString -> msg -> IO ()
 logWithSeverity logger severity msg = logger $ \ft -> metadata ft <> message
