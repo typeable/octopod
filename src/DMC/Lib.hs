@@ -49,7 +49,7 @@ getBaseUrl = do
   return $ maybe defaultBaseUrl parseUrl dmsURL
 
   where
-    defaultBaseUrl = BaseUrl Https "dms.localdomain" 443 ""
+    defaultBaseUrl = BaseUrl Http "dm.kube.thebestagent.pro" 80 ""
 
     parseUrl = fromMaybe defaultBaseUrl . parseUrl'
 
