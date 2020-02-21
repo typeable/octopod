@@ -22,7 +22,7 @@ import System.IO
 import System.IO.Temp
 import System.Process.Typed
 
-import API.Lib (Deployment(Deployment), DeploymentAPI)
+import API.Lib (Deployment (Deployment), DeploymentAPI)
 
 data Args
   = Create { name :: Text, tag :: Text, envs :: [Text] }
@@ -72,7 +72,7 @@ handleCommand clientEnv Edit {name} = do
     Just ed -> do
       res <- flip runClientM clientEnv $ get name
       case res of
-        Right ((Deployment _ t e):_) -> editEnvs ed e >>= sendUpdate t
+        Right ((Deployment _ t e) : _) -> editEnvs ed e >>= sendUpdate t
         Right [] -> print $ "deployment " ++ unpack name ++ " not found"
         Left err -> print $ "request failed, reason: " ++ show err
     Nothing -> print "environment variable $EDITOR not found"

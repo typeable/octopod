@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 
 module API.Lib
-  ( Deployment(..)
+  ( Deployment (..)
   , DeploymentAPI
   ) where
 

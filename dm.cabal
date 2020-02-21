@@ -29,6 +29,7 @@ library
   exposed-modules:
       API.Lib
       DMC.Lib
+      DMS.Helm
       DMS.Lib
       Lib
   other-modules:

@@ -24,7 +24,7 @@ import System.Exit
 import System.Log.FastLogger
 import System.Process.Typed
 
-import API.Lib (Deployment(Deployment), DeploymentAPI)
+import API.Lib (Deployment (Deployment), DeploymentAPI, name, tag, envs)
 import DMS.Helm
 
 data Args
@@ -88,22 +88,22 @@ create d = do
   let ia = infraArgs d
       aa = appArgs d
   createDeployment p d
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> b : ia)
+  liftIO . logInfo l $ "call " <> unwords (pack <$> b : ia)
   createInfra ia b
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> b : aa)
+  liftIO . logInfo l $ "call " <> unwords (pack <$> b : aa)
   createApp aa b
   liftIO . logInfo l $ "deployment created, deployment: " <> (pack . show $ d)
   return ""
 
   where
     createDeployment :: PgPool -> Deployment -> AppM Int64
-    createDeployment p (Deployment n t e) = liftIO $
+    createDeployment p Deployment { name = n, tag = t, envs = e } = liftIO $
       withResource p $ \conn ->
         execute conn "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)" (n, t, unlines e)
 
-    infraArgs (Deployment n _ _) = createInfraArgs . unpack $ n
+    infraArgs Deployment { name = n } = createInfraArgs . unpack $ n
 
-    appArgs (Deployment n t e) = createAppArgs (unpack n) (unpack t) (fmap unpack e)
+    appArgs Deployment { name = n, tag = t, envs = e } = createAppArgs (unpack n) (unpack t) (fmap unpack e)
 
     createInfra :: [String] -> String -> AppM ()
     createInfra args b2bHelm = liftIO . withProcessWait_ (proc b2bHelm args) $ \pr -> do
@@ -128,32 +128,44 @@ get n = do
       withResource p $ \conn -> query conn "SELECT name, tag, envs FROM deployments WHERE name = ?" (Only n)
 
 edit :: Text -> Deployment -> AppM Text
-edit n d@(Deployment _ _ e) = do
+edit n d@Deployment { envs =  e } = do
   State{pool = p, logger = l, b2bHelm = b} <- ask
-  -- TODO: get current tag
-  let aa = appArgs d
-  editDeployment p
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> b : aa)
-  -- TODO: editApp aa b
-  liftIO . logInfo l $ "deployment edited, name: " <> n <> ", envs: " <> unwords e
+  t <- getTag p
+  case t of
+    t : _ -> do
+      let aa = appArgs $ d { name = n, tag = t }
+      editDeployment p
+      liftIO . logInfo l $ "call " <> unwords (pack <$> b : aa)
+      editApp aa b
+      liftIO . logInfo l $ "deployment edited, name: " <> n <> ", envs: " <> unwords e
+    _ -> liftIO . logWarning l $ "tag not found, name: " <> n
   return ""
 
   where
+    getTag :: PgPool -> AppM [Text]
+    getTag p = fmap (fmap fromOnly) . liftIO $
+      withResource p $ \conn -> query conn "SELECT tag FROM deployments WHERE name = ?" (Only n)
+
     editDeployment :: PgPool -> AppM Int64
     editDeployment p = liftIO $
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unlines e, n)
 
-    appArgs (Deployment n t e) = editAppArgs (unpack n) (unpack t) (fmap unpack e)
+    editApp :: [String] -> String -> AppM ()
+    editApp args b2bHelm = liftIO . withProcessWait_ (proc b2bHelm args) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
+
+    appArgs Deployment { name = n, tag = t, envs =  e } = editAppArgs (unpack n) (unpack t) (fmap unpack e)
 
 destroy :: Text -> AppM Text
 destroy n = do
   State{pool = p, logger = l, helm = h} <- ask
   let ia = infraArgs n
       aa = appArgs n
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> h : aa)
+  liftIO . logInfo l $ "call " <> unwords (pack <$> h : aa)
   destroyApp aa h
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> h : ia)
+  liftIO . logInfo l $ "call " <> unwords (pack <$> h : ia)
   destroyInfra ia h
   deleteDeployment p
   liftIO . logInfo l $ "deployment destroyed, name: " <> n
@@ -180,23 +192,35 @@ destroy n = do
         print . getStderr $ pr
 
 update :: Text -> Deployment -> AppM Text
-update n d@(Deployment _ t _) = do
+update n d@Deployment { tag = t } = do
   State{pool = p, logger = l, b2bHelm = b} <- ask
-  -- TODO: get current envs
-  let aa = appArgs d
-  updateDeployment p
-  liftIO . logInfo l $ "execute " <> unwords (pack <$> b : aa)
-  -- TODO: updateApp aa b
-  liftIO . logInfo l $ "deployment updated, name: " <> n <> ", tag: " <> t
+  e <- getEnvs p
+  case e of
+    e : _ -> do
+      let aa = appArgs $ d { name = n, envs = lines e }
+      updateDeployment p
+      liftIO . logInfo l $ "call " <> unwords (pack <$> b : aa)
+      updateApp aa b
+      liftIO . logInfo l $ "deployment updated, name: " <> n <> ", tag: " <> t
+    _ -> liftIO . logWarning l $ "envs not found, name: " <> n
   return ""
 
   where
+    getEnvs :: PgPool -> AppM [Text]
+    getEnvs p = fmap (fmap fromOnly) . liftIO $
+      withResource p $ \conn -> query conn "SELECT envs FROM deployments WHERE name = ?" (Only n)
+
     updateDeployment :: PgPool -> AppM Int64
     updateDeployment p = liftIO $
       withResource p $ \conn ->
         execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)
 
-    appArgs (Deployment n t e) = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
+    updateApp :: [String] -> String -> AppM ()
+    updateApp args b2bHelm = liftIO . withProcessWait_ (proc b2bHelm args) $ \pr -> do
+        print . getStdout $ pr
+        print . getStderr $ pr
+
+    appArgs Deployment { name = n, tag = t, envs = e } = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo logger = logWithSeverity logger "INFO"
