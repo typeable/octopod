@@ -95,7 +95,7 @@ handleCommand clientEnv Update {name, tag}
 deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
 
-list :<|> create :<|> get :<|> edit :<|> destroy :<|> update = client deploymentAPI
+(list :<|> create :<|> get :<|> edit :<|> destroy :<|> update) :<|> ping = client deploymentAPI
 
 list :: ClientM [Text]
 
@@ -108,6 +108,8 @@ edit :: Text -> Deployment -> ClientM Text
 destroy :: Text -> ClientM Text
 
 update :: Text -> Deployment -> ClientM Text
+
+ping :: ClientM Text
 
 handleResponse (Right result) = putStrLn (unpack result) >> putStrLn "done"
 handleResponse (Left err) = putStrLn $ "command failed, reason: " ++ show err

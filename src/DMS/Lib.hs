@@ -68,7 +68,7 @@ deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
 
 server :: ServerT DeploymentAPI AppM
-server = list :<|> create :<|> get :<|> edit :<|> destroy :<|> update
+server = (list :<|> create :<|> get :<|> edit :<|> destroy :<|> update) :<|> ping
 
 list :: AppM [Text]
 list = do
@@ -221,6 +221,18 @@ update n d@Deployment { tag = t } = do
         print . getStderr $ pr
 
     appArgs Deployment { name = n, tag = t, envs = e } = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
+
+
+ping :: AppM Text
+ping = do
+  State{pool = p} <- ask
+  getSomething p
+  return ""
+
+  where
+    getSomething :: PgPool -> AppM [Int]
+    getSomething p = fmap (fmap fromOnly) . liftIO $
+      withResource p $ \conn -> query_ conn "SELECT id FROM deployments WHERE id = 0"
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo logger = logWithSeverity logger "INFO"
