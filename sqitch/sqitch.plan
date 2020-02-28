@@ -3,3 +3,4 @@
 %uri=https://github.com/sqitchers/sqitch-intro/
 
 deployments 2020-02-09T15:47:32Z root <root@f56c3faaf0bf> # Creates deployments table.
+deployment_logs 2020-02-28T21:35:30Z Andrei Orlov <aaorlov1@gmail.com> # Creates deployment_logs table.
