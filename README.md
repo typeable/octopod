@@ -20,9 +20,9 @@ make build
 
 ```bash
 $ result/bin/dmc-exe
-Missing: (create | list | edit | destroy | update)
+Missing: (create | list | edit | destroy | update | info)
 
-Usage: dmc-exe (create | list | edit | destroy | update)
+Usage: dmc-exe (create | list | edit | destroy | update | info)
 ```
 
 # Interact with DMS
