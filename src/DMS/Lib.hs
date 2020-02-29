@@ -25,7 +25,7 @@ import System.Exit
 import System.Log.FastLogger
 import System.Process.Typed
 
-import API.Lib (Deployment (Deployment), DeploymentAPI, name, tag, envs)
+import API.Lib
 import DMS.Helm
 
 data Args
@@ -74,7 +74,7 @@ deploymentAPI :: Proxy DeploymentAPI
 deploymentAPI = Proxy
 
 server :: ServerT DeploymentAPI AppM
-server = (list :<|> create :<|> get :<|> edit :<|> destroy :<|> update) :<|> ping
+server = (list :<|> create :<|> get :<|> edit :<|> destroy :<|> update :<|> info) :<|> ping
 
 list :: AppM [Text]
 list = do
@@ -233,6 +233,33 @@ update n d@Deployment { tag = t } = do
     updateApp args b2bHelm = withProcessWait (proc b2bHelm args) waitProcess
 
     appArgs Deployment { name = n, tag = t, envs = e } = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
+
+info :: Text -> AppM [DeploymentInfo]
+info n = do
+  State{pool = p, logger = l} <- ask
+  liftIO $ do
+    d <- getDeployment p
+    dl <- getDeploymentLogs p
+    let di = DeploymentInfo { deployment = head d, logs = dl }
+    logInfo l $ "get deployment info: " <> (pack . show $ di)
+    return [di]
+
+  where
+    getDeployment :: PgPool -> IO [Deployment]
+    getDeployment p = fmap (fmap (\(n, t, e) -> Deployment n t $ lines e)) $ withResource p $ \conn ->
+      query conn "SELECT name, tag, envs FROM deployments WHERE name = ?" (Only n)
+
+    getDeploymentLogs :: PgPool -> IO [DeploymentLog]
+    getDeploymentLogs p = fmap (fmap (\(a, t, e, c, ts) -> DeploymentLog a t (lines e) c ts)) $ withResource p $ \conn ->
+      query conn q (Only n)
+
+      where q = "SELECT action::text, tag, envs, exit_code, extract(epoch from created_at)::int \
+                \FROM deployment_logs \
+                \WHERE deployment_id in (\
+                  \SELECT id FROM deployments WHERE name = ?\
+                \) \
+                \ORDER BY created_at DESC \
+                \LIMIT 20"
 
 ping :: AppM Text
 ping = do

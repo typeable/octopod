@@ -28,6 +28,8 @@ source-repository head
 library
   exposed-modules:
       API.Lib
+      API.Types.Deployment
+      API.Types.DeploymentInfo
       DMC.Lib
       DMS.Helm
       DMS.Lib
@@ -40,6 +42,7 @@ library
       aeson
     , base >=4.7 && <5
     , bytestring
+    , chronos
     , directory
     , fast-logger
     , http-client
@@ -69,6 +72,7 @@ executable dmc-exe
       aeson
     , base >=4.7 && <5
     , bytestring
+    , chronos
     , directory
     , dm
     , fast-logger
@@ -99,6 +103,7 @@ executable dms-exe
       aeson
     , base >=4.7 && <5
     , bytestring
+    , chronos
     , directory
     , dm
     , fast-logger
@@ -130,6 +135,7 @@ test-suite dm-test
       aeson
     , base >=4.7 && <5
     , bytestring
+    , chronos
     , directory
     , dm
     , fast-logger

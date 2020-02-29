@@ -1,5 +1,5 @@
-{ mkDerivation, aeson, base, bytestring, directory, fast-logger
-, http-client, mtl, network-uri, optparse-generic
+{ mkDerivation, aeson, base, bytestring, chronos, directory
+, fast-logger, http-client, mtl, network-uri, optparse-generic
 , postgresql-simple, resource-pool, servant, servant-client
 , servant-server, stdenv, temporary, text, transformers
 , typed-process, warp
@@ -11,19 +11,19 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    aeson base bytestring directory fast-logger http-client mtl
+    aeson base bytestring chronos directory fast-logger http-client mtl
     network-uri optparse-generic postgresql-simple resource-pool
     servant servant-client servant-server temporary text transformers
     typed-process warp
   ];
   executableHaskellDepends = [
-    aeson base bytestring directory fast-logger http-client mtl
+    aeson base bytestring chronos directory fast-logger http-client mtl
     network-uri optparse-generic postgresql-simple resource-pool
     servant servant-client servant-server temporary text transformers
     typed-process warp
   ];
   testHaskellDepends = [
-    aeson base bytestring directory fast-logger http-client mtl
+    aeson base bytestring chronos directory fast-logger http-client mtl
     network-uri optparse-generic postgresql-simple resource-pool
     servant servant-client servant-server temporary text transformers
     typed-process warp
