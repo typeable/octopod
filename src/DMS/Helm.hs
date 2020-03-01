@@ -37,7 +37,7 @@ createAppArgs name tag envs = [
   , "--set", "b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
   , "--set", "b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
   ]
-  ++ mconcat (fmap ((\a b -> [a, b]) "--set") envs)
+  ++ mconcat (fmap (\a -> ["--set", a]) envs)
   ++ [
     appChartName ++ ":" ++ tag
   ]

@@ -19,17 +19,31 @@ make build
 # Interact with DMC
 
 ```bash
-$ result/bin/dmc-exe
-Missing: (create | list | edit | destroy | update | info)
+$ result/bin/dmc-exe --help
+DMC
 
 Usage: dmc-exe (create | list | edit | destroy | update | info)
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  create
+  list
+  edit
+  destroy
+  update
+  info
 ```
 
 # Interact with DMS
 
 ```bash
-$ result/bin/dms-exe
-Missing: --port INT --db TEXT --db-pool-size INT
+$ result/bin/dms-exe --help
+DMS
 
 Usage: dms-exe --port INT --db TEXT --db-pool-size INT
+
+Available options:
+  -h,--help                Show this help text
 ```
