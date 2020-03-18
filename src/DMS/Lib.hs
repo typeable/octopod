@@ -240,7 +240,7 @@ info n = do
   liftIO $ do
     d <- getDeployment p
     dl <- getDeploymentLogs p
-    let di = DeploymentInfo { deployment = head d, logs = dl }
+    let di = DeploymentInfo { deployment = head d, logs = reverse dl }
     logInfo l $ "get deployment info: " <> (pack . show $ di)
     return [di]
 

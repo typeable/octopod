@@ -141,10 +141,10 @@ printInfo DeploymentInfo {deployment, logs} = do
   putStrLn "Current settings:"
   putStrLn $ "tag: " ++ unpack t
   putStrLn $ "envs: " ++ unpack (unwords e)
-  putStrLn $ "URL: " ++ unpack n ++ ".kube.thebestagent.pro"
+  putStrLn $ "URL: https://" ++ unpack n ++ ".kube.thebestagent.pro"
   putStrLn ""
   putStrLn "Last logs:"
-  mapM_ ppDeploymentLog $ reverse logs
+  mapM_ ppDeploymentLog logs
 
 ppDeploymentLog DeploymentLog {action, deploymentTag, deploymentEnvs, exitCode, createdAt}
   = putStrLn . unpack . unwords $ [ encode_YmdHMS SubsecondPrecisionAuto w3c (timeToDatetime . Time . fromIntegral $ createdAt * 10^9)
