@@ -9,11 +9,13 @@ module DMS.Lib
 
 import Prelude hiding (lines, unlines, unwords)
 
-import Control.Exception (throwIO, Exception)
+import Control.Exception (bracket, throwIO, Exception)
+import Control.Monad (unless)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader  (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Int (Int64)
+import Data.IORef
 import Data.Monoid ((<>))
 import Data.Text (lines, pack, unlines, unpack, unwords)
 import Data.Pool
@@ -27,6 +29,7 @@ import System.Process.Typed
 
 import API.Lib
 import DMS.Helm
+import DMS.Git
 
 data Args
   = Args { port :: Int, db :: ByteString, dbPoolSize :: Int }
@@ -39,9 +42,15 @@ type PgPool = Pool Connection
 type AppM = ReaderT State Handler
 
 data State
-  = State { pool :: PgPool, logger :: TimedFastLogger, helm :: FilePath, b2bHelm :: FilePath }
+  = State { pool :: PgPool
+          , logger :: TimedFastLogger
+          , helm :: FilePath
+          , b2bHelm :: FilePath
+          , git :: FilePath
+          , gitUpgradeSemaphore :: IORef Int
+          }
 
-newtype DeploymentException = DeploymentFailed Int
+data DeploymentException = DeploymentFailed Int | ThereIsAcriveDeployment
   deriving (Show)
 
 instance Exception DeploymentException
@@ -54,12 +63,15 @@ runDMS = do
   args <- getRecord "DMS"
   helm <- helmPath
   b2bHelm <- b2bHelmPath
-  case (helm, b2bHelm) of
-    (Just h, Just b) -> do
+  git <- gitPath
+  semaphore <- newIORef 0
+  case (helm, b2bHelm, git) of
+    (Just h, Just b, Just g) -> do
       pool <- initConnectionPool (db args) (dbPoolSize args)
-      run (port args) (app $ State pool logger h b)
-    (Nothing, _) -> die "helm not found"
-    (_, _) -> die "b2b-helm not found"
+      run (port args) (app $ State pool logger h b g semaphore)
+    (Nothing, _, _) -> die "helm not found"
+    (_, Nothing, _) -> die "b2b-helm not found"
+    (_, _, Nothing) -> die "git not found"
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool db = createPool (connectPostgreSQL db) close 1 30
@@ -90,10 +102,12 @@ list = do
 
 create :: Deployment -> AppM Text
 create d = do
-  State{pool = p, logger = l, b2bHelm = b} <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s } <- ask
   let ia = infraArgs d
       aa = appArgs d
-  liftIO $ do
+  liftIO $ withSemaphore s $ do
+    logInfo l "upgrading git repo..."
+    upgradeRepo g
     createDeployment p d
     logInfo l $ "call " <> unwords (pack <$> b : ia)
     ec1 <- createInfra ia b
@@ -115,10 +129,10 @@ create d = do
     appArgs Deployment { name = n, tag = t, envs = e } = createAppArgs (unpack n) (unpack t) (fmap unpack e)
 
     createInfra :: [String] -> String -> IO ExitCode
-    createInfra args b2bHelm = withProcessWait (proc b2bHelm args) waitProcess
+    createInfra args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
 
     createApp :: [String] -> String -> IO ExitCode
-    createApp args b2bHelm = withProcessWait (proc b2bHelm args) waitProcess
+    createApp args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
 
 get :: Text -> AppM [Deployment]
 get n = do
@@ -135,13 +149,15 @@ get n = do
 
 edit :: Text -> Deployment -> AppM Text
 edit n d@Deployment { envs =  e } = do
-  State{pool = p, logger = l, b2bHelm = b} <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s } <- ask
   t <- liftIO $ getTag p
   case t of
     t : _ -> do
       let d' = d { name = n, tag = t }
           aa = appArgs d'
-      liftIO $ do
+      liftIO $ withSemaphore s $ do
+        logInfo l "upgrading git repo..."
+        upgradeRepo g
         editDeployment p
         logInfo l $ "call " <> unwords (pack <$> b : aa)
         ec <- editApp aa b
@@ -162,13 +178,13 @@ edit n d@Deployment { envs =  e } = do
       execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unlines e, n)
 
     editApp :: [String] -> String -> IO ExitCode
-    editApp args b2bHelm = liftIO . withProcessWait (proc b2bHelm args) $ waitProcess
+    editApp args b2bHelm = liftIO . withProcessWait (withRepoPath $ proc b2bHelm args) $ waitProcess
 
     appArgs Deployment { name = n, tag = t, envs =  e } = editAppArgs (unpack n) (unpack t) (fmap unpack e)
 
 destroy :: Text -> AppM Text
 destroy n = do
-  State{pool = p, logger = l, helm = h} <- ask
+  State { pool = p, logger = l, helm = h } <- ask
   let ia = infraArgs n
       aa = appArgs n
   liftIO $ do
@@ -196,20 +212,22 @@ destroy n = do
     appArgs = destroyAppArgs . unpack
 
     destroyApp :: [String] -> String -> IO ExitCode
-    destroyApp args helm = withProcessWait (proc helm args) waitProcess
+    destroyApp args helm = withProcessWait (withRepoPath $ proc helm args) waitProcess
 
     destroyInfra :: [String] -> String -> IO ExitCode
-    destroyInfra args helm = withProcessWait (proc helm args) waitProcess
+    destroyInfra args helm = withProcessWait (withRepoPath $ proc helm args) waitProcess
 
 update :: Text -> Deployment -> AppM Text
 update n d@Deployment { tag = t } = do
-  State{pool = p, logger = l, b2bHelm = b} <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s} <- ask
   e <- liftIO $ getEnvs p
   case e of
     e : _ -> do
       let d' = d { name = n, envs = lines e }
           aa = appArgs d'
-      liftIO $ do
+      liftIO $ withSemaphore s $ do
+        logInfo l "upgrading git repo..."
+        upgradeRepo g
         updateDeployment p
         logInfo l $ "call " <> unwords (pack <$> b : aa)
         ec <- updateApp aa b
@@ -230,13 +248,13 @@ update n d@Deployment { tag = t } = do
       execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)
 
     updateApp :: [String] -> String -> IO ExitCode
-    updateApp args b2bHelm = withProcessWait (proc b2bHelm args) waitProcess
+    updateApp args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
 
     appArgs Deployment { name = n, tag = t, envs = e } = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
 
 info :: Text -> AppM [DeploymentInfo]
 info n = do
-  State{pool = p, logger = l} <- ask
+  State { pool = p, logger = l } <- ask
   liftIO $ do
     d <- getDeployment p
     dl <- getDeploymentLogs p
@@ -263,7 +281,7 @@ info n = do
 
 ping :: AppM Text
 ping = do
-  State{pool = p} <- ask
+  State { pool = p } <- ask
   getSomething p
   return ""
 
@@ -281,6 +299,18 @@ waitProcess p = do
 handleExitCode :: ExitCode -> IO ()
 handleExitCode ExitSuccess = return ()
 handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
+
+withSemaphore :: IORef Int -> IO () -> IO ()
+withSemaphore semaphore action
+  = bracket (tryToAcquireSemaphore semaphore >>= \r -> unless r $ throwIO ThereIsAcriveDeployment)
+            (\_ -> releaseSemaphore semaphore)
+            (const action)
+
+tryToAcquireSemaphore :: IORef Int -> IO Bool
+tryToAcquireSemaphore s = atomicModifyIORef' s (\a -> (if a == 0 then 1 else a, a == 0))
+
+releaseSemaphore :: IORef Int -> IO ()
+releaseSemaphore s = modifyIORef' s pred
 
 createDeploymentLog :: PgPool -> Deployment -> Text -> ExitCode -> IO Int64
 createDeploymentLog pool Deployment {name = n, tag = t, envs = e} action exitCode
