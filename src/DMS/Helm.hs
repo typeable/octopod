@@ -36,6 +36,7 @@ createAppArgs name tag envs = [
   , "--set", "b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379"
   , "--set", "b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
   , "--set", "b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
+  , "--set", "global.staging_name=" ++ name
   ]
   ++ mconcat (fmap (\a -> ["--set", a]) envs)
   ++ [
@@ -49,6 +50,7 @@ createInfraArgs name = [
   , "--set", "b2b-kafka-int.zk=" ++ rn ++ "-zk-0." ++ rn ++ "-zk." ++ namespace ++ "/int"
   , "--set", "b2b-elasticsearch.cluster_hosts=" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace
   , "--set", "b2b-postgres.postgres_db=" ++ db
+  , "--set", "global.staging_name=" ++ name
   , infraChartName
   ]
   where rn = releaseName infraChartName name

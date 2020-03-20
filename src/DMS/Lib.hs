@@ -106,7 +106,7 @@ create d = do
   let ia = infraArgs d
       aa = appArgs d
   liftIO $ withSemaphore s $ do
-    logInfo l "upgrading git repo..."
+    logInfo l "upgrading git repo"
     upgradeRepo g
     createDeployment p d
     logInfo l $ "call " <> unwords (pack <$> b : ia)
@@ -156,7 +156,7 @@ edit n d@Deployment { envs =  e } = do
       let d' = d { name = n, tag = t }
           aa = appArgs d'
       liftIO $ withSemaphore s $ do
-        logInfo l "upgrading git repo..."
+        logInfo l "upgrading git repo"
         upgradeRepo g
         editDeployment p
         logInfo l $ "call " <> unwords (pack <$> b : aa)
@@ -226,7 +226,7 @@ update n d@Deployment { tag = t } = do
       let d' = d { name = n, envs = lines e }
           aa = appArgs d'
       liftIO $ withSemaphore s $ do
-        logInfo l "upgrading git repo..."
+        logInfo l "upgrading git repo"
         upgradeRepo g
         updateDeployment p
         logInfo l $ "call " <> unwords (pack <$> b : aa)
@@ -290,7 +290,7 @@ ping = do
     getSomething p = fmap (fmap fromOnly) . liftIO $
       withResource p $ \conn -> query_ conn "SELECT id FROM deployments WHERE id = 0"
 
-waitProcess :: (Show stdout, Show stderr) => Process stdin stdout stderr -> IO ExitCode
+waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do
   print . getStdout $ p
   print . getStderr $ p
