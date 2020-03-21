@@ -11,3 +11,9 @@ build-docker: update-default-nix
 
 update-default-nix:
 	nix-shell --pure -p cabal2nix --run "cabal2nix ." > default.nix
+
+shell: update-default-nix
+	nix-shell
+
+ghcid:
+	nix-shell --run 'ghcid -c "cabal new-repl"'
