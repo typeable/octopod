@@ -46,6 +46,7 @@ library
     , chronos
     , directory
     , fast-logger
+    , filepath
     , http-client
     , mtl
     , network-uri
@@ -77,6 +78,7 @@ executable dmc-exe
     , directory
     , dm
     , fast-logger
+    , filepath
     , http-client
     , mtl
     , network-uri
@@ -140,6 +142,7 @@ test-suite dm-test
     , directory
     , dm
     , fast-logger
+    , filepath
     , http-client
     , mtl
     , network-uri

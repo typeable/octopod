@@ -9,13 +9,11 @@ module DMS.Lib
 
 import Prelude hiding (lines, unlines, unwords)
 
-import Control.Exception (bracket, throwIO, Exception)
-import Control.Monad (unless)
+import Control.Exception (throwIO, Exception)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader  (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Int (Int64)
-import Data.IORef
 import Data.Monoid ((<>))
 import Data.Text (lines, pack, unlines, unpack, unwords)
 import Data.Pool
@@ -24,8 +22,10 @@ import Options.Generic
 import Network.Wai.Handler.Warp
 import Servant
 import System.Exit
+import System.FilePath.Posix
 import System.Log.FastLogger
 import System.Process.Typed
+import System.IO.Temp
 
 import API.Lib
 import DMS.Helm
@@ -47,10 +47,9 @@ data State
           , helm :: FilePath
           , b2bHelm :: FilePath
           , git :: FilePath
-          , gitUpgradeSemaphore :: IORef Int
           }
 
-data DeploymentException = DeploymentFailed Int | ThereIsAcriveDeployment
+newtype DeploymentException = DeploymentFailed Int
   deriving (Show)
 
 instance Exception DeploymentException
@@ -64,11 +63,10 @@ runDMS = do
   helm <- helmPath
   b2bHelm <- b2bHelmPath
   git <- gitPath
-  semaphore <- newIORef 0
   case (helm, b2bHelm, git) of
     (Just h, Just b, Just g) -> do
       pool <- initConnectionPool (db args) (dbPoolSize args)
-      run (port args) (app $ State pool logger h b g semaphore)
+      run (port args) (app $ State pool logger h b g)
     (Nothing, _, _) -> die "helm not found"
     (_, Nothing, _) -> die "b2b-helm not found"
     (_, _, Nothing) -> die "git not found"
@@ -102,17 +100,19 @@ list = do
 
 create :: Deployment -> AppM Text
 create d = do
-  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s } <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g } <- ask
   let ia = infraArgs d
       aa = appArgs d
-  liftIO $ withSemaphore s $ do
-    logInfo l "upgrading git repo"
-    upgradeRepo g
+  liftIO $ withTempDirectory "/tmp" "dms" $ \r -> do
+    logInfo l $ "clone git repo to " <> pack r
+    cloneRepo g r
+    copyB2BHelm b r
+    let b' = r </> takeFileName b
     createDeployment p d
-    logInfo l $ "call " <> unwords (pack <$> b : ia)
-    ec1 <- createInfra ia b
-    logInfo l $ "call " <> unwords (pack <$> b : aa)
-    ec2 <- createApp aa b
+    logInfo l $ "call " <> unwords (pack <$> b' : ia)
+    ec1 <- createInfra ia b' r
+    logInfo l $ "call " <> unwords (pack <$> b' : aa)
+    ec2 <- createApp aa b' r
     logInfo l $ "deployment created, deployment: " <> (pack . show $ d)
     let ec = max ec1 ec2
     createDeploymentLog p d "create" ec
@@ -128,11 +128,11 @@ create d = do
 
     appArgs Deployment { name = n, tag = t, envs = e } = createAppArgs (unpack n) (unpack t) (fmap unpack e)
 
-    createInfra :: [String] -> String -> IO ExitCode
-    createInfra args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
+    createInfra :: [String] -> String -> FilePath -> IO ExitCode
+    createInfra args b2bHelm repoPath = withProcessWait (setWorkingDir repoPath $ proc b2bHelm args) waitProcess
 
-    createApp :: [String] -> String -> IO ExitCode
-    createApp args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
+    createApp :: [String] -> String -> FilePath -> IO ExitCode
+    createApp args b2bHelm repoPath = withProcessWait (setWorkingDir repoPath $ proc b2bHelm args) waitProcess
 
 get :: Text -> AppM [Deployment]
 get n = do
@@ -149,18 +149,20 @@ get n = do
 
 edit :: Text -> Deployment -> AppM Text
 edit n d@Deployment { envs =  e } = do
-  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s } <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g } <- ask
   t <- liftIO $ getTag p
   case t of
     t : _ -> do
       let d' = d { name = n, tag = t }
           aa = appArgs d'
-      liftIO $ withSemaphore s $ do
-        logInfo l "upgrading git repo"
-        upgradeRepo g
+      liftIO $ withTempDirectory "/tmp" "dms" $ \r -> do
+        logInfo l $ "clone git repo to " <> pack r
+        cloneRepo g r
+        copyB2BHelm b r
+        let b' = r </> takeFileName b
         editDeployment p
-        logInfo l $ "call " <> unwords (pack <$> b : aa)
-        ec <- editApp aa b
+        logInfo l $ "call " <> unwords (pack <$> b' : aa)
+        ec <- editApp aa b' r
         logInfo l $ "deployment edited, name: " <> n <> ", envs: " <> unwords e
         createDeploymentLog p d' "edit" ec
         handleExitCode ec
@@ -177,8 +179,8 @@ edit n d@Deployment { envs =  e } = do
     editDeployment p = withResource p $ \conn ->
       execute conn "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?" (unlines e, n)
 
-    editApp :: [String] -> String -> IO ExitCode
-    editApp args b2bHelm = liftIO . withProcessWait (withRepoPath $ proc b2bHelm args) $ waitProcess
+    editApp :: [String] -> String -> FilePath -> IO ExitCode
+    editApp args b2bHelm repoPath = liftIO . withProcessWait (setWorkingDir repoPath $ proc b2bHelm args) $ waitProcess
 
     appArgs Deployment { name = n, tag = t, envs =  e } = editAppArgs (unpack n) (unpack t) (fmap unpack e)
 
@@ -212,25 +214,27 @@ destroy n = do
     appArgs = destroyAppArgs . unpack
 
     destroyApp :: [String] -> String -> IO ExitCode
-    destroyApp args helm = withProcessWait (withRepoPath $ proc helm args) waitProcess
+    destroyApp args helm = withProcessWait (proc helm args) waitProcess
 
     destroyInfra :: [String] -> String -> IO ExitCode
-    destroyInfra args helm = withProcessWait (withRepoPath $ proc helm args) waitProcess
+    destroyInfra args helm = withProcessWait (proc helm args) waitProcess
 
 update :: Text -> Deployment -> AppM Text
 update n d@Deployment { tag = t } = do
-  State { pool = p, logger = l, b2bHelm = b, git = g, gitUpgradeSemaphore = s} <- ask
+  State { pool = p, logger = l, b2bHelm = b, git = g } <- ask
   e <- liftIO $ getEnvs p
   case e of
     e : _ -> do
       let d' = d { name = n, envs = lines e }
           aa = appArgs d'
-      liftIO $ withSemaphore s $ do
-        logInfo l "upgrading git repo"
-        upgradeRepo g
+      liftIO $ withTempDirectory "/tmp" "dms" $ \r -> do
+        logInfo l $ "clone git repo to " <> pack r
+        cloneRepo g r
+        copyB2BHelm b r
+        let b' = r </> takeFileName b
         updateDeployment p
-        logInfo l $ "call " <> unwords (pack <$> b : aa)
-        ec <- updateApp aa b
+        logInfo l $ "call " <> unwords (pack <$> b' : aa)
+        ec <- updateApp aa b' r
         logInfo l $ "deployment updated, name: " <> n <> ", tag: " <> t
         createDeploymentLog p d' "update" ec
         handleExitCode ec
@@ -247,8 +251,8 @@ update n d@Deployment { tag = t } = do
     updateDeployment p = withResource p $ \conn ->
       execute conn "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?" (t, n)
 
-    updateApp :: [String] -> String -> IO ExitCode
-    updateApp args b2bHelm = withProcessWait (withRepoPath $ proc b2bHelm args) waitProcess
+    updateApp :: [String] -> String -> FilePath -> IO ExitCode
+    updateApp args b2bHelm repoPath = withProcessWait (setWorkingDir repoPath $ proc b2bHelm args) waitProcess
 
     appArgs Deployment { name = n, tag = t, envs = e } = updateAppArgs (unpack n) (unpack t) (fmap unpack e)
 
@@ -290,6 +294,8 @@ ping = do
     getSomething p = fmap (fmap fromOnly) . liftIO $
       withResource p $ \conn -> query_ conn "SELECT id FROM deployments WHERE id = 0"
 
+copyB2BHelm b2bHelm repoPath = withProcessWait (proc "cp" [b2bHelm, repoPath]) waitProcess
+
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do
   print . getStdout $ p
@@ -299,18 +305,6 @@ waitProcess p = do
 handleExitCode :: ExitCode -> IO ()
 handleExitCode ExitSuccess = return ()
 handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
-
-withSemaphore :: IORef Int -> IO () -> IO ()
-withSemaphore semaphore action
-  = bracket (tryToAcquireSemaphore semaphore >>= \r -> unless r $ throwIO ThereIsAcriveDeployment)
-            (\_ -> releaseSemaphore semaphore)
-            (const action)
-
-tryToAcquireSemaphore :: IORef Int -> IO Bool
-tryToAcquireSemaphore s = atomicModifyIORef' s (\a -> (if a == 0 then 1 else a, a == 0))
-
-releaseSemaphore :: IORef Int -> IO ()
-releaseSemaphore s = modifyIORef' s pred
 
 createDeploymentLog :: PgPool -> Deployment -> Text -> ExitCode -> IO Int64
 createDeploymentLog pool Deployment {name = n, tag = t, envs = e} action exitCode

@@ -2,8 +2,7 @@
 
 module DMS.Git
   ( gitPath
-  , upgradeRepo
-  , withRepoPath
+  , cloneRepo
   ) where
 
 import System.Directory (findExecutable)
@@ -13,13 +12,9 @@ import System.Process.Typed
 gitPath :: IO (Maybe FilePath)
 gitPath = findExecutable "git"
 
-upgradeRepo :: FilePath -> IO ExitCode
-upgradeRepo git = withProcessWait (withRepoPath $ proc git ["pull", "origin", "master"]) waitProcess
-
-withRepoPath :: ProcessConfig i o e -> ProcessConfig i o e
-withRepoPath = setWorkingDir repoPath
-
-repoPath = "/b2b-helm"
+cloneRepo :: FilePath -> FilePath -> IO ExitCode
+cloneRepo git repoPath = withProcessWait (setWorkingDir repoPath $ proc git args) waitProcess
+  where args = ["clone", "--recursive", "--depth=1", "git@github.com:Aviora/b2b-helm.git", "."]
 
 waitProcess :: (Show stdout, Show stderr) => Process stdin stdout stderr -> IO ExitCode
 waitProcess p = do
