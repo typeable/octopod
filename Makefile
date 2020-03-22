@@ -1,19 +1,19 @@
 .PHONY: build build-docker repl
 
 build: update-default-nix
-	nix-build release.nix
+	nix build nixpkgs.haskellPackages.dm -I nixpkgs=nix
 
 repl: update-default-nix
-	nix-shell --pure shell.nix --run "cabal repl lib:dm"
+	nix-shell --pure shell.nix --run "cabal repl lib:dm" -I nixpkgs=nix
 
 build-docker: update-default-nix
-	nix-build --attr docker-container-slim docker.nix
+	nix build nixpkgs.dms-container-slim -I nixpkgs=nix
 
 update-default-nix:
-	nix-shell --pure -p cabal2nix --run "cabal2nix ." > default.nix
+	nix-shell --pure -p cabal2nix --run "cabal2nix ." -I nixpkgs=nix > default.nix
 
 shell: update-default-nix
-	nix-shell
+	nix-shell -I nixpkgs=nix
 
-ghcid:
-	nix-shell --run 'ghcid -c "cabal new-repl"'
+ghcid: update-default-nix
+	nix-shell --run 'ghcid -c "cabal new-repl"' -I nixpkgs=nix

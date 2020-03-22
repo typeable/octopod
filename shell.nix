@@ -1,13 +1,12 @@
-{ nixpkgs ? import <nixpkgs> {} }:
+{ nixpkgs ? import ./nix/. {} }:
 let
   inherit (nixpkgs) pkgs;
   inherit (pkgs) haskellPackages;
-
-  project = import ./release.nix;
-in
-pkgs.stdenv.mkDerivation {
+in with pkgs;
+stdenv.mkDerivation {
   name = "shell";
-  buildInputs = project.env.nativeBuildInputs ++ [
+  buildInputs = haskellPackages.dm.env.nativeBuildInputs ++ [
+    haskellPackages.ghcid
     haskellPackages.cabal-install
   ];
 }

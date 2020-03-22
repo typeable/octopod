@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module DMS.Git
   ( gitPath
   , cloneRepo
