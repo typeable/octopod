@@ -1,5 +1,5 @@
 .stack-work/
 package.yaml
-nix/dm.nix
+default.nix
 result
 *~
