@@ -61,13 +61,19 @@ with
             pkgs.coreutils
             pkgs.bash
           ];
-          config.Cmd = [ "${dm}/bin/dms-exe" ];
+          config = {
+            Cmd = [ "${dm}/bin/dms-exe" ];
+            Volumes = {
+              "/migrations" = {};
+            };
           extraCommands = ''
             cp -av ${dm}/migrations/deploy $out/migrations/
             cp -av ${dm}/migrations/revert $out/migrations/
             cp -av ${dm}/migrations/verify $out/migrations/
             cp -av ${dm}/migrations/sqitch.plan $out/migrations/
           '';
+          };
+
         };
 
         niv = import sources.niv {};
