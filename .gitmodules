@@ -1,0 +1,4 @@
+[submodule "b2b-helm"]
+	path = b2b-helm
+	url = git@github.com:Aviora/b2b-helm.git
+	branch = master
