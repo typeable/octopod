@@ -1,14 +1,12 @@
 module DMS (runDMS) where
 
-import Prelude hiding (lines, unlines, unwords, log)
 
-import Control.Exception (bracket, throwIO, Exception)
-import Control.Monad (unless, void)
+import Control.Exception (throwIO, Exception)
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Coerce
-import Data.IORef
 import Data.Int (Int64)
 import Data.Monoid ((<>))
 import Data.Pool
@@ -17,8 +15,11 @@ import Data.Traversable
 import Database.PostgreSQL.Simple
 import Network.Wai.Handler.Warp
 import Options.Generic
+import Prelude hiding (lines, unlines, unwords, log)
 import Servant
 import System.Exit
+import System.FilePath.Posix
+import System.IO.Temp
 import System.Log.FastLogger
 import System.Process.Typed
 
@@ -39,12 +40,11 @@ type PgPool = Pool Connection
 type AppM = ReaderT AppState Handler
 
 data AppState = AppState
-  { pool                :: PgPool
-  , logger              :: TimedFastLogger
-  , helm                :: FilePath
-  , b2bHelm             :: FilePath
-  , git                 :: FilePath
-  , gitUpgradeSemaphore :: IORef Int
+  { pool    :: PgPool
+  , logger  :: TimedFastLogger
+  , helm    :: FilePath
+  , b2bHelm :: FilePath
+  , git     :: FilePath
   }
 
 data DeploymentException
@@ -63,11 +63,10 @@ runDMS = do
   helmBin <- helmPath
   b2bHelmBin <- b2bHelmPath
   gitBin <- gitPath
-  semaphore <- newIORef 0
   case (helmBin, b2bHelmBin, gitBin) of
     (Just h, Just b, Just g) -> do
       pgPool <- initConnectionPool (db args) (dbPoolSize args)
-      run (port args) (app $ AppState pgPool logger' h b g semaphore)
+      run (port args) (app $ AppState pgPool logger' h b g)
     (Nothing, _, _) -> die "helm not found"
     (_, Nothing, _) -> die "b2b-helm not found"
     (_, _, Nothing) -> die "git not found"
@@ -106,24 +105,10 @@ createH dep = do
     log :: Text -> IO ()
     log          = logInfo (logger st)
     b2bHelmBin   = b2bHelm st
+    gitBin       = git st
     pgPool       = pool st
     infraCmdArgs = createInfraArgs $ name dep
     appCmdArgs   = appArgs dep
-  liftIO $ withSemaphore (gitUpgradeSemaphore st) $ do
-    log "upgrading git repo"
-    void $ upgradeRepo $ git st
-    void $ createDeployment pgPool dep
-    log $ "call " <> unwords (pack b2bHelmBin : infraCmdArgs)
-    ec1 <- createInfra infraCmdArgs b2bHelmBin
-    log $ "call " <> mconcat (pack b2bHelmBin : appCmdArgs)
-    ec2 <- createApp appCmdArgs b2bHelmBin
-    log $ "deployment created, deployment: " <> (pack . show $ dep)
-    let ec = max ec1 ec2
-    createDeploymentLog pgPool dep "create" ec
-    handleExitCode ec
-  pure NoContent
-
-  where
     createDeployment :: PgPool -> Deployment -> IO Int64
     createDeployment p Deployment { name = n, tag = t, envs = e } =
       withResource p $ \conn -> execute
@@ -131,17 +116,44 @@ createH dep = do
         "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
         (n, t, formatEnvPairs e)
+  liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
+    log $ "clone git repo to " <> pack tempDir
+    void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
+    let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
+    void $ createDeployment pgPool dep
+    log $ "call " <> unwords (pack b2bHelmSandboxedBin : infraCmdArgs)
+    ec1 <- createInfra infraCmdArgs b2bHelmSandboxedBin tempDir
+    log $ "call " <> mconcat (pack b2bHelmSandboxedBin : appCmdArgs)
+    ec2 <- createApp appCmdArgs b2bHelmSandboxedBin tempDir
+    log $ "deployment created, deployment: " <> (pack . show $ dep)
+    let ec = max ec1 ec2
+    createDeploymentLog pgPool dep "create" ec
+    handleExitCode ec
+  pure NoContent
+
+copyB2BHelm :: FilePath -> FilePath -> IO ExitCode
+copyB2BHelm b2bHelmBin repoPath =
+  withProcessWait (proc "cp" [b2bHelmBin, repoPath]) waitProcess
 
 appArgs :: Deployment -> [CommandArg]
 appArgs (Deployment n t e) = composeAppArgs n t e
 
-createInfra :: [CommandArg] -> FilePath -> IO ExitCode
-createInfra args b2bHelmBin =
-  withProcessWait (withRepoPath $ proc b2bHelmBin $ unpack <$> args) waitProcess
+createInfra
+  :: [CommandArg]
+  -> FilePath -- ^ b2b helm path
+  -> FilePath -- ^ Repo path
+  -> IO ExitCode
+createInfra args b2bHelmBin repoPath =
+  withProcessWait (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args) waitProcess
 
-createApp :: [CommandArg] -> FilePath -> IO ExitCode
-createApp args b2bHelmBin =
-  withProcessWait (withRepoPath $ proc b2bHelmBin $ unpack <$> args) waitProcess
+createApp
+  :: [CommandArg]
+  -> FilePath     -- ^ b2b helm path
+  -> FilePath     -- ^ repo path
+  -> IO ExitCode
+createApp args b2bHelmBin repoPath = withProcessWait
+  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args)
+  waitProcess
 
 getH :: DeploymentName -> AppM Deployment
 getH dName = do
@@ -189,15 +201,17 @@ editH n e = do
     log          = logInfo (logger st)
     b2bHelmBin  = b2bHelm st
     pgPool       = pool st
+    gitBin       = git st
   liftIO $ getTag pgPool >>= \case
     t : _ -> do
-      liftIO $ withSemaphore (gitUpgradeSemaphore st) $ do
-        log "upgrading git repo..."
-        void $ upgradeRepo $ git st
+      liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
+        log $ "clone git repo to " <> pack tempDir
+        void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
+        let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
         void $ updateEditDeployment pgPool
         let dep = Deployment n t e
-        log $ "call " <> unwords (pack b2bHelmBin : appArgs dep)
-        ec <- editApp (appArgs dep) (b2bHelm st)
+        log $ "call " <> unwords (pack b2bHelmSandboxedBin : appArgs dep)
+        ec <- editApp (appArgs dep) b2bHelmSandboxedBin tempDir
         log
           $ "deployment edited, name: " <> coerce n
           <> ", envs: " <> formatEnvPairs e
@@ -217,9 +231,13 @@ editH n e = do
       -- FIXME: make EnvPairs a newtype and give it ToField instance
       (formatEnvPairs e, n)
 
-editApp :: [CommandArg] -> FilePath -> IO ExitCode
-editApp args b2bHelmBin = liftIO . withProcessWait
-  (withRepoPath $ proc b2bHelmBin $ unpack <$> args) $ waitProcess
+editApp
+  :: [CommandArg]
+  -> FilePath      -- ^ b2b helm path
+  -> FilePath      -- ^ repo path
+  -> IO ExitCode
+editApp args b2bHelmBin repoPath = liftIO . withProcessWait
+  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args) $ waitProcess
 
 destroyH :: DeploymentName -> AppM NoContent
 destroyH dName = do
@@ -243,11 +261,11 @@ destroyH dName = do
 
 destroyApp :: [CommandArg] -> FilePath -> IO ExitCode
 destroyApp args helmBin =
-  withProcessWait (withRepoPath $ proc helmBin $ unpack <$> args) waitProcess
+  withProcessWait (proc helmBin $ unpack <$> args) waitProcess
 
 destroyInfra :: [CommandArg] -> FilePath -> IO ExitCode
 destroyInfra args helmBin =
-  withProcessWait (withRepoPath $ proc helmBin $ unpack <$> args) waitProcess
+  withProcessWait (proc helmBin $ unpack <$> args) waitProcess
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
@@ -259,6 +277,11 @@ deleteDeploymentLogs p n = withResource p $ \conn -> execute
 deleteDeployment :: PgPool -> DeploymentName -> IO Int64
 deleteDeployment p n = withResource p $ \conn ->
   execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
+
+updateApp :: [CommandArg] -> FilePath -> FilePath -> IO ExitCode
+updateApp cmdArgs b2bHelmBin repoPath = withProcessWait
+  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> cmdArgs)
+  waitProcess
 
 updateH :: DeploymentName -> DeploymentTag -> AppM NoContent
 updateH dName dTag = do
@@ -272,18 +295,16 @@ updateH dName dTag = do
       let
         b2bHelmBin = b2bHelm st
         log        = logInfo (logger st)
-        args    = composeAppArgs dName dTag envPairs
-      liftIO $ withSemaphore (gitUpgradeSemaphore st) $ do
-        log "upgrading git repo..."
-        void $ upgradeRepo (git st)
+        args       = composeAppArgs dName dTag envPairs
+        gitBin     = git st
+      liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
+        log $ "clone git repo to " <> pack tempDir
+        void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
+        let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
         void $ updateDeploymentNameAndTag pgPool dName dTag
-        log $ "call " <> unwords (pack b2bHelmBin : args)
+        log $ "call " <> unwords (pack b2bHelmSandboxedBin : args)
         let
-          updateApp :: [CommandArg] -> IO ExitCode
-          updateApp args' = withProcessWait
-            (withRepoPath $ proc b2bHelmBin $ unpack <$> args')
-            waitProcess
-        ec <- updateApp args
+        ec <- updateApp args b2bHelmSandboxedBin tempDir
         log $ "deployment updated, name: "
           <> coerce dName <> ", tag: " <> coerce dTag
         createDeploymentLog pgPool (Deployment dName dTag envPairs) "update" ec
@@ -337,19 +358,6 @@ waitProcess p = do
 handleExitCode :: ExitCode -> IO ()
 handleExitCode ExitSuccess = return ()
 handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
-
-withSemaphore :: IORef Int -> IO () -> IO ()
-withSemaphore semaphore act = bracket
-  (tryToAcquireSemaphore semaphore >>= \r ->
-    unless r $ throwIO ThereIsAcriveDeployment)
-  (\_ -> releaseSemaphore semaphore)
-  (const act)
-
-tryToAcquireSemaphore :: IORef Int -> IO Bool
-tryToAcquireSemaphore s = atomicModifyIORef' s (\a -> (if a == 0 then 1 else a, a == 0))
-
-releaseSemaphore :: IORef Int -> IO ()
-releaseSemaphore s = modifyIORef' s pred
 
 createDeploymentLog :: PgPool -> Deployment -> Action -> ExitCode -> IO ()
 createDeploymentLog pgPool (Deployment n t e) a ec = do

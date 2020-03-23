@@ -2,48 +2,6 @@
 with
   { overlay = _: pkgs:
       rec {
-        dm = haskellPackages.dm;
-
-        dms-container = pkgs.dockerTools.buildImage {
-            name = "dms-container";
-            config.Cmd = [ "${dm}/bin/dms-exe" ];
-        };
-
-        dms-container-slim = pkgs.dockerTools.buildImage {
-            name = "dms-container-slim";
-            config.Cmd = [ "${dm}/bin/dms-exe" ];
-        };
-
-        niv = import sources.niv {};
-
-        haskellPackages = pkgs.haskellPackages.override {
-          overrides = hself: hsuper: {
-
-            deriving-aeson = hsuper.callPackage(
-              pkgs.stdenv.mkDerivation ({
-                name = "deriving-aeson";
-                buildCommand = ''
-                  ${hsuper.cabal2nix}/bin/cabal2nix file://${sources.deriving-aeson} > $out
-                '';
-              })) {};
-
-            dm = hsuper.callPackage ../default.nix { };
-
-            dm-static = pkgs.haskell.lib.justStaticExecutables(
-              hsuper.callPackage ../default.nix {}
-            );
-          };
-        };
-      };
-  };
-import sources.nixpkgs                  # and use them again!
-  { overlays = [ overlay ] ; config = {}; }
-||||||| constructed merge base
-=======
-{ sources ? import ./sources.nix }:     # import the sources
-with
-  { overlay = _: pkgs:
-      rec {
         dm = haskellPackages.dm-static.overrideAttrs(oldAttrs: {
           installPhase = oldAttrs.installPhase + ''
             mkdir $out/migrations/
