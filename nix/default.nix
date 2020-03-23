@@ -1,6 +1,6 @@
 { sources ? import ./sources.nix }:     # import the sources
 with
-  { overlay = _: pkgs:
+  { overlay = _: pkgs: with pkgs;
       rec {
         dm = haskellPackages.dm-static.overrideAttrs(oldAttrs: {
           installPhase = oldAttrs.installPhase + ''
@@ -12,18 +12,21 @@ with
           '';
         });
 
-        dms-container = pkgs.dockerTools.buildImage {
+        dms-container = dockerTools.buildImage {
           name = "dms-container-slim";
           contents = [
             dm
+            git
             b2b-helm-tool
-            pkgs.kubernetes-helm2
-            pkgs.coreutils
-            pkgs.bash
+            kubernetes-helm2
+            coreutils
+            bash
           ];
           config = {
-            Cmd = [
+            Entrypoint = [
               "${dm}/bin/dms-exe"
+            ];
+            Cmd = [
               "--port"
               "4000"
               "--db"
@@ -46,7 +49,7 @@ with
 
         niv = import sources.niv {};
 
-        b2b-helm-tool = pkgs.buildGoPackage rec {
+        b2b-helm-tool = buildGoPackage rec {
           version = "0.1";
           pname = "b2b-helm-tool";
           goPackagePath = "github.com/aviora/b2b-helm";
@@ -58,7 +61,7 @@ with
           overrides = hself: hsuper: {
 
             deriving-aeson = hsuper.callPackage(
-              pkgs.stdenv.mkDerivation ({
+              stdenv.mkDerivation ({
                 name = "deriving-aeson";
                 buildCommand = ''
                   ${hsuper.cabal2nix}/bin/cabal2nix file://${sources.deriving-aeson} > $out
@@ -68,7 +71,7 @@ with
             dm = hsuper.callPackage ../default.nix {
             };
 
-            dm-static = pkgs.haskell.lib.justStaticExecutables(
+            dm-static = haskell.lib.justStaticExecutables(
               hsuper.callPackage ../default.nix {}
             );
           };

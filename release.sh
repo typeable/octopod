@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 export tag=$(git rev-parse HEAD)
 $(aws ecr get-login --no-include-email --region us-east-1)
 make build-docker
