@@ -16,6 +16,7 @@ with
           name = "dms-container-slim";
           contents = [
             dm
+            b2b-helm-tool
             pkgs.kubernetes-helm2
             pkgs.coreutils
             pkgs.bash
@@ -36,6 +37,14 @@ with
         };
 
         niv = import sources.niv {};
+
+        b2b-helm-tool = pkgs.buildGoPackage rec {
+          version = "0.1";
+          pname = "b2b-helm-tool";
+          goPackagePath = "github.com/aviora/b2b-helm";
+          src = ./b2b-helm/tool;
+          goDeps = ./b2b-helm/tool/deps.nix;
+        };
 
         haskellPackages = pkgs.haskellPackages.override {
           overrides = hself: hsuper: {
