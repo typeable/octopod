@@ -16,6 +16,7 @@ with
           name = "dms-container-slim";
           contents = [
             dm
+            pkgs.kubernetes-helm2
             pkgs.coreutils
             pkgs.bash
           ];
