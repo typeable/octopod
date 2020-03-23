@@ -1,17 +1,24 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module DMS.Helm
   ( helmPath
   , b2bHelmPath
-  , createAppArgs
+  , composeAppArgs
   , createInfraArgs
-  , editAppArgs
-  , updateAppArgs
   , destroyAppArgs
   , destroyInfraArgs
+  , CommandArg
+  , ChartName(..)
   ) where
 
+import Data.Coerce
+import Data.String
+import Data.Text as T
 import System.Directory (findExecutable)
+
+import Types
+
+
+type CommandArg = Text
+newtype ChartName = ChartName Text deriving (IsString)
 
 helmPath :: IO (Maybe FilePath)
 helmPath = findExecutable "helm"
@@ -19,47 +26,64 @@ helmPath = findExecutable "helm"
 b2bHelmPath :: IO (Maybe FilePath)
 b2bHelmPath = findExecutable "b2b-helm"
 
+appChartName, infraChartName :: ChartName
 appChartName = "b2b-dm-staging"
 infraChartName = "b2b-infra-dm-staging"
+
+namespace :: Text
 namespace = "staging"
 
-releaseName chartName name = chartName ++ "-" ++ name
+taggedRelease :: ChartName -> DeploymentTag -> Text
+taggedRelease cn dt = coerce cn <> ":" <> coerce dt
 
-createAppArgs name tag envs = [
+releaseName :: ChartName -> DeploymentName -> Text
+releaseName chartName dName = coerce chartName <> "-" <> coerce dName
+
+composeAppArgs :: DeploymentName -> DeploymentTag -> EnvPairs -> [CommandArg]
+composeAppArgs dName dTag envPairs = [
     "-d", "deploy"
-  , "--release-name", releaseName appChartName name
-  , "--set", "b2b-app.email_domain=" ++ name ++ ".kube.thebestagent.pro"
-  , "--set", "b2b-app.domain=" ++ name ++ ".kube.thebestagent.pro"
-  , "--set", "b2b-app.connections.pg_instance=avia:avia@" ++ rn ++ "-postgres-0." ++ rn ++ "-postgres." ++ namespace ++ ":5432"
-  , "--set", "b2b-app.connections.elastic=http://" ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200"
-  , "--set", "b2b-app.connections.elasic_hosts=http://" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace ++ ":9200"
-  , "--set", "b2b-app.connections.redis=" ++ rn ++ "-redis-0." ++ rn ++ "-redis." ++ namespace ++ ":6379"
-  , "--set", "b2b-app.connections.kafka_ext=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
-  , "--set", "b2b-app.connections.kafka_int=" ++ rn ++ "-kafka-int-0." ++ rn ++ "-kafka-int:9092"
-  , "--set", "global.staging_name=" ++ name
+  , "--release-name", releaseName appChartName dName
+  , "--set", "b2b-app.email_domain=" <> coerce dName <> ".kube.thebestagent.pro"
+  , "--set", "b2b-app.domain=" <> coerce dName <> ".kube.thebestagent.pro"
+  , "--set", "b2b-app.connections.pg_instance=avia:avia@"
+    <> rn <> "-postgres-0." <> rn <> "-postgres." <> namespace <> ":5432"
+  , "--set", "b2b-app.connections.elastic=http://"
+    <> rn <> "-elasticsearch." <> namespace <> ":9200"
+  , "--set", "b2b-app.connections.elasic_hosts=http://"
+    <> rn <> "-elasticsearch-0." <> rn <> "-elasticsearch."
+    <> namespace <> ":9200"
+  , "--set", "b2b-app.connections.redis="
+    <> rn <> "-redis-0." <> rn <> "-redis." <> namespace <> ":6379"
+  , "--set", "b2b-app.connections.kafka_ext="
+    <> rn <> "-kafka-int-0." <> rn <> "-kafka-int:9092"
+  , "--set", "b2b-app.connections.kafka_int="
+    <> rn <> "-kafka-int-0." <> rn <> "-kafka-int:9092"
+  , "--set", "global.staging_name=" <> coerce dName
   ]
-  ++ mconcat (fmap (\a -> ["--set", a]) envs)
-  ++ [
-    appChartName ++ ":" ++ tag
-  ]
-  where rn = releaseName infraChartName name
+  ++ mconcat (fmap (\a -> ["--set", a]) $ concatPair <$> envPairs)
+  ++ [taggedRelease appChartName dTag]
+  where rn = releaseName infraChartName dName
 
-createInfraArgs name = [
+createInfraArgs :: DeploymentName -> [Text]
+createInfraArgs dName = [
     "-d", "deploy"
   , "--release-name", rn
-  , "--set", "b2b-kafka-int.zk=" ++ rn ++ "-zk-0." ++ rn ++ "-zk." ++ namespace ++ "/int"
-  , "--set", "b2b-elasticsearch.cluster_hosts=" ++ rn ++ "-elasticsearch-0." ++ rn ++ "-elasticsearch." ++ namespace
-  , "--set", "b2b-postgres.postgres_db=" ++ db
-  , "--set", "global.staging_name=" ++ name
-  , infraChartName
+  , "--set", "b2b-kafka-int.zk=" <> rn <> "-zk-0."
+    <> rn <> "-zk." <> namespace <> "/int"
+  , "--set", "b2b-elasticsearch.cluster_hosts="
+    <> rn <> "-elasticsearch-0." <> rn <> "-elasticsearch." <> namespace
+  , "--set", "b2b-postgres.postgres_db=" <> db
+  , "--set", "global.staging_name=" <> coerce dName
+  , coerce infraChartName
   ]
-  where rn = releaseName infraChartName name
-        db = (\c -> if c == '-' then '_' else c) <$> releaseName appChartName name
+  where
+    rn = releaseName infraChartName dName
+    db = T.replace "-" "_" $ releaseName appChartName dName
 
-editAppArgs = createAppArgs
+composeDestroyArgs :: ChartName -> DeploymentName -> [CommandArg]
+composeDestroyArgs chartName dName =
+  ["delete", releaseName chartName dName, "--purge"]
 
-updateAppArgs = createAppArgs
-
-destroyAppArgs name = ["delete", releaseName appChartName name, "--purge"]
-
-destroyInfraArgs name = ["delete", releaseName infraChartName name, "--purge"]
+destroyAppArgs, destroyInfraArgs :: DeploymentName -> [CommandArg]
+destroyAppArgs = composeDestroyArgs appChartName
+destroyInfraArgs = composeDestroyArgs infraChartName

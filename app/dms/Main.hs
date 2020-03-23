@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import DMS
 
 main :: IO ()
 main = runDMS

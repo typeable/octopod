@@ -1,11 +1,4 @@
-cabal-version: 1.12
-
--- This file has been generated from package.yaml by hpack version 0.31.2.
---
--- see: https://github.com/sol/hpack
---
--- hash: af2336457e3fa8fe709928806e38347b41a2781ea75cedc4c7757454c8cab393
-
+cabal-version: 2.4
 name:           dm
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/dm#readme>
@@ -14,7 +7,7 @@ bug-reports:    https://github.com/https://github.com/Aviora/dm/issues
 author:         Andrei Orlov
 maintainer:     aaorlov1@gmail.com
 copyright:      2020 LLC Typeable
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -26,15 +19,28 @@ source-repository head
   location: https://github.com/https://github.com/Aviora/dm
 
 library
+  ghc-options:         -Wall
+                       -Werror
+  default-extensions:  BlockArguments
+                     , ConstraintKinds
+                     , DataKinds
+                     , DeriveFunctor
+                     , DeriveGeneric
+                     , DerivingVia
+                     , DuplicateRecordFields
+                     , GeneralizedNewtypeDeriving
+                     , LambdaCase
+                     , OverloadedStrings
+                     , ScopedTypeVariables
+                     , TypeApplications
+                     , TypeOperators
   exposed-modules:
-      API.Lib
-      API.Types.Deployment
-      API.Types.DeploymentInfo
-      DMC.Lib
+      API
+      DMC
+      DMS
       DMS.Helm
       DMS.Git
-      DMS.Lib
-      Lib
+      Types
   other-modules:
       Paths_dm
   hs-source-dirs:
@@ -44,10 +50,14 @@ library
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , deriving-aeson
     , directory
     , fast-logger
     , filepath
+    , generic-lens
+    , http-api-data
     , http-client
+    , lens
     , mtl
     , network-uri
     , optparse-generic
@@ -65,6 +75,8 @@ library
 
 executable dmc-exe
   main-is: Main.hs
+  ghc-options:         -Wall
+                       -Werror
   other-modules:
       Paths_dm
   hs-source-dirs:
@@ -97,6 +109,8 @@ executable dmc-exe
 
 executable dms-exe
   main-is: Main.hs
+  ghc-options:         -Wall
+                       -Werror
   other-modules:
       Paths_dm
   hs-source-dirs:
