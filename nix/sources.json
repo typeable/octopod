@@ -24,15 +24,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "nixos-19.09",
+        "branch": "separate-helm-2-and-3",
         "description": "A read-only mirror of NixOS/nixpkgs tracking the released channels. Send issues and PRs to",
         "homepage": "https://github.com/NixOS/nixpkgs",
-        "owner": "NixOS",
-        "repo": "nixpkgs-channels",
-        "rev": "ce9f1aaa39ee2a5b76a9c9580c859a74de65ead5",
-        "sha256": "1s2b9rvpyamiagvpl5cggdb2nmx4f7lpylipd397wz8f0wngygpi",
+        "owner": "dredozubov",
+        "repo": "nixpkgs",
+        "rev": "88651a34d1b3c4516f96f1f6e14be1f32d6b064d",
+        "sha256": "0ssk5xg0kknmavy79q3y79yz45578cgijxmy2irv2w6qd4sm5n05",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs-channels/archive/ce9f1aaa39ee2a5b76a9c9580c859a74de65ead5.tar.gz",
+        "url": "https://github.com/dredozubov/nixpkgs/archive/88651a34d1b3c4516f96f1f6e14be1f32d6b064d.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
