@@ -22,7 +22,15 @@ with
             pkgs.bash
           ];
           config = {
-            Cmd = [ "${dm}/bin/dms-exe" ];
+            Cmd = [
+              "${dm}/bin/dms-exe"
+              "--port"
+              "4000"
+              "--db"
+              "host='127.0.0.1' port=5432 user='dm' password='dm'"
+              "--db-pool-size"
+              "10"
+            ];
             Volumes = {
               "/migrations" = {};
             };
