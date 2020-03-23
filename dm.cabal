@@ -38,8 +38,8 @@ library
       API
       DMC
       DMS
-      DMS.Helm
       DMS.Git
+      DMS.Kubernetes
       Types
   other-modules:
       Paths_dm

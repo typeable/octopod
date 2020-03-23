@@ -1,10 +1,12 @@
-module DMS.Helm
+module DMS.Kubernetes
   ( helmPath
   , b2bHelmPath
+  , kubectlPath
   , composeAppArgs
   , createInfraArgs
   , destroyAppArgs
   , destroyInfraArgs
+  , deletePVCArgs
   , CommandArg
   , ChartName(..)
   ) where
@@ -25,6 +27,9 @@ helmPath = findExecutable "helm"
 
 b2bHelmPath :: IO (Maybe FilePath)
 b2bHelmPath = findExecutable "b2b-helm"
+
+kubectlPath :: IO (Maybe FilePath)
+kubectlPath = findExecutable "kubectl"
 
 appChartName, infraChartName :: ChartName
 appChartName = "b2b-dm-staging"
@@ -87,3 +92,13 @@ composeDestroyArgs chartName dName =
 destroyAppArgs, destroyInfraArgs :: DeploymentName -> [CommandArg]
 destroyAppArgs = composeDestroyArgs appChartName
 destroyInfraArgs = composeDestroyArgs infraChartName
+
+deletePVCArgs :: DeploymentName -> [CommandArg]
+deletePVCArgs dName = [
+      "delete"
+    , "pvc"
+    , "-n"
+    , namespace
+    , "-l"
+    , "staging=" <> coerce dName
+  ]

@@ -25,7 +25,7 @@ import System.Process.Typed
 
 import API
 import DMS.Git
-import DMS.Helm
+import DMS.Kubernetes
 import Types
 
 
@@ -45,6 +45,7 @@ data AppState = AppState
   , helm    :: FilePath
   , b2bHelm :: FilePath
   , git     :: FilePath
+  , kubectl :: FilePath
   }
 
 data DeploymentException
@@ -63,13 +64,15 @@ runDMS = do
   helmBin <- helmPath
   b2bHelmBin <- b2bHelmPath
   gitBin <- gitPath
-  case (helmBin, b2bHelmBin, gitBin) of
-    (Just h, Just b, Just g) -> do
+  kubectlBin <- kubectlPath
+  case (helmBin, b2bHelmBin, gitBin, kubectlBin) of
+    (Just h, Just b, Just g, Just k) -> do
       pgPool <- initConnectionPool (db args) (dbPoolSize args)
-      run (port args) (app $ AppState pgPool logger' h b g)
-    (Nothing, _, _) -> die "helm not found"
-    (_, Nothing, _) -> die "b2b-helm not found"
-    (_, _, Nothing) -> die "git not found"
+      run (port args) (app $ AppState pgPool logger' h b g k)
+    (Nothing, _, _, _) -> die "helm not found"
+    (_, Nothing, _, _) -> die "b2b-helm not found"
+    (_, _, Nothing, _) -> die "git not found"
+    (_, _, _, Nothing) -> die "kubectl not found"
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -244,6 +247,7 @@ destroyH dName = do
   st <- ask
   let
     helmBin = helm st
+    kubectlBin = kubectl st
     log     = logInfo (logger st)
     pgPool  = pool st
   liftIO $ do
@@ -253,10 +257,13 @@ destroyH dName = do
     let infraArgs = destroyInfraArgs dName
     log $ "call " <> unwords (pack helmBin : infraArgs)
     ec2 <- destroyInfra infraArgs helmBin
+    let deletePVCArgs' = deletePVCArgs dName
+    log $ "call " <> unwords (pack kubectlBin : deletePVCArgs')
+    ec3 <- deletePVC deletePVCArgs' kubectlBin
     void $ deleteDeploymentLogs pgPool dName
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
-    handleExitCode $ max ec1 ec2
+    handleExitCode $ ec1 `max` ec2 `max` ec3
   pure NoContent
 
 destroyApp :: [CommandArg] -> FilePath -> IO ExitCode
@@ -266,6 +273,10 @@ destroyApp args helmBin =
 destroyInfra :: [CommandArg] -> FilePath -> IO ExitCode
 destroyInfra args helmBin =
   withProcessWait (proc helmBin $ unpack <$> args) waitProcess
+
+deletePVC :: [CommandArg] -> FilePath -> IO ExitCode
+deletePVC args kubectlBin =
+  withProcessWait (proc kubectlBin $ unpack <$> args) waitProcess
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
