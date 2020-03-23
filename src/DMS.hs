@@ -8,7 +8,6 @@ import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Int (Int64)
-import Data.Monoid ((<>))
 import Data.Pool
 import Data.Text (lines, pack, unpack, unwords)
 import Data.Traversable
