@@ -32,6 +32,7 @@ with {
             cp -av ${dm}/migrations/revert $out/migrations/
             cp -av ${dm}/migrations/verify $out/migrations/
             cp -av ${dm}/migrations/sqitch.plan $out/migrations/
+            ${kubernetes-helm2} init --client-only
           '';
         };
 
