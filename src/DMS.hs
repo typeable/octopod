@@ -1,6 +1,7 @@
 module DMS (runDMS) where
 
 
+import Control.Applicative
 import Control.Exception (throwIO, Exception)
 import Control.Monad
 import Control.Monad.IO.Class
@@ -8,6 +9,7 @@ import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Int (Int64)
+import Data.Maybe
 import Data.Pool
 import Data.Text (lines, pack, unpack, unwords)
 import Data.Traversable
@@ -60,18 +62,14 @@ runDMS = do
   (logger', _) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
   logInfo logger' "started"
   args <- getRecord "DMS"
-  helmBin <- helmPath
-  b2bHelmBin <- b2bHelmPath
-  gitBin <- gitPath
-  kubectlBin <- kubectlPath
-  case (helmBin, b2bHelmBin, gitBin, kubectlBin) of
-    (Just h, Just b, Just g, Just k) -> do
-      pgPool <- initConnectionPool (db args) (dbPoolSize args)
-      run (port args) (app $ AppState pgPool logger' h b g k)
-    (Nothing, _, _, _) -> die "helm not found"
-    (_, Nothing, _, _) -> die "b2b-helm not found"
-    (_, _, Nothing, _) -> die "git not found"
-    (_, _, _, Nothing) -> die "kubectl not found"
+  let a ?! e = a >>= maybe (die e) pure
+  helmBin <- helmPath ?! "helm not found"
+  b2bHelmBin <- b2bHelmPath ?! "b2b-helm not found"
+  gitBin <- gitPath ?! "git not found"
+  kubectlBin <- kubectlPath ?! "kubectl not found"
+  pgPool <- initConnectionPool (db args) (dbPoolSize args)
+  let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
+  run (port args) app'
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
