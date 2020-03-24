@@ -51,7 +51,7 @@ Available options:
 # How to deploy a new staging
 
 ```bash
-dmc create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e b2b-app.env.ENV_VAR1=env_val1 -e b2b-app.env.ENV_VAR2=env_val2
+dmc create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -e ENV_VAR2=env_val2
 ```
 
 Note that in our ECR(hosted docker registry) we use a convention of
@@ -69,7 +69,7 @@ dmc edit --name STAGING_NAME
 override an environment variable `FOO` with a value `foo`, add a line like this:
 
 ```
-b2b-app.env.FOO=foo
+FOO=foo
 ```
 
 To commit the changes, save the file and quit your default `$EDITOR`. `:wq` in
