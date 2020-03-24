@@ -18,6 +18,10 @@ type EnvPairs = [EnvPair]
 concatPair :: EnvPair -> Text
 concatPair (k, v) = k <> "=" <> v
 
+-- | Format for b2b-helm-tool / helm
+concatPairWithAppEnv :: EnvPair -> Text
+concatPairWithAppEnv pair = "b2b-app.env." <> concatPair pair
+
 -- | Format for output
 formatEnvPairs :: EnvPairs -> Text
 formatEnvPairs = T.unlines . fmap concatPair

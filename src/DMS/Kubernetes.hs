@@ -65,7 +65,7 @@ composeAppArgs dName dTag envPairs = [
     <> rn <> "-kafka-int-0." <> rn <> "-kafka-int:9092"
   , "--set", "global.staging_name=" <> coerce dName
   ]
-  ++ mconcat (fmap (\a -> ["--set", a]) $ concatPair <$> envPairs)
+  ++ mconcat (fmap (\a -> ["--set", a]) $ concatPairWithAppEnv <$> envPairs)
   ++ [taggedRelease appChartName dTag]
   where rn = releaseName infraChartName dName
 
