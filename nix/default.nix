@@ -19,6 +19,7 @@ with
             git
             b2b-helm-tool
             kubernetes-helm2
+            kubectl
             coreutils
             bash
           ];
