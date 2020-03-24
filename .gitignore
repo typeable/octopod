@@ -2,4 +2,5 @@
 package.yaml
 default.nix
 result
+dms-docker
 *~

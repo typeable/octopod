@@ -1,6 +1,6 @@
 { sources ? import ./sources.nix }:     # import the sources
 with
-  { overlay = _: pkgs:
+  { overlay = _: pkgs: with pkgs;
       rec {
         dm = haskellPackages.dm-static.overrideAttrs(oldAttrs: {
           installPhase = oldAttrs.installPhase + ''
@@ -12,15 +12,28 @@ with
           '';
         });
 
-        dms-container = pkgs.dockerTools.buildImage {
+        dms-container = dockerTools.buildImage {
           name = "dms-container-slim";
           contents = [
             dm
-            pkgs.coreutils
-            pkgs.bash
+            git
+            b2b-helm-tool
+            kubernetes-helm2
+            coreutils
+            bash
           ];
           config = {
-            Cmd = [ "${dm}/bin/dms-exe" ];
+            Entrypoint = [
+              "${dm}/bin/dms-exe"
+            ];
+            Cmd = [
+              "--port"
+              "4000"
+              "--db"
+              "host='127.0.0.1' port=5432 user='dm' password='dm'"
+              "--db-pool-size"
+              "10"
+            ];
             Volumes = {
               "/migrations" = {};
             };
@@ -36,11 +49,19 @@ with
 
         niv = import sources.niv {};
 
+        b2b-helm-tool = buildGoPackage rec {
+          version = "0.1";
+          pname = "b2b-helm-tool";
+          goPackagePath = "github.com/aviora/b2b-helm";
+          src = ../b2b-helm/tool;
+          goDeps = ../b2b-helm/tool/deps.nix;
+        };
+
         haskellPackages = pkgs.haskellPackages.override {
           overrides = hself: hsuper: {
 
             deriving-aeson = hsuper.callPackage(
-              pkgs.stdenv.mkDerivation ({
+              stdenv.mkDerivation ({
                 name = "deriving-aeson";
                 buildCommand = ''
                   ${hsuper.cabal2nix}/bin/cabal2nix file://${sources.deriving-aeson} > $out
@@ -50,7 +71,7 @@ with
             dm = hsuper.callPackage ../default.nix {
             };
 
-            dm-static = pkgs.haskell.lib.justStaticExecutables(
+            dm-static = haskell.lib.justStaticExecutables(
               hsuper.callPackage ../default.nix {}
             );
           };

@@ -95,7 +95,7 @@ handleCreate clientEnv createCmd = do
 handleList :: ClientEnv -> IO ()
 handleList clientEnv = do
   l <- runClientM listH clientEnv
-  handleResponse T.putStrLn $ T.unlines . coerce <$> l
+  handleResponse T.putStr $ T.unlines . coerce <$> l
 
 handleEdit :: ClientEnv -> DeploymentName -> IO ()
 handleEdit clientEnv dName = do
