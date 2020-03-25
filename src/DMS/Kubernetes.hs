@@ -79,6 +79,10 @@ createInfraArgs dName = [
     <> rn <> "-elasticsearch-0." <> rn <> "-elasticsearch." <> namespace
   , "--set", "b2b-postgres.postgres_db=" <> db
   , "--set", "global.staging_name=" <> coerce dName
+  , "--set", "b2b-kibana.elasic_hosts=http://b2b-infra-dm-staging-" <> coerce dName
+    <> "-elasticsearch-0.b2b-infra-dm-staging-" <> coerce dName
+    <> "-elasticsearch.staging:9200"
+  , "--set", "b2b-kibana.domain=kibana." <> coerce dName <> ".kube.thebestagent.pro"
   , coerce infraChartName
   ]
   where
