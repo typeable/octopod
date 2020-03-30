@@ -4,6 +4,7 @@ import Chronos
 import Control.Lens hiding (List)
 import Control.Monad
 import Data.Coerce
+import Data.Default.Class (def)
 import Data.Foldable
 import Data.Generics.Product
 import Data.Maybe (fromMaybe)
@@ -11,9 +12,13 @@ import Data.Proxy
 import Data.Text as T
 import Data.Text.IO as T
 import Data.Text.Lens
+import Network.Connection
 import Network.HTTP.Client
-  ( defaultManagerSettings, managerResponseTimeout, newManager
+  ( managerResponseTimeout, newManager
   , responseTimeoutMicro)
+import Network.HTTP.Client.TLS
+import Network.TLS
+import Network.TLS.Extra.Cipher
 import Network.URI
 import Options.Generic
 import Prelude as P
@@ -33,12 +38,12 @@ import Types
 -- | CLI options
 -- FIXME: add options documentation
 data Args
-  = Create { name :: Text, tag :: Text, envs :: [Text] }
-  | List
-  | Edit { name :: Text }
-  | Destroy { name :: Text }
-  | Update { name :: Text, tag :: Text }
-  | Info { name :: Text }
+  = Create { name :: Text, tag :: Text, envs :: [Text], tlsCert :: Maybe Text, tlsKey :: Maybe Text }
+  | List { tlsCert :: Maybe Text, tlsKey :: Maybe Text }
+  | Edit { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
+  | Destroy { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
+  | Update { name :: Text, tag :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
+  | Info { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
   deriving stock (Show, Generic)
 
 instance ParseRecord Args where
@@ -49,22 +54,41 @@ instance ParseRecord Args where
 runDMC :: IO ()
 runDMC = do
   args <- getRecord "DMC"
-  manager <- newManager defaultManagerSettings
-    { managerResponseTimeout =
-      responseTimeoutMicro $ 20 * 60 * 10 ^ (6 :: Int) }
+  let cert = maybe "cert.pem" unpack $ tlsCert args
+      key = maybe "key.pem" unpack $ tlsKey args
+  manager <- makeManager cert key
   env <- getBaseUrl
   let clientEnv = mkClientEnv manager env
   case args of
-    Create n t e      -> do
+    Create n t e _ _    -> do
       envPairs <- parseEnvs e
       handleCreate clientEnv $ Deployment (coerce n) (coerce t) envPairs
-    List              -> handleList clientEnv
-    Edit tName        -> handleEdit clientEnv $ DeploymentName tName
-    Destroy tName     -> handleDestroy clientEnv $ DeploymentName tName
-    Update tName tTag -> handleUpdate clientEnv
+    List _ _                -> handleList clientEnv
+    Edit tName _ _          -> handleEdit clientEnv $ DeploymentName tName
+    Destroy tName _ _       -> handleDestroy clientEnv $ DeploymentName tName
+    Update tName tTag _ _   -> handleUpdate clientEnv
       (DeploymentName tName)
       (DeploymentTag tTag)
-    Info tName        -> handleInfo clientEnv $ DeploymentName tName
+    Info tName _ _          -> handleInfo clientEnv $ DeploymentName tName
+  where
+    makeManager cert key = do
+      creds <- either error Just `fmap` credentialLoadX509 cert key
+      let hooks = def
+                   { onCertificateRequest = \_ -> return creds
+                   , onServerCertificate = \_ _ _ _ -> return []
+                   }
+          clientParams = (defaultParamsClient dmsHostName  "")
+                          { clientHooks = hooks
+                          , clientSupported = def { supportedCiphers = ciphersuite_default }
+                          }
+          tlsSettings = TLSSettings clientParams
+          tlsManagerSettings' = (mkManagerSettings tlsSettings Nothing)
+                                  { managerResponseTimeout =
+                                    responseTimeoutMicro $ 20 * 60 * 10 ^ (6 :: Int) }
+          in newManager tlsManagerSettings'
+
+dmsHostName :: String
+dmsHostName = "dm.kube.thebestagent.pro"
 
 getBaseUrl :: IO BaseUrl
 getBaseUrl = do
@@ -73,7 +97,7 @@ getBaseUrl = do
   let
     -- FIXME: unhardcode
     defaultBaseUrl :: BaseUrl
-    defaultBaseUrl = BaseUrl Http "dm.kube.thebestagent.pro" 80 ""
+    defaultBaseUrl = BaseUrl Https dmsHostName 443 ""
     parseUrl :: String -> BaseUrl
     parseUrl = fromMaybe defaultBaseUrl . parseUrl'
      where

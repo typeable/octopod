@@ -1,9 +1,10 @@
-{ mkDerivation, aeson, base, bytestring, chronos, deriving-aeson
-, directory, fast-logger, filepath, generic-lens, http-api-data
-, http-client, lens, mtl, network-uri, optparse-generic
+{ mkDerivation, aeson, base, bytestring, chronos, connection
+, data-default-class, deriving-aeson, directory, fast-logger
+, filepath, generic-lens, http-api-data, http-client
+, http-client-tls, lens, mtl, network-uri, optparse-generic
 , postgresql-simple, resource-pool, servant, servant-client
-, servant-server, stdenv, temporary, text, transformers
-, typed-process, warp
+, servant-server, stdenv, temporary, text, tls, transformers
+, typed-process, warp, warp-tls, x509, x509-store, x509-validation
 }:
 mkDerivation {
   pname = "dm";
@@ -12,23 +13,28 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    aeson base bytestring chronos deriving-aeson directory fast-logger
-    filepath generic-lens http-api-data http-client lens mtl
-    network-uri optparse-generic postgresql-simple resource-pool
-    servant servant-client servant-server temporary text transformers
-    typed-process warp
+    aeson base bytestring chronos connection data-default-class
+    deriving-aeson directory fast-logger filepath generic-lens
+    http-api-data http-client http-client-tls lens mtl network-uri
+    optparse-generic postgresql-simple resource-pool servant
+    servant-client servant-server temporary text tls transformers
+    typed-process warp warp-tls x509 x509-store x509-validation
   ];
   executableHaskellDepends = [
-    aeson base bytestring chronos directory fast-logger filepath
-    http-client mtl network-uri optparse-generic postgresql-simple
-    resource-pool servant servant-client servant-server temporary text
-    transformers typed-process warp
+    aeson base bytestring chronos connection data-default-class
+    directory fast-logger filepath http-client http-client-tls mtl
+    network-uri optparse-generic postgresql-simple resource-pool
+    servant servant-client servant-server temporary text tls
+    transformers typed-process warp warp-tls x509 x509-store
+    x509-validation
   ];
   testHaskellDepends = [
-    aeson base bytestring chronos directory fast-logger filepath
-    http-client mtl network-uri optparse-generic postgresql-simple
-    resource-pool servant servant-client servant-server temporary text
-    transformers typed-process warp
+    aeson base bytestring chronos connection data-default-class
+    directory fast-logger filepath http-client http-client-tls mtl
+    network-uri optparse-generic postgresql-simple resource-pool
+    servant servant-client servant-server temporary text tls
+    transformers typed-process warp warp-tls x509 x509-store
+    x509-validation
   ];
   homepage = "https://github.com/https://github.com/Aviora/dm#readme";
   license = stdenv.lib.licenses.bsd3;
