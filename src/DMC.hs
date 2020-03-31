@@ -3,8 +3,10 @@ module DMC (runDMC) where
 import Chronos
 import Control.Lens hiding (List)
 import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import qualified Data.ByteString.Char8 as BSC
 import Data.Coerce
-import Data.Default.Class (def)
 import Data.Foldable
 import Data.Generics.Product
 import Data.Maybe (fromMaybe)
@@ -12,80 +14,40 @@ import Data.Proxy
 import Data.Text as T
 import Data.Text.IO as T
 import Data.Text.Lens
-import Network.Connection
-import Network.HTTP.Client
-  ( managerResponseTimeout, newManager
-  , responseTimeoutMicro)
-import Network.HTTP.Client.TLS
-import Network.TLS
-import Network.TLS.Extra.Cipher
 import Network.URI
-import Options.Generic
 import Prelude as P
 import Servant.API
 import Servant.Client
-  ( ClientError, BaseUrl(..), ClientEnv, ClientM, runClientM, client
-  , mkClientEnv, Scheme(..))
+  ( ClientError, BaseUrl(..), ClientEnv, ClientM, Scheme(..)
+  , runClientM, client, mkClientEnv)
 import System.Environment (lookupEnv)
 import System.IO
 import System.IO.Temp
 import System.Process.Typed
 
 import API
+import DMC.Args
+import TLS (makeClientManager)
 import Types
-
-
--- | CLI options
--- FIXME: add options documentation
-data Args
-  = Create { name :: Text, tag :: Text, envs :: [Text], tlsCert :: Maybe Text, tlsKey :: Maybe Text }
-  | List { tlsCert :: Maybe Text, tlsKey :: Maybe Text }
-  | Edit { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
-  | Destroy { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
-  | Update { name :: Text, tag :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
-  | Info { name :: Text, tlsCert :: Maybe Text, tlsKey :: Maybe Text  }
-  deriving stock (Show, Generic)
-
-instance ParseRecord Args where
-  -- FIXME: external CLI interface depends on the naming in the code, yuck
-  parseRecord = parseRecordWithModifiers $ defaultModifiers
-    { shortNameModifier = firstLetter }
 
 runDMC :: IO ()
 runDMC = do
-  args <- getRecord "DMC"
-  let cert = maybe "cert.pem" unpack $ tlsCert args
-      key = maybe "key.pem" unpack $ tlsKey args
-  manager <- makeManager cert key
+  args <- parseArgs
+  let cert = maybe "cert.pem" (BSC.unpack . unTLSCertPath) $ dmcTLSCertPath args
+      key = maybe "key.pem" (BSC.unpack . unTLSKeyPath) $ dmcTLSKeyPath args
+  manager <- makeClientManager dmsHostName cert key
   env <- getBaseUrl
   let clientEnv = mkClientEnv manager env
-  case args of
-    Create n t e _ _    -> do
-      envPairs <- parseEnvs e
-      handleCreate clientEnv $ Deployment (coerce n) (coerce t) envPairs
-    List _ _                -> handleList clientEnv
-    Edit tName _ _          -> handleEdit clientEnv $ DeploymentName tName
-    Destroy tName _ _       -> handleDestroy clientEnv $ DeploymentName tName
-    Update tName tTag _ _   -> handleUpdate clientEnv
-      (DeploymentName tName)
-      (DeploymentTag tTag)
-    Info tName _ _          -> handleInfo clientEnv $ DeploymentName tName
-  where
-    makeManager cert key = do
-      creds <- either error Just `fmap` credentialLoadX509 cert key
-      let hooks = def
-                   { onCertificateRequest = \_ -> return creds
-                   , onServerCertificate = \_ _ _ _ -> return []
-                   }
-          clientParams = (defaultParamsClient dmsHostName  "")
-                          { clientHooks = hooks
-                          , clientSupported = def { supportedCiphers = ciphersuite_default }
-                          }
-          tlsSettings = TLSSettings clientParams
-          tlsManagerSettings' = (mkManagerSettings tlsSettings Nothing)
-                                  { managerResponseTimeout =
-                                    responseTimeoutMicro $ 20 * 60 * 10 ^ (6 :: Int) }
-          in newManager tlsManagerSettings'
+  flip runReaderT clientEnv $
+    case args of
+      CreateC n t e _ _          -> do
+        envPairs <- liftIO $ parseEnvs e
+        handleCreate $ Deployment (coerce n) (coerce t) envPairs
+      ListC _ _                  -> handleList
+      EditC tName _ _            -> handleEdit $ DeploymentName tName
+      DestroyC tName _ _         -> handleDestroy $ DeploymentName tName
+      UpdateC tName tTag _ _     -> handleUpdate (DeploymentName tName) (DeploymentTag tTag)
+      InfoC tName _ _            -> handleInfo $ DeploymentName tName
 
 dmsHostName :: String
 dmsHostName = "dm.kube.thebestagent.pro"
@@ -111,30 +73,36 @@ getBaseUrl = do
          return $ BaseUrl s h p ""
   return $ maybe defaultBaseUrl parseUrl dmsURL
 
-handleCreate :: ClientEnv -> Deployment -> IO ()
-handleCreate clientEnv createCmd = do
-  response <- runClientM (createH createCmd) clientEnv
-  handleResponse (const $ pure ()) response
+handleCreate :: Deployment -> ReaderT ClientEnv IO ()
+handleCreate createCmd = do
+  clientEnv <- ask
+  liftIO $ do
+    response <- runClientM (createH createCmd) clientEnv
+    handleResponse (const $ pure ()) response
 
-handleList :: ClientEnv -> IO ()
-handleList clientEnv = do
-  l <- runClientM listH clientEnv
-  handleResponse T.putStr $ T.unlines . coerce <$> l
+handleList :: ReaderT ClientEnv IO ()
+handleList = do
+  clientEnv <- ask
+  liftIO $ do
+    l <- runClientM listH clientEnv
+    handleResponse T.putStr $ T.unlines . coerce <$> l
 
-handleEdit :: ClientEnv -> DeploymentName -> IO ()
-handleEdit clientEnv dName = do
-  editor <- lookupEnv "EDITOR"
-  case editor of
-    Just ed -> do
-      res <- flip runClientM clientEnv $ getH dName
-      case res of
-        Right (Deployment _ _ e) -> do
-          envPairs <- editEnvs ed e
-          response <- runClientM (editH dName envPairs) clientEnv
-          handleResponse (const $ pure ()) response
-        Left err ->
-          P.print $ "request failed, reason: " <> show err
-    Nothing -> error "environment variable $EDITOR not found"
+handleEdit :: DeploymentName -> ReaderT ClientEnv IO ()
+handleEdit dName = do
+  clientEnv <- ask
+  liftIO $ do
+    editor <- lookupEnv "EDITOR"
+    case editor of
+      Just ed -> do
+        res <- flip runClientM clientEnv $ getH dName
+        case res of
+          Right (Deployment _ _ e) -> do
+            envPairs <- editEnvs ed e
+            response <- runClientM (editH dName envPairs) clientEnv
+            handleResponse (const $ pure ()) response
+          Left err ->
+            P.print $ "request failed, reason: " <> show err
+      Nothing -> error "environment variable $EDITOR not found"
 
 editEnvs :: FilePath -> EnvPairs -> IO EnvPairs
 editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
@@ -146,22 +114,27 @@ editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
   T.putStrLn "sending update..."
   pure envPairs
 
-handleDestroy :: ClientEnv -> DeploymentName -> IO ()
-handleDestroy clientEnv dName = do
-  handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
+handleDestroy :: DeploymentName -> ReaderT ClientEnv IO ()
+handleDestroy dName = do
+  clientEnv <- ask
+  liftIO $ handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
 
-handleUpdate :: ClientEnv -> DeploymentName -> DeploymentTag -> IO ()
-handleUpdate clientEnv dName dTag = do
-  response <- runClientM (updateH dName dTag) clientEnv
-  handleResponse (const $ pure ()) response
+handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
+handleUpdate dName dTag = do
+  clientEnv <- ask
+  liftIO $ do
+    response <- runClientM (updateH dName dTag) clientEnv
+    handleResponse (const $ pure ()) response
 
-handleInfo :: ClientEnv -> DeploymentName -> IO ()
-handleInfo clientEnv dName = do
-  res <- runClientM (infoH dName) clientEnv
-  case res of
-    Right (i : _) -> printInfo i
-    Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
-    Left err -> print $ "request failed, reason: " ++ show err
+handleInfo :: DeploymentName -> ReaderT ClientEnv IO ()
+handleInfo dName = do
+  clientEnv <- ask
+  liftIO $ do
+    res <- runClientM (infoH dName) clientEnv
+    case res of
+      Right (i : _) -> printInfo i
+      Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
+      Left err -> print $ "request failed, reason: " ++ show err
 
 listH :: ClientM [DeploymentName]
 

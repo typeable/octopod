@@ -7,21 +7,13 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BSC
 import Data.Coerce
-import Data.Default.Class (def)
 import Data.Int (Int64)
 import Data.Maybe
 import Data.Pool
 import Data.Text (lines, pack, unpack, unwords)
 import Data.Traversable
-import Data.X509 (ExtKeyUsagePurpose(..), HashALG(HashSHA256))
-import Data.X509.CertificateStore (readCertificateStore)
-import Data.X509.Validation
-  (ValidationChecks(..), ValidationHooks(..), checkLeafV3, validate)
 import Database.PostgreSQL.Simple
-import Network.TLS
-  (CertificateRejectReason(..), CertificateUsage(..), onClientCertificate)
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WarpTLS
 import Options.Generic
@@ -35,23 +27,12 @@ import System.Process.Typed
 
 
 import API
+import DMS.Args
 import DMS.Git
 import DMS.Kubernetes
+import TLS (createTLSOpts)
 import Types
 
-
-data Args = Args
-  { port :: Int
-  , db :: ByteString
-  , dbPoolSize :: Int
-  , tlsCert :: ByteString
-  , tlsKey :: ByteString
-  , tlsStore :: ByteString
-  }
-  deriving (Generic, Show)
-
-instance ParseRecord Args where
-  parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 type PgPool = Pool Connection
 type AppM = ReaderT AppState Handler
@@ -77,52 +58,18 @@ runDMS = do
   timeCache <- newTimeCache "%Y-%m-%d %T%z"
   (logger', _) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
   logInfo logger' "started"
-  args <- getRecord "DMS"
+  opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
   helmBin <- helmPath ?! "helm not found"
   b2bHelmBin <- b2bHelmPath ?! "b2b-helm not found"
   gitBin <- gitPath ?! "git not found"
   kubectlBin <- kubectlPath ?! "kubectl not found"
-  pgPool <- initConnectionPool (db args) (dbPoolSize args)
+  pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
-  let cert = tlsCert args
-      key = tlsKey args
-      store = BSC.unpack $ tlsStore args
-      tlsOpts' = tlsOpts cert key store
-      in runTLS tlsOpts' warpOpts app'
-
-  where tlsOpts cert key storePath
-          = (initTLSSettings cert key)
-             { tlsWantClientCert = True
-             , onInsecure = DenyInsecure "This server only accepts secure HTTPS connections."
-             , tlsServerHooks = def { onClientCertificate =
-                fmap certificateUsageFromValidations . (validateCertificate storePath)}
-             }
-        initTLSSettings cert key = tlsSettings (BSC.unpack cert) (BSC.unpack key)
-        warpOpts = setPort serverPort defaultSettings
-        certificateUsageFromValidations = maybe CertificateUsageAccept
-          (CertificateUsageReject . CertificateRejectOther)
-        serviceID = ("localhost", BSC.pack $ show serverPort)
-        validationHooks = def
-          { hookValidateName = \_ _ -> [] }
-        validationChecks = def
-          { checkStrictOrdering = True
-          , checkLeafKeyPurpose = [KeyUsagePurpose_ClientAuth]
-          , checkLeafV3 = False
-          }
-        validateCertificate storePath cert = do
-          mstore <- readCertificateStore storePath
-          maybe
-            (pure $ Just "Cannot init a store")
-            (fmap fromX509FailedReasons . (\store -> validate HashSHA256
-              validationHooks validationChecks store def serviceID cert))
-            mstore
-        fromX509FailedReasons reasons = case reasons of
-          [] -> Nothing
-          _  -> Just (show reasons)
-
-serverPort :: Int
-serverPort = 4443
+  let serverPort = dmsPort opts
+      tlsOpts = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
+      warpOpts = setPort (unServerPort serverPort) defaultSettings
+      in runTLS tlsOpts warpOpts app'
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =

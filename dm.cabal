@@ -37,9 +37,12 @@ library
   exposed-modules:
       API
       DMC
+      DMC.Args
       DMS
+      DMS.Args
       DMS.Git
       DMS.Kubernetes
+      TLS
       Types
   other-modules:
       Paths_dm
