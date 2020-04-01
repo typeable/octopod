@@ -3,6 +3,9 @@ module DMC (runDMC) where
 import Chronos
 import Control.Lens hiding (List)
 import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import qualified Data.ByteString.Char8 as BSC
 import Data.Coerce
 import Data.Foldable
 import Data.Generics.Product
@@ -11,60 +14,43 @@ import Data.Proxy
 import Data.Text as T
 import Data.Text.IO as T
 import Data.Text.Lens
-import Network.HTTP.Client
-  ( defaultManagerSettings, managerResponseTimeout, newManager
-  , responseTimeoutMicro)
 import Network.URI
-import Options.Generic
 import Prelude as P
 import Servant.API
 import Servant.Client
-  ( ClientError, BaseUrl(..), ClientEnv, ClientM, runClientM, client
-  , mkClientEnv, Scheme(..))
+  ( ClientError, BaseUrl(..), ClientEnv, ClientM, Scheme(..)
+  , runClientM, client, mkClientEnv)
 import System.Environment (lookupEnv)
 import System.IO
 import System.IO.Temp
 import System.Process.Typed
 
 import API
+import DMC.Args
+import TLS (makeClientManager)
 import Types
-
-
--- | CLI options
--- FIXME: add options documentation
-data Args
-  = Create { name :: Text, tag :: Text, envs :: [Text] }
-  | List
-  | Edit { name :: Text }
-  | Destroy { name :: Text }
-  | Update { name :: Text, tag :: Text }
-  | Info { name :: Text }
-  deriving stock (Show, Generic)
-
-instance ParseRecord Args where
-  -- FIXME: external CLI interface depends on the naming in the code, yuck
-  parseRecord = parseRecordWithModifiers $ defaultModifiers
-    { shortNameModifier = firstLetter }
 
 runDMC :: IO ()
 runDMC = do
-  args <- getRecord "DMC"
-  manager <- newManager defaultManagerSettings
-    { managerResponseTimeout =
-      responseTimeoutMicro $ 20 * 60 * 10 ^ (6 :: Int) }
+  args <- parseArgs
+  let cert = maybe "cert.pem" (BSC.unpack . unTLSCertPath) $ dmcTLSCertPath args
+      key = maybe "key.pem" (BSC.unpack . unTLSKeyPath) $ dmcTLSKeyPath args
+  manager <- makeClientManager dmsHostName cert key
   env <- getBaseUrl
   let clientEnv = mkClientEnv manager env
-  case args of
-    Create n t e      -> do
-      envPairs <- parseEnvs e
-      handleCreate clientEnv $ Deployment (coerce n) (coerce t) envPairs
-    List              -> handleList clientEnv
-    Edit tName        -> handleEdit clientEnv $ DeploymentName tName
-    Destroy tName     -> handleDestroy clientEnv $ DeploymentName tName
-    Update tName tTag -> handleUpdate clientEnv
-      (DeploymentName tName)
-      (DeploymentTag tTag)
-    Info tName        -> handleInfo clientEnv $ DeploymentName tName
+  flip runReaderT clientEnv $
+    case args of
+      CreateC n t e _ _          -> do
+        envPairs <- liftIO $ parseEnvs e
+        handleCreate $ Deployment (coerce n) (coerce t) envPairs
+      ListC _ _                  -> handleList
+      EditC tName _ _            -> handleEdit $ DeploymentName tName
+      DestroyC tName _ _         -> handleDestroy $ DeploymentName tName
+      UpdateC tName tTag _ _     -> handleUpdate (DeploymentName tName) (DeploymentTag tTag)
+      InfoC tName _ _            -> handleInfo $ DeploymentName tName
+
+dmsHostName :: String
+dmsHostName = "dm.kube.thebestagent.pro"
 
 getBaseUrl :: IO BaseUrl
 getBaseUrl = do
@@ -73,7 +59,7 @@ getBaseUrl = do
   let
     -- FIXME: unhardcode
     defaultBaseUrl :: BaseUrl
-    defaultBaseUrl = BaseUrl Http "dm.kube.thebestagent.pro" 80 ""
+    defaultBaseUrl = BaseUrl Https dmsHostName 443 ""
     parseUrl :: String -> BaseUrl
     parseUrl = fromMaybe defaultBaseUrl . parseUrl'
      where
@@ -87,30 +73,36 @@ getBaseUrl = do
          return $ BaseUrl s h p ""
   return $ maybe defaultBaseUrl parseUrl dmsURL
 
-handleCreate :: ClientEnv -> Deployment -> IO ()
-handleCreate clientEnv createCmd = do
-  response <- runClientM (createH createCmd) clientEnv
-  handleResponse (const $ pure ()) response
+handleCreate :: Deployment -> ReaderT ClientEnv IO ()
+handleCreate createCmd = do
+  clientEnv <- ask
+  liftIO $ do
+    response <- runClientM (createH createCmd) clientEnv
+    handleResponse (const $ pure ()) response
 
-handleList :: ClientEnv -> IO ()
-handleList clientEnv = do
-  l <- runClientM listH clientEnv
-  handleResponse T.putStr $ T.unlines . coerce <$> l
+handleList :: ReaderT ClientEnv IO ()
+handleList = do
+  clientEnv <- ask
+  liftIO $ do
+    l <- runClientM listH clientEnv
+    handleResponse T.putStr $ T.unlines . coerce <$> l
 
-handleEdit :: ClientEnv -> DeploymentName -> IO ()
-handleEdit clientEnv dName = do
-  editor <- lookupEnv "EDITOR"
-  case editor of
-    Just ed -> do
-      res <- flip runClientM clientEnv $ getH dName
-      case res of
-        Right (Deployment _ _ e) -> do
-          envPairs <- editEnvs ed e
-          response <- runClientM (editH dName envPairs) clientEnv
-          handleResponse (const $ pure ()) response
-        Left err ->
-          P.print $ "request failed, reason: " <> show err
-    Nothing -> error "environment variable $EDITOR not found"
+handleEdit :: DeploymentName -> ReaderT ClientEnv IO ()
+handleEdit dName = do
+  clientEnv <- ask
+  liftIO $ do
+    editor <- lookupEnv "EDITOR"
+    case editor of
+      Just ed -> do
+        res <- flip runClientM clientEnv $ getH dName
+        case res of
+          Right (Deployment _ _ e) -> do
+            envPairs <- editEnvs ed e
+            response <- runClientM (editH dName envPairs) clientEnv
+            handleResponse (const $ pure ()) response
+          Left err ->
+            P.print $ "request failed, reason: " <> show err
+      Nothing -> error "environment variable $EDITOR not found"
 
 editEnvs :: FilePath -> EnvPairs -> IO EnvPairs
 editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
@@ -122,22 +114,27 @@ editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
   T.putStrLn "sending update..."
   pure envPairs
 
-handleDestroy :: ClientEnv -> DeploymentName -> IO ()
-handleDestroy clientEnv dName = do
-  handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
+handleDestroy :: DeploymentName -> ReaderT ClientEnv IO ()
+handleDestroy dName = do
+  clientEnv <- ask
+  liftIO $ handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
 
-handleUpdate :: ClientEnv -> DeploymentName -> DeploymentTag -> IO ()
-handleUpdate clientEnv dName dTag = do
-  response <- runClientM (updateH dName dTag) clientEnv
-  handleResponse (const $ pure ()) response
+handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
+handleUpdate dName dTag = do
+  clientEnv <- ask
+  liftIO $ do
+    response <- runClientM (updateH dName dTag) clientEnv
+    handleResponse (const $ pure ()) response
 
-handleInfo :: ClientEnv -> DeploymentName -> IO ()
-handleInfo clientEnv dName = do
-  res <- runClientM (infoH dName) clientEnv
-  case res of
-    Right (i : _) -> printInfo i
-    Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
-    Left err -> print $ "request failed, reason: " ++ show err
+handleInfo :: DeploymentName -> ReaderT ClientEnv IO ()
+handleInfo dName = do
+  clientEnv <- ask
+  liftIO $ do
+    res <- runClientM (infoH dName) clientEnv
+    case res of
+      Right (i : _) -> printInfo i
+      Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
+      Left err -> print $ "request failed, reason: " ++ show err
 
 listH :: ClientM [DeploymentName]
 

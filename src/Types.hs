@@ -1,6 +1,7 @@
 module Types where
 
 import Data.Bifunctor
+import Data.ByteString (ByteString)
 import Data.String
 import Data.Text as T
 import Data.Traversable
@@ -72,3 +73,21 @@ data DeploymentInfo = DeploymentInfo
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentInfo
+
+newtype ServerPort = ServerPort { unServerPort :: Int }
+  deriving (Show)
+
+newtype DBPoolSize = DBPoolSize { unDBPoolSize :: Int }
+  deriving (Show)
+
+newtype DBConnectionString = DbConnectionString { unDBConnectionString :: ByteString }
+  deriving (Show)
+
+newtype TLSCertPath = TLSCertPath { unTLSCertPath :: ByteString }
+  deriving (Show)
+
+newtype TLSKeyPath = TLSKeyPath { unTLSKeyPath :: ByteString }
+  deriving (Show)
+
+newtype TLSStorePath = TLSStore { unTLSStorePath :: ByteString }
+  deriving (Show)

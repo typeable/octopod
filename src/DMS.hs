@@ -15,6 +15,7 @@ import Data.Text (lines, pack, unpack, unwords)
 import Data.Traversable
 import Database.PostgreSQL.Simple
 import Network.Wai.Handler.Warp
+import Network.Wai.Handler.WarpTLS
 import Options.Generic
 import Prelude hiding (lines, unlines, unwords, log)
 import Servant
@@ -24,18 +25,14 @@ import System.IO.Temp
 import System.Log.FastLogger
 import System.Process.Typed
 
+
 import API
+import DMS.Args
 import DMS.Git
 import DMS.Kubernetes
+import TLS (createTLSOpts)
 import Types
 
-
-data Args
-  = Args { port :: Int, db :: ByteString, dbPoolSize :: Int }
-  deriving (Generic, Show)
-
-instance ParseRecord Args where
-  parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 type PgPool = Pool Connection
 type AppM = ReaderT AppState Handler
@@ -61,15 +58,18 @@ runDMS = do
   timeCache <- newTimeCache "%Y-%m-%d %T%z"
   (logger', _) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
   logInfo logger' "started"
-  args <- getRecord "DMS"
+  opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
   helmBin <- helmPath ?! "helm not found"
   b2bHelmBin <- b2bHelmPath ?! "b2b-helm not found"
   gitBin <- gitPath ?! "git not found"
   kubectlBin <- kubectlPath ?! "kubectl not found"
-  pgPool <- initConnectionPool (db args) (dbPoolSize args)
+  pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
-  run (port args) app'
+  let serverPort = dmsPort opts
+      tlsOpts = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
+      warpOpts = setPort (unServerPort serverPort) defaultSettings
+      in runTLS tlsOpts warpOpts app'
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =

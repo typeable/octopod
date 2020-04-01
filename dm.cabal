@@ -37,9 +37,12 @@ library
   exposed-modules:
       API
       DMC
+      DMC.Args
       DMS
+      DMS.Args
       DMS.Git
       DMS.Kubernetes
+      TLS
       Types
   other-modules:
       Paths_dm
@@ -50,6 +53,8 @@ library
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , connection
+    , data-default-class
     , deriving-aeson
     , directory
     , fast-logger
@@ -57,6 +62,7 @@ library
     , generic-lens
     , http-api-data
     , http-client
+    , http-client-tls
     , lens
     , mtl
     , network-uri
@@ -68,9 +74,14 @@ library
     , servant-server
     , temporary
     , text
+    , tls
     , transformers
     , typed-process
     , warp
+    , warp-tls
+    , x509
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
 
 executable dmc-exe
@@ -87,11 +98,14 @@ executable dmc-exe
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , connection
+    , data-default-class
     , directory
     , dm
     , fast-logger
     , filepath
     , http-client
+    , http-client-tls
     , mtl
     , network-uri
     , optparse-generic
@@ -102,9 +116,14 @@ executable dmc-exe
     , servant-server
     , temporary
     , text
+    , tls
     , transformers
     , typed-process
     , warp
+    , warp-tls
+    , x509
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
 
 executable dms-exe
@@ -121,10 +140,13 @@ executable dms-exe
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , connection
+    , data-default-class
     , directory
     , dm
     , fast-logger
     , http-client
+    , http-client-tls
     , mtl
     , network-uri
     , optparse-generic
@@ -135,9 +157,14 @@ executable dms-exe
     , servant-server
     , temporary
     , text
+    , tls
     , transformers
     , typed-process
     , warp
+    , warp-tls
+    , x509
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
 
 test-suite dm-test
@@ -153,11 +180,14 @@ test-suite dm-test
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , connection
+    , data-default-class
     , directory
     , dm
     , fast-logger
     , filepath
     , http-client
+    , http-client-tls
     , mtl
     , network-uri
     , optparse-generic
@@ -168,7 +198,12 @@ test-suite dm-test
     , servant-server
     , temporary
     , text
+    , tls
     , transformers
     , typed-process
     , warp
+    , warp-tls
+    , x509
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
