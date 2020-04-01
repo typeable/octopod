@@ -49,6 +49,33 @@ Available options:
   -h,--help                Show this help text
 ```
 
+# Kubernetes installation
+
+1. Deploy DMS's infra
+
+```bash
+./b2b-helm-tool -d deploy dms-infra
+```
+
+2. Clone b2b-helm to `/tmp`
+
+```bash
+git clone https://github.com/Aviora/b2b-helm.git /tmp/b2b-helm
+```
+
+3. Give needed permissions for DMS
+
+```bash
+cd /tmp/b2b-helm/charts/admin && helm install --name dm-helm-access ./helm-access
+cd /tmp/b2b-helm/charts/admin && helm install --name dm-pvc-control ./pvc-control
+```
+
+4. Deploy DMS
+
+```bash
+./b2b-helm-tool -d deploy dms:dm-v3
+```
+
 # How to deploy a new staging
 
 ```bash
@@ -76,30 +103,3 @@ FOO=foo
 To commit the changes, save the file and quit your default `$EDITOR`. `:wq` in
 vim. Note that to discard your changes, you have to exit your `$EDITOR` with a
 not-zero exit code. You can do this by typing `:cq` in vim.
-
-# Installation
-
-1. Deploy DMS's infra
-
-```bash
-./b2b-helm-tool -d deploy dms-infra
-```
-
-2. Clone b2b-helm to `/tmp`
-
-```bash
-git clone https://github.com/Aviora/b2b-helm.git /tmp/b2b-helm
-```
-
-3. Give needed permissions for DMS
-
-```bash
-cd /tmp/b2b-helm/charts/admin && helm install --name dm-helm-access ./helm-access
-cd /tmp/b2b-helm/charts/admin && helm install --name dm-pvc-control ./pvc-control
-```
-
-4. Deploy DMS
-
-```bash
-./b2b-helm-tool -d deploy dms:dm-v3
-```
