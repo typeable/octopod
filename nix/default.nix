@@ -1,14 +1,15 @@
 { sources ? import ./sources.nix
 , b2b-helm-pkgs ? import ../b2b-helm { }
-, migrations ? ../migrations
-, server-cert ? ../tmp/server_cert.pem
-, server-key ? ../tmp/server_key.pem
-, passwd ? ../tmp/passwd
-, ssh-config ? ../tmp/ssh_config
-, ssh-known-hosts ? ../tmp/ssh_known_hosts
-, deploy-key ? ../tmp/deploy.key
-, client-cert ? ../tmp/client_cert.pem
-, client-key ? ../tmp/client_key.pem
+
+, migrations ? "please use '--arg migration <value>'"
+, server-cert ? "please use '--arg server-cert <value>'"
+, server-key ? "please use '--arg server-key <value>'"
+, passwd ? "please use '--arg passwd <value>'"
+, ssh-config ? "please use '--arg ssh-config <value>'"
+, ssh-known-hosts ? "please use '--arg ssh-known-hosts <value>'"
+, deploy-key ? "please use '--arg deploy-key <value>'"
+, client-cert ? "please use '--arg client-cert <value>'"
+, client-key ? "please use '--arg client-key <value>'"
 }:
 with {
   overlay = _: pkgs:
