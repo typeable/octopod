@@ -49,6 +49,14 @@ Available options:
   -h,--help                Show this help text
 ```
 
+# Build and publish docker images to ECR
+
+For a build and publish of Docker images you must have needed AWS permissions: access to SSM and ECR!
+
+```
+./release.sh <user|ci|rundesk>
+```
+
 # Kubernetes installation
 
 1. Deploy DMS's infra
