@@ -16,10 +16,16 @@ with {
     with pkgs; rec {
       dm = haskellPackages.dm-static;
 
+      cacert' = cacert.overrideAttrs (o: {
+        fixupPhase = ''
+          cat $out/etc/ssl/certs/* > $out/etc/ssl/certs/ca-certificates.crt
+        '';
+      });
+
       dms-container = dockerTools.buildImage {
         name = "dms-container-slim";
         contents =
-          [ dm git b2b-helm-tool kubernetes-helm2 kubectl coreutils bash openssh ];
+          [ dm git b2b-helm-tool kubernetes-helm2 kubectl coreutils bash openssh gnugrep cacert' ];
 
         runAsRoot = ''
           mkdir /tmp
