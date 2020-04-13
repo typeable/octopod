@@ -35,7 +35,7 @@ build_credentials() {
 
 download_deploy_key() {
     key=`aws ssm get-parameter --name "$1" --with-decryption | jq '.Parameter.Value'`
-    echo -e $key > $configs/deploy.key
+    echo -e $key | sed -r 's/"//g' > $configs/deploy.key
 }
 
 build_configs() {
