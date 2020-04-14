@@ -25,7 +25,7 @@ with {
       dms-container = dockerTools.buildImage {
         name = "dms-container-slim";
         contents =
-          [ dm git b2b-helm-tool kubernetes-helm2 kubectl coreutils bash openssh gnugrep cacert' ];
+          [ dm git b2b-helm-tool kubernetes-helm2-bin kubectl coreutils bash openssh gnugrep cacert' ];
 
         runAsRoot = ''
           mkdir /tmp
@@ -51,6 +51,10 @@ with {
           cp -av ${deploy-key} /root/.ssh/deploy.key
           chown root /root/.ssh/*
           chmod 400 /root/.ssh/*
+
+          mkdir -p /usr/local/bin
+          cp ${kubernetes-helm2-bin}/helm /usr/local/bin/
+          chmod +x /usr/local/bin/helm
         '';
 
         config = {
@@ -97,6 +101,11 @@ with {
         goPackagePath = "github.com/aviora/b2b-helm";
         src = ../b2b-helm/tool;
         goDeps = ../b2b-helm/tool/deps.nix;
+      };
+
+      kubernetes-helm2-bin = fetchzip {
+        url = "https://get.helm.sh/helm-v2.16.5-linux-amd64.tar.gz";
+        sha256 = "1r91i8gy3zsgwx1fr2n6syspjrqv822ngf54db8xycskv4p5mxxj";
       };
 
       haskellPackages = pkgs.haskellPackages.override {
