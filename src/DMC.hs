@@ -50,7 +50,7 @@ runDMC = do
       InfoC tName _ _            -> handleInfo $ DeploymentName tName
 
 dmsHostName :: String
-dmsHostName = "dm.kube.thebestagent.pro"
+dmsHostName = "dm.stage.thebestagent.pro"
 
 getBaseUrl :: IO BaseUrl
 getBaseUrl = do
@@ -170,7 +170,7 @@ printInfo (DeploymentInfo (Deployment dName dTag envPairs) dLogs) = do
   T.putStrLn $ "tag: " <> coerce dTag
   T.putStrLn $ "envs: " <> formatEnvPairs envPairs
   T.putStrLn
-    $ "URL: https://" <> coerce dName <> ".kube.thebestagent.pro"
+    $ "URL: https://" <> coerce dName <> ".stage.thebestagent.pro"
   T.putStrLn ""
   T.putStrLn "Last logs:"
   mapM_ ppDeploymentLog dLogs
