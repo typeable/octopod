@@ -48,8 +48,8 @@ composeAppArgs :: DeploymentName -> DeploymentTag -> EnvPairs -> [CommandArg]
 composeAppArgs dName dTag envPairs = [
     "-d", "deploy"
   , "--release-name", releaseName appChartName dName
-  , "--set", "b2b-app.email_domain=" <> coerce dName <> ".kube.thebestagent.pro"
-  , "--set", "b2b-app.domain=" <> coerce dName <> ".kube.thebestagent.pro"
+  , "--set", "b2b-app.email_domain=" <> coerce dName <> ".stage.thebestagent.pro"
+  , "--set", "b2b-app.domain=" <> coerce dName <> ".stage.thebestagent.pro"
   , "--set", "b2b-app.connections.pg_instance=avia:avia@"
     <> rn <> "-postgres-0." <> rn <> "-postgres." <> namespace <> ":5432"
   , "--set", "b2b-app.connections.elastic=http://"
@@ -82,7 +82,7 @@ createInfraArgs dName = [
   , "--set", "b2b-kibana.elasic_hosts=http://b2b-infra-dm-staging-" <> coerce dName
     <> "-elasticsearch-0.b2b-infra-dm-staging-" <> coerce dName
     <> "-elasticsearch.staging:9200"
-  , "--set", "b2b-kibana.domain=kibana." <> coerce dName <> ".kube.thebestagent.pro"
+  , "--set", "b2b-kibana.domain=kibana." <> coerce dName <> ".stage.thebestagent.pro"
   , coerce infraChartName
   ]
   where
