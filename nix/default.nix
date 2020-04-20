@@ -78,7 +78,7 @@ with {
 
       dmc-container = dockerTools.buildImage {
         name = "dmc-container-slim";
-        contents = [ dm coreutils bash ];
+        contents = [ dm coreutils bash emacs vim ];
 
         runAsRoot = ''
           mkdir /app
@@ -90,6 +90,7 @@ with {
 
         config = {
           Entrypoint = [ "/app/dmc-exe" ];
+          Env = [ "EDITOR=${vim}/bin/vim" ];
         };
       };
 
