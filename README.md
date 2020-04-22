@@ -81,13 +81,18 @@ cd /tmp/b2b-helm/charts/admin && helm install --name dm-pvc-control ./pvc-contro
 4. Deploy DMS
 
 ```bash
-./b2b-helm-tool -d deploy dms:dm-v3
+./b2b-helm-tool -d deploy dms:latest
 ```
 
 # How to deploy a new staging
 
 ```bash
 dmc create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -e ENV_VAR2=env_val2
+```
+
+Or use Docker:
+```bash
+docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -e ENV_VAR2=env_val2
 ```
 
 Note that in our ECR(hosted docker registry) we use a convention of
@@ -99,6 +104,15 @@ intermediate steps.
 
 ```bash
 dmc edit --name STAGING_NAME
+```
+
+Or use Docker:
+```bash
+# use Vim
+docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest edit --name STAGING_NAME
+
+# use Emacs
+docker run -ti -e EDITOR=emacs --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest edit --name STAGING_NAME
 ```
 
 `dmc edit` opens an `$EDITOR` where you can override staging variables. To
