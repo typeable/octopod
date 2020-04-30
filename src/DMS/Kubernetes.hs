@@ -7,6 +7,7 @@ module DMS.Kubernetes
   , destroyAppArgs
   , destroyInfraArgs
   , deletePVCArgs
+  , deleteCertArgs
   , CommandArg
   , ChartName(..)
   ) where
@@ -105,4 +106,15 @@ deletePVCArgs dName = [
     , namespace
     , "-l"
     , "staging=" <> coerce dName
+  ]
+
+deleteCertArgs :: DeploymentName -> [CommandArg]
+deleteCertArgs dName = [
+      "delete"
+    , "certificate"
+    , "-n"
+    , namespace
+    , "b2b-dm-staging-" <> coerce dName <> "-tls"
+    , "b2b-dm-staging-"<> coerce dName <> "-tls-tasker"
+    , "b2b-infra-dm-staging-" <> coerce dName <> "-kibana-tls"
   ]

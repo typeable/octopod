@@ -248,19 +248,26 @@ destroyH dName = do
     log     = logInfo (logger st)
     pgPool  = pool st
   liftIO $ do
-    let appArgs' = destroyAppArgs dName
-    log $ "call " <> unwords (pack helmBin : appArgs')
-    ec1 <- destroyApp appArgs' helmBin
-    let infraArgs = destroyInfraArgs dName
-    log $ "call " <> unwords (pack helmBin : infraArgs)
-    ec2 <- destroyInfra infraArgs helmBin
-    let deletePVCArgs' = deletePVCArgs dName
-    log $ "call " <> unwords (pack kubectlBin : deletePVCArgs')
-    ec3 <- deletePVC deletePVCArgs' kubectlBin
+    ec1 <- do
+      let appArgs' = destroyAppArgs dName
+      log $ "call " <> unwords (pack helmBin : appArgs')
+      destroyApp appArgs' helmBin
+    ec2 <- do
+      let infraArgs = destroyInfraArgs dName
+      log $ "call " <> unwords (pack helmBin : infraArgs)
+      destroyInfra infraArgs helmBin
+    ec3 <- do
+      let deletePVCArgs' = deletePVCArgs dName
+      log $ "call " <> unwords (pack kubectlBin : deletePVCArgs')
+      deletePVC deletePVCArgs' kubectlBin
+    ec4 <- do
+      let deleteCertArgs' = deleteCertArgs dName
+      log $ "call " <> unwords (pack kubectlBin : deleteCertArgs')
+      deleteCert deleteCertArgs' kubectlBin
     void $ deleteDeploymentLogs pgPool dName
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
-    handleExitCode $ ec1 `max` ec2 `max` ec3
+    handleExitCode $ maximum [ec1, ec2, ec3, ec4]
   pure NoContent
 
 destroyApp :: [CommandArg] -> FilePath -> IO ExitCode
@@ -274,6 +281,9 @@ destroyInfra args helmBin =
 deletePVC :: [CommandArg] -> FilePath -> IO ExitCode
 deletePVC args kubectlBin =
   withProcessWait (proc kubectlBin $ unpack <$> args) waitProcess
+
+deleteCert :: [CommandArg] -> FilePath -> IO ExitCode
+deleteCert = deletePVC
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
