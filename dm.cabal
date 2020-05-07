@@ -50,6 +50,7 @@ library
       src
   build-depends:
       aeson
+    , async
     , base >=4.7 && <5
     , bytestring
     , chronos
@@ -95,6 +96,7 @@ executable dmc-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , async
     , base >=4.7 && <5
     , bytestring
     , chronos
@@ -137,6 +139,7 @@ executable dms-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , async
     , base >=4.7 && <5
     , bytestring
     , chronos
@@ -177,6 +180,7 @@ test-suite dm-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , async
     , base >=4.7 && <5
     , bytestring
     , chronos

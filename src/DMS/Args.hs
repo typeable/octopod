@@ -11,6 +11,7 @@ import Types
 
 data Args = Args
   { port :: Int
+  , uiPort :: Int
   , db :: ByteString
   , dbPoolSize :: Int
   , tlsCertPath :: ByteString
@@ -24,6 +25,7 @@ instance ParseRecord Args where
 
 data DMSOpts = DMSOpts
   { dmsPort :: ServerPort
+  , dmsUIPort :: ServerPort
   , dmsDB :: DBConnectionString
   , dmsDBPoolSize :: DBPoolSize
   , dmsTLSCertPath :: TLSCertPath
@@ -37,6 +39,7 @@ parseArgs = do
   args <- getRecord "DMS"
   pure $ DMSOpts
     (coerce $ port args)
+    (coerce $ uiPort args)
     (coerce $ db args)
     (coerce $ dbPoolSize args)
     (coerce $ tlsCertPath args)

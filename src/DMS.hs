@@ -2,6 +2,7 @@ module DMS (runDMS) where
 
 
 import Control.Applicative
+import Control.Concurrent.Async (race_)
 import Control.Exception (throwIO, Exception)
 import Control.Monad
 import Control.Monad.IO.Class
@@ -66,10 +67,11 @@ runDMS = do
   kubectlBin <- kubectlPath ?! "kubectl not found"
   pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
-  let serverPort = dmsPort opts
+      serverPort = dmsPort opts
+      uiServerPort = unServerPort $ dmsUIPort opts
       tlsOpts = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
       warpOpts = setPort (unServerPort serverPort) defaultSettings
-      in runTLS tlsOpts warpOpts app'
+      in (run uiServerPort app') `race_` (runTLS tlsOpts warpOpts app')
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
