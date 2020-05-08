@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BSC
 import Data.Coerce
 import Data.Int (Int64)
 import Data.Maybe
@@ -20,6 +21,7 @@ import Network.Wai.Handler.WarpTLS
 import Options.Generic
 import Prelude hiding (lines, unlines, unwords, log)
 import Servant
+import System.Environment (lookupEnv)
 import System.Exit
 import System.FilePath.Posix
 import System.IO.Temp
@@ -45,6 +47,13 @@ data AppState = AppState
   , b2bHelm :: FilePath
   , git     :: FilePath
   , kubectl :: FilePath
+  , project_name :: ProjectName
+  , base_domain :: Domain
+  , creation_command :: Command
+  , update_command :: Command
+  , update_envs_command :: Command
+  , deletion_command :: Command
+  , checking_command :: Command
   }
 
 data DeploymentException
@@ -65,8 +74,27 @@ runDMS = do
   b2bHelmBin <- b2bHelmPath ?! "b2b-helm not found"
   gitBin <- gitPath ?! "git not found"
   kubectlBin <- kubectlPath ?! "kubectl not found"
+  proj_name <- coerce . BSC.pack <$> lookupEnv "PROJECT_NAME" ?! "PROJECT_NAME is not set"
+  domain <- coerce . BSC.pack <$> lookupEnv "BASE_DOMAIN" ?! "BASE_DOMAIN is not set"
+  creation_cmd <- coerce <$> lookupEnv "CREATION_COMMAND" ?! "CREATION_COMMAND is not set"
+  update_cmd <- coerce <$> lookupEnv "UPDATE_COMMAND" ?! "UPDATE_COMMAND is not set"
+  update_envs_cmd <- coerce <$> lookupEnv "UPDATE_ENVS_COMMAND" ?! "UPDATE_ENVS_COMMAND is not set"
+  deletion_cmd <- coerce <$> lookupEnv "DELETION_COMMAND" ?! "DELETION_COMMAND is not set"
+  checking_cmd <- coerce <$> lookupEnv "CHECKING_COMMAND" ?! "CHECKING_COMMAND is not set"
   pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
-  let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
+  let app' = app $ AppState pgPool
+                            logger'
+                            helmBin
+                            b2bHelmBin
+                            gitBin
+                            kubectlBin
+                            proj_name
+                            domain
+                            creation_cmd
+                            update_cmd
+                            update_envs_cmd
+                            deletion_cmd
+                            checking_cmd
       serverPort = dmsPort opts
       uiServerPort = unServerPort $ dmsUIPort opts
       tlsOpts = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
@@ -354,6 +382,18 @@ infoH dName = do
 
 pingH :: AppM NoContent
 pingH = do
+
+  -- FIXME: at least some use
+  state <- ask
+  liftIO $ print $ base_domain state
+  liftIO $ print $ project_name state
+  liftIO $ print $ creation_command state
+  liftIO $ print $ update_command state
+  liftIO $ print $ update_envs_command state
+  liftIO $ print $ deletion_command state
+  liftIO $ print $ checking_command state
+
+
   pgPool <- pool <$> ask
   _ :: [Only Int] <-
     liftIO $ withResource pgPool $ \conn -> query_ conn "SELECT 1"
