@@ -156,7 +156,8 @@ infoH :: DeploymentName -> ClientM [DeploymentInfo]
  :<|> editH
  :<|> destroyH
  :<|> updateH
- :<|> infoH)
+ :<|> infoH
+ :<|> _)
  :<|> _ = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()

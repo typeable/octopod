@@ -17,6 +17,7 @@ type DestroyEndpoint c = c :> DeleteNoContent '[PlainText] NoContent
 type UpdateEndpoint c =
   c :> Capture "tag" DeploymentTag :> PutNoContent '[PlainText] NoContent
 type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
+type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
 
 -- FIXME: Text as a return type for many endpoints
 type DeploymentAPI' c =
@@ -29,6 +30,7 @@ type DeploymentAPI' c =
       :<|> DestroyEndpoint c
       :<|> UpdateEndpoint c
       :<|> InfoEndpoint c
+      :<|> StatusEndpoint c
       )
     :<|> "ping" :> GetNoContent '[PlainText] NoContent
     )
