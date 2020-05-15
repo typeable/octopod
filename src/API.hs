@@ -7,7 +7,7 @@ import Types
 
 type CaptureName = Capture "name" DeploymentName
 
-type ListEndpoint = Get '[JSON] [DeploymentName]
+type ListEndpoint = Get '[JSON] [DeploymentFullInfo]
 type CreateEndpoint =
   ReqBody '[JSON] Deployment :> PostNoContent '[PlainText] NoContent
 type GetEndpoint c = c :> Get '[JSON] Deployment

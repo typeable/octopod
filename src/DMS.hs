@@ -8,7 +8,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BSC
 import Data.Coerce
 import Data.Int (Int64)
 import Data.Maybe
@@ -63,7 +62,7 @@ runDMS = do
   logInfo logger' "started"
   opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
-  proj_name <- coerce . BSC.pack <$> lookupEnv "PROJECT_NAME" ?! "PROJECT_NAME is not set"
+  proj_name <- coerce . pack <$> lookupEnv "PROJECT_NAME" ?! "PROJECT_NAME is not set"
   domain <- coerce . pack <$> lookupEnv "BASE_DOMAIN" ?! "BASE_DOMAIN is not set"
   ns <- coerce . pack <$> lookupEnv "NAMESPACE" ?! "NAMESPACE is not set"
   creation_cmd <- coerce . pack <$> lookupEnv "CREATION_COMMAND" ?! "CREATION_COMMAND is not set"
@@ -104,16 +103,26 @@ server :: ServerT API AppM
 server = (listH :<|> createH :<|> getH :<|> editH
     :<|> destroyH :<|> updateH :<|> infoH :<|> statusH) :<|> pingH
 
-listH :: AppM [DeploymentName]
+listH :: AppM [DeploymentFullInfo]
 listH = do
-  AppState{pool = p, logger = l} <- ask
-  ds <- getDeployments p
+  AppState{pool = p, logger = l, base_domain = d} <- ask
+
+  retrieved <- liftIO $ withResource p $ \conn -> query_ conn q
+  ds <- liftIO $ for retrieved $ \(n, t, e, ct, ut) -> do
+    es <- parseEnvs (lines e)
+    pure $ DeploymentFullInfo (Deployment n t es) ct ut (depUrls d n)
+
   liftIO . logInfo l $ "get deployments: " <> (pack . show $ ds)
   return ds
   where
-    getDeployments :: PgPool -> AppM [DeploymentName]
-    getDeployments p = fmap (fmap fromOnly) . liftIO $
-      withResource p $ \conn -> query_ conn "SELECT name FROM deployments"
+    q = "SELECT name, tag, envs, extract(epoch from created_at)::int, extract(epoch from updated_at)::int \
+        \FROM deployments ORDER BY name"
+    depUrls d n = [("app", appUrl d n)
+                  , ("kibana", "kibana." <> appUrl d n)
+                  , ("tasker", "tasker." <> appUrl d n)
+                  ]
+    appUrl d n = coerce n <> "." <> coerce d
+
 
 createH :: Deployment -> AppM NoContent
 createH dep = do
@@ -123,7 +132,11 @@ createH dep = do
     log = logInfo (logger st)
     pgPool = pool st
     -- FIXME: add envs to args
-    args = [coerce $ base_domain st, coerce $ namespace st, coerce $ name dep, coerce $ tag dep]
+    args = [coerce $ project_name st
+           , coerce $ base_domain st
+           , coerce $ namespace st
+           , coerce $ name dep
+           , coerce $ tag dep]
     cmd = coerce $ creation_command st
     createDeployment :: PgPool -> Deployment -> IO Int64
     createDeployment p Deployment { name = n, tag = t, envs = e } =
@@ -300,11 +313,6 @@ infoH dName = do
 
 pingH :: AppM NoContent
 pingH = do
-
-  -- FIXME: at least some use
-  state <- ask
-  liftIO $ print $ project_name state
-
   pgPool <- pool <$> ask
   _ :: [Only Int] <-
     liftIO $ withResource pgPool $ \conn -> query_ conn "SELECT 1"

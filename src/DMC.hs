@@ -85,7 +85,8 @@ handleList = do
   clientEnv <- ask
   liftIO $ do
     l <- runClientM listH clientEnv
-    handleResponse T.putStr $ T.unlines . coerce <$> l
+    handleResponse T.putStr $ T.unlines . coerce . (dn <$>) <$> l
+  where dn (DeploymentFullInfo (Deployment n _ _) _ _ _) = n
 
 handleEdit :: DeploymentName -> ReaderT ClientEnv IO ()
 handleEdit dName = do
@@ -136,7 +137,7 @@ handleInfo dName = do
       Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
       Left err -> print $ "request failed, reason: " ++ show err
 
-listH :: ClientM [DeploymentName]
+listH :: ClientM [DeploymentFullInfo]
 
 createH :: Deployment -> ClientM NoContent
 

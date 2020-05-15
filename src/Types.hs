@@ -74,6 +74,15 @@ data DeploymentInfo = DeploymentInfo
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentInfo
 
+data DeploymentFullInfo = DeploymentFullInfo
+  { deployment :: Deployment
+  , createdAt :: Int
+  , updatedAt :: Int
+  , urls :: [(Text, Text)]
+  }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
 data Status = Ok | Error
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake Status
@@ -100,7 +109,7 @@ newtype TLSKeyPath = TLSKeyPath { unTLSKeyPath :: ByteString }
 newtype TLSStorePath = TLSStore { unTLSStorePath :: ByteString }
   deriving (Show)
 
-newtype ProjectName = ProjectName { unProjectName :: ByteString }
+newtype ProjectName = ProjectName { unProjectName :: Text }
   deriving (Show)
 
 newtype Domain = Domain { unDomain :: Text }
