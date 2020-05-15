@@ -1,2 +1,2 @@
-FROM scratch
-ADD echo.sh /
+FROM busybox
+ADD echo.sh /utils/
