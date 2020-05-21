@@ -28,6 +28,7 @@ library
                      , DeriveGeneric
                      , DerivingVia
                      , DuplicateRecordFields
+                     , FlexibleContexts
                      , GeneralizedNewtypeDeriving
                      , LambdaCase
                      , OverloadedStrings

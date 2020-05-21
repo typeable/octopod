@@ -131,12 +131,13 @@ createH dep = do
     log :: Text -> IO ()
     log = logInfo (logger st)
     pgPool = pool st
-    -- FIXME: add envs to args
-    args = [coerce $ project_name st
-           , coerce $ base_domain st
-           , coerce $ namespace st
-           , coerce $ name dep
-           , coerce $ tag dep]
+    args = [ "--project-name", coerce $ project_name st
+           , "--base-domain", coerce $ base_domain st
+           , "--namespace", coerce $ namespace st
+           , "--name", coerce $ name dep
+           , "--tag", coerce $ tag dep
+           ]
+           ++ concat [["--env", concatPair e] | e <- envs dep]
     cmd = coerce $ creation_command st
     createDeployment :: PgPool -> Deployment -> IO Int64
     createDeployment p Deployment { name = n, tag = t, envs = e } =
@@ -200,11 +201,17 @@ editH n e = do
     log :: Text -> IO ()
     log          = logInfo (logger st)
     pgPool       = pool st
-    -- FIXME: add envs to args
-    args = [coerce $ base_domain st, coerce $ namespace st, coerce n]
-    cmd = coerce $ update_command st
   liftIO $ getTag pgPool >>= \case
     t : _ -> do
+      let
+        args = [ "--project-name", coerce $ project_name st
+               , "--base-domain", coerce $ base_domain st
+               , "--namespace", coerce $ namespace st
+               , "--name", coerce n
+               , "--tag", coerce t
+               ]
+               ++ concat [["--env", concatPair p] | p <- e]
+        cmd = coerce $ update_command st
       liftIO $  do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
@@ -235,7 +242,10 @@ destroyH dName = do
   let
     log     = logInfo (logger st)
     pgPool  = pool st
-    args = [coerce dName]
+    args = [ "--project-name", coerce $ project_name st
+           , "--namespace", coerce $ namespace st
+           , "--name", coerce dName
+           ]
     cmd = coerce $ deletion_command st
   liftIO $ do
     log $ "call " <> unwords (cmd : args)
@@ -268,7 +278,13 @@ updateH dName dTag = do
       envPairs <- liftIO $ parseEnvs $ lines storedEnv
       let
         log        = logInfo (logger st)
-        args = [coerce $ base_domain st, coerce $ namespace st, coerce dName, coerce dTag]
+        args = [ "--project-name", coerce $ project_name st
+               , "--base-domain", coerce $ base_domain st
+               , "--namespace", coerce $ namespace st
+               , "--name", coerce $ dName
+               , "--tag", coerce $ dTag
+               ]
+               ++ concat [["--env", concatPair e] | e <- envPairs]
         cmd = coerce $ update_envs_command st
       liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
