@@ -7,6 +7,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Output;
 
 const APP_CHART_NAME: &str = "b2b-dm-staging";
 const INFRA_CHART_NAME: &str = "b2b-infra-dm-staging";
@@ -54,6 +55,17 @@ pub fn whereis(cmd: &str) -> Option<String> {
         })
 }
 
+pub fn print_command_result(output: Output) {
+    println!(
+        "{}",
+        String::from_utf8(output.stdout).expect("valid stdout")
+    );
+    eprintln!(
+        "{}",
+        String::from_utf8(output.stderr).expect("valid stderr")
+    );
+}
+
 #[derive(Debug)]
 pub struct EnvPair {
     pub key: String,
@@ -89,7 +101,6 @@ pub fn create_infra_atrs(domain: &str, namespace: &str, name: &str) -> Vec<Strin
 
     vec![
         "-d",
-        "--dry-run",
         "deploy",
         "--release-name",
         &rn,
@@ -97,8 +108,8 @@ pub fn create_infra_atrs(domain: &str, namespace: &str, name: &str) -> Vec<Strin
         &format!("b2b-kafka-int.zk={}-zk-0.{}-zk.{}/int", rn, rn, namespace),
         "--set",
         &format!(
-            "b2b-{}.cluster_hosts={}-{}-0.{}-elasticsearch.{}",
-            es, rn, es, rn, namespace
+            "b2b-{}.cluster_hosts={}-{}-0.{}-{}.{}",
+            es, rn, es, rn, es, namespace
         ),
         "--set",
         &format!("b2b-postgres.postgres_db={}", db),
@@ -131,7 +142,6 @@ pub fn create_app_atrs(
 
     let mut atrs = vec![
         "-d",
-        "--dry-run",
         "deploy",
         "--release-name",
         &rn,
@@ -146,8 +156,8 @@ pub fn create_app_atrs(
         ),
         "--set",
         &format!(
-            "b2b-app.connections.elastic=http://{}-elasticsearch.{}:9200",
-            rni, namespace
+            "b2b-app.connections.elastic=http://{}-{}.{}:9200",
+            rni, es, namespace
         ),
         "--set",
         &format!(
@@ -178,7 +188,12 @@ pub fn create_app_atrs(
 
     let mut env_atrs = envs
         .into_iter()
-        .map(|e| vec!["--set".to_string(), e.to_string()])
+        .map(|e| {
+            vec![
+                "--set".to_string(),
+                format!("b2b-app.env.{}", e.to_string()),
+            ]
+        })
         .flatten()
         .collect::<Vec<_>>();
     let mut tagged_release_name = vec![tagged_release(APP_CHART_NAME, tag)];
@@ -211,6 +226,21 @@ pub fn delete_pvcs_atrs(namespace: &str, name: &str) -> Vec<String> {
         namespace,
         "-l",
         &format!("staging={}", name),
+    ]
+    .iter()
+    .map(ToString::to_string)
+    .collect::<Vec<_>>()
+}
+
+pub fn delete_cert_atrs(namespace: &str, name: &str) -> Vec<String> {
+    vec![
+        "delete",
+        "certificate",
+        "-n",
+        namespace,
+        &format!("b2b-dm-staging-{}-tls", name),
+        &format!("b2b-dm-staging-{}-tls-tasker", name),
+        &format!("b2b-infra-dm-staging-{}-kibana-tls", name),
     ]
     .iter()
     .map(ToString::to_string)

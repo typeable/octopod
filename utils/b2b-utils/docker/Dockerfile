@@ -1,7 +1,7 @@
 FROM busybox
 
-ADD tmp/create /
-ADD tmp/update /
-ADD tmp/update_envs /
-ADD tmp/delete /
-ADD tmp/check /
+ADD tmp/create /utils/
+ADD tmp/update /utils/
+ADD tmp/update_envs /utils/
+ADD tmp/delete /utils/
+ADD tmp/check /utils/

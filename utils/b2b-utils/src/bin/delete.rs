@@ -7,6 +7,13 @@ fn main() -> std::io::Result<()> {
     let matches = App::new("delete")
         .version("0.1")
         .arg(
+            Arg::with_name("project-name")
+                .long("project-name")
+                .short("p")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("namespace")
                 .long("namespace")
                 .short("s")
@@ -22,8 +29,10 @@ fn main() -> std::io::Result<()> {
         )
         .get_matches();
 
+    let project_name = matches.value_of("project-name").expect("get project-name");
     let namespace = matches.value_of("namespace").expect("get namepace");
     let name = matches.value_of("name").expect("get name");
+    println!("project_name: {:?}", project_name);
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
 
@@ -31,40 +40,25 @@ fn main() -> std::io::Result<()> {
         .args(delete_app_atrs(name))
         .output()
         .expect("delete app");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
 
     let output = Command::new("helm")
         .args(delete_infra_atrs(name))
         .output()
         .expect("delete infra");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
 
     let output = Command::new("kubectl")
         .args(delete_pvcs_atrs(namespace, name))
         .output()
         .expect("delete PVCs");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
+
+    let output = Command::new("kubectl")
+        .args(delete_cert_atrs(namespace, name))
+        .output()
+        .expect("delete certificates");
+    print_command_result(output);
 
     Ok(())
 }

@@ -10,6 +10,13 @@ fn main() -> std::io::Result<()> {
     let matches = App::new("create")
         .version("0.1")
         .arg(
+            Arg::with_name("project-name")
+                .long("project-name")
+                .short("p")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("base-domain")
                 .long("base-domain")
                 .short("d")
@@ -47,16 +54,18 @@ fn main() -> std::io::Result<()> {
         )
         .get_matches();
 
+    let project_name = matches.value_of("project-name").expect("get project-name");
     let base_domain = matches.value_of("base-domain").expect("get base-domain");
     let namespace = matches.value_of("namespace").expect("get namepace");
     let name = matches.value_of("name").expect("get name");
     let tag = matches.value_of("tag").expect("get tag");
     let envs = matches
         .values_of("env")
-        .expect("get envs")
+        .unwrap_or_else(Default::default)
         .map(|e| e.try_into().expect("get valid key=value"))
         .collect::<Vec<EnvPair>>();
 
+    println!("project_name: {:?}", project_name);
     println!("base_domain: {:?}", base_domain);
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
@@ -83,14 +92,7 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("clone repo");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
 
     fs::copy(&b2b_heml, Path::new(&work_dir).join("b2b-helm"))?;
 
@@ -99,28 +101,14 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("create infra");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
 
     let output = Command::new("b2b-helm")
         .args(create_app_atrs(base_domain, namespace, name, tag, envs))
         .current_dir(&work_dir)
         .output()
         .expect("create app");
-    println!(
-        "{}",
-        String::from_utf8(output.stdout).expect("valid stdout")
-    );
-    eprintln!(
-        "{}",
-        String::from_utf8(output.stderr).expect("valid stderr")
-    );
+    print_command_result(output);
 
     Ok(())
 }
