@@ -117,12 +117,11 @@ listH = do
   where
     q = "SELECT name, tag, envs, extract(epoch from created_at)::int, extract(epoch from updated_at)::int \
         \FROM deployments ORDER BY name"
-    depUrls d n = [("app", appUrl d n)
+    depUrls d n = [ ("app", appUrl d n)
                   , ("kibana", "kibana." <> appUrl d n)
                   , ("tasker", "tasker." <> appUrl d n)
                   ]
     appUrl d n = coerce n <> "." <> coerce d
-
 
 createH :: Deployment -> AppM NoContent
 createH dep = do
