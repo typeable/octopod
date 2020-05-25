@@ -92,43 +92,50 @@ push_docker_images() {
     rm $outfile
 }
 
-key="b2b-helm-repo-user-deploy-key"
+build_docker_images() {
+    build_configs $key
+    update_dependencies
+    build_dmc_docker_image $configs $dmc_docker
+    build_dms_docker_image $configs $migrations $dms_docker
+}
 
-case "$1" in
-    user)
-        echo "$1 mode"
-        key="b2b-helm-repo-user-deploy-key"
-        ;;
-    ci)
-        echo "$1 mode"
-        key="b2b-helm-repo-ci-deploy-key"
-        ;;
-    rundesk)
-        echo "$1 mode"
-        key="b2b-helm-repo-rundesk-deploy-key"
-        ;;
-    *)
-        echo "usage: $0 <mode>"
-        echo "mode = user | ci | rundesk"
-        exit 1
-        ;;
-esac
+cleanup() {
+    rm -r $configs
+    echo "'$configs' directory deleted"
+}
 
 export tag=$(git rev-parse HEAD)
 export migrations="./migrations"
-export configs=`mktemp -d`
 export dmc_docker="dmc-docker"
 export dms_docker="dms-docker"
 export cert_expiration=730
 
-echo "using '$configs' directory"
-
-aws_login
-build_configs $key
-update_dependencies
-build_dmc_docker_image $configs $dmc_docker
-build_dms_docker_image $configs $migrations $dms_docker
-push_docker_images
-
-rm -r $configs
-echo "'$configs' directory deleted"
+case "$1" in
+    user)
+        echo "$1 mode"
+        export key="b2b-helm-repo-user-deploy-key"
+        export configs=`mktemp -d`
+        echo "using '$configs' directory"
+        aws_login
+        build_docker_images
+        push_docker_images
+        cleanup
+        ;;
+    ci)
+        echo "$1 mode"
+        export key="b2b-helm-repo-ci-deploy-key"
+        if [ -d "$2" ]; then
+            export configs="$2"
+        else
+            echo "cannot access '$2': No such directory"
+            exit 1
+        fi
+        echo "using '$configs' directory"
+        build_docker_images
+        ;;
+    *)
+        echo "usage: $0 <mode> [<work_dir>]"
+        echo "mode = user | ci"
+        exit 1
+        ;;
+esac

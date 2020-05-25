@@ -1,0 +1,80 @@
+name: Build Docker Image
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+    name: build-docker
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure git credentials
+      run: |
+        git config --global credential.helper '!f() { echo "username=${{ secrets.GH_USERNAME }}"; echo "password=${{ secrets.GH_ACCESS_TOKEN }}"; }; f'
+
+    - uses: actions/checkout@v2
+      with:
+        repo: Aviora/dm
+        fetch-depth: 0 # fetch all history
+
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        git submodule sync --recursive
+        git submodule update --init --force --recursive --depth=1
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Set up remote builds
+      id: remote
+      run: |
+        tempdir=/tmp/dm_$(date +%Y%m%d%H%M%S)
+
+        # set up ssh keys
+        mkdir -p ~/.ssh
+        echo "${{ secrets.builder_ssh_key }}" > $HOME/.ssh/builder
+        echo -e "\nHost builder\n\tHostName ${{ secrets.builder_addr }}\n\tServerAliveInterval 30\n\tServerAliveCountMax 5\n\tUser nix\n\tStrictHostKeyChecking no\n\tIdentityFile $HOME/.ssh/builder" | sudo tee /etc/ssh/ssh_config
+        echo -e "echo ${{ secrets.builder_addr }}\tbuilder" | sudo tee /etc/hosts
+        chmod 0500 $HOME/.ssh/builder
+        ssh builder uname
+        rsync --exclude '.git' -lr ./ builder:$tempdir
+        echo "##[set-output name=tempdir;]$tempdir"
+
+    - name: Build and push image to Amazon ECR
+      env:
+        tempdir: ${{ steps.remote.outputs.tempdir }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # build docker images
+        ssh builder "cd $tempdir; mkdir tmp; ./release.sh ci tmp"
+
+        # push docker images to ECR
+        for app in dmc dms; do
+            image_name=`ssh builder "cat $tempdir/$app-docker" | docker load | awk '{print $3}'`
+            docker tag $image_name $ECR_REGISTRY/$app:$IMAGE_TAG
+            docker tag $image_name $ECR_REGISTRY/$app:latest
+            docker push $ECR_REGISTRY/$app:$IMAGE_TAG
+        done
+        for app in dmc dms; do
+            docker push $ECR_REGISTRY/$app:latest
+        done
+
+    - name: Clean up
+      if: always()
+      env:
+        tempdir: ${{ steps.remote.outputs.tempdir }}
+      run: |
+        docker logout ${{ steps.login-ecr.outputs.registry }}
+        ssh builder "rm -rf $tempdir"
