@@ -96,7 +96,7 @@ listH = do
   where
     getDeployments :: PgPool -> AppM [DeploymentName]
     getDeployments p = fmap (fmap fromOnly) . liftIO $
-      withResource p $ \conn -> query_ conn "SELECT name FROM deployments"
+      withResource p $ \conn -> query_ conn "SELECT name FROM deployments ORDER BY name"
 
 createH :: Deployment -> AppM NoContent
 createH dep = do
