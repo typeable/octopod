@@ -15,7 +15,7 @@ type EditEndpoint c =
   c :> ReqBody '[JSON] EnvPairs :> PatchNoContent '[PlainText] NoContent
 type DestroyEndpoint c = c :> DeleteNoContent '[PlainText] NoContent
 type UpdateEndpoint c =
-  c :> Capture "tag" DeploymentTag :> PutNoContent '[PlainText] NoContent
+  c :> ReqBody '[JSON] DeploymentUpdate :> PutNoContent '[PlainText] NoContent
 type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
 type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
 

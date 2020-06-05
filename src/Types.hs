@@ -84,6 +84,13 @@ data DeploymentFullInfo = DeploymentFullInfo
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
+data DeploymentUpdate = DeploymentUpdate
+  { newTag :: DeploymentTag
+  , newEnvs :: EnvPairs
+  }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
+
 data Status
   = Ok
   | Error

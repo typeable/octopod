@@ -127,7 +127,8 @@ handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
 handleUpdate dName dTag = do
   clientEnv <- ask
   liftIO $ do
-    response <- runClientM (updateH dName dTag) clientEnv
+    let dUpdate = DeploymentUpdate { newTag = dTag, newEnvs = [] }
+    response <- runClientM (updateH dName dUpdate) clientEnv
     handleResponse (const $ pure ()) response
 
 handleInfo :: DeploymentName -> ReaderT ClientEnv IO ()
@@ -150,7 +151,7 @@ editH :: DeploymentName -> EnvPairs -> ClientM NoContent
 
 destroyH :: DeploymentName -> ClientM NoContent
 
-updateH :: DeploymentName -> DeploymentTag -> ClientM NoContent
+updateH :: DeploymentName -> DeploymentUpdate -> ClientM NoContent
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
