@@ -125,3 +125,9 @@ FOO=foo
 To commit the changes, save the file and quit your default `$EDITOR`. `:wq` in
 vim. Note that to discard your changes, you have to exit your `$EDITOR` with a
 not-zero exit code. You can do this by typing `:cq` in vim.
+
+# How clean up Docker cache
+
+```bash
+docker rmi 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
+```
