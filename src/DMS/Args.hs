@@ -10,29 +10,27 @@ import Types
 
 
 data Args = Args
-  { port :: Int
-  , uiPort :: Int
-  , db :: ByteString
-  , dbPoolSize :: Int
-  , tlsCertPath :: ByteString
-  , tlsKeyPath :: ByteString
+  { port         :: Int
+  , uiPort       :: Int
+  , db           :: ByteString
+  , dbPoolSize   :: Int
+  , tlsCertPath  :: ByteString
+  , tlsKeyPath   :: ByteString
   , tlsStorePath :: ByteString
-  }
-  deriving (Generic, Show)
+  } deriving (Generic, Show)
 
 instance ParseRecord Args where
   parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 data DMSOpts = DMSOpts
-  { dmsPort :: ServerPort
-  , dmsUIPort :: ServerPort
-  , dmsDB :: DBConnectionString
-  , dmsDBPoolSize :: DBPoolSize
-  , dmsTLSCertPath :: TLSCertPath
-  , dmsTLSKeyPath :: TLSKeyPath
+  { dmsPort         :: ServerPort
+  , dmsUIPort       :: ServerPort
+  , dmsDB           :: DBConnectionString
+  , dmsDBPoolSize   :: DBPoolSize
+  , dmsTLSCertPath  :: TLSCertPath
+  , dmsTLSKeyPath   :: TLSKeyPath
   , dmsTLSStorePath :: TLSStorePath
-  }
-  deriving (Show)
+  } deriving (Show)
 
 parseArgs :: IO DMSOpts
 parseArgs = do

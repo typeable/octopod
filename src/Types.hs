@@ -31,7 +31,8 @@ parseEnvs :: [Text] -> IO [(Text, Text)]
 parseEnvs texts =
   for texts $ \t ->
     case T.findIndex (== '=') t of
-      Just i -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t -- T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
+      Just i     -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t
+                    -- ^ T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
       Nothing    -> error $
         "Malformed environment key-value pair " <> T.unpack t <>
         ", should be similar to FOO=bar"
@@ -76,14 +77,16 @@ data DeploymentInfo = DeploymentInfo
 
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
-  , createdAt :: Int
-  , updatedAt :: Int
-  , urls :: [(Text, Text)]
+  , createdAt  :: Int
+  , updatedAt  :: Int
+  , urls       :: [(Text, Text)]
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
-data Status = Ok | Error
+data Status
+  = Ok
+  | Error
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake Status
 

@@ -33,7 +33,7 @@ kubectlPath :: IO (Maybe FilePath)
 kubectlPath = findExecutable "kubectl"
 
 appChartName, infraChartName :: ChartName
-appChartName = "b2b-dm-staging"
+appChartName   = "b2b-dm-staging"
 infraChartName = "b2b-infra-dm-staging"
 
 namespace :: Text
@@ -68,7 +68,8 @@ composeAppArgs dName dTag envPairs = [
   ]
   ++ mconcat (fmap (\a -> ["--set", a]) $ concatPairWithAppEnv <$> envPairs)
   ++ [taggedRelease appChartName dTag]
-  where rn = releaseName infraChartName dName
+  where
+    rn = releaseName infraChartName dName
 
 createInfraArgs :: DeploymentName -> [Text]
 createInfraArgs dName = [
@@ -95,7 +96,7 @@ composeDestroyArgs chartName dName =
   ["delete", releaseName chartName dName, "--purge"]
 
 destroyAppArgs, destroyInfraArgs :: DeploymentName -> [CommandArg]
-destroyAppArgs = composeDestroyArgs appChartName
+destroyAppArgs   = composeDestroyArgs appChartName
 destroyInfraArgs = composeDestroyArgs infraChartName
 
 deletePVCArgs :: DeploymentName -> [CommandArg]
