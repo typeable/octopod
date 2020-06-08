@@ -4,7 +4,6 @@
 mkdir tmp
 cp ../target/x86_64-unknown-linux-musl/release/create ./tmp
 cp ../target/x86_64-unknown-linux-musl/release/update ./tmp
-cp ../target/x86_64-unknown-linux-musl/release/update ./tmp/update_envs
 cp ../target/x86_64-unknown-linux-musl/release/delete ./tmp
 cp ../target/x86_64-unknown-linux-musl/release/check ./tmp
 

@@ -43,7 +43,6 @@ data AppState = AppState
   , namespace           :: Namespace
   , creation_command    :: Command
   , update_command      :: Command
-  , update_envs_command :: Command
   , deletion_command    :: Command
   , checking_command    :: Command }
 
@@ -68,7 +67,6 @@ runDMS = do
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
   creation_cmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
   update_cmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
-  update_envs_cmd <- coerce . pack <$> getEnvOrDie "UPDATE_ENVS_COMMAND"
   deletion_cmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
   checking_cmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
   pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
@@ -79,7 +77,6 @@ runDMS = do
                                     ns
                                     creation_cmd
                                     update_cmd
-                                    update_envs_cmd
                                     deletion_cmd
                                     checking_cmd
       serverPort   = dmsPort opts
@@ -285,7 +282,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
                , "--name", coerce $ dName
                , "--tag", coerce $ dTag
                ] ++ concat [["--env", concatPair e] | e <- envPairs]
-        cmd  = coerce $ update_envs_command st
+        cmd  = coerce $ update_command st
       liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
         log $ "call " <> unwords (cmd : args)

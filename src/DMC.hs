@@ -104,7 +104,7 @@ handleEdit dName = do
             envPairs <- editEnvs editor dEnvs
             response <- runClientM (editH dName envPairs) clientEnv
             handleResponse (const $ pure ()) response
-          Left err                 ->
+          Left err                     ->
             P.print $ "request failed, reason: " <> show err
       Nothing     -> error "environment variable $EDITOR not found"
 
