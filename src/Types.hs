@@ -86,7 +86,7 @@ data DeploymentFullInfo = DeploymentFullInfo
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag
-  , newEnvs :: EnvPairs
+  , newEnvs :: Maybe EnvPairs
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate

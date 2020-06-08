@@ -268,15 +268,15 @@ deleteDeployment p n = withResource p $ \conn ->
   execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
 
 updateH :: DeploymentName -> DeploymentUpdate -> AppM NoContent
-updateH dName DeploymentUpdate { newTag = dTag, newEnvs = dEnvs } = do
+updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
   st <- ask
   let pgPool = pool st
   retrieved <- liftIO $ selectEnvPairs pgPool dName
   case retrieved of
     storedEnv : _ -> do
-      envPairs <- liftIO $ case dEnvs of
-        [] -> parseEnvs $ lines storedEnv
-        _  -> pure dEnvs
+      envPairs <- liftIO $ case nEnvs of
+        Nothing -> parseEnvs $ lines storedEnv
+        Just dEnvs  -> pure dEnvs
       let
         log  = logInfo (logger st)
         args = [ "--project-name", coerce $ project_name st
