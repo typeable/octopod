@@ -128,6 +128,10 @@ not-zero exit code. You can do this by typing `:cq` in vim.
 
 # How clean up Docker cache
 
+DMC using a certificate for authentication in DMS.
+After deploy of new DMS's version needs to use a new certificate.
+Needs to remove old DMC's Docker image from Docker cache, at next run `docker run ...` will download the last version of DMC's Docker image.
+
 ```bash
 docker rmi 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
 ```
