@@ -125,3 +125,15 @@ FOO=foo
 To commit the changes, save the file and quit your default `$EDITOR`. `:wq` in
 vim. Note that to discard your changes, you have to exit your `$EDITOR` with a
 not-zero exit code. You can do this by typing `:cq` in vim.
+
+# How clean up Docker cache
+
+DMC using a certificate for authentication in DMS.
+After deploy of new DMS's version needs to use a new certificate.
+
+To make sure the actual image is being used, remove the old docker image and pull the new one before with:
+
+```bash
+docker rmi 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
+docker pull 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
+```

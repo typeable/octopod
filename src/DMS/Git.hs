@@ -11,10 +11,17 @@ gitPath :: IO (Maybe FilePath)
 gitPath = findExecutable "git"
 
 cloneRepo :: FilePath -> FilePath -> IO ExitCode
-cloneRepo git repoPath = withProcessWait (setWorkingDir repoPath $ proc git args) waitProcess
-  where args = ["clone", "--recursive", "--depth=1", "git@github.com:Aviora/b2b-helm.git", "."]
+cloneRepo git repoPath =
+  withProcessWait (setWorkingDir repoPath $ proc git args) waitProcess
+  where
+    args =
+      [ "clone"
+      , "--recursive"
+      , "--depth=1"
+      , "git@github.com:Aviora/b2b-helm.git"
+      , "." ]
 
-waitProcess :: (Show stdout, Show stderr) => Process stdin stdout stderr -> IO ExitCode
+waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do
   print . getStdout $ p
   print . getStderr $ p

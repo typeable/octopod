@@ -1,53 +1,54 @@
 module DMC (runDMC) where
 
-import Chronos
-import Control.Lens hiding (List)
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import           Chronos
+import           Control.Lens hiding (List)
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import qualified Data.ByteString.Char8 as BSC
-import Data.Coerce
-import Data.Foldable
-import Data.Generics.Product
-import Data.Maybe (fromMaybe)
-import Data.Proxy
-import Data.Text as T
-import Data.Text.IO as T
-import Data.Text.Lens
-import Network.URI
-import Prelude as P
-import Servant.API
-import Servant.Client
-  ( ClientError, BaseUrl(..), ClientEnv, ClientM, Scheme(..)
+import           Data.Coerce
+import           Data.Foldable
+import           Data.Generics.Product
+import           Data.Maybe (fromMaybe)
+import           Data.Proxy
+import           Data.Text as T
+import           Data.Text.IO as T
+import           Data.Text.Lens
+import           Network.URI
+import           Prelude as P
+import           Servant.API
+import           Servant.Client
+  (ClientError, BaseUrl(..), ClientEnv, ClientM, Scheme(..)
   , runClientM, client, mkClientEnv)
-import System.Environment (lookupEnv)
-import System.IO
-import System.IO.Temp
-import System.Process.Typed
+import           System.Environment (lookupEnv)
+import           System.IO
+import           System.IO.Temp
+import           System.Process.Typed
 
-import API
-import DMC.Args
-import TLS (makeClientManager)
-import Types
+import           API
+import           DMC.Args
+import           TLS (makeClientManager)
+import           Types
 
 runDMC :: IO ()
 runDMC = do
   args <- parseArgs
-  let cert = maybe "cert.pem" (BSC.unpack . unTLSCertPath) $ dmcTLSCertPath args
-      key = maybe "key.pem" (BSC.unpack . unTLSKeyPath) $ dmcTLSKeyPath args
+  let
+    cert = maybe "cert.pem" (BSC.unpack . unTLSCertPath) $ dmcTLSCertPath args
+    key = maybe "key.pem" (BSC.unpack . unTLSKeyPath) $ dmcTLSKeyPath args
   manager <- makeClientManager dmsHostName cert key
   env <- getBaseUrl
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      CreateC n t e _ _          -> do
-        envPairs <- liftIO $ parseEnvs e
-        handleCreate $ Deployment (coerce n) (coerce t) envPairs
-      ListC _ _                  -> handleList
-      EditC tName _ _            -> handleEdit $ DeploymentName tName
-      DestroyC tName _ _         -> handleDestroy $ DeploymentName tName
-      UpdateC tName tTag _ _     -> handleUpdate (DeploymentName tName) (DeploymentTag tTag)
-      InfoC tName _ _            -> handleInfo $ DeploymentName tName
+      CreateC  tName tTag tEnvs _ _ -> do
+        envPairs <- liftIO $ parseEnvs tEnvs
+        handleCreate $ Deployment (coerce tName) (coerce tTag) envPairs
+      ListC    _     _              -> handleList
+      EditC    tName _    _         -> handleEdit . coerce $ tName
+      DestroyC tName _    _         -> handleDestroy . coerce $ tName
+      UpdateC  tName tTag _     _   -> handleUpdate (coerce tName) (coerce tTag)
+      InfoC    tName _    _         -> handleInfo . coerce $ tName
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
@@ -62,15 +63,15 @@ getBaseUrl = do
     defaultBaseUrl = BaseUrl Https dmsHostName 443 ""
     parseUrl :: String -> BaseUrl
     parseUrl = fromMaybe defaultBaseUrl . parseUrl'
-     where
-       parseUrl' url = do
-         uri <- parseURI url
-         uriData <- uriAuthority uri
-         let
-           s = if uriScheme uri == "https:" then Https else Http
-           h = uriRegName uriData
-           p = read . P.tail . uriPort $ uriData
-         return $ BaseUrl s h p ""
+      where
+        parseUrl' url = do
+          uri <- parseURI url
+          uriData <- uriAuthority uri
+          let
+            schema = if uriScheme uri == "https:" then Https else Http
+            host = uriRegName uriData
+            port = read . P.tail . uriPort $ uriData
+          return $ BaseUrl schema host port ""
   return $ maybe defaultBaseUrl parseUrl dmsURL
 
 handleCreate :: Deployment -> ReaderT ClientEnv IO ()
@@ -84,46 +85,52 @@ handleList :: ReaderT ClientEnv IO ()
 handleList = do
   clientEnv <- ask
   liftIO $ do
-    l <- runClientM listH clientEnv
-    handleResponse T.putStr $ T.unlines . coerce <$> l
+    resp <- runClientM listH clientEnv
+    let
+      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _) = dName
+      names = T.unlines . coerce . (getName <$>) <$> resp
+    handleResponse T.putStr names
 
 handleEdit :: DeploymentName -> ReaderT ClientEnv IO ()
 handleEdit dName = do
   clientEnv <- ask
   liftIO $ do
-    editor <- lookupEnv "EDITOR"
-    case editor of
-      Just ed -> do
+    editorPath <- lookupEnv "EDITOR"
+    case editorPath of
+      Just editor -> do
         res <- flip runClientM clientEnv $ getH dName
         case res of
-          Right (Deployment _ _ e) -> do
-            envPairs <- editEnvs ed e
+          Right (Deployment _ _ dEnvs) -> do
+            envPairs <- editEnvs editor dEnvs
             response <- runClientM (editH dName envPairs) clientEnv
             handleResponse (const $ pure ()) response
-          Left err ->
+          Left err                     ->
             P.print $ "request failed, reason: " <> show err
-      Nothing -> error "environment variable $EDITOR not found"
+      Nothing     -> error "environment variable $EDITOR not found"
 
 editEnvs :: FilePath -> EnvPairs -> IO EnvPairs
-editEnvs ed e = withTempFile "" "dmc" $ \p h -> do
-  for_ e $ \(k,v) -> (T.hPutStrLn h $ k <> "=" <> v)
-  hFlush h
-  withProcessWait_ (proc ed [p]) $ \_ -> T.hPutStrLn h "processing update..."
-  l <- T.lines <$> T.readFile p
-  envPairs <- parseEnvs l
+editEnvs editor currentEnvPairs = withTempFile "" "dmc" $ \filePath handle -> do
+  for_ currentEnvPairs $ \(k, v) -> (T.hPutStrLn handle $ k <> "=" <> v)
+  hFlush handle
+  withProcessWait_ (proc editor [filePath]) $ \_ ->
+    T.hPutStrLn handle "processing update..."
+  rawEnvs <- T.lines <$> T.readFile filePath
+  envPairs <- parseEnvs rawEnvs
   T.putStrLn "sending update..."
   pure envPairs
 
 handleDestroy :: DeploymentName -> ReaderT ClientEnv IO ()
 handleDestroy dName = do
   clientEnv <- ask
-  liftIO $ handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
 
 handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
 handleUpdate dName dTag = do
   clientEnv <- ask
   liftIO $ do
-    response <- runClientM (updateH dName dTag) clientEnv
+    let dUpdate = DeploymentUpdate { newTag = dTag, newEnvs = Nothing }
+    response <- runClientM (updateH dName dUpdate) clientEnv
     handleResponse (const $ pure ()) response
 
 handleInfo :: DeploymentName -> ReaderT ClientEnv IO ()
@@ -133,10 +140,12 @@ handleInfo dName = do
     res <- runClientM (infoH dName) clientEnv
     case res of
       Right (i : _) -> printInfo i
-      Right [] -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
-      Left err -> print $ "request failed, reason: " ++ show err
+      Right []      -> print notFoundMsg
+      Left err      -> print $ "request failed, reason: " ++ show err
+    where
+      notFoundMsg = "deployment " ++ unpack (coerce dName) ++ " not found"
 
-listH :: ClientM [DeploymentName]
+listH :: ClientM [DeploymentFullInfo]
 
 createH :: Deployment -> ClientM NoContent
 
@@ -146,22 +155,23 @@ editH :: DeploymentName -> EnvPairs -> ClientM NoContent
 
 destroyH :: DeploymentName -> ClientM NoContent
 
-updateH :: DeploymentName -> DeploymentTag -> ClientM NoContent
+updateH :: DeploymentName -> DeploymentUpdate -> ClientM NoContent
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
-(listH
- :<|> createH
- :<|> getH
- :<|> editH
- :<|> destroyH
- :<|> updateH
- :<|> infoH)
- :<|> _ = client (Proxy @API)
+( listH
+  :<|> createH
+  :<|> getH
+  :<|> editH
+  :<|> destroyH
+  :<|> updateH
+  :<|> infoH
+  :<|> _)
+    :<|> _ = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result) = f result
-handleResponse _ (Left err) =
+handleResponse _ (Left err)     =
   T.putStrLn $ "command failed, reason: " <> T.pack (show err)
 
 printInfo :: DeploymentInfo -> IO ()

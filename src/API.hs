@@ -7,7 +7,7 @@ import Types
 
 type CaptureName = Capture "name" DeploymentName
 
-type ListEndpoint = Get '[JSON] [DeploymentName]
+type ListEndpoint = Get '[JSON] [DeploymentFullInfo]
 type CreateEndpoint =
   ReqBody '[JSON] Deployment :> PostNoContent '[PlainText] NoContent
 type GetEndpoint c = c :> Get '[JSON] Deployment
@@ -15,8 +15,9 @@ type EditEndpoint c =
   c :> ReqBody '[JSON] EnvPairs :> PatchNoContent '[PlainText] NoContent
 type DestroyEndpoint c = c :> DeleteNoContent '[PlainText] NoContent
 type UpdateEndpoint c =
-  c :> Capture "tag" DeploymentTag :> PutNoContent '[PlainText] NoContent
+  c :> ReqBody '[JSON] DeploymentUpdate :> PutNoContent '[PlainText] NoContent
 type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
+type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
 
 -- FIXME: Text as a return type for many endpoints
 type DeploymentAPI' c =
@@ -29,6 +30,7 @@ type DeploymentAPI' c =
       :<|> DestroyEndpoint c
       :<|> UpdateEndpoint c
       :<|> InfoEndpoint c
+      :<|> StatusEndpoint c
       )
     :<|> "ping" :> GetNoContent '[PlainText] NoContent
     )

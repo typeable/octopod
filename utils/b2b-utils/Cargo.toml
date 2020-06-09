@@ -1,0 +1,25 @@
+[package]
+name = "b2b-utils"
+version = "0.1.0"
+authors = ["Andrei Orlov <aaorlov1@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.1"
+rand = "0.7.3"
+
+[[bin]]
+name = "create"
+path = "src/bin/create.rs"
+
+[[bin]]
+name = "update"
+path = "src/bin/update.rs"
+
+[[bin]]
+name = "delete"
+path = "src/bin/delete.rs"
+
+[[bin]]
+name = "check"
+path = "src/bin/check.rs"

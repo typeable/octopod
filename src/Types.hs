@@ -31,8 +31,9 @@ parseEnvs :: [Text] -> IO [(Text, Text)]
 parseEnvs texts =
   for texts $ \t ->
     case T.findIndex (== '=') t of
-      Just i -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t -- T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
-      Nothing    -> error $
+      Just i  -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t
+      -- ^ T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
+      Nothing -> error $
         "Malformed environment key-value pair " <> T.unpack t <>
         ", should be similar to FOO=bar"
 
@@ -74,13 +75,40 @@ data DeploymentInfo = DeploymentInfo
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentInfo
 
+data DeploymentFullInfo = DeploymentFullInfo
+  { deployment :: Deployment
+  , createdAt  :: Int
+  , updatedAt  :: Int
+  , urls       :: [(Text, Text)]
+  }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
+data DeploymentUpdate = DeploymentUpdate
+  { newTag :: DeploymentTag
+  , newEnvs :: Maybe EnvPairs
+  }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
+
+data Status
+  = Ok
+  | Error
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake Status
+
+newtype DeploymentStatus = DeploymentStatus { status :: Status }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake DeploymentStatus
+
 newtype ServerPort = ServerPort { unServerPort :: Int }
   deriving (Show)
 
 newtype DBPoolSize = DBPoolSize { unDBPoolSize :: Int }
   deriving (Show)
 
-newtype DBConnectionString = DbConnectionString { unDBConnectionString :: ByteString }
+newtype DBConnectionString = DbConnectionString
+  { unDBConnectionString :: ByteString }
   deriving (Show)
 
 newtype TLSCertPath = TLSCertPath { unTLSCertPath :: ByteString }
@@ -90,4 +118,16 @@ newtype TLSKeyPath = TLSKeyPath { unTLSKeyPath :: ByteString }
   deriving (Show)
 
 newtype TLSStorePath = TLSStore { unTLSStorePath :: ByteString }
+  deriving (Show)
+
+newtype ProjectName = ProjectName { unProjectName :: Text }
+  deriving (Show)
+
+newtype Domain = Domain { unDomain :: Text }
+  deriving (Show)
+
+newtype Namespace = Namespace { unNamespace :: Text }
+  deriving (Show)
+
+newtype Command = Command { unCommand :: Text }
   deriving (Show)

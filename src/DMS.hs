@@ -2,6 +2,7 @@ module DMS (runDMS) where
 
 
 import Control.Applicative
+import Control.Concurrent.Async (race_)
 import Control.Exception (throwIO, Exception)
 import Control.Monad
 import Control.Monad.IO.Class
@@ -19,32 +20,31 @@ import Network.Wai.Handler.WarpTLS
 import Options.Generic
 import Prelude hiding (lines, unlines, unwords, log)
 import Servant
+import System.Environment (lookupEnv)
 import System.Exit
-import System.FilePath.Posix
-import System.IO.Temp
 import System.Log.FastLogger
 import System.Process.Typed
 
 
 import API
 import DMS.Args
-import DMS.Git
-import DMS.Kubernetes
 import TLS (createTLSOpts)
 import Types
 
 
 type PgPool = Pool Connection
-type AppM = ReaderT AppState Handler
+type AppM   = ReaderT AppState Handler
 
 data AppState = AppState
-  { pool    :: PgPool
-  , logger  :: TimedFastLogger
-  , helm    :: FilePath
-  , b2bHelm :: FilePath
-  , git     :: FilePath
-  , kubectl :: FilePath
-  }
+  { pool                :: PgPool
+  , logger              :: TimedFastLogger
+  , project_name        :: ProjectName
+  , base_domain         :: Domain
+  , namespace           :: Namespace
+  , creation_command    :: Command
+  , update_command      :: Command
+  , deletion_command    :: Command
+  , checking_command    :: Command }
 
 data DeploymentException
   = DeploymentFailed Int
@@ -59,17 +59,37 @@ runDMS = do
   (logger', _) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
   logInfo logger' "started"
   opts <- parseArgs
-  let a ?! e = a >>= maybe (die e) pure
-  helmBin <- helmPath ?! "helm not found"
-  b2bHelmBin <- b2bHelmPath ?! "b2b-helm not found"
-  gitBin <- gitPath ?! "git not found"
-  kubectlBin <- kubectlPath ?! "kubectl not found"
-  pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
-  let app' = app $ AppState pgPool logger' helmBin b2bHelmBin gitBin kubectlBin
-  let serverPort = dmsPort opts
-      tlsOpts = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
-      warpOpts = setPort (unServerPort serverPort) defaultSettings
-      in runTLS tlsOpts warpOpts app'
+  let
+    a ?! e = a >>= maybe (die e) pure
+    getEnvOrDie eName = lookupEnv eName ?! (eName <> " is not set")
+  proj_name <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
+  domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
+  ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
+  creation_cmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
+  update_cmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
+  deletion_cmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
+  checking_cmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
+  pgPool <- initConnectionPool
+    (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
+  let
+    app'         =
+      app $ AppState
+        pgPool
+        logger'
+        proj_name
+        domain
+        ns
+        creation_cmd
+        update_cmd
+        deletion_cmd
+        checking_cmd
+    serverPort   = dmsPort opts
+    uiServerPort = unServerPort $ dmsUIPort opts
+    tlsOpts      =
+      createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts)
+        (dmsTLSStorePath opts) serverPort
+    warpOpts     = setPort (unServerPort serverPort) defaultSettings
+    in (run uiServerPort app') `race_` (runTLS tlsOpts warpOpts app')
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -84,31 +104,49 @@ app s = serve api $ hoistServer api (nt s) server
     api = Proxy @API
 
 server :: ServerT API AppM
-server = (listH :<|> createH :<|> getH :<|> editH
-    :<|> destroyH :<|> updateH :<|> infoH) :<|> pingH
+server =
+  (listH :<|> createH :<|> getH :<|> editH
+    :<|> destroyH :<|> updateH :<|> infoH :<|> statusH) :<|> pingH
 
-listH :: AppM [DeploymentName]
+listH :: AppM [DeploymentFullInfo]
 listH = do
-  AppState{pool = p, logger = l} <- ask
-  ds <- getDeployments p
-  liftIO . logInfo l $ "get deployments: " <> (pack . show $ ds)
-  return ds
+  AppState {pool = p, logger = l, base_domain = d} <- ask
+
+  retrieved <- liftIO $ withResource p $ \conn -> query_ conn q
+  deployments <- liftIO $ for retrieved $ \(n, t, e, ct, ut) -> do
+    es <- parseEnvs (lines e)
+    pure $ DeploymentFullInfo (Deployment n t es) ct ut (depUrls d n)
+
+  liftIO . logInfo l $ "get deployments: " <> (pack . show $ deployments)
+  return deployments
   where
-    getDeployments :: PgPool -> AppM [DeploymentName]
-    getDeployments p = fmap (fmap fromOnly) . liftIO $
-      withResource p $ \conn -> query_ conn "SELECT name FROM deployments ORDER BY name"
+    q                    =
+      "SELECT name, tag, envs, extract(epoch from created_at)::int, \
+        \extract(epoch from updated_at)::int \
+      \FROM deployments ORDER BY name"
+    depUrls domain dName =
+      [ ("app", appUrl domain dName)
+      , ("kibana", "kibana." <> appUrl domain dName)
+      , ("tasker", "tasker." <> appUrl domain dName)]
+    appUrl domain dName  = coerce dName <> "." <> coerce domain
 
 createH :: Deployment -> AppM NoContent
 createH dep = do
   st <- ask
   let
     log :: Text -> IO ()
-    log          = logInfo (logger st)
-    b2bHelmBin   = b2bHelm st
-    gitBin       = git st
-    pgPool       = pool st
-    infraCmdArgs = createInfraArgs $ name dep
-    appCmdArgs   = appArgs dep
+    log                                                           =
+      logInfo (logger st)
+    pgPool                                                        = pool st
+    args                                                          =
+      [ "--project-name", coerce $ project_name st
+      , "--base-domain", coerce $ base_domain st
+      , "--namespace", coerce $ namespace st
+      , "--name", coerce $ name dep
+      , "--tag", coerce $ tag dep
+      ] ++ concat [["--env", concatPair e] | e <- envs dep]
+    cmd                                                           =
+      coerce $ creation_command st
     createDeployment :: PgPool -> Deployment -> IO Int64
     createDeployment p Deployment { name = n, tag = t, envs = e } =
       withResource p $ \conn -> execute
@@ -116,44 +154,15 @@ createH dep = do
         "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
         (n, t, formatEnvPairs e)
-  liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
-    log $ "clone git repo to " <> pack tempDir
-    void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
-    let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
+
+  liftIO $ do
     void $ createDeployment pgPool dep
-    log $ "call " <> unwords (pack b2bHelmSandboxedBin : infraCmdArgs)
-    ec1 <- createInfra infraCmdArgs b2bHelmSandboxedBin tempDir
-    log $ "call " <> mconcat (pack b2bHelmSandboxedBin : appCmdArgs)
-    ec2 <- createApp appCmdArgs b2bHelmSandboxedBin tempDir
+    log $ "call " <> unwords (cmd : args)
+    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     log $ "deployment created, deployment: " <> (pack . show $ dep)
-    let ec = max ec1 ec2
     createDeploymentLog pgPool dep "create" ec
     handleExitCode ec
   pure NoContent
-
-copyB2BHelm :: FilePath -> FilePath -> IO ExitCode
-copyB2BHelm b2bHelmBin repoPath =
-  withProcessWait (proc "cp" [b2bHelmBin, repoPath]) waitProcess
-
-appArgs :: Deployment -> [CommandArg]
-appArgs (Deployment n t e) = composeAppArgs n t e
-
-createInfra
-  :: [CommandArg]
-  -> FilePath -- ^ b2b helm path
-  -> FilePath -- ^ Repo path
-  -> IO ExitCode
-createInfra args b2bHelmBin repoPath =
-  withProcessWait (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args) waitProcess
-
-createApp
-  :: [CommandArg]
-  -> FilePath     -- ^ b2b helm path
-  -> FilePath     -- ^ repo path
-  -> IO ExitCode
-createApp args b2bHelmBin repoPath = withProcessWait
-  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args)
-  waitProcess
 
 getH :: DeploymentName -> AppM Deployment
 getH dName = do
@@ -167,7 +176,8 @@ selectDeploymentLogs :: PgPool -> DeploymentName -> IO [DeploymentLog]
 selectDeploymentLogs p dName = do
   let
     q =
-      "SELECT action::text, tag, envs, exit_code, extract(epoch from created_at)::int \
+      "SELECT action::text, tag, envs, exit_code, \
+        \extract(epoch from created_at)::int \
       \FROM deployment_logs \
       \WHERE deployment_id in (\
         \SELECT id FROM deployments WHERE name = ?\
@@ -194,96 +204,68 @@ selectDeployments p dName = do
   for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
 
 editH :: DeploymentName -> EnvPairs -> AppM NoContent
-editH n e = do
+editH dName dEnvs = do
   st <- ask
   let
     log :: Text -> IO ()
     log          = logInfo (logger st)
-    b2bHelmBin  = b2bHelm st
     pgPool       = pool st
-    gitBin       = git st
   liftIO $ getTag pgPool >>= \case
-    t : _ -> do
-      liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
-        log $ "clone git repo to " <> pack tempDir
-        void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
-        let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
+    dTag : _ -> do
+      let
+        args =
+          [ "--project-name", coerce $ project_name st
+          , "--base-domain", coerce $ base_domain st
+          , "--namespace", coerce $ namespace st
+          , "--name", coerce dName
+          , "--tag", coerce dTag
+          ] ++ concat [["--env", concatPair p] | p <- dEnvs]
+        cmd  = coerce $ update_command st
+      liftIO $  do
         void $ updateEditDeployment pgPool
-        let dep = Deployment n t e
-        log $ "call " <> unwords (pack b2bHelmSandboxedBin : appArgs dep)
-        ec <- editApp (appArgs dep) b2bHelmSandboxedBin tempDir
+        log $ "call " <> unwords (cmd : args)
+        ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
         log
-          $ "deployment edited, name: " <> coerce n
-          <> ", envs: " <> formatEnvPairs e
+          $ "deployment edited, name: " <> coerce dName
+          <> ", envs: " <> formatEnvPairs dEnvs
+        let dep = Deployment dName dTag dEnvs
         createDeploymentLog pgPool dep "edit" ec
         handleExitCode ec
         return ()
-    _ -> liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce n
+    _     ->
+      liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
   return NoContent
   where
-    getTag :: PgPool -> IO [DeploymentTag]
-    getTag p = fmap (fmap fromOnly) $ withResource p $ \conn ->
-      query conn "SELECT tag FROM deployments WHERE name = ?" (Only n)
-    updateEditDeployment :: PgPool -> IO Int64
+    getTag                 :: PgPool -> IO [DeploymentTag]
+    getTag p               = fmap (fmap fromOnly) $ withResource p $ \conn ->
+      query conn "SELECT tag FROM deployments WHERE name = ?" (Only dName)
+    updateEditDeployment   :: PgPool -> IO Int64
     updateEditDeployment p = withResource p $ \conn -> execute
       conn
       "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?"
       -- FIXME: make EnvPairs a newtype and give it ToField instance
-      (formatEnvPairs e, n)
-
-editApp
-  :: [CommandArg]
-  -> FilePath      -- ^ b2b helm path
-  -> FilePath      -- ^ repo path
-  -> IO ExitCode
-editApp args b2bHelmBin repoPath = liftIO . withProcessWait
-  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> args) $ waitProcess
+      (formatEnvPairs dEnvs, dName)
 
 destroyH :: DeploymentName -> AppM NoContent
 destroyH dName = do
   st <- ask
   let
-    helmBin = helm st
-    kubectlBin = kubectl st
     log     = logInfo (logger st)
     pgPool  = pool st
+    args    =
+      [ "--project-name", coerce $ project_name st
+      , "--namespace", coerce $ namespace st
+      , "--name", coerce dName
+      ]
+    cmd     = coerce $ deletion_command st
   liftIO $ do
-    ec1 <- do
-      let appArgs' = destroyAppArgs dName
-      log $ "call " <> unwords (pack helmBin : appArgs')
-      destroyApp appArgs' helmBin
-    ec2 <- do
-      let infraArgs = destroyInfraArgs dName
-      log $ "call " <> unwords (pack helmBin : infraArgs)
-      destroyInfra infraArgs helmBin
-    ec3 <- do
-      let deletePVCArgs' = deletePVCArgs dName
-      log $ "call " <> unwords (pack kubectlBin : deletePVCArgs')
-      deletePVC deletePVCArgs' kubectlBin
-    ec4 <- do
-      let deleteCertArgs' = deleteCertArgs dName
-      log $ "call " <> unwords (pack kubectlBin : deleteCertArgs')
-      deleteCert deleteCertArgs' kubectlBin
+    log $ "call " <> unwords (cmd : args)
+    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     void $ deleteDeploymentLogs pgPool dName
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
-    handleExitCode $ maximum [ec1, ec2, ec3, ec4]
+    handleExitCode ec
   pure NoContent
-
-destroyApp :: [CommandArg] -> FilePath -> IO ExitCode
-destroyApp args helmBin =
-  withProcessWait (proc helmBin $ unpack <$> args) waitProcess
-
-destroyInfra :: [CommandArg] -> FilePath -> IO ExitCode
-destroyInfra args helmBin =
-  withProcessWait (proc helmBin $ unpack <$> args) waitProcess
-
-deletePVC :: [CommandArg] -> FilePath -> IO ExitCode
-deletePVC args kubectlBin =
-  withProcessWait (proc kubectlBin $ unpack <$> args) waitProcess
-
-deleteCert :: [CommandArg] -> FilePath -> IO ExitCode
-deleteCert = deletePVC
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
@@ -296,33 +278,30 @@ deleteDeployment :: PgPool -> DeploymentName -> IO Int64
 deleteDeployment p n = withResource p $ \conn ->
   execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
 
-updateApp :: [CommandArg] -> FilePath -> FilePath -> IO ExitCode
-updateApp cmdArgs b2bHelmBin repoPath = withProcessWait
-  (setWorkingDir repoPath $ proc b2bHelmBin $ unpack <$> cmdArgs)
-  waitProcess
-
-updateH :: DeploymentName -> DeploymentTag -> AppM NoContent
-updateH dName dTag = do
+updateH :: DeploymentName -> DeploymentUpdate -> AppM NoContent
+updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
   st <- ask
-  let
-    pgPool    = pool st
+  let pgPool = pool st
   retrieved <- liftIO $ selectEnvPairs pgPool dName
   case retrieved of
     storedEnv : _ -> do
-      envPairs <- liftIO $ parseEnvs $ lines storedEnv
+      envPairs <- liftIO $ case nEnvs of
+        Nothing -> parseEnvs $ lines storedEnv
+        Just dEnvs  -> pure dEnvs
       let
-        b2bHelmBin = b2bHelm st
-        log        = logInfo (logger st)
-        args       = composeAppArgs dName dTag envPairs
-        gitBin     = git st
-      liftIO $ withTempDirectory "/tmp" "dms" $ \tempDir -> do
-        log $ "clone git repo to " <> pack tempDir
-        void $ cloneRepo gitBin tempDir >> copyB2BHelm b2bHelmBin tempDir
-        let b2bHelmSandboxedBin = tempDir </> takeFileName b2bHelmBin
+        log  = logInfo (logger st)
+        args =
+          [ "--project-name", coerce $ project_name st
+          , "--base-domain", coerce $ base_domain st
+          , "--namespace", coerce $ namespace st
+          , "--name", coerce $ dName
+          , "--tag", coerce $ dTag
+          ] ++ concat [["--env", concatPair e] | e <- envPairs]
+        cmd  = coerce $ update_command st
+      liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
-        log $ "call " <> unwords (pack b2bHelmSandboxedBin : args)
-        let
-        ec <- updateApp args b2bHelmSandboxedBin tempDir
+        log $ "call " <> unwords (cmd : args)
+        ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
         log $ "deployment updated, name: "
           <> coerce dName <> ", tag: " <> coerce dTag
         createDeploymentLog pgPool (Deployment dName dTag envPairs) "update" ec
@@ -351,8 +330,7 @@ updateDeploymentNameAndTag p dName dTag = withResource p $ \conn -> execute
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
   st <- ask
-  let
-    pgPool = pool st
+  let pgPool = pool st
   liftIO $ do
     dep <- selectDeployment pgPool dName
     depLogs <- selectDeploymentLogs pgPool dName
@@ -363,9 +341,19 @@ infoH dName = do
 pingH :: AppM NoContent
 pingH = do
   pgPool <- pool <$> ask
-  _ :: [Only Int] <-
-    liftIO $ withResource pgPool $ \conn -> query_ conn "SELECT 1"
+  _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn ->
+    query_ conn "SELECT 1"
   pure NoContent
+
+statusH :: DeploymentName -> AppM DeploymentStatus
+statusH dName = do
+  cmd <- checking_command <$> ask
+  let args = [unpack . coerce $ dName]
+  ec <- liftIO $ withProcessWait (proc (unpack $ coerce cmd) args) waitProcess
+  pure . DeploymentStatus $
+    case ec of
+      ExitSuccess -> Ok
+      _           -> Error
 
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do
@@ -374,7 +362,7 @@ waitProcess p = do
   waitExitCode p
 
 handleExitCode :: ExitCode -> IO ()
-handleExitCode ExitSuccess = return ()
+handleExitCode ExitSuccess     = return ()
 handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
 
 createDeploymentLog :: PgPool -> Deployment -> Action -> ExitCode -> IO ()
@@ -384,7 +372,8 @@ createDeploymentLog pgPool (Deployment n t e) a ec = do
       ExitSuccess     -> 0
       ExitFailure err -> err
     q =
-      "INSERT INTO deployment_logs (deployment_id, action, tag, envs, exit_code) (\
+      "INSERT INTO deployment_logs \
+      \(deployment_id, action, tag, envs, exit_code) (\
         \SELECT id, ?, ?, ?, ? \
         \FROM deployments \
         \WHERE name = ? \

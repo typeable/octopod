@@ -1,4 +1,4 @@
-{ mkDerivation, aeson, base, bytestring, chronos, connection
+{ mkDerivation, aeson, async, base, bytestring, chronos, connection
 , data-default-class, deriving-aeson, directory, fast-logger
 , filepath, generic-lens, http-api-data, http-client
 , http-client-tls, lens, mtl, network-uri, optparse-generic
@@ -13,7 +13,7 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    aeson base bytestring chronos connection data-default-class
+    aeson async base bytestring chronos connection data-default-class
     deriving-aeson directory fast-logger filepath generic-lens
     http-api-data http-client http-client-tls lens mtl network-uri
     optparse-generic postgresql-simple resource-pool servant
@@ -21,7 +21,7 @@ mkDerivation {
     typed-process warp warp-tls x509 x509-store x509-validation
   ];
   executableHaskellDepends = [
-    aeson base bytestring chronos connection data-default-class
+    aeson async base bytestring chronos connection data-default-class
     directory fast-logger filepath http-client http-client-tls mtl
     network-uri optparse-generic postgresql-simple resource-pool
     servant servant-client servant-server temporary text tls
@@ -29,7 +29,7 @@ mkDerivation {
     x509-validation
   ];
   testHaskellDepends = [
-    aeson base bytestring chronos connection data-default-class
+    aeson async base bytestring chronos connection data-default-class
     directory fast-logger filepath http-client http-client-tls mtl
     network-uri optparse-generic postgresql-simple resource-pool
     servant servant-client servant-server temporary text tls
