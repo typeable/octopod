@@ -130,8 +130,10 @@ not-zero exit code. You can do this by typing `:cq` in vim.
 
 DMC using a certificate for authentication in DMS.
 After deploy of new DMS's version needs to use a new certificate.
-Needs to remove old DMC's Docker image from Docker cache, at next run `docker run ...` will download the last version of DMC's Docker image.
+
+To make sure the actual image is being used, remove the old docker image and pull the new one before with:
 
 ```bash
 docker rmi 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
+docker pull 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
 ```
