@@ -31,9 +31,9 @@ parseEnvs :: [Text] -> IO [(Text, Text)]
 parseEnvs texts =
   for texts $ \t ->
     case T.findIndex (== '=') t of
-      Just i     -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t
-                    -- ^ T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
-      Nothing    -> error $
+      Just i  -> pure $ bimap strip (T.tail . strip) $ T.splitAt i t
+      -- ^ T.splitAt returns pair with not empty Texts, e.g. ("X", "=Y")
+      Nothing -> error $
         "Malformed environment key-value pair " <> T.unpack t <>
         ", should be similar to FOO=bar"
 
@@ -107,7 +107,8 @@ newtype ServerPort = ServerPort { unServerPort :: Int }
 newtype DBPoolSize = DBPoolSize { unDBPoolSize :: Int }
   deriving (Show)
 
-newtype DBConnectionString = DbConnectionString { unDBConnectionString :: ByteString }
+newtype DBConnectionString = DbConnectionString
+  { unDBConnectionString :: ByteString }
   deriving (Show)
 
 newtype TLSCertPath = TLSCertPath { unTLSCertPath :: ByteString }

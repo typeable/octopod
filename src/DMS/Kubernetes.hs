@@ -46,10 +46,12 @@ releaseName :: ChartName -> DeploymentName -> Text
 releaseName chartName dName = coerce chartName <> "-" <> coerce dName
 
 composeAppArgs :: DeploymentName -> DeploymentTag -> EnvPairs -> [CommandArg]
-composeAppArgs dName dTag envPairs = [
-    "-d", "deploy"
+composeAppArgs dName dTag envPairs =
+  [ "-d"
+  , "deploy"
   , "--release-name", releaseName appChartName dName
-  , "--set", "b2b-app.email_domain=" <> coerce dName <> ".stage.thebestagent.pro"
+  , "--set", "b2b-app.email_domain=" <> coerce dName
+    <> ".stage.thebestagent.pro"
   , "--set", "b2b-app.domain=" <> coerce dName <> ".stage.thebestagent.pro"
   , "--set", "b2b-app.connections.pg_instance=avia:avia@"
     <> rn <> "-postgres-0." <> rn <> "-postgres." <> namespace <> ":5432"
@@ -72,8 +74,9 @@ composeAppArgs dName dTag envPairs = [
     rn = releaseName infraChartName dName
 
 createInfraArgs :: DeploymentName -> [Text]
-createInfraArgs dName = [
-    "-d", "deploy"
+createInfraArgs dName =
+  [ "-d"
+  , "deploy"
   , "--release-name", rn
   , "--set", "b2b-kafka-int.zk=" <> rn <> "-zk-0."
     <> rn <> "-zk." <> namespace <> "/int"
@@ -81,12 +84,13 @@ createInfraArgs dName = [
     <> rn <> "-elasticsearch-0." <> rn <> "-elasticsearch." <> namespace
   , "--set", "b2b-postgres.postgres_db=" <> db
   , "--set", "global.staging_name=" <> coerce dName
-  , "--set", "b2b-kibana.elasic_hosts=http://b2b-infra-dm-staging-" <> coerce dName
+  , "--set", "b2b-kibana.elasic_hosts=http://b2b-infra-dm-staging-"
+    <> coerce dName
     <> "-elasticsearch-0.b2b-infra-dm-staging-" <> coerce dName
     <> "-elasticsearch.staging:9200"
-  , "--set", "b2b-kibana.domain=kibana." <> coerce dName <> ".stage.thebestagent.pro"
-  , coerce infraChartName
-  ]
+  , "--set", "b2b-kibana.domain=kibana." <> coerce dName
+    <> ".stage.thebestagent.pro"
+  , coerce infraChartName ]
   where
     rn = releaseName infraChartName dName
     db = T.replace "-" "_" $ releaseName appChartName dName
@@ -100,22 +104,20 @@ destroyAppArgs   = composeDestroyArgs appChartName
 destroyInfraArgs = composeDestroyArgs infraChartName
 
 deletePVCArgs :: DeploymentName -> [CommandArg]
-deletePVCArgs dName = [
-      "delete"
-    , "pvc"
-    , "-n"
-    , namespace
-    , "-l"
-    , "staging=" <> coerce dName
-  ]
+deletePVCArgs dName =
+  [ "delete"
+  , "pvc"
+  , "-n"
+  , namespace
+  , "-l"
+  , "staging=" <> coerce dName ]
 
 deleteCertArgs :: DeploymentName -> [CommandArg]
-deleteCertArgs dName = [
-      "delete"
-    , "certificate"
-    , "-n"
-    , namespace
-    , "b2b-dm-staging-" <> coerce dName <> "-tls"
-    , "b2b-dm-staging-"<> coerce dName <> "-tls-tasker"
-    , "b2b-infra-dm-staging-" <> coerce dName <> "-kibana-tls"
-  ]
+deleteCertArgs dName =
+  [ "delete"
+  , "certificate"
+  , "-n"
+  , namespace
+  , "b2b-dm-staging-" <> coerce dName <> "-tls"
+  , "b2b-dm-staging-"<> coerce dName <> "-tls-tasker"
+  , "b2b-infra-dm-staging-" <> coerce dName <> "-kibana-tls" ]

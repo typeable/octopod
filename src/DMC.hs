@@ -45,10 +45,10 @@ runDMC = do
         envPairs <- liftIO $ parseEnvs tEnvs
         handleCreate $ Deployment (coerce tName) (coerce tTag) envPairs
       ListC    _     _              -> handleList
-      EditC    tName _    _         -> handleEdit . DeploymentName $ tName
-      DestroyC tName _    _         -> handleDestroy . DeploymentName $ tName
-      UpdateC  tName tTag _     _   -> handleUpdate (DeploymentName tName) (DeploymentTag tTag)
-      InfoC    tName _    _         -> handleInfo . DeploymentName $ tName
+      EditC    tName _    _         -> handleEdit . coerce $ tName
+      DestroyC tName _    _         -> handleDestroy . coerce $ tName
+      UpdateC  tName tTag _     _   -> handleUpdate (coerce tName) (coerce tTag)
+      InfoC    tName _    _         -> handleInfo . coerce $ tName
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
@@ -63,15 +63,15 @@ getBaseUrl = do
     defaultBaseUrl = BaseUrl Https dmsHostName 443 ""
     parseUrl :: String -> BaseUrl
     parseUrl = fromMaybe defaultBaseUrl . parseUrl'
-     where
-       parseUrl' url = do
-         uri <- parseURI url
-         uriData <- uriAuthority uri
-         let
-           schema = if uriScheme uri == "https:" then Https else Http
-           host = uriRegName uriData
-           port = read . P.tail . uriPort $ uriData
-         return $ BaseUrl schema host port ""
+      where
+        parseUrl' url = do
+          uri <- parseURI url
+          uriData <- uriAuthority uri
+          let
+            schema = if uriScheme uri == "https:" then Https else Http
+            host = uriRegName uriData
+            port = read . P.tail . uriPort $ uriData
+          return $ BaseUrl schema host port ""
   return $ maybe defaultBaseUrl parseUrl dmsURL
 
 handleCreate :: Deployment -> ReaderT ClientEnv IO ()
@@ -112,7 +112,8 @@ editEnvs :: FilePath -> EnvPairs -> IO EnvPairs
 editEnvs editor currentEnvPairs = withTempFile "" "dmc" $ \filePath handle -> do
   for_ currentEnvPairs $ \(k, v) -> (T.hPutStrLn handle $ k <> "=" <> v)
   hFlush handle
-  withProcessWait_ (proc editor [filePath]) $ \_ -> T.hPutStrLn handle "processing update..."
+  withProcessWait_ (proc editor [filePath]) $ \_ ->
+    T.hPutStrLn handle "processing update..."
   rawEnvs <- T.lines <$> T.readFile filePath
   envPairs <- parseEnvs rawEnvs
   T.putStrLn "sending update..."
@@ -121,7 +122,8 @@ editEnvs editor currentEnvPairs = withTempFile "" "dmc" $ \filePath handle -> do
 handleDestroy :: DeploymentName -> ReaderT ClientEnv IO ()
 handleDestroy dName = do
   clientEnv <- ask
-  liftIO $ handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
 
 handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
 handleUpdate dName dTag = do
@@ -138,8 +140,10 @@ handleInfo dName = do
     res <- runClientM (infoH dName) clientEnv
     case res of
       Right (i : _) -> printInfo i
-      Right []      -> print $ "deployment " ++ unpack (coerce dName) ++ " not found"
+      Right []      -> print notFoundMsg
       Left err      -> print $ "request failed, reason: " ++ show err
+    where
+      notFoundMsg = "deployment " ++ unpack (coerce dName) ++ " not found"
 
 listH :: ClientM [DeploymentFullInfo]
 
@@ -155,15 +159,15 @@ updateH :: DeploymentName -> DeploymentUpdate -> ClientM NoContent
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
-(listH
- :<|> createH
- :<|> getH
- :<|> editH
- :<|> destroyH
- :<|> updateH
- :<|> infoH
- :<|> _)
- :<|> _ = client (Proxy @API)
+( listH
+  :<|> createH
+  :<|> getH
+  :<|> editH
+  :<|> destroyH
+  :<|> updateH
+  :<|> infoH
+  :<|> _)
+    :<|> _ = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result) = f result

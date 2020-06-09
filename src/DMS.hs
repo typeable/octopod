@@ -69,21 +69,27 @@ runDMS = do
   update_cmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
   deletion_cmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
   checking_cmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
-  pgPool <- initConnectionPool (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
-  let app'         = app $ AppState pgPool
-                                    logger'
-                                    proj_name
-                                    domain
-                                    ns
-                                    creation_cmd
-                                    update_cmd
-                                    deletion_cmd
-                                    checking_cmd
-      serverPort   = dmsPort opts
-      uiServerPort = unServerPort $ dmsUIPort opts
-      tlsOpts      = createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts) (dmsTLSStorePath opts) serverPort
-      warpOpts     = setPort (unServerPort serverPort) defaultSettings
-      in (run uiServerPort app') `race_` (runTLS tlsOpts warpOpts app')
+  pgPool <- initConnectionPool
+    (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
+  let
+    app'         =
+      app $ AppState
+        pgPool
+        logger'
+        proj_name
+        domain
+        ns
+        creation_cmd
+        update_cmd
+        deletion_cmd
+        checking_cmd
+    serverPort   = dmsPort opts
+    uiServerPort = unServerPort $ dmsUIPort opts
+    tlsOpts      =
+      createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts)
+        (dmsTLSStorePath opts) serverPort
+    warpOpts     = setPort (unServerPort serverPort) defaultSettings
+    in (run uiServerPort app') `race_` (runTLS tlsOpts warpOpts app')
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -98,7 +104,8 @@ app s = serve api $ hoistServer api (nt s) server
     api = Proxy @API
 
 server :: ServerT API AppM
-server = (listH :<|> createH :<|> getH :<|> editH
+server =
+  (listH :<|> createH :<|> getH :<|> editH
     :<|> destroyH :<|> updateH :<|> infoH :<|> statusH) :<|> pingH
 
 listH :: AppM [DeploymentFullInfo]
@@ -114,12 +121,13 @@ listH = do
   return deployments
   where
     q                    =
-      "SELECT name, tag, envs, extract(epoch from created_at)::int, extract(epoch from updated_at)::int \
+      "SELECT name, tag, envs, extract(epoch from created_at)::int, \
+        \extract(epoch from updated_at)::int \
       \FROM deployments ORDER BY name"
-    depUrls domain dName = [ ("app", appUrl domain dName)
-                           , ("kibana", "kibana." <> appUrl domain dName)
-                           , ("tasker", "tasker." <> appUrl domain dName)
-                           ]
+    depUrls domain dName =
+      [ ("app", appUrl domain dName)
+      , ("kibana", "kibana." <> appUrl domain dName)
+      , ("tasker", "tasker." <> appUrl domain dName)]
     appUrl domain dName  = coerce dName <> "." <> coerce domain
 
 createH :: Deployment -> AppM NoContent
@@ -127,7 +135,8 @@ createH dep = do
   st <- ask
   let
     log :: Text -> IO ()
-    log                                                           = logInfo (logger st)
+    log                                                           =
+      logInfo (logger st)
     pgPool                                                        = pool st
     args                                                          =
       [ "--project-name", coerce $ project_name st
@@ -136,7 +145,8 @@ createH dep = do
       , "--name", coerce $ name dep
       , "--tag", coerce $ tag dep
       ] ++ concat [["--env", concatPair e] | e <- envs dep]
-    cmd                                                           = coerce $ creation_command st
+    cmd                                                           =
+      coerce $ creation_command st
     createDeployment :: PgPool -> Deployment -> IO Int64
     createDeployment p Deployment { name = n, tag = t, envs = e } =
       withResource p $ \conn -> execute
@@ -166,7 +176,8 @@ selectDeploymentLogs :: PgPool -> DeploymentName -> IO [DeploymentLog]
 selectDeploymentLogs p dName = do
   let
     q =
-      "SELECT action::text, tag, envs, exit_code, extract(epoch from created_at)::int \
+      "SELECT action::text, tag, envs, exit_code, \
+        \extract(epoch from created_at)::int \
       \FROM deployment_logs \
       \WHERE deployment_id in (\
         \SELECT id FROM deployments WHERE name = ?\
@@ -193,45 +204,47 @@ selectDeployments p dName = do
   for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
 
 editH :: DeploymentName -> EnvPairs -> AppM NoContent
-editH n e = do
+editH dName dEnvs = do
   st <- ask
   let
     log :: Text -> IO ()
     log          = logInfo (logger st)
     pgPool       = pool st
   liftIO $ getTag pgPool >>= \case
-    t : _ -> do
+    dTag : _ -> do
       let
-        args = [ "--project-name", coerce $ project_name st
-               , "--base-domain", coerce $ base_domain st
-               , "--namespace", coerce $ namespace st
-               , "--name", coerce n
-               , "--tag", coerce t
-               ] ++ concat [["--env", concatPair p] | p <- e]
+        args =
+          [ "--project-name", coerce $ project_name st
+          , "--base-domain", coerce $ base_domain st
+          , "--namespace", coerce $ namespace st
+          , "--name", coerce dName
+          , "--tag", coerce dTag
+          ] ++ concat [["--env", concatPair p] | p <- dEnvs]
         cmd  = coerce $ update_command st
       liftIO $  do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
         ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
         log
-          $ "deployment edited, name: " <> coerce n
-          <> ", envs: " <> formatEnvPairs e
-        let dep = Deployment n t e
+          $ "deployment edited, name: " <> coerce dName
+          <> ", envs: " <> formatEnvPairs dEnvs
+        let dep = Deployment dName dTag dEnvs
         createDeploymentLog pgPool dep "edit" ec
         handleExitCode ec
         return ()
-    _     -> liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce n
+    _     ->
+      liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
   return NoContent
   where
     getTag                 :: PgPool -> IO [DeploymentTag]
     getTag p               = fmap (fmap fromOnly) $ withResource p $ \conn ->
-      query conn "SELECT tag FROM deployments WHERE name = ?" (Only n)
+      query conn "SELECT tag FROM deployments WHERE name = ?" (Only dName)
     updateEditDeployment   :: PgPool -> IO Int64
     updateEditDeployment p = withResource p $ \conn -> execute
       conn
       "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?"
       -- FIXME: make EnvPairs a newtype and give it ToField instance
-      (formatEnvPairs e, n)
+      (formatEnvPairs dEnvs, dName)
 
 destroyH :: DeploymentName -> AppM NoContent
 destroyH dName = do
@@ -239,10 +252,11 @@ destroyH dName = do
   let
     log     = logInfo (logger st)
     pgPool  = pool st
-    args    = [ "--project-name", coerce $ project_name st
-              , "--namespace", coerce $ namespace st
-              , "--name", coerce dName
-              ]
+    args    =
+      [ "--project-name", coerce $ project_name st
+      , "--namespace", coerce $ namespace st
+      , "--name", coerce dName
+      ]
     cmd     = coerce $ deletion_command st
   liftIO $ do
     log $ "call " <> unwords (cmd : args)
@@ -276,12 +290,13 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
         Just dEnvs  -> pure dEnvs
       let
         log  = logInfo (logger st)
-        args = [ "--project-name", coerce $ project_name st
-               , "--base-domain", coerce $ base_domain st
-               , "--namespace", coerce $ namespace st
-               , "--name", coerce $ dName
-               , "--tag", coerce $ dTag
-               ] ++ concat [["--env", concatPair e] | e <- envPairs]
+        args =
+          [ "--project-name", coerce $ project_name st
+          , "--base-domain", coerce $ base_domain st
+          , "--namespace", coerce $ namespace st
+          , "--name", coerce $ dName
+          , "--tag", coerce $ dTag
+          ] ++ concat [["--env", concatPair e] | e <- envPairs]
         cmd  = coerce $ update_command st
       liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
@@ -326,7 +341,8 @@ infoH dName = do
 pingH :: AppM NoContent
 pingH = do
   pgPool <- pool <$> ask
-  _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn -> query_ conn "SELECT 1"
+  _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn ->
+    query_ conn "SELECT 1"
   pure NoContent
 
 statusH :: DeploymentName -> AppM DeploymentStatus
@@ -356,7 +372,8 @@ createDeploymentLog pgPool (Deployment n t e) a ec = do
       ExitSuccess     -> 0
       ExitFailure err -> err
     q =
-      "INSERT INTO deployment_logs (deployment_id, action, tag, envs, exit_code) (\
+      "INSERT INTO deployment_logs \
+      \(deployment_id, action, tag, envs, exit_code) (\
         \SELECT id, ?, ?, ?, ? \
         \FROM deployments \
         \WHERE name = ? \

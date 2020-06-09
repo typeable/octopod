@@ -24,14 +24,20 @@ import           Network.Wai.Handler.WarpTLS hiding (TLSSettings, tlsSettings)
 import Types
 
 
-createTLSOpts :: TLSCertPath -> TLSKeyPath -> TLSStorePath -> ServerPort -> WTLS.TLSSettings
-createTLSOpts tlsCert tlsKey tlsStore serverPort
-  = initTLSSettings
-      { tlsWantClientCert = True
-      , onInsecure        = DenyInsecure "This server only accepts secure HTTPS connections."
-      , tlsServerHooks    = def { onClientCertificate =
-          fmap certificateUsageFromValidations . validateCertificate }
-      }
+createTLSOpts
+  :: TLSCertPath
+  -> TLSKeyPath
+  -> TLSStorePath
+  -> ServerPort
+  -> WTLS.TLSSettings
+createTLSOpts tlsCert tlsKey tlsStore serverPort =
+  initTLSSettings
+    { tlsWantClientCert = True
+    , onInsecure        = DenyInsecure
+      "This server only accepts secure HTTPS connections."
+    , tlsServerHooks    = def { onClientCertificate =
+      fmap certificateUsageFromValidations . validateCertificate }
+    }
   where
     tlsCert'                        = unTLSCertPath tlsCert
     tlsKey'                         = unTLSKeyPath tlsKey
@@ -63,17 +69,18 @@ createTLSOpts tlsCert tlsKey tlsStore serverPort
 makeClientManager :: String -> FilePath -> FilePath -> IO Manager
 makeClientManager dmsHostName cert key = do
   creds <- either error Just <$> credentialLoadX509 cert key
-  let hooks               = def
-        { onCertificateRequest = \_       -> return creds
-        , onServerCertificate  = \_ _ _ _ -> return []
-        }
-      clientParams        = (defaultParamsClient dmsHostName  "")
-        { clientHooks     = hooks
-        , clientSupported = def { supportedCiphers = ciphersuite_default }
-        }
-      tlsSettings         = TLSSettings clientParams
-      timeout             = 20 * 60 * 10 ^ (6 :: Int)
-      tlsManagerSettings' = (mkManagerSettings tlsSettings Nothing)
-        { managerResponseTimeout = responseTimeoutMicro timeout }
-      in newManager tlsManagerSettings'
+  let
+    hooks               = def
+      { onCertificateRequest = \_       -> return creds
+      , onServerCertificate  = \_ _ _ _ -> return []
+      }
+    clientParams        = (defaultParamsClient dmsHostName  "")
+      { clientHooks     = hooks
+      , clientSupported = def { supportedCiphers = ciphersuite_default }
+      }
+    tlsSettings         = TLSSettings clientParams
+    timeout             = 20 * 60 * 10 ^ (6 :: Int)
+    tlsManagerSettings' = (mkManagerSettings tlsSettings Nothing)
+      { managerResponseTimeout = responseTimeoutMicro timeout }
+    in newManager tlsManagerSettings'
 
