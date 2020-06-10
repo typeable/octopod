@@ -133,5 +133,8 @@ newtype Domain = Domain { unDomain :: Text }
 newtype Namespace = Namespace { unNamespace :: Text }
   deriving (Show)
 
+newtype ArchiveRetention = ArchiveRetention { unArchiveRetention :: Int }
+  deriving (Show)
+
 newtype Command = Command { unCommand :: Text }
   deriving (Show)

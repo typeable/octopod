@@ -39,6 +39,13 @@ data Args
     { name        :: Text
     , tlsCertPath :: Maybe ByteString
     , tlsKeyPath  :: Maybe ByteString }
+  | Restore
+    { name        :: Text
+    , tlsCertPath :: Maybe ByteString
+    , tlsKeyPath  :: Maybe ByteString }
+  | CleanArchive
+    { tlsCertPath :: Maybe ByteString
+    , tlsKeyPath  :: Maybe ByteString }
   deriving stock (Show, Generic)
 
 instance ParseRecord Args where
@@ -77,16 +84,25 @@ data DMCArgs
     { deploymentName :: Text
     , dmcTLSCertPath :: Maybe TLSCertPath
     , dmcTLSKeyPath  :: Maybe TLSKeyPath }
+  | RestoreC
+    { deploymentName :: Text
+    , dmcTLSCertPath :: Maybe TLSCertPath
+    , dmcTLSKeyPath  :: Maybe TLSKeyPath }
+  | CleanArchiveC
+    { dmcTLSCertPath :: Maybe TLSCertPath
+    , dmcTLSKeyPath  :: Maybe TLSKeyPath }
   deriving stock (Show, Generic)
 
 parseArgs :: IO DMCArgs
 parseArgs = do
   args <- getRecord "DMC"
   pure $ case args of
-    Create  n t e c k -> CreateC n t e (coerce <$> c) (coerce <$> k)
-    List    c k       -> ListC (coerce <$> c) (coerce <$> k)
-    Edit    n c k     -> EditC n (coerce <$> c) (coerce <$> k)
-    Delete n c k      -> DeleteC n (coerce <$> c) (coerce <$> k)
-    Update  n t c k   -> UpdateC n t (coerce <$> c) (coerce <$> k)
-    Info    n c k     -> InfoC n (coerce <$> c) (coerce <$> k)
-    Cleanup n c k     -> CleanupC n (coerce <$> c) (coerce <$> k)
+    Create       n t e c k -> CreateC n t e (coerce <$> c) (coerce <$> k)
+    List         c k       -> ListC (coerce <$> c) (coerce <$> k)
+    Edit         n c k     -> EditC n (coerce <$> c) (coerce <$> k)
+    Delete       n c k     -> DeleteC n (coerce <$> c) (coerce <$> k)
+    Update       n t c k   -> UpdateC n t (coerce <$> c) (coerce <$> k)
+    Info         n c k     -> InfoC n (coerce <$> c) (coerce <$> k)
+    Cleanup      n c k     -> CleanupC n (coerce <$> c) (coerce <$> k)
+    Restore      n c k     -> RestoreC n (coerce <$> c) (coerce <$> k)
+    CleanArchive c k       -> CleanArchiveC (coerce <$> c) (coerce <$> k)

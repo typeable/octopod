@@ -22,7 +22,8 @@ make build
 $ result/bin/dmc-exe --help
 DMC
 
-Usage: dmc-exe (create | list | edit | delete | update | info | cleanup)
+Usage: dmc-exe (create | list | edit | delete | update | info | cleanup |
+                 restore | cleanarchive)
 
 Available options:
   -h,--help                Show this help text
@@ -35,6 +36,8 @@ Available commands:
   update
   info
   cleanup
+  restore
+  cleanarchive
 ```
 
 # Interact with DMS

@@ -36,16 +36,17 @@ type PgPool = Pool Connection
 type AppM   = ReaderT AppState Handler
 
 data AppState = AppState
-  { pool                :: PgPool
-  , logger              :: TimedFastLogger
-  , project_name        :: ProjectName
-  , base_domain         :: Domain
-  , namespace           :: Namespace
-  , creation_command    :: Command
-  , update_command      :: Command
-  , deletion_command    :: Command
-  , checking_command    :: Command
-  , cleanup_command    :: Command }
+  { pool             :: PgPool
+  , logger           :: TimedFastLogger
+  , projectName      :: ProjectName
+  , baseDomain       :: Domain
+  , namespace        :: Namespace
+  , archiveRetention :: ArchiveRetention
+  , creationCommand  :: Command
+  , updateCommand    :: Command
+  , deletionCommand  :: Command
+  , checkingCommand  :: Command
+  , cleanupCommand   :: Command }
 
 data DeploymentException
   = DeploymentFailed Int
@@ -53,6 +54,11 @@ data DeploymentException
   deriving (Show)
 
 instance Exception DeploymentException
+
+data DeploymentListType
+  = AllDeployments
+  | ArchivedOnlyDeployments
+  deriving (Show)
 
 runDMS :: IO ()
 runDMS = do
@@ -63,14 +69,15 @@ runDMS = do
   let
     a ?! e = a >>= maybe (die e) pure
     getEnvOrDie eName = lookupEnv eName ?! (eName <> " is not set")
-  proj_name <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
+  projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  creation_cmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
-  update_cmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
-  deletion_cmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
-  checking_cmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
-  cleanup_cmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
+  archRetention <- ArchiveRetention . read <$> getEnvOrDie "ARCHIVE_RETENTION"
+  creationCmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
+  updateCmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
+  deletionCmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
+  checkingCmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
+  cleanupCmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   pgPool <- initConnectionPool
     (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   let
@@ -78,14 +85,15 @@ runDMS = do
       app $ AppState
         pgPool
         logger'
-        proj_name
+        projName
         domain
         ns
-        creation_cmd
-        update_cmd
-        deletion_cmd
-        checking_cmd
-        cleanup_cmd
+        archRetention
+        creationCmd
+        updateCmd
+        deletionCmd
+        checkingCmd
+        cleanupCmd
     serverPort   = dmsPort opts
     uiServerPort = unServerPort $ dmsUIPort opts
     tlsOpts      =
@@ -108,12 +116,14 @@ app s = serve api $ hoistServer api (nt s) server
 
 server :: ServerT API AppM
 server =
-  (listH :<|> createH :<|> getH :<|> editH
-    :<|> deleteH :<|> updateH :<|> infoH :<|> statusH :<|> cleanupH) :<|> pingH
+  ( listH :<|> createH :<|> getH :<|> editH
+    :<|> deleteH :<|> updateH :<|> infoH :<|> statusH
+    :<|> cleanupH :<|> restoreH
+  ) :<|> pingH :<|> cleanArchiveH
 
 listH :: AppM [DeploymentFullInfo]
 listH = do
-  AppState {pool = p, logger = l, base_domain = d} <- ask
+  AppState {pool = p, logger = l, baseDomain = d} <- ask
 
   retrieved <- liftIO $ withResource p $ \conn -> query_ conn q
   deployments <- liftIO $ for retrieved $ \(n, t, e, a, ct, ut) -> do
@@ -137,41 +147,46 @@ createH :: Deployment -> AppM NoContent
 createH dep = do
   st <- ask
   let
-    log :: Text -> IO ()
-    log                                                           =
-      logInfo (logger st)
-    pgPool                                                        = pool st
-    args                                                          =
-      [ "--project-name", coerce $ project_name st
-      , "--base-domain", coerce $ base_domain st
-      , "--namespace", coerce $ namespace st
-      , "--name", coerce $ name dep
-      , "--tag", coerce $ tag dep
-      ] ++ concat [["--env", concatPair e] | e <- envs dep]
-    cmd                                                           =
-      coerce $ creation_command st
-    createDeployment :: PgPool -> Deployment -> IO Int64
-    createDeployment p Deployment { name = n, tag = t, envs = e } =
+    pgPool                                                 = pool st
+    createDep :: PgPool -> Deployment -> IO Int64
+    createDep p Deployment { name = n, tag = t, envs = e } =
       withResource p $ \conn -> execute
         conn
         "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
         (n, t, formatEnvPairs e)
-
-  liftIO $ do
-    void $ createDeployment pgPool dep
-    log $ "call " <> unwords (cmd : args)
-    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
-    log $ "deployment created, deployment: " <> (pack . show $ dep)
+  void $ liftIO $ createDep pgPool dep
+  ec <- createDeployment dep st
+  void $ liftIO $ do
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
     handleExitCode ec
   pure NoContent
+
+createDeployment :: Deployment -> AppState -> AppM ExitCode
+createDeployment dep st = do
+  let
+    log :: Text -> IO ()
+    log  = logInfo (logger st)
+    args =
+      [ "--project-name", coerce $ projectName st
+      , "--base-domain", coerce $ baseDomain st
+      , "--namespace", coerce $ namespace st
+      , "--name", coerce $ name dep
+      , "--tag", coerce $ tag dep
+      ] ++ concat [["--env", concatPair e] | e <- envs dep]
+    cmd  = coerce $ creationCommand st
+
+  liftIO $ do
+    log $ "call " <> unwords (cmd : args)
+    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+    log $ "deployment created, deployment: " <> (pack . show $ dep)
+    pure ec
 
 getH :: DeploymentName -> AppM Deployment
 getH dName = do
   st <- ask
   liftIO $ do
-    dep <- selectDeployment (pool st) dName
+    dep <- selectDeployment (pool st) dName AllDeployments
     logInfo (logger st) $ "get deployment: " <> (pack . show $ dep)
     return dep
 
@@ -193,18 +208,31 @@ selectDeploymentLogs p dName = do
     envPairs <- parseEnvs $ lines e
     pure $ DeploymentLog a t envPairs ec ts
 
-selectDeployment :: PgPool -> DeploymentName -> IO Deployment
-selectDeployment p n = selectDeployments p n >>= \case
+selectDeployment
+  :: PgPool
+  -> DeploymentName
+  -> DeploymentListType
+  -> IO Deployment
+selectDeployment p n t = selectDeployments p n t >>= \case
   [d] -> pure d
   []  -> error "deployment not found"
   _   -> error "more than one deployment found in the database"
 
-selectDeployments :: PgPool -> DeploymentName -> IO [Deployment]
-selectDeployments p dName = do
-  retrieved <- withResource p $ \conn -> query
-    conn
-    "SELECT name, tag, envs FROM deployments WHERE name = ?"
-    (Only dName)
+selectDeployments
+  :: PgPool
+  -> DeploymentName
+  -> DeploymentListType
+  -> IO [Deployment]
+selectDeployments p dName lType = do
+  let
+    q AllDeployments          =
+      "SELECT name, tag, envs FROM deployments WHERE name = ?"
+    q ArchivedOnlyDeployments =
+      "SELECT name, tag, envs FROM deployments \
+      \WHERE name = ? AND archived = 't'"
+
+  retrieved <- withResource p $ \conn ->
+    query conn (q lType) (Only dName)
   for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
 
 editH :: DeploymentName -> EnvPairs -> AppM NoContent
@@ -218,13 +246,13 @@ editH dName dEnvs = do
     dTag : _ -> do
       let
         args =
-          [ "--project-name", coerce $ project_name st
-          , "--base-domain", coerce $ base_domain st
+          [ "--project-name", coerce $ projectName st
+          , "--base-domain", coerce $ baseDomain st
           , "--namespace", coerce $ namespace st
           , "--name", coerce dName
           , "--tag", coerce dTag
           ] ++ concat [["--env", concatPair p] | p <- dEnvs]
-        cmd  = coerce $ update_command st
+        cmd  = coerce $ updateCommand st
       liftIO $  do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
@@ -257,13 +285,13 @@ deleteH dName = do
     log     = logInfo (logger st)
     pgPool  = pool st
     args    =
-      [ "--project-name", coerce $ project_name st
+      [ "--project-name", coerce $ projectName st
       , "--namespace", coerce $ namespace st
       , "--name", coerce dName
       ]
-    cmd     = coerce $ deletion_command st
+    cmd     = coerce $ deletionCommand st
   liftIO $ do
-    dep <- selectDeployment pgPool dName
+    dep <- selectDeployment pgPool dName AllDeployments
     log $ "call " <> unwords (cmd : args)
     ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     void $ archiveDeployment pgPool dName
@@ -294,13 +322,13 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
       let
         log  = logInfo (logger st)
         args =
-          [ "--project-name", coerce $ project_name st
-          , "--base-domain", coerce $ base_domain st
+          [ "--project-name", coerce $ projectName st
+          , "--base-domain", coerce $ baseDomain st
           , "--namespace", coerce $ namespace st
           , "--name", coerce $ dName
           , "--tag", coerce $ dTag
           ] ++ concat [["--env", concatPair e] | e <- envPairs]
-        cmd  = coerce $ update_command st
+        cmd  = coerce $ updateCommand st
       liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
         log $ "call " <> unwords (cmd : args)
@@ -339,7 +367,7 @@ infoH dName = do
   st <- ask
   let pgPool = pool st
   liftIO $ do
-    dep <- selectDeployment pgPool dName
+    dep <- selectDeployment pgPool dName AllDeployments
     depLogs <- selectDeploymentLogs pgPool dName
     let depInfo = DeploymentInfo dep $ reverse depLogs
     logInfo (logger st) $ "get deployment info: " <> (pack . show $ depInfo)
@@ -354,7 +382,7 @@ pingH = do
 
 statusH :: DeploymentName -> AppM DeploymentStatus
 statusH dName = do
-  cmd <- checking_command <$> ask
+  cmd <- checkingCommand <$> ask
   let args = [unpack . coerce $ dName]
   ec <- liftIO $ withProcessWait (proc (unpack $ coerce cmd) args) waitProcess
   pure . DeploymentStatus $
@@ -365,15 +393,20 @@ statusH dName = do
 cleanupH :: DeploymentName -> AppM NoContent
 cleanupH dName = do
   st <- ask
+  cleanupDeployment dName st
+  pure NoContent
+
+cleanupDeployment :: DeploymentName -> AppState -> AppM ()
+cleanupDeployment dName st = do
   let
     log     = logInfo (logger st)
     pgPool  = pool st
     args    =
-      [ "--project-name", coerce $ project_name st
+      [ "--project-name", coerce $ projectName st
       , "--namespace", coerce $ namespace st
       , "--name", coerce dName
       ]
-    cmd     = coerce $ cleanup_command st
+    cmd     = coerce $ cleanupCommand st
   liftIO $ do
     log $ "call " <> unwords (cmd : args)
     ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
@@ -381,7 +414,6 @@ cleanupH dName = do
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
     handleExitCode ec
-  pure NoContent
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
@@ -393,6 +425,36 @@ deleteDeploymentLogs p n = withResource p $ \conn -> execute
 deleteDeployment :: PgPool -> DeploymentName -> IO Int64
 deleteDeployment p n = withResource p $ \conn ->
   execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
+
+cleanArchiveH :: AppM NoContent
+cleanArchiveH = do
+  st <- ask
+  let
+    pgPool  = pool st
+    archRetention = unArchiveRetention . archiveRetention $ st
+    q =
+      "SELECT name FROM deployments \
+      \WHERE archived = 't' AND archived_at + interval '?' second < now()"
+  retrieved :: [Only DeploymentName] <- liftIO $
+    withResource pgPool $ \conn -> query conn q (Only archRetention)
+  void $ for retrieved $ \(Only dName) -> cleanupDeployment dName st
+  pure NoContent
+
+restoreH :: DeploymentName -> AppM NoContent
+restoreH dName = do
+  st <- ask
+  let pgPool  = pool st
+  dep <- liftIO $ selectDeployment pgPool dName ArchivedOnlyDeployments
+  ec <- createDeployment dep st
+  void $ liftIO $ do
+    let
+      q =
+        "UPDATE deployments SET archived = 'f', archived_at = null \
+        \WHERE name = ?"
+    void $ withResource pgPool $ \conn -> execute conn q (Only dName)
+    createDeploymentLog pgPool dep "restore" ec $ ArchivedFlag False
+    handleExitCode ec
+  pure NoContent
 
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do

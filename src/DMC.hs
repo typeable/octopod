@@ -44,12 +44,14 @@ runDMC = do
       CreateC  tName tTag tEnvs _ _ -> do
         envPairs <- liftIO $ parseEnvs tEnvs
         handleCreate $ Deployment (coerce tName) (coerce tTag) envPairs
-      ListC    _     _              -> handleList
-      EditC    tName _    _         -> handleEdit . coerce $ tName
-      DeleteC  tName _    _         -> handleDelete . coerce $ tName
-      UpdateC  tName tTag _     _   -> handleUpdate (coerce tName) (coerce tTag)
-      InfoC    tName _    _         -> handleInfo . coerce $ tName
-      CleanupC tName _    _         -> handleCleanup . coerce $ tName
+      ListC         _     _        -> handleList
+      EditC         tName _    _   -> handleEdit . coerce $ tName
+      DeleteC       tName _    _   -> handleDelete . coerce $ tName
+      UpdateC       tName tTag _ _ -> handleUpdate (coerce tName) (coerce tTag)
+      InfoC         tName _    _   -> handleInfo . coerce $ tName
+      CleanupC      tName _    _   -> handleCleanup . coerce $ tName
+      RestoreC      tName _    _   -> handleRestore . coerce $ tName
+      CleanArchiveC _     _        -> handleCleanArchive
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
@@ -152,6 +154,18 @@ handleCleanup dName = do
   liftIO $
     handleResponse (const $ pure ()) =<< runClientM (cleanupH dName) clientEnv
 
+handleRestore :: DeploymentName -> ReaderT ClientEnv IO ()
+handleRestore dName = do
+  clientEnv <- ask
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM (restoreH dName) clientEnv
+
+handleCleanArchive :: ReaderT ClientEnv IO ()
+handleCleanArchive = do
+  clientEnv <- ask
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM cleanArchiveH clientEnv
+
 listH :: ClientM [DeploymentFullInfo]
 
 createH :: Deployment -> ClientM NoContent
@@ -170,6 +184,12 @@ _statusH :: DeploymentName -> ClientM DeploymentStatus
 
 cleanupH :: DeploymentName -> ClientM NoContent
 
+restoreH :: DeploymentName -> ClientM NoContent
+
+_pingH :: ClientM NoContent
+
+cleanArchiveH :: ClientM NoContent
+
 ( listH
   :<|> createH
   :<|> getH
@@ -178,8 +198,9 @@ cleanupH :: DeploymentName -> ClientM NoContent
   :<|> updateH
   :<|> infoH
   :<|> _statusH
-  :<|> cleanupH)
-    :<|> _ = client (Proxy @API)
+  :<|> cleanupH
+  :<|> restoreH)
+    :<|> _pingH :<|> cleanArchiveH = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result) = f result

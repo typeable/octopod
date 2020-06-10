@@ -20,6 +20,13 @@ type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
 type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
 type CleanupEndpoint c =
   c :> "cleanup" :> DeleteNoContent '[PlainText] NoContent
+type RestoreEndpoint c =
+  c :> "restore" :> PatchNoContent '[PlainText] NoContent
+
+type PingEndpoint =
+  "ping" :> GetNoContent '[PlainText] NoContent
+type CleanArchiveEndpoint =
+  "clean_archive" :> DeleteNoContent '[PlainText] NoContent
 
 -- FIXME: Text as a return type for many endpoints
 type DeploymentAPI' c =
@@ -34,8 +41,10 @@ type DeploymentAPI' c =
       :<|> InfoEndpoint c
       :<|> StatusEndpoint c
       :<|> CleanupEndpoint c
+      :<|> RestoreEndpoint c
       )
-    :<|> "ping" :> GetNoContent '[PlainText] NoContent
+    :<|> PingEndpoint
+    :<|> CleanArchiveEndpoint
     )
 
 type API = DeploymentAPI' CaptureName
