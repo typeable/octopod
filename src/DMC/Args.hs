@@ -22,7 +22,7 @@ data Args
     { name        :: Text
     , tlsCertPath :: Maybe ByteString
     , tlsKeyPath  :: Maybe ByteString }
-  | Destroy
+  | Delete
     { name        :: Text
     , tlsCertPath :: Maybe ByteString
     , tlsKeyPath  :: Maybe ByteString }
@@ -32,6 +32,10 @@ data Args
     , tlsCertPath :: Maybe ByteString
     , tlsKeyPath  :: Maybe ByteString }
   | Info
+    { name        :: Text
+    , tlsCertPath :: Maybe ByteString
+    , tlsKeyPath  :: Maybe ByteString }
+  | Cleanup
     { name        :: Text
     , tlsCertPath :: Maybe ByteString
     , tlsKeyPath  :: Maybe ByteString }
@@ -56,7 +60,7 @@ data DMCArgs
     { deploymentName :: Text
     , dmcTLSCertPath :: Maybe TLSCertPath
     , dmcTLSKeyPath  :: Maybe TLSKeyPath }
-  | DestroyC
+  | DeleteC
     { deploymentName :: Text
     , dmcTLSCertPath :: Maybe TLSCertPath
     , dmcTLSKeyPath  :: Maybe TLSKeyPath }
@@ -69,6 +73,10 @@ data DMCArgs
     { deploymentName :: Text
     , dmcTLSCertPath :: Maybe TLSCertPath
     , dmcTLSKeyPath  :: Maybe TLSKeyPath }
+  | CleanupC
+    { deploymentName :: Text
+    , dmcTLSCertPath :: Maybe TLSCertPath
+    , dmcTLSKeyPath  :: Maybe TLSKeyPath }
   deriving stock (Show, Generic)
 
 parseArgs :: IO DMCArgs
@@ -78,6 +86,7 @@ parseArgs = do
     Create  n t e c k -> CreateC n t e (coerce <$> c) (coerce <$> k)
     List    c k       -> ListC (coerce <$> c) (coerce <$> k)
     Edit    n c k     -> EditC n (coerce <$> c) (coerce <$> k)
-    Destroy n c k     -> DestroyC n (coerce <$> c) (coerce <$> k)
+    Delete n c k      -> DeleteC n (coerce <$> c) (coerce <$> k)
     Update  n t c k   -> UpdateC n t (coerce <$> c) (coerce <$> k)
     Info    n c k     -> InfoC n (coerce <$> c) (coerce <$> k)
+    Cleanup n c k     -> CleanupC n (coerce <$> c) (coerce <$> k)

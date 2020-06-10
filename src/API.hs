@@ -13,11 +13,13 @@ type CreateEndpoint =
 type GetEndpoint c = c :> Get '[JSON] Deployment
 type EditEndpoint c =
   c :> ReqBody '[JSON] EnvPairs :> PatchNoContent '[PlainText] NoContent
-type DestroyEndpoint c = c :> DeleteNoContent '[PlainText] NoContent
+type DeleteEndpoint c = c :> DeleteNoContent '[PlainText] NoContent
 type UpdateEndpoint c =
   c :> ReqBody '[JSON] DeploymentUpdate :> PutNoContent '[PlainText] NoContent
 type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
 type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
+type CleanupEndpoint c =
+  c :> "cleanup" :> DeleteNoContent '[PlainText] NoContent
 
 -- FIXME: Text as a return type for many endpoints
 type DeploymentAPI' c =
@@ -27,10 +29,11 @@ type DeploymentAPI' c =
       :<|> CreateEndpoint
       :<|> GetEndpoint c
       :<|> EditEndpoint c
-      :<|> DestroyEndpoint c
+      :<|> DeleteEndpoint c
       :<|> UpdateEndpoint c
       :<|> InfoEndpoint c
       :<|> StatusEndpoint c
+      :<|> CleanupEndpoint c
       )
     :<|> "ping" :> GetNoContent '[PlainText] NoContent
     )

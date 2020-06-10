@@ -36,16 +36,16 @@ fn main() -> std::io::Result<()> {
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
 
-    let output = Command::new("helm")
-        .args(delete_app_atrs(name))
+    let output = Command::new("kubectl")
+        .args(delete_pvcs_atrs(namespace, name))
         .output()
-        .expect("delete app");
+        .expect("delete PVCs");
     print_command_result(output);
 
-    let output = Command::new("helm")
-        .args(delete_infra_atrs(name))
+    let output = Command::new("kubectl")
+        .args(delete_cert_atrs(namespace, name))
         .output()
-        .expect("delete infra");
+        .expect("delete certificates");
     print_command_result(output);
 
     Ok(())

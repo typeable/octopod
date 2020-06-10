@@ -50,6 +50,9 @@ newtype DeploymentTag = DeploymentTag { unDeploymentTag :: Text }
 newtype Action = Action { unAction :: Text }
   deriving (Show, FromJSON, ToJSON, FromField, ToField, IsString)
 
+newtype ArchivedFlag = ArchivedFlag { unArchivedFlag :: Bool }
+  deriving (Show, FromJSON, ToJSON, FromField, ToField)
+
 data Deployment = Deployment
   { name :: DeploymentName
   , tag  :: DeploymentTag
@@ -77,6 +80,7 @@ data DeploymentInfo = DeploymentInfo
 
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
+  , archived   :: Bool
   , createdAt  :: Int
   , updatedAt  :: Int
   , urls       :: [(Text, Text)]

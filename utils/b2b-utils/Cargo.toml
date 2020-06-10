@@ -23,3 +23,7 @@ path = "src/bin/delete.rs"
 [[bin]]
 name = "check"
 path = "src/bin/check.rs"
+
+[[bin]]
+name = "cleanup"
+path = "src/bin/cleanup.rs"

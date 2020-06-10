@@ -46,9 +46,10 @@ runDMC = do
         handleCreate $ Deployment (coerce tName) (coerce tTag) envPairs
       ListC    _     _              -> handleList
       EditC    tName _    _         -> handleEdit . coerce $ tName
-      DestroyC tName _    _         -> handleDestroy . coerce $ tName
+      DeleteC  tName _    _         -> handleDelete . coerce $ tName
       UpdateC  tName tTag _     _   -> handleUpdate (coerce tName) (coerce tTag)
       InfoC    tName _    _         -> handleInfo . coerce $ tName
+      CleanupC tName _    _         -> handleCleanup . coerce $ tName
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
@@ -87,7 +88,7 @@ handleList = do
   liftIO $ do
     resp <- runClientM listH clientEnv
     let
-      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _) = dName
+      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _ _) = dName
       names = T.unlines . coerce . (getName <$>) <$> resp
     handleResponse T.putStr names
 
@@ -119,11 +120,11 @@ editEnvs editor currentEnvPairs = withTempFile "" "dmc" $ \filePath handle -> do
   T.putStrLn "sending update..."
   pure envPairs
 
-handleDestroy :: DeploymentName -> ReaderT ClientEnv IO ()
-handleDestroy dName = do
+handleDelete :: DeploymentName -> ReaderT ClientEnv IO ()
+handleDelete dName = do
   clientEnv <- ask
   liftIO $
-    handleResponse (const $ pure ()) =<< runClientM (destroyH dName) clientEnv
+    handleResponse (const $ pure ()) =<< runClientM (deleteH dName) clientEnv
 
 handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
 handleUpdate dName dTag = do
@@ -145,6 +146,12 @@ handleInfo dName = do
     where
       notFoundMsg = "deployment " ++ unpack (coerce dName) ++ " not found"
 
+handleCleanup :: DeploymentName -> ReaderT ClientEnv IO ()
+handleCleanup dName = do
+  clientEnv <- ask
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM (cleanupH dName) clientEnv
+
 listH :: ClientM [DeploymentFullInfo]
 
 createH :: Deployment -> ClientM NoContent
@@ -153,20 +160,25 @@ getH :: DeploymentName -> ClientM Deployment
 
 editH :: DeploymentName -> EnvPairs -> ClientM NoContent
 
-destroyH :: DeploymentName -> ClientM NoContent
+deleteH :: DeploymentName -> ClientM NoContent
 
 updateH :: DeploymentName -> DeploymentUpdate -> ClientM NoContent
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
+_statusH :: DeploymentName -> ClientM DeploymentStatus
+
+cleanupH :: DeploymentName -> ClientM NoContent
+
 ( listH
   :<|> createH
   :<|> getH
   :<|> editH
-  :<|> destroyH
+  :<|> deleteH
   :<|> updateH
   :<|> infoH
-  :<|> _)
+  :<|> _statusH
+  :<|> cleanupH)
     :<|> _ = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
