@@ -22,7 +22,7 @@ make build
 $ result/bin/dmc-exe --help
 DMC
 
-Usage: dmc-exe (create | list | edit | destroy | update | info)
+Usage: dmc-exe (create | list | edit | delete | update | info | cleanup)
 
 Available options:
   -h,--help                Show this help text
@@ -31,9 +31,10 @@ Available commands:
   create
   list
   edit
-  destroy
+  delete
   update
   info
+  cleanup
 ```
 
 # Interact with DMS
@@ -42,8 +43,8 @@ Available commands:
 $ result/bin/dms-exe --help
 DMS
 
-Usage: dms-exe --port INT --db TEXT --db-pool-size INT --tls-cert-path TEXT
-               --tls-key-path TEXT --tls-store-path TEXT
+Usage: dms-exe --port INT --ui-port INT --db TEXT --db-pool-size INT
+               --tls-cert-path TEXT --tls-key-path TEXT --tls-store-path TEXT
 
 Available options:
   -h,--help                Show this help text
@@ -54,7 +55,7 @@ Available options:
 For a build and publish of Docker images you must have needed AWS permissions: access to SSM and ECR!
 
 ```
-./release.sh <user|ci|rundesk>
+./release.sh <user|ci>
 ```
 
 # Kubernetes installation
