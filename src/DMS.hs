@@ -18,6 +18,7 @@ import Database.PostgreSQL.Simple
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WarpTLS
 import Options.Generic
+import PostgreSQL.ErrorCodes (unique_violation)
 import Prelude hiding (lines, unlines, unwords, log)
 import Servant
 import System.Environment (lookupEnv)
@@ -157,8 +158,11 @@ createH dep = do
         (n, t, formatEnvPairs e)
   res :: Either SqlError Int64 <- liftIO . try $ createDep pgPool dep
   case res of
-    Right _ -> pure ()
-    Left _  -> throwError err400 { errBody = "deployment already exists" }
+    Right _                                                 -> pure ()
+    Left (SqlError code _ _ _ _) | code == unique_violation ->
+      throwError err400 { errBody = "deployment already exists" }
+    Left (SqlError _ _ _ _ _)                               ->
+      throwError err409 { errBody = "some database error" }
   ec <- createDeployment dep st
   void $ liftIO $ do
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False

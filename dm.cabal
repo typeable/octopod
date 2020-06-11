@@ -69,6 +69,7 @@ library
     , mtl
     , network-uri
     , optparse-generic
+    , postgresql-error-codes
     , postgresql-simple
     , resource-pool
     , servant
@@ -113,6 +114,7 @@ executable dmc-exe
     , mtl
     , network-uri
     , optparse-generic
+    , postgresql-error-codes
     , postgresql-simple
     , resource-pool
     , servant
@@ -156,6 +158,7 @@ executable dms-exe
     , mtl
     , network-uri
     , optparse-generic
+    , postgresql-error-codes
     , postgresql-simple
     , resource-pool
     , servant
@@ -199,6 +202,7 @@ test-suite dm-test
     , mtl
     , network-uri
     , optparse-generic
+    , postgresql-error-codes
     , postgresql-simple
     , resource-pool
     , servant
