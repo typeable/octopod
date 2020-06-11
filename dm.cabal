@@ -41,8 +41,6 @@ library
       DMC.Args
       DMS
       DMS.Args
-      DMS.Git
-      DMS.Kubernetes
       TLS
       Types
   other-modules:
