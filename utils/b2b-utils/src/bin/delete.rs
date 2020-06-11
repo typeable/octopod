@@ -1,5 +1,5 @@
 use clap::{App, Arg};
-use std::process::Command;
+use std::process::{exit, Command};
 
 use b2b_utils::*;
 
@@ -40,13 +40,19 @@ fn main() -> std::io::Result<()> {
         .args(delete_app_atrs(name))
         .output()
         .expect("delete app");
+    let success = output.status.success();
     print_command_result(output);
 
     let output = Command::new("helm")
         .args(delete_infra_atrs(name))
         .output()
         .expect("delete infra");
+    let success2 = output.status.success();
     print_command_result(output);
+
+    if !(success && success2) {
+        exit(1)
+    }
 
     Ok(())
 }

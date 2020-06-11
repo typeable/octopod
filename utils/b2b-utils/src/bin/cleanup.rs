@@ -1,5 +1,5 @@
 use clap::{App, Arg};
-use std::process::Command;
+use std::process::{exit, Command};
 
 use b2b_utils::*;
 
@@ -40,13 +40,19 @@ fn main() -> std::io::Result<()> {
         .args(delete_pvcs_atrs(namespace, name))
         .output()
         .expect("delete PVCs");
+    let success = output.status.success();
     print_command_result(output);
 
     let output = Command::new("kubectl")
         .args(delete_cert_atrs(namespace, name))
         .output()
         .expect("delete certificates");
+    let success2 = output.status.success();
     print_command_result(output);
+
+    if !(success && success2) {
+        exit(1)
+    }
 
     Ok(())
 }

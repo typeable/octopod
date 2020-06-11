@@ -56,6 +56,7 @@ pub fn whereis(cmd: &str) -> Option<String> {
 }
 
 pub fn print_command_result(output: Output) {
+    println!("status: {}", output.status);
     println!(
         "{}",
         String::from_utf8(output.stdout).expect("valid stdout")

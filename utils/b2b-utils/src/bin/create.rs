@@ -2,7 +2,7 @@ use clap::{App, Arg};
 use std::convert::TryInto;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{exit, Command};
 
 use b2b_utils::*;
 
@@ -92,6 +92,7 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("clone repo");
+    let success = output.status.success();
     print_command_result(output);
 
     fs::copy(&b2b_heml, Path::new(&work_dir).join("b2b-helm"))?;
@@ -101,6 +102,7 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("create infra");
+    let success2 = output.status.success();
     print_command_result(output);
 
     let output = Command::new("b2b-helm")
@@ -108,7 +110,12 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("create app");
+    let success3 = output.status.success();
     print_command_result(output);
+
+    if !(success && success2 && success3) {
+        exit(1)
+    }
 
     Ok(())
 }

@@ -73,6 +73,7 @@ library
     , resource-pool
     , servant
     , servant-client
+    , servant-client-core
     , servant-server
     , temporary
     , text
@@ -116,6 +117,7 @@ executable dmc-exe
     , resource-pool
     , servant
     , servant-client
+    , servant-client-core
     , servant-server
     , temporary
     , text
@@ -158,6 +160,7 @@ executable dms-exe
     , resource-pool
     , servant
     , servant-client
+    , servant-client-core
     , servant-server
     , temporary
     , text
@@ -200,6 +203,7 @@ test-suite dm-test
     , resource-pool
     , servant
     , servant-client
+    , servant-client-core
     , servant-server
     , temporary
     , text

@@ -3,7 +3,7 @@ module DMS (runDMS) where
 
 import Control.Applicative
 import Control.Concurrent.Async (race_)
-import Control.Exception (throwIO, Exception)
+import Control.Exception (throwIO, try, Exception)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
@@ -72,7 +72,7 @@ runDMS = do
   projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  archRetention <- ArchiveRetention . read <$> getEnvOrDie "ARCHIVE_RETENTION"
+  archRetention <- coerce . read @Int <$> getEnvOrDie "ARCHIVE_RETENTION"
   creationCmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
   updateCmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
   deletionCmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
@@ -155,7 +155,10 @@ createH dep = do
         "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
         (n, t, formatEnvPairs e)
-  void $ liftIO $ createDep pgPool dep
+  res :: Either SqlError Int64 <- liftIO . try $ createDep pgPool dep
+  case res of
+    Right _ -> pure ()
+    Left _  -> throwError err400 { errBody = "deployment already exists" }
   ec <- createDeployment dep st
   void $ liftIO $ do
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
@@ -185,8 +188,8 @@ createDeployment dep st = do
 getH :: DeploymentName -> AppM Deployment
 getH dName = do
   st <- ask
+  dep <- selectDeployment (pool st) dName AllDeployments
   liftIO $ do
-    dep <- selectDeployment (pool st) dName AllDeployments
     logInfo (logger st) $ "get deployment: " <> (pack . show $ dep)
     return dep
 
@@ -212,28 +215,25 @@ selectDeployment
   :: PgPool
   -> DeploymentName
   -> DeploymentListType
-  -> IO Deployment
-selectDeployment p n t = selectDeployments p n t >>= \case
-  [d] -> pure d
-  []  -> error "deployment not found"
-  _   -> error "more than one deployment found in the database"
-
-selectDeployments
-  :: PgPool
-  -> DeploymentName
-  -> DeploymentListType
-  -> IO [Deployment]
-selectDeployments p dName lType = do
+  -> AppM Deployment
+selectDeployment p dName lType = do
   let
     q AllDeployments          =
-      "SELECT name, tag, envs FROM deployments WHERE name = ?"
+      "SELECT name, tag, envs FROM deployments \
+      \WHERE name = ?"
     q ArchivedOnlyDeployments =
       "SELECT name, tag, envs FROM deployments \
       \WHERE name = ? AND archived = 't'"
 
-  retrieved <- withResource p $ \conn ->
-    query conn (q lType) (Only dName)
-  for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
+  deps <- liftIO $ do
+    retrieved <- withResource p $ \conn ->
+      query conn (q lType) (Only dName)
+    for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
+  case deps of
+    [dep] -> pure dep
+    []    -> throwError err404 { errBody = "deployment not found" }
+    _     -> throwError err406
+      { errBody = "more than one deployment found in the database" }
 
 editH :: DeploymentName -> EnvPairs -> AppM NoContent
 editH dName dEnvs = do
@@ -290,8 +290,8 @@ deleteH dName = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ deletionCommand st
+  dep <- selectDeployment pgPool dName AllDeployments
   liftIO $ do
-    dep <- selectDeployment pgPool dName AllDeployments
     log $ "call " <> unwords (cmd : args)
     ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     void $ archiveDeployment pgPool dName
@@ -366,8 +366,8 @@ infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
   st <- ask
   let pgPool = pool st
+  dep <- selectDeployment pgPool dName AllDeployments
   liftIO $ do
-    dep <- selectDeployment pgPool dName AllDeployments
     depLogs <- selectDeploymentLogs pgPool dName
     let depInfo = DeploymentInfo dep $ reverse depLogs
     logInfo (logger st) $ "get deployment info: " <> (pack . show $ depInfo)
@@ -382,6 +382,9 @@ pingH = do
 
 statusH :: DeploymentName -> AppM DeploymentStatus
 statusH dName = do
+  st <- ask
+  let pgPool = pool st
+  void $ selectDeployment pgPool dName AllDeployments
   cmd <- checkingCommand <$> ask
   let args = [unpack . coerce $ dName]
   ec <- liftIO $ withProcessWait (proc (unpack $ coerce cmd) args) waitProcess
@@ -444,7 +447,7 @@ restoreH :: DeploymentName -> AppM NoContent
 restoreH dName = do
   st <- ask
   let pgPool  = pool st
-  dep <- liftIO $ selectDeployment pgPool dName ArchivedOnlyDeployments
+  dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
   ec <- createDeployment dep st
   void $ liftIO $ do
     let

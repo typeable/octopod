@@ -18,8 +18,10 @@ import           Network.URI
 import           Prelude as P
 import           Servant.API
 import           Servant.Client
-  (ClientError, BaseUrl(..), ClientEnv, ClientM, Scheme(..)
+  (BaseUrl(..), ClientError, ClientEnv, ClientM, Scheme(..)
   , runClientM, client, mkClientEnv)
+import           Servant.Client.Core
+  (ClientError(FailureResponse), ResponseF(..))
 import           System.Environment (lookupEnv)
 import           System.IO
 import           System.IO.Temp
@@ -203,9 +205,11 @@ cleanArchiveH :: ClientM NoContent
     :<|> _pingH :<|> cleanArchiveH = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
-handleResponse f (Right result) = f result
-handleResponse _ (Left err)     =
-  T.putStrLn $ "command failed, reason: " <> T.pack (show err)
+handleResponse f (Right result)                    = f result
+handleResponse _ (Left (FailureResponse _req res)) =
+  T.putStrLn $ "error: " <> T.pack (show $ responseBody res)
+handleResponse _ (Left err)                        =
+  T.putStrLn $ "command failed due to unknown reason: " <> T.pack (show err)
 
 printInfo :: DeploymentInfo -> IO ()
 printInfo (DeploymentInfo (Deployment dName dTag envPairs) dLogs) = do
