@@ -1,43 +1,30 @@
-{ mkDerivation, aeson, async, base, bytestring, chronos, connection
-, data-default-class, deriving-aeson, directory, fast-logger
-, filepath, generic-lens, http-api-data, http-client
-, http-client-tls, lens, mtl, network-uri, optparse-generic
-, postgresql-error-codes, postgresql-simple, resource-pool, servant
-, servant-client, servant-client-core, servant-server, stdenv
-, temporary, text, tls, transformers, typed-process, warp, warp-tls
-, x509, x509-store, x509-validation
+{ sources ? import ./nix/sources.nix
+, reflex-platform ? ((import sources.nixpkgs {}).fetchFromGitHub {
+    owner = "reflex-frp";
+    repo = "reflex-platform";
+    rev = "5429278830e1555a577f2550e045ce7f7164aa65";
+    sha256 = "1lp86cgccmim573rarsjny5vh0ygkfp5afq7006li0k9w2sw2d4c";
+    })
 }:
-mkDerivation {
-  pname = "dm";
-  version = "0.1.0.0";
-  src = ./.;
-  isLibrary = true;
-  isExecutable = true;
-  libraryHaskellDepends = [
-    aeson async base bytestring chronos connection data-default-class
-    deriving-aeson directory fast-logger filepath generic-lens
-    http-api-data http-client http-client-tls lens mtl network-uri
-    optparse-generic postgresql-error-codes postgresql-simple
-    resource-pool servant servant-client servant-client-core
-    servant-server temporary text tls transformers typed-process warp
-    warp-tls x509 x509-store x509-validation
-  ];
-  executableHaskellDepends = [
-    aeson async base bytestring chronos connection data-default-class
-    directory fast-logger filepath http-client http-client-tls mtl
-    network-uri optparse-generic postgresql-error-codes
-    postgresql-simple resource-pool servant servant-client
-    servant-client-core servant-server temporary text tls transformers
-    typed-process warp warp-tls x509 x509-store x509-validation
-  ];
-  testHaskellDepends = [
-    aeson async base bytestring chronos connection data-default-class
-    directory fast-logger filepath http-client http-client-tls mtl
-    network-uri optparse-generic postgresql-error-codes
-    postgresql-simple resource-pool servant servant-client
-    servant-client-core servant-server temporary text tls transformers
-    typed-process warp warp-tls x509 x509-store x509-validation
-  ];
-  homepage = "https://github.com/https://github.com/Aviora/dm#readme";
-  license = stdenv.lib.licenses.bsd3;
-}
+(import reflex-platform {}).project ({ pkgs, ... }: {
+  useWarp = true;
+
+  packages = {
+    dm-common = ./dm-common;
+    dm-frontend = ./dm-frontend;
+    dm-backend = ./dm-backend;
+  };
+
+  overrides = hself: hsuper: {
+    deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
+    servant = pkgs.haskell.lib.overrideCabal hsuper.servant (old: {
+      postInstall = "";
+    });
+  };
+
+  shells = {
+    ghc = ["dm-common" "dm-backend" "dm-frontend"];
+    ghcjs = ["dm-common" "dm-frontend"];
+  };
+})
+

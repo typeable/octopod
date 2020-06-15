@@ -27,7 +27,7 @@ import           System.IO
 import           System.IO.Temp
 import           System.Process.Typed
 
-import           API
+import           Common.API
 import           DMC.Args
 import           TLS (makeClientManager)
 import           Types

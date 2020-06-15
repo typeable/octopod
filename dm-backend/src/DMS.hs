@@ -27,8 +27,9 @@ import System.Log.FastLogger
 import System.Process.Typed
 
 
-import API
+import Common.API
 import DMS.Args
+import Orphans ()
 import TLS (createTLSOpts)
 import Types
 

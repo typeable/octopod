@@ -14,7 +14,7 @@
 with {
   overlay = _: pkgs:
     with pkgs; rec {
-      dm = haskellPackages.dm-static;
+      dm-backend = haskellPackages.dm-backend-static;
 
       cacert' = cacert.overrideAttrs (o: {
         fixupPhase = ''
@@ -25,13 +25,13 @@ with {
       dms-container = dockerTools.buildImage {
         name = "dms-container-slim";
         contents =
-          [ dm git b2b-helm-tool kubernetes-helm2-bin kubectl coreutils bash openssh gnugrep cacert' ];
+          [ dm-backend git b2b-helm-tool kubernetes-helm2-bin kubectl coreutils bash openssh gnugrep cacert' ];
 
         runAsRoot = ''
           mkdir /tmp
 
           mkdir /app
-          cp -av ${dm}/bin/dms-exe /app/dms-exe
+          cp -av ${dm-backend}/bin/dms-exe /app/dms-exe
 
           mkdir /migrations
           cp -av ${migrations}/* /migrations/
@@ -78,11 +78,11 @@ with {
 
       dmc-container = dockerTools.buildImage {
         name = "dmc-container-slim";
-        contents = [ dm coreutils bash emacs vim ];
+        contents = [ dm-backend coreutils bash emacs vim ];
 
         runAsRoot = ''
           mkdir /app
-          cp -av ${dm}/bin/dmc-exe /app/dmc-exe
+          cp -av ${dm-backend}/bin/dmc-exe /app/dmc-exe
 
           cp ${client-cert} /cert.pem
           cp ${client-key} /key.pem
@@ -111,18 +111,10 @@ with {
 
       haskellPackages = pkgs.haskellPackages.override {
         overrides = hself: hsuper: {
+          dm-backend = (hsuper.callPackage ../default.nix { }).ghc.dm-backend;
 
-          deriving-aeson = hsuper.callPackage (stdenv.mkDerivation ({
-            name = "deriving-aeson";
-            buildCommand = ''
-              ${hsuper.cabal2nix}/bin/cabal2nix file://${sources.deriving-aeson} > $out
-            '';
-          })) { };
-
-          dm = hsuper.callPackage ../default.nix { };
-
-          dm-static = haskell.lib.justStaticExecutables
-            (hsuper.callPackage ../default.nix { });
+          dm-backend-static = haskell.lib.justStaticExecutables
+            (hsuper.callPackage ../default.nix { }).ghc.dm-backend;
         };
       };
     };

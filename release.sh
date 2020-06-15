@@ -45,9 +45,7 @@ build_configs() {
     download_deploy_key $1
 }
 
-
 update_dependencies() {
-    make update-default-nix
     make update-b2b-helm-nix
 }
 

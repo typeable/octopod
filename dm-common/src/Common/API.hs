@@ -1,8 +1,8 @@
-module API where
+module Common.API where
 
 import Servant.API
 
-import Types
+import Common.Types
 
 
 type CaptureName = Capture "name" DeploymentName

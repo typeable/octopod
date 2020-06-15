@@ -4,3 +4,4 @@ default.nix
 result
 dms-docker
 *~
+dist-newstyle

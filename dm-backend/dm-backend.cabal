@@ -1,5 +1,5 @@
 cabal-version: 2.4
-name:           dm
+name:           dm-backend
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/dm#readme>
 homepage:       https://github.com/https://github.com/Aviora/dm#readme
@@ -33,18 +33,17 @@ library
                      , LambdaCase
                      , OverloadedStrings
                      , ScopedTypeVariables
+                     , StandaloneDeriving
                      , TypeApplications
                      , TypeOperators
   exposed-modules:
-      API
       DMC
       DMC.Args
       DMS
       DMS.Args
+      Orphans
       TLS
       Types
-  other-modules:
-      Paths_dm
   hs-source-dirs:
       src
   build-depends:
@@ -57,6 +56,7 @@ library
     , data-default-class
     , deriving-aeson
     , directory
+    , dm-common
     , fast-logger
     , filepath
     , generic-lens
@@ -90,8 +90,6 @@ executable dmc-exe
   main-is: Main.hs
   ghc-options:         -Wall
                        -Werror
-  other-modules:
-      Paths_dm
   hs-source-dirs:
       app/dmc
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -104,7 +102,7 @@ executable dmc-exe
     , connection
     , data-default-class
     , directory
-    , dm
+    , dm-backend
     , fast-logger
     , filepath
     , http-client
@@ -135,8 +133,6 @@ executable dms-exe
   main-is: Main.hs
   ghc-options:         -Wall
                        -Werror
-  other-modules:
-      Paths_dm
   hs-source-dirs:
       app/dms
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -149,7 +145,7 @@ executable dms-exe
     , connection
     , data-default-class
     , directory
-    , dm
+    , dm-backend
     , fast-logger
     , http-client
     , http-client-tls
@@ -178,8 +174,6 @@ executable dms-exe
 test-suite dm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
-  other-modules:
-      Paths_dm
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -192,7 +186,7 @@ test-suite dm-test
     , connection
     , data-default-class
     , directory
-    , dm
+    , dm-backend
     , fast-logger
     , filepath
     , http-client

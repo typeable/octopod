@@ -141,3 +141,27 @@ To make sure the actual image is being used, remove the old docker image and pul
 docker rmi 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
 docker pull 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest
 ```
+
+# Develop
+
+Cache set up:
+```
+binary-caches = https://cache.nixos.org https://nixcache.reflex-frp.org
+binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=
+binary-caches-parallel-connections = 40
+```
+
+Enter shell to work on the backend:
+```
+make shell
+```
+
+Enter shell to work on the frontend (with GHC):
+```
+make shell
+```
+
+Enter shell to work on the frontend (with GHCJS):
+```
+make shell-ghcjs
+```
