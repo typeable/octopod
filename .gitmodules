@@ -2,3 +2,6 @@
 	path = b2b-helm
 	url = https://github.com/Aviora/b2b-helm.git
 	branch = master
+[submodule "dm-css"]
+	path = dm-css
+	url = git@github.com:Aviora/dm-css.git

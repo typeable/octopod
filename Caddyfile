@@ -1,0 +1,41 @@
+localhost:8000
+
+mime .css text/css
+
+rewrite /static/styles {
+  r (.*)
+  to /dm-css/production/styles/{1}
+}
+
+mime .js 	application/javascript
+
+rewrite /static/vendors {
+  r (.*)
+  to /dm-css/production/vendors/{1}
+}
+
+rewrite /static/scripts {
+  r (.*)
+  to /dm-css/production/scripts/{1}
+}
+
+rewrite /static/images {
+  r (.*)
+  to /dm-css/production/images/{1}
+}
+
+proxy /api localhost:3002 {
+  transparent
+}
+
+rewrite /ghcjs /frontend-result/bin/frontend.jsexe/index.html
+
+proxy / localhost:3003 {
+  transparent
+  websocket
+  except /dm-css/
+  except /frontend-result/
+}
+
+
+log / stdout

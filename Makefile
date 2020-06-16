@@ -3,6 +3,9 @@
 build:
 	nix-build . -A ghc.dm-backend
 
+build-frontend:
+	nix-build . -A ghcjs.dm-frontend -o frontend-result
+
 repl:
 	nix-shell . -A shells.ghc --run "cabal repl lib:dm-backend"
 
@@ -19,7 +22,7 @@ ghcid:
 	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl dm-backend"'
 
 ghcid-frontend:
-	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl dm-frontend"'
+	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl dm-frontend -fdevelopment" --test 'Main.main''
 
 push-dms: build-docker
 	./release.sh

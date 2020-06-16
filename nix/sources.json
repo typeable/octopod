@@ -34,5 +34,17 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/1484e1acfeee4c5ec039df93282e78ffc0be2236.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "servant-reflex": {
+        "branch": "master",
+        "description": "Generate reflex client functions for querying a servant API",
+        "homepage": null,
+        "owner": "imalsogreg",
+        "repo": "servant-reflex",
+        "rev": "37a3e8f2566627d910df140982bd49bf4dba171e",
+        "sha256": "1yqxf6f81n4y4527rl69hfqymrnmj7lskgns2qsh59ibisp3y9rg",
+        "type": "tarball",
+        "url": "https://github.com/imalsogreg/servant-reflex/archive/37a3e8f2566627d910df140982bd49bf4dba171e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

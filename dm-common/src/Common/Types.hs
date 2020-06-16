@@ -15,11 +15,11 @@ type EnvPairs = [EnvPair]
 
 newtype DeploymentName = DeploymentName { unDeploymentName :: Text }
   deriving
-    ( Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData)
+    ( Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
 newtype DeploymentTag = DeploymentTag { unDeploymentTag :: Text }
   deriving
-    ( Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData)
+    ( Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
 newtype Action = Action { unAction :: Text }
   deriving (Show, FromJSON, ToJSON, IsString)
@@ -32,7 +32,7 @@ data Deployment = Deployment
   , tag  :: DeploymentTag
   , envs :: EnvPairs
   }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake Deployment
 
 data DeploymentLog = DeploymentLog
@@ -59,7 +59,7 @@ data DeploymentFullInfo = DeploymentFullInfo
   , updatedAt  :: Int
   , urls       :: [(Text, Text)]
   }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
 data DeploymentUpdate = DeploymentUpdate

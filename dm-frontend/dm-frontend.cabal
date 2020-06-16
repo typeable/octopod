@@ -15,12 +15,52 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 cabal-version:       >=1.10
 
+
+flag development
+  default: False
+  description: mock host
+
 executable frontend
+  if flag(development)
+    cpp-options:       -DDEVELOPMENT
   main-is:             Main.hs
-  -- other-modules:
+  other-modules:       Frontend.API
+                     , Page.Deployments
+                     , Page.Utils
+  ghc-options:         -Wall
+                       -Werror
+                       -Wno-missing-home-modules
+                       -Wno-error=missing-home-modules
+  default-extensions:  BlockArguments
+                     , ConstraintKinds
+                     , DataKinds
+                     , DeriveFunctor
+                     , DeriveGeneric
+                     , DerivingVia
+                     , DuplicateRecordFields
+                     , FlexibleContexts
+                     , GeneralizedNewtypeDeriving
+                     , LambdaCase
+                     , OverloadedStrings
+                     , ScopedTypeVariables
+                     , StandaloneDeriving
+                     , TypeApplications
+                     , TypeOperators
+                     , MonoLocalBinds
+                     , RecordWildCards
+                     , RecursiveDo
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , dm-common
+                     , generic-lens
+                     , ghcjs-dom
+                     , jsaddle
+                     , lens
                      , reflex-dom
+                     , reflex-dom-helpers
+                     , servant
+                     , servant-reflex
+                     , text
+                     , time
   hs-source-dirs:      src
   default-language:    Haskell2010

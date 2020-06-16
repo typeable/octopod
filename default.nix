@@ -17,6 +17,7 @@
 
   overrides = hself: hsuper: {
     deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
+    servant-reflex = hsuper.callCabal2nix "servant-reflex" sources.servant-reflex { };
     servant = pkgs.haskell.lib.overrideCabal hsuper.servant (old: {
       postInstall = "";
     });
