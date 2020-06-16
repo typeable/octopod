@@ -80,6 +80,7 @@ git clone https://github.com/Aviora/b2b-helm.git /tmp/b2b-helm
 ```bash
 cd /tmp/b2b-helm/charts/admin && helm install --name dm-helm-access ./helm-access
 cd /tmp/b2b-helm/charts/admin && helm install --name dm-pvc-control ./pvc-control
+cd /tmp/b2b-helm/charts/admin && helm install --name dm-cert-control ./cert-control
 ```
 
 4. Deploy DMS
