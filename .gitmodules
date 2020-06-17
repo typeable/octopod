@@ -4,4 +4,5 @@
 	branch = master
 [submodule "dm-css"]
 	path = dm-css
-	url = git@github.com:Aviora/dm-css.git
+	url = https://github.com/Aviora/dm-css.git
+	branch = master
