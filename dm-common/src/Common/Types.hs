@@ -78,3 +78,13 @@ data Status
 newtype DeploymentStatus = DeploymentStatus { status :: Status }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
+
+data CommandResponse
+  = Success
+  | ValidationError
+    { nameField :: [Text]
+    , tagField :: [Text] }
+  | AppError
+    { errorMessage :: Text }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake CommandResponse

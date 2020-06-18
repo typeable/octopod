@@ -1,37 +1,39 @@
 module DMS (runDMS) where
 
 
-import Control.Applicative
-import Control.Concurrent.Async (race_)
-import Control.Exception (throwIO, try, Exception)
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
-import Data.ByteString (ByteString)
-import Data.Coerce
-import Data.Int (Int64)
-import Data.Maybe
-import Data.Pool
-import Data.Text (lines, pack, unpack, unwords)
-import Data.Traversable
-import Database.PostgreSQL.Simple
-import Network.Wai.Handler.Warp
-import Network.Wai.Handler.WarpTLS
-import Options.Generic
-import PostgreSQL.ErrorCodes (unique_violation)
-import Prelude hiding (lines, unlines, unwords, log)
-import Servant
-import System.Environment (lookupEnv)
-import System.Exit
-import System.Log.FastLogger
-import System.Process.Typed
+import           Control.Applicative
+import           Control.Concurrent.Async (race_)
+import           Control.Exception (throwIO, try, Exception)
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BSL
+import           Data.Aeson (encode)
+import           Data.Coerce
+import           Data.Int (Int64)
+import           Data.Maybe
+import           Data.Pool
+import           Data.Text (lines, pack, unpack, unwords)
+import           Data.Traversable
+import           Database.PostgreSQL.Simple
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Handler.WarpTLS
+import           Options.Generic
+import           PostgreSQL.ErrorCodes (unique_violation)
+import           Prelude hiding (lines, unlines, unwords, log)
+import           Servant
+import           System.Environment (lookupEnv)
+import           System.Exit
+import           System.Log.FastLogger
+import           System.Process.Typed
 
 
-import Common.API
-import DMS.Args
-import Orphans ()
-import TLS (createTLSOpts)
-import Types
+import           Common.API
+import           DMS.Args
+import           Orphans ()
+import           TLS (createTLSOpts)
+import           Types
 
 
 type PgPool = Pool Connection
@@ -145,7 +147,7 @@ listH = do
       , ("tasker", "tasker." <> appUrl domain dName)]
     appUrl domain dName  = coerce dName <> "." <> coerce domain
 
-createH :: Deployment -> AppM NoContent
+createH :: Deployment -> AppM CommandResponse
 createH dep = do
   st <- ask
   let
@@ -161,14 +163,15 @@ createH dep = do
   case res of
     Right _                                                 -> pure ()
     Left (SqlError code _ _ _ _) | code == unique_violation ->
-      throwError err400 { errBody = "deployment already exists" }
+      throwError err400
+        { errBody = validationError ["deployment already exists"] [] }
     Left (SqlError _ _ _ _ _)                               ->
-      throwError err409 { errBody = "some database error" }
+      throwError err409 { errBody = appError "some database error" }
   ec <- createDeployment dep st
   void $ liftIO $ do
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
     handleExitCode ec
-  pure NoContent
+  pure Success
 
 createDeployment :: Deployment -> AppState -> AppM ExitCode
 createDeployment dep st = do
@@ -236,11 +239,12 @@ selectDeployment p dName lType = do
     for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
   case deps of
     [dep] -> pure dep
-    []    -> throwError err404 { errBody = "deployment not found" }
+    []    -> throwError err404
+      { errBody = validationError ["name not found"] [] }
     _     -> throwError err406
-      { errBody = "more than one deployment found in the database" }
+      { errBody = validationError ["more than one name found"] [] }
 
-editH :: DeploymentName -> EnvPairs -> AppM NoContent
+editH :: DeploymentName -> EnvPairs -> AppM CommandResponse
 editH dName dEnvs = do
   st <- ask
   let
@@ -271,7 +275,7 @@ editH dName dEnvs = do
         return ()
     _     ->
       liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
-  return NoContent
+  return Success
   where
     getTag                 :: PgPool -> IO [DeploymentTag]
     getTag p               = fmap (fmap fromOnly) $ withResource p $ \conn ->
@@ -283,7 +287,7 @@ editH dName dEnvs = do
       -- FIXME: make EnvPairs a newtype and give it ToField instance
       (formatEnvPairs dEnvs, dName)
 
-deleteH :: DeploymentName -> AppM NoContent
+deleteH :: DeploymentName -> AppM CommandResponse
 deleteH dName = do
   st <- ask
   let
@@ -303,7 +307,7 @@ deleteH dName = do
     void $ createDeploymentLog pgPool dep "delete" ec $ ArchivedFlag True
     log $ "deployment deleted, name: " <> coerce dName
     handleExitCode ec
-  pure NoContent
+  pure Success
 
 archiveDeployment :: PgPool -> DeploymentName -> IO Int64
 archiveDeployment p dName = withResource p $ \conn -> do
@@ -314,7 +318,7 @@ archiveDeployment p dName = withResource p $ \conn -> do
       \WHERE name = ?"
   execute conn q (Only dName)
 
-updateH :: DeploymentName -> DeploymentUpdate -> AppM NoContent
+updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
   st <- ask
   let pgPool = pool st
@@ -349,7 +353,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
         return ()
     _ ->
       liftIO . logWarning (logger st) $ "envs not found, name: " <> coerce dName
-  return NoContent
+  return Success
 
 selectEnvPairs :: PgPool -> DeploymentName -> IO [Text]
 selectEnvPairs p dName = fmap (fmap fromOnly) $ withResource p $ \conn -> query
@@ -398,11 +402,11 @@ statusH dName = do
       ExitSuccess -> Ok
       _           -> Error
 
-cleanupH :: DeploymentName -> AppM NoContent
+cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
   st <- ask
   cleanupDeployment dName st
-  pure NoContent
+  pure Success
 
 cleanupDeployment :: DeploymentName -> AppState -> AppM ()
 cleanupDeployment dName st = do
@@ -434,7 +438,7 @@ deleteDeployment :: PgPool -> DeploymentName -> IO Int64
 deleteDeployment p n = withResource p $ \conn ->
   execute conn "DELETE FROM deployments WHERE name = ?" (Only n)
 
-cleanArchiveH :: AppM NoContent
+cleanArchiveH :: AppM CommandResponse
 cleanArchiveH = do
   st <- ask
   let
@@ -446,9 +450,9 @@ cleanArchiveH = do
   retrieved :: [Only DeploymentName] <- liftIO $
     withResource pgPool $ \conn -> query conn q (Only archRetention)
   void $ for retrieved $ \(Only dName) -> cleanupDeployment dName st
-  pure NoContent
+  pure Success
 
-restoreH :: DeploymentName -> AppM NoContent
+restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
   st <- ask
   let pgPool  = pool st
@@ -462,7 +466,7 @@ restoreH dName = do
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
     createDeploymentLog pgPool dep "restore" ec $ ArchivedFlag False
     handleExitCode ec
-  pure NoContent
+  pure Success
 
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
 waitProcess p = do
@@ -496,6 +500,13 @@ createDeploymentLog pgPool (Deployment dName dTag dEnvs) act ec arch = do
       \)"
   void $ withResource pgPool $ \conn ->
     execute conn q (act, dTag, formatEnvPairs dEnvs, exitCode', arch', dName)
+
+appError :: Text -> BSL.ByteString
+appError = encode . AppError
+
+validationError :: [Text] -> [Text] -> BSL.ByteString
+validationError nameErrors tagErrors =
+  encode $ ValidationError nameErrors tagErrors
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo l = logWithSeverity l "INFO"

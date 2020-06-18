@@ -170,27 +170,27 @@ handleCleanArchive = do
 
 listH :: ClientM [DeploymentFullInfo]
 
-createH :: Deployment -> ClientM NoContent
+createH :: Deployment -> ClientM CommandResponse
 
 getH :: DeploymentName -> ClientM Deployment
 
-editH :: DeploymentName -> EnvPairs -> ClientM NoContent
+editH :: DeploymentName -> EnvPairs -> ClientM CommandResponse
 
-deleteH :: DeploymentName -> ClientM NoContent
+deleteH :: DeploymentName -> ClientM CommandResponse
 
-updateH :: DeploymentName -> DeploymentUpdate -> ClientM NoContent
+updateH :: DeploymentName -> DeploymentUpdate -> ClientM CommandResponse
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
 _statusH :: DeploymentName -> ClientM DeploymentStatus
 
-cleanupH :: DeploymentName -> ClientM NoContent
+cleanupH :: DeploymentName -> ClientM CommandResponse
 
-restoreH :: DeploymentName -> ClientM NoContent
+restoreH :: DeploymentName -> ClientM CommandResponse
 
 _pingH :: ClientM NoContent
 
-cleanArchiveH :: ClientM NoContent
+cleanArchiveH :: ClientM CommandResponse
 
 ( listH
   :<|> createH
