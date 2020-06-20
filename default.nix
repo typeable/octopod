@@ -16,6 +16,18 @@
   };
 
   overrides = hself: hsuper: {
+    amazonka = pkgs.haskell.lib.overrideCabal hsuper.amazonka (old: {
+      broken = false;
+    });
+    amazonka-core = pkgs.haskell.lib.overrideCabal hsuper.amazonka-core (old: {
+      broken = false;
+    });
+    amazonka-ecr = pkgs.haskell.lib.overrideCabal hsuper.amazonka-ecr (old: {
+      broken = false;
+    });
+    amazonka-test = pkgs.haskell.lib.overrideCabal hsuper.amazonka-test (old: {
+      broken = false;
+    });
     deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
     servant-reflex = hsuper.callCabal2nix "servant-reflex" sources.servant-reflex { };
     servant = pkgs.haskell.lib.overrideCabal hsuper.servant (old: {
