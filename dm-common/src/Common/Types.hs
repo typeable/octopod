@@ -89,5 +89,5 @@ data CommandResponse
     , tagField :: [Text] }
   | AppError
     { errorMessage :: Text }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake CommandResponse

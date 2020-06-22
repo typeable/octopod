@@ -50,7 +50,8 @@ executable frontend
                      , RecordWildCards
                      , RecursiveDo
   -- other-extensions:
-  build-depends:       base >=4.12 && <4.13
+  build-depends:       aeson
+                     , base >=4.12 && <4.13
                      , dm-common
                      , generic-lens
                      , ghcjs-dom

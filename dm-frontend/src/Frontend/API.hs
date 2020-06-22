@@ -4,9 +4,8 @@
 
 module Frontend.API where
 
-#ifdef DEVELOPMENT
 import Control.Lens
-#endif
+import Data.Aeson
 import Data.Proxy
 import Data.Text as T
 import Reflex.Dom as R
@@ -117,3 +116,16 @@ projectName
   :<|> pingEndpoint
   :<|> cleanArchiveEndpoint
   :<|> projectName = apiClients
+
+commandResponse :: ReqResult tag CommandResponse -> Maybe CommandResponse
+commandResponse = \case
+  ResponseSuccess _ a _   -> Just a
+  ResponseFailure _ _ xhr ->
+    xhr ^? xhrResponse_response . _Just
+      . to getArrayBufferBody . _Just
+      . to decodeStrict . _Just
+  RequestFailure _ _      -> Nothing
+  where
+    getArrayBufferBody = \case
+      XhrResponseBody_ArrayBuffer x -> Just x
+      _                             -> Nothing
