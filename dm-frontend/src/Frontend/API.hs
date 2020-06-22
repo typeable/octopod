@@ -49,7 +49,7 @@ createEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text Deployment)
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 getEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
@@ -60,18 +60,18 @@ editEndpoint
   => Dynamic t (Either Text DeploymentName)
   -> Dynamic t (Either Text [EnvPair])
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 deleteEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 updateEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
   -> Dynamic t (Either Text DeploymentUpdate)
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 infoEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
@@ -86,12 +86,12 @@ cleanupEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 restoreEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
 pingEndpoint
   :: MonadWidget t m
   => Event t ()
@@ -99,7 +99,11 @@ pingEndpoint
 cleanArchiveEndpoint
   :: MonadWidget t m
   => Event t ()
-  -> m (Event t (ReqResult () NoContent))
+  -> m (Event t (ReqResult () CommandResponse))
+projectName
+  :: MonadWidget t m
+  => Event t ()
+  -> m (Event t (ReqResult () ProjectName))
 (listEndpoint
   :<|> createEndpoint
   :<|> getEndpoint
@@ -111,4 +115,5 @@ cleanArchiveEndpoint
   :<|> cleanupEndpoint
   :<|> restoreEndpoint)
   :<|> pingEndpoint
-  :<|> cleanArchiveEndpoint = apiClients
+  :<|> cleanArchiveEndpoint
+  :<|> projectName = apiClients
