@@ -192,6 +192,8 @@ _pingH :: ClientM NoContent
 
 cleanArchiveH :: ClientM CommandResponse
 
+_projectName :: ClientM ProjectName
+
 ( listH
   :<|> createH
   :<|> getH
@@ -202,7 +204,9 @@ cleanArchiveH :: ClientM CommandResponse
   :<|> _statusH
   :<|> cleanupH
   :<|> restoreH)
-    :<|> _pingH :<|> cleanArchiveH = client (Proxy @API)
+    :<|> _pingH
+    :<|> cleanArchiveH
+    :<|> _projectName = client (Proxy @API)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result)                    = f result

@@ -63,9 +63,6 @@ newtype TLSKeyPath = TLSKeyPath { unTLSKeyPath :: ByteString }
 newtype TLSStorePath = TLSStore { unTLSStorePath :: ByteString }
   deriving (Show)
 
-newtype ProjectName = ProjectName { unProjectName :: Text }
-  deriving (Show)
-
 newtype Domain = Domain { unDomain :: Text }
   deriving (Show)
 

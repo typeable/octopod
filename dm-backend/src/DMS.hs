@@ -123,7 +123,7 @@ server =
   ( listH :<|> createH :<|> getH :<|> editH
     :<|> deleteH :<|> updateH :<|> infoH :<|> statusH
     :<|> cleanupH :<|> restoreH
-  ) :<|> pingH :<|> cleanArchiveH
+  ) :<|> pingH :<|> cleanArchiveH :<|> projectNameH
 
 listH :: AppM [DeploymentFullInfo]
 listH = do
@@ -388,6 +388,11 @@ pingH = do
   _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn ->
     query_ conn "SELECT 1"
   pure NoContent
+
+projectNameH :: AppM ProjectName
+projectNameH = do
+  projName <- projectName <$> ask
+  pure projName
 
 statusH :: DeploymentName -> AppM DeploymentStatus
 statusH dName = do

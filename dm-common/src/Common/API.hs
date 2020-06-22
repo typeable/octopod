@@ -27,6 +27,8 @@ type PingEndpoint =
   "ping" :> GetNoContent '[PlainText] NoContent
 type CleanArchiveEndpoint =
   "clean_archive" :> Delete '[JSON] CommandResponse
+type ProjectNameEndpoint =
+  "project_name" :> Get '[JSON] ProjectName
 
 -- FIXME: Text as a return type for many endpoints
 type DeploymentAPI' c =
@@ -45,6 +47,7 @@ type DeploymentAPI' c =
       )
     :<|> PingEndpoint
     :<|> CleanArchiveEndpoint
+    :<|> ProjectNameEndpoint
     )
 
 type API = DeploymentAPI' CaptureName
