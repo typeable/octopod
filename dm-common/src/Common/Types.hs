@@ -27,6 +27,9 @@ newtype Action = Action { unAction :: Text }
 newtype ArchivedFlag = ArchivedFlag { unArchivedFlag :: Bool }
   deriving (Show, FromJSON, ToJSON)
 
+newtype ProjectName = ProjectName { uProjectName :: Text }
+  deriving (Show, FromJSON, ToJSON)
+
 data Deployment = Deployment
   { name :: DeploymentName
   , tag  :: DeploymentTag
