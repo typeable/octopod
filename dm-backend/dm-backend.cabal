@@ -41,6 +41,7 @@ library
       DMC.Args
       DMS
       DMS.Args
+      DMS.AWS
       Orphans
       TLS
       Types
@@ -48,6 +49,8 @@ library
       src
   build-depends:
       aeson
+    , amazonka
+    , amazonka-ecr
     , async
     , base >=4.7 && <5
     , bytestring
@@ -96,6 +99,8 @@ executable dmc-exe
   build-depends:
       aeson
     , async
+    , amazonka
+    , amazonka-ecr
     , base >=4.7 && <5
     , bytestring
     , chronos
@@ -139,6 +144,8 @@ executable dms-exe
   build-depends:
       aeson
     , async
+    , amazonka
+    , amazonka-ecr
     , base >=4.7 && <5
     , bytestring
     , chronos
@@ -180,6 +187,8 @@ test-suite dm-test
   build-depends:
       aeson
     , async
+    , amazonka
+    , amazonka-ecr
     , base >=4.7 && <5
     , bytestring
     , chronos

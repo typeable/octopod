@@ -31,6 +31,7 @@ import           System.Process.Typed
 
 import           Common.API
 import           DMS.Args
+import           DMS.AWS
 import           Orphans ()
 import           TLS (createTLSOpts)
 import           Types
@@ -159,6 +160,7 @@ createH dep = do
         "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
         (n, t, formatEnvPairs e)
+  failIfImageNotFound $ tag dep
   res :: Either SqlError Int64 <- liftIO . try $ createDep pgPool dep
   case res of
     Right _                                                 -> pure ()
@@ -338,6 +340,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
           , "--tag", coerce $ dTag
           ] ++ concat [["--env", concatPair e] | e <- envPairs]
         cmd  = coerce $ updateCommand st
+      failIfImageNotFound dTag
       liftIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
         log $ "call " <> unwords (cmd : args)
@@ -457,6 +460,7 @@ restoreH dName = do
   st <- ask
   let pgPool  = pool st
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
+  failIfImageNotFound $ tag dep
   ec <- createDeployment dep st
   void $ liftIO $ do
     let
@@ -500,6 +504,14 @@ createDeploymentLog pgPool (Deployment dName dTag dEnvs) act ec arch = do
       \)"
   void $ withResource pgPool $ \conn ->
     execute conn q (act, dTag, formatEnvPairs dEnvs, exitCode', arch', dName)
+
+failIfImageNotFound :: DeploymentTag -> AppM ()
+failIfImageNotFound dTag = do
+  foundTag <- liftIO . findImageTag $ dTag
+  case foundTag of
+    Just _  -> pure ()
+    Nothing ->
+      throwError err400 { errBody = validationError [] ["tag not found"] }
 
 appError :: Text -> BSL.ByteString
 appError = encode . AppError
