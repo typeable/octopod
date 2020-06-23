@@ -12,7 +12,7 @@ import Data.Time.Clock.POSIX
 import Reflex.Dom
 import Servant.Reflex
 
-import Common.Types
+import Common.Types as CT
 import Frontend.API
 import Page.NewStagingPopup
 import Page.Utils
@@ -177,8 +177,14 @@ activeDeploymentWidget clickedEv dDyn' = do
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     el "tr" $ do
       el "td" $ do
-        text $ coerce $ deployment ^. field @"name"
-        divClass "status status--success" $ text "<Status>"
+        let dname = deployment ^. field @"name"
+        text $ coerce dname
+        statusUpdateEv <- getPostBuild
+        respEv <- statusEndpoint (Right <$> constDyn dname) statusUpdateEv
+        let statusEv = fmapMaybe reqSuccess respEv
+        widgetHold_ blank $ status <$> statusEv <&> \case
+          CT.Ok -> divClass "status status--success" $ text "Success"
+          CT.Error -> divClass "status status--failure" $ text "Failure"
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
