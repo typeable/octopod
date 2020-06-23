@@ -12,6 +12,7 @@ import Types
 data Args = Args
   { port         :: Int
   , uiPort       :: Int
+  , wsPort       :: Int
   , db           :: ByteString
   , dbPoolSize   :: Int
   , tlsCertPath  :: ByteString
@@ -25,6 +26,7 @@ instance ParseRecord Args where
 data DMSOpts = DMSOpts
   { dmsPort         :: ServerPort
   , dmsUIPort       :: ServerPort
+  , dmsWSPort       :: ServerPort
   , dmsDB           :: DBConnectionString
   , dmsDBPoolSize   :: DBPoolSize
   , dmsTLSCertPath  :: TLSCertPath
@@ -38,6 +40,7 @@ parseArgs = do
   pure $ DMSOpts
     (coerce $ port args)
     (coerce $ uiPort args)
+    (coerce $ wsPort args)
     (coerce $ db args)
     (coerce $ dbPoolSize args)
     (coerce $ tlsCertPath args)

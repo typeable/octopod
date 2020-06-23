@@ -91,3 +91,7 @@ data CommandResponse
     { errorMessage :: Text }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake CommandResponse
+
+data WSEvent = FrontendPleaseUpdateEverything
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake WSEvent

@@ -55,6 +55,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , conduit
     , connection
     , data-default-class
     , deriving-aeson
@@ -77,6 +78,8 @@ library
     , servant-client
     , servant-client-core
     , servant-server
+    , servant-websockets
+    , stm
     , temporary
     , text
     , tls
@@ -104,6 +107,7 @@ executable dmc-exe
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , conduit
     , connection
     , data-default-class
     , directory
@@ -122,6 +126,8 @@ executable dmc-exe
     , servant-client
     , servant-client-core
     , servant-server
+    , servant-websockets
+    , stm
     , temporary
     , text
     , tls
@@ -149,6 +155,7 @@ executable dms-exe
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , conduit
     , connection
     , data-default-class
     , directory
@@ -166,6 +173,8 @@ executable dms-exe
     , servant-client
     , servant-client-core
     , servant-server
+    , servant-websockets
+    , stm
     , temporary
     , text
     , tls
@@ -192,6 +201,7 @@ test-suite dm-test
     , base >=4.7 && <5
     , bytestring
     , chronos
+    , conduit
     , connection
     , data-default-class
     , directory
@@ -210,6 +220,8 @@ test-suite dm-test
     , servant-client
     , servant-client-core
     , servant-server
+    , servant-websockets
+    , stm
     , temporary
     , text
     , tls
