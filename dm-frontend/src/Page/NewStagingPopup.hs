@@ -1,6 +1,6 @@
 module Page.NewStagingPopup where
 
-import Control.Lens (preview)
+import Control.Lens (preview, _1, _2)
 import Control.Monad
 import Data.Functor
 import Data.Generics.Sum
@@ -52,25 +52,28 @@ newStagingPopupBody errEv =
       commandResponseEv = fmapMaybe commandResponse errEv
       otherFailureEv = AppError <$> fmapMaybe reqFailure errEv
       errsEv = leftmost [commandResponseEv, otherFailureEv]
-    widgetHold_ blank $ errsEv <&> \case
-      ValidationError {..} -> do
-        let errs = nameField <> tagField
-        divClass "staging__output notification notification--danger" $ do
-          el "b" $ text "Validation error: "
-          text $ T.intercalate ". " errs
-      AppError {..} ->
-        divClass "staging__output notification notification--danger" $ do
-          el "b" $ text "App error: "
-          text errorMessage
-      _ -> blank
-    nameDyn <- dmTextInput "tag" "Name" "Name" (constDyn Nothing)
-    tagDyn <- dmTextInput "tag" "Tag" "Tag" (constDyn Nothing)
+      appErrEv = fmapMaybe (preview (_Ctor @"AppError")) errsEv
+      nameErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _1 )) errsEv
+      tagErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) errsEv
+      toMaybe [] = Nothing
+      toMaybe xs = Just $ T.intercalate ". " xs
+    nameErrDyn <- holdDyn Nothing $ toMaybe <$> nameErrEv
+    tagErrDyn <- holdDyn Nothing $ toMaybe <$> tagErrEv
+    errorHeader appErrEv
+    nameDyn <- dmTextInput "tag" "Name" "Name" nameErrDyn
+    tagDyn <- dmTextInput "tag" "Tag" "Tag" tagErrDyn
     envVarsDyn <- envVarsInput
     pure $ Deployment
       <$> (DeploymentName <$> nameDyn)
       <*> (DeploymentTag <$> tagDyn)
       <*> envVarsDyn
 
+errorHeader :: MonadWidget t m => Event t Text -> m ()
+errorHeader appErrEv = do
+  widgetHold_ blank $ appErrEv <&> \appErr -> do
+    divClass "staging__output notification notification--danger" $ do
+      el "b" $ text "App error: "
+      text appErr
 
 dmTextInput
   :: MonadWidget t m
@@ -79,20 +82,32 @@ dmTextInput
   -> Text
   -> Dynamic t (Maybe Text)
   -> m (Dynamic t Text)
-dmTextInput clss lbl placeholder _errDyn =
+dmTextInput clss lbl placeholder errDyn =
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text lbl
     elClass "div" "staging__widget" $
-      dmTextInput' clss placeholder
+      dmTextInput' clss placeholder errDyn
 
-dmTextInput' :: MonadWidget t m => Text -> Text -> m (Dynamic t Text)
-dmTextInput' clss placeholder = do
-  elClass "div" (clss <> " input") $ do
+dmTextInput'
+  :: MonadWidget t m
+  => Text
+  -> Text
+  -> Dynamic t (Maybe Text)
+  -> m (Dynamic t Text)
+dmTextInput' clss placeholder errDyn = do
+  let
+    classDyn = errDyn <&> \case
+      Nothing -> clss <> " input"
+      Just _  -> clss <> " input input--error"
+  elDynClass "div" classDyn $ do
     inp <- inputElement $ def
       & initialAttributes .~
         (  "type" =: "text"
         <> "class" =: "input__widget"
         <> "placeholder" =: placeholder )
+    dyn_ $ errDyn <&> \case
+      Nothing -> blank
+      Just x  -> divClass "input__output" $ text x
     pure $ value inp
 
 envVarsInput :: MonadWidget t m => m (Dynamic t EnvPairs)
@@ -116,8 +131,8 @@ envVarInput
   -> m ()
 envVarInput ix _ = do
   divClass "overrides__item" $ do
-    keyDyn <- dmTextInput' "overrides__key" "key"
-    valDyn <- dmTextInput' "overrides__value" "value"
+    keyDyn <- dmTextInput' "overrides__key" "key" (constDyn Nothing)
+    valDyn <- dmTextInput' "overrides__value" "value" (constDyn Nothing)
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let
       envEv = updated $ zipDyn keyDyn valDyn

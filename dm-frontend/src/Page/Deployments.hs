@@ -20,7 +20,7 @@ import Page.Utils
 deploymentsPage :: MonadWidget t m => m ()
 deploymentsPage = do
   headWidget
-  initLoadWidget
+  deploymentsWidget
 
 headWidget :: MonadWidget t m => m ()
 headWidget =
@@ -34,51 +34,18 @@ headWidget =
         nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
         dynText nameDyn
 
-initLoadWidget :: MonadWidget t m => m ()
-initLoadWidget = do
-  pb <- getPostBuild
-  respEv <- listEndpoint pb
-  let
-    okEv = fmapMaybe reqSuccess respEv
-    errEv = fmapMaybe reqSuccess respEv
-  widgetHold_ blank $ leftmost
-    [ deploymentsWidget <$> okEv
-    , errDeploymentsWidget <$ errEv ]
-  blank
-
-errDeploymentsWidget :: MonadWidget t m => m ()
-errDeploymentsWidget =
-  divClass "no-page" $
-    divClass "no-page__inner" $
-      divClass "null null--data" $
-        divClass "null__content" $
-          divClass "null__heading" $
-            text "Cannot retrieve the data"
-
 deploymentsWidgetWrapper :: MonadWidget t m => m a -> m a
 deploymentsWidgetWrapper m =
   divClass "page" $
     divClass "page__wrap container" m
 
-
--- data DeploymentsEvent
---   = DENewStagingSidebar
---   | DECloseSidebar
---   deriving (Generic)
-
--- instance Semigroup DeploymentsEvent where
---   a <> _ = a
-
-
-deploymentsWidget :: MonadWidget t m => [DeploymentFullInfo] -> m ()
-deploymentsWidget ds = do
+deploymentsWidget :: MonadWidget t m => m ()
+deploymentsWidget = do
   showNewStagingEv <- deploymentsWidgetWrapper $ mdo
-    dsDyn <- holdDyn ds never
     showNewStagingEv' <- deploymentsHeadWidget
-    deploymentsListWidget dsDyn
+    initDeploymentsListWidget
     pure showNewStagingEv'
   void $ newStagingPopup showNewStagingEv never
-
 
 deploymentsHeadWidget :: MonadWidget t m => m (Event t ())
 deploymentsHeadWidget =
@@ -98,77 +65,52 @@ deploymentsHeadWidget =
       text "New staging"
     pure $ domEvent Click nsEl
 
-
-deploymentsListWidget
-  :: MonadWidget t m
-  => Dynamic t [DeploymentFullInfo]
-  -> m ()
-deploymentsListWidget dsDyn = do
+initDeploymentsListWidget :: MonadWidget t m => m ()
+initDeploymentsListWidget = dataWidgetWrapper $ do
+  pb <- getPostBuild
+  respEv <- listEndpoint pb
   let
-    emptyDyn' = L.null <$> dsDyn
-  emptyDyn <- holdUniqDyn emptyDyn'
-  divClass "page__body" $
-    dyn_ $ ffor emptyDyn $ \case
-      True  -> noDeploymentsWidget
-      False -> deploymentsListWidget' dsDyn
+    okEv = fmapMaybe reqSuccess respEv
+    errEv = fmapMaybe reqFailure respEv
+  widgetHold_ loadingDeploymentsWidget $ leftmost
+    [ deploymentsListWidget <$> okEv
+    , errDeploymentsWidget <$ errEv ]
 
-noDeploymentsWidget :: MonadWidget t m => m ()
-noDeploymentsWidget =
-  divClass "no-data" $
-    divClass "null null--search" $ do
-      elClass "b" "null__heading" $ text "No results found"
-      divClass "null__message" $ do
-        text "It seems we can’t find any results"
-        el "br" blank
-        text "based on your search"
-
-deploymentsListWidget'
-  :: MonadWidget t m
-  => Dynamic t [DeploymentFullInfo]
-  -> m ()
-deploymentsListWidget' dsDyn = divClass "data" $ mdo
+deploymentsListWidget :: MonadWidget t m => [DeploymentFullInfo] -> m ()
+deploymentsListWidget ds = dataWidgetWrapper $ mdo
+  dsDyn <- holdDyn ds never
   let
     isArchived = view (field @"archived")
     activeDsDyn = L.filter (not . isArchived) <$> dsDyn
     archivedDsDyn = L.filter isArchived <$> dsDyn
   clickedEv <- elementClick
-  activeDeploymentsWidget activeDsDyn clickedEv
-  showDyn <- toggle False $ domEvent Click archivedBtnEl
-  let
-    btnClassDyn = ffor showDyn $ \case
-      True -> "data__show-archive expander expander--stand-alone expander--open"
-      False -> "data__show-archive expander expander--stand-alone"
-    btnAttrsDyn = ffor btnClassDyn $ \btnClass ->
-      (  "class" =: btnClass
-      <> "type" =: "button" )
-  (archivedBtnEl, _) <- elDynAttr' "button" btnAttrsDyn $
-    text "Show Archived stagings"
-  archivedDeploymentsWidget showDyn archivedDsDyn clickedEv
+  activeDeploymentsWidget clickedEv activeDsDyn
+  archivedDeploymentsWidget clickedEv archivedDsDyn
 
 activeDeploymentsWidget
   :: MonadWidget t m
-  => Dynamic t [DeploymentFullInfo]
-  -> Event t ClickedElement
+  => Event t ClickedElement
+  -> Dynamic t [DeploymentFullInfo]
   -> m ()
-activeDeploymentsWidget dsDyn clickedEv =
+activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
-    elClass "table" "stagings-table panel" $ do
-      el "thead" $
-        el "tr" $ do
-          el "th" $ text "Name"
-          el "th" $ text "Links"
-          el "th" $ text "Tag"
-          el "th" $ text "Overrides"
-          el "th" $ do
-            _sortBtn <- elAttr "button"
-              (  "class" =: "sort sort--active sort--asc"
-              <> "type" =: "button" ) $ text "Created"
-            blank
-          el "th" $ text "Changed"
-          el "th" $
-            elClass "span" "visuallyhidden" $ text "Menu"
-      el "tbody" $
-        void $ simpleList dsDyn (activeDeploymentWidget clickedEv)
+    tableWrapper $ do
+      let emptyDyn' = L.null <$> dsDyn
+      emptyDyn <- holdUniqDyn emptyDyn'
+      dyn_ $ emptyDyn <&> \case
+        False -> void $ simpleList dsDyn (activeDeploymentWidget clickedEv)
+        True  -> emptyTableBody $ noDeploymentsWidget
+
+statusWidget :: MonadWidget t m => DeploymentName -> m ()
+statusWidget dname = do
+  statusUpdateEv <- getPostBuild
+  respEv <- statusEndpoint (Right <$> constDyn dname) statusUpdateEv
+  let
+    loadingW = divClass "status" $ divClass "loading loading--status-alike" $ text "Loading"
+    statusEv = fmapMaybe reqSuccess respEv
+  widgetHold_ loadingW $ status <$> statusEv <&> \case
+    CT.Ok -> divClass "status status--success" $ text "Success"
+    CT.Error -> divClass "status status--failure" $ text "Failure"
 
 activeDeploymentWidget
   :: MonadWidget t m
@@ -182,12 +124,7 @@ activeDeploymentWidget clickedEv dDyn' = do
       el "td" $ do
         let dname = deployment ^. field @"name"
         text $ coerce dname
-        statusUpdateEv <- getPostBuild
-        respEv <- statusEndpoint (Right <$> constDyn dname) statusUpdateEv
-        let statusEv = fmapMaybe reqSuccess respEv
-        widgetHold_ blank $ status <$> statusEv <&> \case
-          CT.Ok -> divClass "status status--success" $ text "Success"
-          CT.Error -> divClass "status status--failure" $ text "Failure"
+        statusWidget dname
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
@@ -225,38 +162,41 @@ activeDeploymentWidget clickedEv dDyn' = do
               <> "type" =: "button") $ text "Move to archive"
         dropdownWidget' clickedEv btn body
 
-intToUTCTime :: Int -> UTCTime
-intToUTCTime = posixSecondsToUTCTime . realToFrac
-
 archivedDeploymentsWidget
   :: MonadWidget t m
-  => Dynamic t Bool
+  => Event t ClickedElement
   -> Dynamic t [DeploymentFullInfo]
-  -> Event t ClickedElement
   -> m ()
-archivedDeploymentsWidget showDyn dsDyn clickedEv = do
+archivedDeploymentsWidget clickedEv dsDyn = do
+  showDyn <- toggleButton
   let
     classDyn = ffor showDyn $ \case
       True  -> "data__archive data__archive--open"
       False -> "data__archive"
   elDynClass "div" classDyn $
-    elClass "table" "stagings-table panel" $ do
-      el "thead" $
-        el "tr" $ do
-          el "th" $ text "Name"
-          el "th" $ text "Links"
-          el "th" $ text "Tag"
-          el "th" $ text "Overrides"
-          el "th" $ do
-            _sortBtn <- elAttr "button"
-              (  "class" =: "sort sort--active sort--asc"
-              <> "type" =: "button" ) $ text "Created"
-            blank
-          el "th" $ text "Changed"
-          el "th" $
-            elClass "span" "visuallyhidden" $ text "Menu"
-      el "tbody" $
-        void $ simpleList dsDyn (archivedDeploymentWidget clickedEv)
+    tableWrapper $ do
+      let emptyDyn' = L.null <$> dsDyn
+      emptyDyn <- holdUniqDyn emptyDyn'
+      dyn_ $ emptyDyn <&> \case
+        False -> void $ simpleList dsDyn (archivedDeploymentWidget clickedEv)
+        True  -> emptyTableBody $ noDeploymentsWidget
+
+tableHeader :: MonadWidget t m => m ()
+tableHeader = do
+  el "thead" $
+    el "tr" $ do
+      el "th" $ text "Name"
+      el "th" $ text "Links"
+      el "th" $ text "Tag"
+      el "th" $ text "Overrides"
+      el "th" $ do
+        _sortBtn <- elAttr "button"
+          (  "class" =: "sort sort--active sort--asc"
+          <> "type" =: "button" ) $ text "Created"
+        blank
+      el "th" $ text "Changed"
+      el "th" $
+        elClass "span" "visuallyhidden" $ text "Menu"
 
 archivedDeploymentWidget
   :: MonadWidget t m
@@ -296,3 +236,75 @@ archivedDeploymentWidget clickedEv dDyn' = do
             (  "class" =: "action action--delete"
             <> "type" =: "button") $ text "Restore from archive"
         dropdownWidget' clickedEv btn body
+
+intToUTCTime :: Int -> UTCTime
+intToUTCTime = posixSecondsToUTCTime . realToFrac
+
+tableWrapper :: MonadWidget t m => m a -> m a
+tableWrapper ma =
+  divClass "stagings-table" $
+    el "table" $ do
+      tableHeader
+      el "tbody" ma
+
+initTableWrapper :: MonadWidget t m => m () -> m ()
+initTableWrapper ma = do
+  divClass "data_primary" $
+    tableWrapper $
+      emptyTableBody $ ma
+
+loadingDeploymentsWidget :: MonadWidget t m => m ()
+loadingDeploymentsWidget =
+  initTableWrapper $
+    divClass "loading loading--enlarged loading--alternate" $
+      text "Loading..."
+
+errDeploymentsWidget :: MonadWidget t m => m ()
+errDeploymentsWidget =
+  initTableWrapper $
+    divClass "null null--data" $ do
+      elClass "b" "null__heading" $
+        text "Cannot retrieve the data"
+      divClass "null__message" $
+        text "Try to reload page"
+
+noDeploymentsWidget' :: MonadWidget t m => m () -> m () -> m ()
+noDeploymentsWidget' h b =
+  divClass "null null--search" $ do
+    elClass "b" "null__heading" h
+    divClass "null__message" b
+
+noDeploymentsWidget :: MonadWidget t m => m ()
+noDeploymentsWidget = noDeploymentsWidget' (text "No stagings") blank
+
+_badSearchWidget :: MonadWidget t m => m ()
+_badSearchWidget = do
+  let
+    h = text "No results found"
+    b = do
+      text "It seems we can’t find any results"
+      el "br" blank
+      text "based on your search"
+  noDeploymentsWidget' h b
+
+emptyTableBody :: MonadWidget t m => m () -> m ()
+emptyTableBody msg =
+  elClass "tr" "no-stagings-table" $
+    elAttr "td" ("colspan" =: "7") msg
+
+dataWidgetWrapper :: MonadWidget t m => m a -> m a
+dataWidgetWrapper ma = divClass "page__body" $ divClass "data" ma
+
+toggleButton :: MonadWidget t m => m (Dynamic t Bool)
+toggleButton = mdo
+  showDyn <- toggle False $ domEvent Click archivedBtnEl
+  let
+    btnClassDyn = ffor showDyn $ \case
+      True -> "data__show-archive expander expander--stand-alone expander--open"
+      False -> "data__show-archive expander expander--stand-alone"
+    btnAttrsDyn = ffor btnClassDyn $ \btnClass ->
+      (  "class" =: btnClass
+      <> "type" =: "button" )
+  (archivedBtnEl, _) <- elDynAttr' "button" btnAttrsDyn $
+    text "Show Archived stagings"
+  pure showDyn

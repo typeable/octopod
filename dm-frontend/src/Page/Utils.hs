@@ -44,7 +44,7 @@ dropdownWidget' clickedEl btn body = mdo
       False -> "drop drop--actions"
   btnEl <- fmap fst $ elDynClass' "div" wrapperClassDyn $ do
     btn
-    divClass "drop__dropdown panel panel--flying" body
+    divClass "drop__dropdown" body
   blank
 
 showT :: Show a => a -> Text
@@ -111,5 +111,5 @@ buttonDynClass clDyn lblDyn = do
   (bEl, _) <- elDynAttr' "button" attrDyn $ dynText lblDyn
   return $ domEvent Click bEl
 
-
-
+-- data WebData
+--   = NotLoaded

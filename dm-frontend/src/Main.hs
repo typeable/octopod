@@ -20,7 +20,7 @@ headWidget = do
     (  "name" =: "viewport"
     <> "content" =: "width=device-width, initial-scale=1" ) blank
   elAttr "link"
-    (  "href" =: "https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@400;500;700;900&display=swap"
+    (  "href" =: "https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@400;500;700&display=swap"
     <> "rel" =: "stylesheet") blank
   elAttr "link"
     (  "href" =: "/static/styles/style.css"
