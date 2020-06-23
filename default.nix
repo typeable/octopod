@@ -16,23 +16,16 @@
   };
 
   overrides = hself: hsuper: {
-    amazonka = pkgs.haskell.lib.overrideCabal hsuper.amazonka (old: {
-      broken = false;
-    });
-    amazonka-core = pkgs.haskell.lib.overrideCabal hsuper.amazonka-core (old: {
-      broken = false;
-    });
-    amazonka-ecr = pkgs.haskell.lib.overrideCabal hsuper.amazonka-ecr (old: {
-      broken = false;
-    });
-    amazonka-test = pkgs.haskell.lib.overrideCabal hsuper.amazonka-test (old: {
-      broken = false;
-    });
+    amazonka = hsuper.callPackage nix/amazonka-1.6.1.nix {};
+    amazonka-core = hsuper.callPackage nix/amazonka-core-1.6.1.nix {};
+    amazonka-ecr = hsuper.callPackage nix/amazonka-ecr-1.6.1.nix {};
+    amazonka-test = hsuper.callPackage nix/amazonka-test-1.6.1.nix {};
     deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
     servant-reflex = hsuper.callCabal2nix "servant-reflex" sources.servant-reflex { };
     servant = pkgs.haskell.lib.overrideCabal hsuper.servant (old: {
       postInstall = "";
     });
+    servant-websockets = hsuper.callPackage nix/servant-websockets-2.0.0.nix {};
   };
 
   shells = {

@@ -3,14 +3,16 @@ module DMS (runDMS) where
 
 import           Control.Applicative
 import           Control.Concurrent.Async (race_)
+import           Control.Concurrent.STM
 import           Control.Exception (throwIO, try, Exception)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as BSL
-import           Data.Aeson (encode)
+import           Data.Aeson (Value (..), encode, toJSON)
 import           Data.Coerce
+import           Data.Conduit (ConduitT, yield)
 import           Data.Int (Int64)
 import           Data.Maybe
 import           Data.Pool
@@ -43,6 +45,7 @@ type AppM   = ReaderT AppState Handler
 data AppState = AppState
   { pool             :: PgPool
   , logger           :: TimedFastLogger
+  , eventSink        :: TChan WSEvent
   , projectName      :: ProjectName
   , baseDomain       :: Domain
   , namespace        :: Namespace
@@ -85,11 +88,13 @@ runDMS = do
   cleanupCmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   pgPool <- initConnectionPool
     (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
+  channel <- liftIO . atomically $ newBroadcastTChan
   let
     app'         =
       app $ AppState
         pgPool
         logger'
+        channel
         projName
         domain
         ns
@@ -99,13 +104,18 @@ runDMS = do
         deletionCmd
         checkingCmd
         cleanupCmd
+    wsApp'       = wsApp channel
     serverPort   = dmsPort opts
     uiServerPort = unServerPort $ dmsUIPort opts
+    wsServerPort = unServerPort $ dmsWSPort opts
     tlsOpts      =
       createTLSOpts (dmsTLSCertPath opts) (dmsTLSKeyPath opts)
         (dmsTLSStorePath opts) serverPort
     warpOpts     = setPort (unServerPort serverPort) defaultSettings
-    in (run uiServerPort app') `race_` (runTLS tlsOpts warpOpts app')
+    in
+      (run uiServerPort app')
+      `race_` (runTLS tlsOpts warpOpts app')
+      `race_` (run wsServerPort wsApp')
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -118,6 +128,21 @@ app :: AppState -> Application
 app s = serve api $ hoistServer api (nt s) server
   where
     api = Proxy @API
+
+wsApp :: TChan WSEvent -> Application
+wsApp channel = serve api $ wsServer channel
+  where
+    api = Proxy @WebSocketAPI
+
+wsServer :: TChan WSEvent -> Server WebSocketAPI
+wsServer = eventS
+
+eventS :: MonadIO m => TChan WSEvent -> ConduitT () Value m ()
+eventS channel = do
+  dupChannel <- liftIO . atomically $ dupTChan channel
+  forever $ do
+    event <- liftIO . atomically . readTChan $ dupChannel
+    yield . toJSON $ event
 
 server :: ServerT API AppM
 server =
@@ -173,6 +198,7 @@ createH dep = do
   void $ liftIO $ do
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
     handleExitCode ec
+  sendReloadEvent
   pure Success
 
 createDeployment :: Deployment -> AppState -> AppM ExitCode
@@ -277,6 +303,7 @@ editH dName dEnvs = do
         return ()
     _     ->
       liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
+  sendReloadEvent
   return Success
   where
     getTag                 :: PgPool -> IO [DeploymentTag]
@@ -309,6 +336,7 @@ deleteH dName = do
     void $ createDeploymentLog pgPool dep "delete" ec $ ArchivedFlag True
     log $ "deployment deleted, name: " <> coerce dName
     handleExitCode ec
+  sendReloadEvent
   pure Success
 
 archiveDeployment :: PgPool -> DeploymentName -> IO Int64
@@ -356,6 +384,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
         return ()
     _ ->
       liftIO . logWarning (logger st) $ "envs not found, name: " <> coerce dName
+  sendReloadEvent
   return Success
 
 selectEnvPairs :: PgPool -> DeploymentName -> IO [Text]
@@ -390,12 +419,11 @@ pingH = do
   pgPool <- pool <$> ask
   _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn ->
     query_ conn "SELECT 1"
+  sendReloadEvent
   pure NoContent
 
 projectNameH :: AppM ProjectName
-projectNameH = do
-  projName <- projectName <$> ask
-  pure projName
+projectNameH = projectName <$> ask
 
 statusH :: DeploymentName -> AppM DeploymentStatus
 statusH dName = do
@@ -414,6 +442,7 @@ cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
   st <- ask
   cleanupDeployment dName st
+  sendReloadEvent
   pure Success
 
 cleanupDeployment :: DeploymentName -> AppState -> AppM ()
@@ -475,6 +504,7 @@ restoreH dName = do
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
     createDeploymentLog pgPool dep "restore" ec $ ArchivedFlag False
     handleExitCode ec
+  sendReloadEvent
   pure Success
 
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
@@ -524,6 +554,11 @@ appError = encode . AppError
 validationError :: [Text] -> [Text] -> BSL.ByteString
 validationError nameErrors tagErrors =
   encode $ ValidationError nameErrors tagErrors
+
+sendReloadEvent :: AppM ()
+sendReloadEvent = do
+  channel <- eventSink <$> ask
+  liftIO . atomically $ writeTChan channel FrontendPleaseUpdateEverything
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo l = logWithSeverity l "INFO"
