@@ -28,8 +28,11 @@ headWidget =
     divClass "header__wrap container" $ do
       elClass "b" "header__logo" $
         text "Deployment Manager"
-      elClass "div" "header__project" $
-        text "<Project name>"
+      elClass "div" "header__project" $ do
+        pb <- getPostBuild
+        respEv <- projectName pb
+        nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
+        dynText nameDyn
 
 initLoadWidget :: MonadWidget t m => m ()
 initLoadWidget = do
