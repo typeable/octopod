@@ -33,8 +33,7 @@ rewrite /ghcjs /frontend-result/bin/frontend.jsexe/index.html
 proxy / localhost:3003 {
   transparent
   websocket
-  except /dm-css/
-  except /frontend-result/
+  except /dm-css/ /frontend-result/
 }
 
 

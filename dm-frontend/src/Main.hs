@@ -9,6 +9,7 @@ main :: IO ()
 main = mainWidgetWithHead headWidget $
   deploymentsPage
 
+
 headWidget :: DomBuilder t m => m ()
 headWidget = do
   elAttr "meta" ( "charset" =: "urf8 ") blank

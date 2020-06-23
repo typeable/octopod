@@ -1,41 +1,115 @@
 module Page.Utils where
 
+import Data.Monoid
 import Data.Text
+import Control.Lens
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
-import Reflex.Dom
+import Reflex.Dom as R
 
-clickInside :: MonadWidget t m => DOM.Element -> m (Event t Bool)
-clickInside elm = do
-  doc <- currentDocumentUnchecked
-  wrapDomEvent doc (`on` Events.click) $ do
-    t :: Maybe DOM.Element <- target
-    DOM.contains elm t
+newtype ClickedElement =
+  ClickedElement { unClickedElement :: Maybe DOM.Element }
 
-documentClickWidget :: MonadWidget t m => m (Event t (Maybe Text))
-documentClickWidget = do
+elementClick :: MonadWidget t m =>  m (Event t ClickedElement)
+elementClick = do
   doc <- currentDocumentUnchecked
-  wrapDomEvent doc (`on` Events.click) $ do
-    t :: Maybe DOM.Element <- target
-    sequence $ getId <$> t
+  wrapDomEvent doc (`on` Events.click) $ ClickedElement <$> target
 
 dropdownWidget
   :: MonadWidget t m
-  => Text
+  => m ()
+  -> m ()
+  -> m ()
+dropdownWidget btn body = mdo
+  clickedEl <- elementClick
+  dropdownWidget' clickedEl btn body
+
+dropdownWidget'
+  :: MonadWidget t m
+  => Event t ClickedElement
   -> m ()
   -> m ()
   -> m ()
-dropdownWidget elId btn body = mdo
-  docClickEv <- documentClickWidget
+dropdownWidget' clickedEl btn body = mdo
+  clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
+    DOM.contains (_element_raw btnEl) clicked
+  openedDyn <- foldDyn switchState False clickInsideEv
   let
-    openEv = ffilter (Just elId ==) docClickEv
-    closeEv = docClickEv
-  wrapperClassDyn <- holdDyn "drop drop--actions" $ leftmost
-    [ "drop drop--actions drop--expanded" <$ openEv
-    , "drop drop--actions" <$ closeEv ]
-  elDynClass "div" wrapperClassDyn $ do
+    switchState ev cur = ev && not cur
+    wrapperClassDyn = ffor openedDyn $ \case
+      True -> "drop drop--actions drop--expanded"
+      False -> "drop drop--actions"
+  btnEl <- fmap fst $ elDynClass' "div" wrapperClassDyn $ do
     btn
     divClass "drop__dropdown panel panel--flying" body
+  blank
+
+showT :: Show a => a -> Text
+showT = pack . show
+
+sidebar
+  :: MonadWidget t m
+  => Event t ()
+  -> Event t ()
+  -> m (Event t a, Event t ())
+  -> m (Event t a)
+sidebar showEv closeEv m = mdo
+  let
+    blank' = pure (never, never)
+    selfCloseEv = switchDyn $ snd <$> resultEvDyn
+    closeEv' = leftmost
+      [ closeEv, selfCloseEv ]
+    animationDuration = 0.3
+  deferDomClearEv <- delay animationDuration closeEv'
+  popupClassDyn <- holdDyn "popup" $ leftmost
+    [ "popup" <$ closeEv'
+    , "popup popup--visible" <$ showEv ]
+  resultEvDyn <- elDynClass "div" popupClassDyn $ do
+    popupOverlay
+    widgetHold blank' $ leftmost
+      [ m <$ showEv
+      , blank' <$ deferDomClearEv ]
+  pure $ switchDyn $ fst <$> resultEvDyn
+
+popupOverlay :: DomBuilder t m => m ()
+popupOverlay =
+  elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
+
+-- Lens convenience helpers
+(<^.>) :: Functor f => f a -> Getting b a b -> f b
+(<^.>) fa l = fa <&> (^. l)
+
+(<^?>) :: Functor f => f a -> Getting (First b) a b -> f (Maybe b)
+(<^?>) fa l = fa <&> (^? l)
+
+(<^..>) :: Functor f => f a -> Getting (Endo [b]) a b -> f [b]
+(<^..>) fa t = fa <&> (^.. t)
+
+infixl 8 <^.>, <^..>, <^?>
+
+
+eventWriterWrapper :: (MonadWidget t m, Semigroup e) => (Event t e -> EventWriterT t e m ()) -> m (Event t e)
+eventWriterWrapper m = mdo
+  (_, ev) <- runEventWriterT (m ev)
+  pure ev
+
+buttonClass :: DomBuilder t m => Text -> Text -> m (Event t ())
+buttonClass cl lbl = do
+  (bEl, _) <- elAttr' "button" ("class" =: cl <> "type" =: "button") $ text lbl
+  return $ domEvent Click bEl
+
+buttonDynClass
+  :: (DomBuilder t m, PostBuild t m)
+  => Dynamic t Text
+  -> Dynamic t Text
+  -> m (Event t ())
+buttonDynClass clDyn lblDyn = do
+  let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
+  (bEl, _) <- elDynAttr' "button" attrDyn $ dynText lblDyn
+  return $ domEvent Click bEl
+
+
+

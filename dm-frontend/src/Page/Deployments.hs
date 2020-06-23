@@ -14,12 +14,13 @@ import Servant.Reflex
 
 import Common.Types
 import Frontend.API
+import Page.NewStagingPopup
 import Page.Utils
 
 deploymentsPage :: MonadWidget t m => m ()
 deploymentsPage = do
   headWidget
-  bodyLoadWidget
+  initLoadWidget
 
 headWidget :: MonadWidget t m => m ()
 headWidget =
@@ -30,8 +31,8 @@ headWidget =
       elClass "div" "header__project" $
         text "<Project name>"
 
-bodyLoadWidget :: MonadWidget t m => m ()
-bodyLoadWidget = do
+initLoadWidget :: MonadWidget t m => m ()
+initLoadWidget = do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
@@ -56,13 +57,27 @@ deploymentsWidgetWrapper m =
   divClass "page" $
     divClass "page__wrap container" m
 
-deploymentsWidget :: MonadWidget t m => [DeploymentFullInfo] -> m ()
-deploymentsWidget ds = deploymentsWidgetWrapper $ do
-  dsDyn <- holdDyn ds never
-  deploymentsHeadWidget
-  deploymentsListWidget dsDyn
 
-deploymentsHeadWidget :: MonadWidget t m => m ()
+-- data DeploymentsEvent
+--   = DENewStagingSidebar
+--   | DECloseSidebar
+--   deriving (Generic)
+
+-- instance Semigroup DeploymentsEvent where
+--   a <> _ = a
+
+
+deploymentsWidget :: MonadWidget t m => [DeploymentFullInfo] -> m ()
+deploymentsWidget ds = do
+  showNewStagingEv <- deploymentsWidgetWrapper $ mdo
+    dsDyn <- holdDyn ds never
+    showNewStagingEv' <- deploymentsHeadWidget
+    deploymentsListWidget dsDyn
+    pure showNewStagingEv'
+  void $ newStagingPopup showNewStagingEv never
+
+
+deploymentsHeadWidget :: MonadWidget t m => m (Event t ())
 deploymentsHeadWidget =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
@@ -76,8 +91,10 @@ deploymentsHeadWidget =
       (_, _delete) <- elClass' "button" "input__clear-type spot spot--cancel" $
         text "Delete"
       blank
-    elClass "a" "page__add-staging button button--add popup-handler" $
+    (nsEl, _) <- elClass' "a" "page__add-staging button button--add popup-handler" $
       text "New staging"
+    pure $ domEvent Click nsEl
+
 
 deploymentsListWidget
   :: MonadWidget t m
@@ -102,7 +119,6 @@ noDeploymentsWidget =
         el "br" blank
         text "based on your search"
 
-
 deploymentsListWidget'
   :: MonadWidget t m
   => Dynamic t [DeploymentFullInfo]
@@ -112,7 +128,8 @@ deploymentsListWidget' dsDyn = divClass "data" $ mdo
     isArchived = view (field @"archived")
     activeDsDyn = L.filter (not . isArchived) <$> dsDyn
     archivedDsDyn = L.filter isArchived <$> dsDyn
-  activeDeploymentsWidget activeDsDyn
+  clickedEv <- elementClick
+  activeDeploymentsWidget activeDsDyn clickedEv
   showDyn <- toggle False $ domEvent Click archivedBtnEl
   let
     btnClassDyn = ffor showDyn $ \case
@@ -123,15 +140,14 @@ deploymentsListWidget' dsDyn = divClass "data" $ mdo
       <> "type" =: "button" )
   (archivedBtnEl, _) <- elDynAttr' "button" btnAttrsDyn $
     text "Show Archived stagings"
-  archivedDeploymentsWidget showDyn archivedDsDyn
-
-
+  archivedDeploymentsWidget showDyn archivedDsDyn clickedEv
 
 activeDeploymentsWidget
   :: MonadWidget t m
   => Dynamic t [DeploymentFullInfo]
+  -> Event t ClickedElement
   -> m ()
-activeDeploymentsWidget dsDyn =
+activeDeploymentsWidget dsDyn clickedEv =
   divClass "data__primary" $
     elClass "table" "stagings-table panel" $ do
       el "thead" $
@@ -149,13 +165,14 @@ activeDeploymentsWidget dsDyn =
           el "th" $
             elClass "span" "visuallyhidden" $ text "Menu"
       el "tbody" $
-        void $ simpleList dsDyn activeDeploymentWidget
+        void $ simpleList dsDyn (activeDeploymentWidget clickedEv)
 
 activeDeploymentWidget
   :: MonadWidget t m
-  => Dynamic t DeploymentFullInfo
+  => Event t ClickedElement
+  -> Dynamic t DeploymentFullInfo
   -> m ()
-activeDeploymentWidget dDyn' = do
+activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     el "tr" $ do
@@ -197,7 +214,7 @@ activeDeploymentWidget dDyn' = do
             elAttr "button"
               (  "class" =: "action action--delete"
               <> "type" =: "button") $ text "Move to archive"
-        dropdownWidget elId btn body
+        dropdownWidget' clickedEv btn body
 
 intToUTCTime :: Int -> UTCTime
 intToUTCTime = posixSecondsToUTCTime . realToFrac
@@ -206,8 +223,9 @@ archivedDeploymentsWidget
   :: MonadWidget t m
   => Dynamic t Bool
   -> Dynamic t [DeploymentFullInfo]
+  -> Event t ClickedElement
   -> m ()
-archivedDeploymentsWidget showDyn dsDyn = do
+archivedDeploymentsWidget showDyn dsDyn clickedEv = do
   let
     classDyn = ffor showDyn $ \case
       True  -> "data__archive data__archive--open"
@@ -229,13 +247,14 @@ archivedDeploymentsWidget showDyn dsDyn = do
           el "th" $
             elClass "span" "visuallyhidden" $ text "Menu"
       el "tbody" $
-        void $ simpleList dsDyn archivedDeploymentWidget
+        void $ simpleList dsDyn (archivedDeploymentWidget clickedEv)
 
 archivedDeploymentWidget
   :: MonadWidget t m
-  => Dynamic t DeploymentFullInfo
+  => Event t ClickedElement
+  -> Dynamic t DeploymentFullInfo
   -> m ()
-archivedDeploymentWidget dDyn' = do
+archivedDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     el "tr" $ do
@@ -267,4 +286,4 @@ archivedDeploymentWidget dDyn' = do
           body = elAttr "button"
             (  "class" =: "action action--delete"
             <> "type" =: "button") $ text "Restore from archive"
-        dropdownWidget elId btn body
+        dropdownWidget' clickedEv btn body
