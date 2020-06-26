@@ -237,7 +237,7 @@ selectDeploymentLogs :: PgPool -> DeploymentName -> IO [DeploymentLog]
 selectDeploymentLogs p dName = do
   let
     q =
-      "SELECT action::text, tag, envs, exit_code, \
+      "SELECT id, action::text, tag, envs, exit_code, \
         \duration, extract(epoch from created_at)::int \
       \FROM deployment_logs \
       \WHERE deployment_id in (\
@@ -247,9 +247,9 @@ selectDeploymentLogs p dName = do
       \LIMIT 20"
   retrievedLogs <- withResource p (\conn -> query conn q (Only dName))
   -- FIXME: use FromRow instance instead
-  for retrievedLogs $ \(a, t, e, ec, d, ts) -> do
+  for retrievedLogs $ \(ai, a, t, e, ec, d, ts) -> do
     envPairs <- parseEnvs $ lines e
-    pure $ DeploymentLog a t envPairs ec (Duration d) ts
+    pure $ DeploymentLog (ActionId ai) a t envPairs ec (Duration d) ts
 
 selectDeployment
   :: PgPool
@@ -512,14 +512,14 @@ restoreH dName = do
   pure Success
 
 getActionInfoH :: ActionId -> AppM ActionInfo
-getActionInfoH actionId = do
+getActionInfoH aId = do
   st <- ask
   let
     pgPool = pool st
-    actionId' = Only . unActionId $ actionId
+    aId' = Only . unActionId $ aId
     q = "SELECT stdout, stderr FROM deployment_logs WHERE id = ?"
   rows :: [(Text, Text)] <- liftIO $
-    withResource pgPool (\conn -> query conn q actionId')
+    withResource pgPool $ \conn -> query conn q aId'
   case rows of
     (out, err) : _ -> pure $ ActionInfo out err
     _              ->

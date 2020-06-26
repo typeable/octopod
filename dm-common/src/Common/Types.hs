@@ -42,7 +42,8 @@ data Deployment = Deployment
   deriving (FromJSON, ToJSON) via Snake Deployment
 
 data DeploymentLog = DeploymentLog
-  { action         :: Action
+  { actionId       :: ActionId
+  , action         :: Action
   , deploymentTag  :: DeploymentTag
   , deploymentEnvs :: EnvPairs
   , exitCode       :: Int
