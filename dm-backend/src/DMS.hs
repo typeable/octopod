@@ -2,6 +2,7 @@ module DMS (runDMS) where
 
 
 import           Control.Applicative
+import           Control.Concurrent (forkIO)
 import           Control.Concurrent.Async (race_)
 import           Control.Concurrent.STM
 import           Control.Exception (throwIO, try, Exception)
@@ -195,14 +196,14 @@ createH dep = do
         { errBody = validationError ["deployment already exists"] [] }
     Left (SqlError _ _ _ _ _)                               ->
       throwError err409 { errBody = appError "some database error" }
-  ec <- createDeployment dep st
-  void $ liftIO $ do
+  void . liftIO . forkIO $ do
+    ec <- createDeployment dep st
     createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
+    sendReloadEvent st
     handleExitCode ec
-  sendReloadEvent
   pure Success
 
-createDeployment :: Deployment -> AppState -> AppM ExitCode
+createDeployment :: Deployment -> AppState -> IO ExitCode
 createDeployment dep st = do
   let
     log :: Text -> IO ()
@@ -291,7 +292,7 @@ editH dName dEnvs = do
           , "--tag", coerce dTag
           ] ++ concat [["--env", concatPair p] | p <- dEnvs]
         cmd  = coerce $ updateCommand st
-      liftIO $  do
+      void . liftIO . forkIO $ do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
         ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
@@ -300,11 +301,10 @@ editH dName dEnvs = do
           <> ", envs: " <> formatEnvPairs dEnvs
         let dep = Deployment dName dTag dEnvs
         createDeploymentLog pgPool dep "edit" ec $ ArchivedFlag False
+        sendReloadEvent st
         handleExitCode ec
-        return ()
     _     ->
       liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
-  sendReloadEvent
   return Success
   where
     getTag                 :: PgPool -> IO [DeploymentTag]
@@ -330,14 +330,14 @@ deleteH dName = do
       ]
     cmd     = coerce $ deletionCommand st
   dep <- selectDeployment pgPool dName AllDeployments
-  liftIO $ do
+  void . liftIO . forkIO $ do
     log $ "call " <> unwords (cmd : args)
     ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     void $ archiveDeployment pgPool dName
     void $ createDeploymentLog pgPool dep "delete" ec $ ArchivedFlag True
     log $ "deployment deleted, name: " <> coerce dName
+    sendReloadEvent st
     handleExitCode ec
-  sendReloadEvent
   pure Success
 
 archiveDeployment :: PgPool -> DeploymentName -> IO Int64
@@ -370,7 +370,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
           ] ++ concat [["--env", concatPair e] | e <- envPairs]
         cmd  = coerce $ updateCommand st
       failIfImageNotFound dTag
-      liftIO $ do
+      void . liftIO . forkIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
         log $ "call " <> unwords (cmd : args)
         ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
@@ -381,11 +381,10 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
             dep = Deployment dName dTag envPairs
             arch = ArchivedFlag False
           createDeploymentLog pgPool dep "update" ec arch
+        sendReloadEvent st
         handleExitCode ec
-        return ()
     _ ->
       liftIO . logWarning (logger st) $ "envs not found, name: " <> coerce dName
-  sendReloadEvent
   return Success
 
 selectEnvPairs :: PgPool -> DeploymentName -> IO [Text]
@@ -442,7 +441,6 @@ cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
   st <- ask
   cleanupDeployment dName st
-  sendReloadEvent
   pure Success
 
 cleanupDeployment :: DeploymentName -> AppState -> AppM ()
@@ -456,12 +454,13 @@ cleanupDeployment dName st = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ cleanupCommand st
-  liftIO $ do
+  void . liftIO . forkIO $ do
     log $ "call " <> unwords (cmd : args)
     ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
     void $ deleteDeploymentLogs pgPool dName
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
+    sendReloadEvent st
     handleExitCode ec
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
@@ -495,16 +494,16 @@ restoreH dName = do
   let pgPool  = pool st
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
   failIfImageNotFound $ tag dep
-  ec <- createDeployment dep st
-  void $ liftIO $ do
+  void . liftIO . forkIO $ do
+    ec <- createDeployment dep st
     let
       q =
         "UPDATE deployments SET archived = 'f', archived_at = null \
         \WHERE name = ?"
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
     createDeploymentLog pgPool dep "restore" ec $ ArchivedFlag False
+    sendReloadEvent st
     handleExitCode ec
-  sendReloadEvent
   pure Success
 
 waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
@@ -555,10 +554,9 @@ validationError :: [Text] -> [Text] -> BSL.ByteString
 validationError nameErrors tagErrors =
   encode $ ValidationError nameErrors tagErrors
 
-sendReloadEvent :: AppM ()
-sendReloadEvent = do
-  channel <- eventSink <$> ask
-  liftIO . atomically $ writeTChan channel FrontendPleaseUpdateEverything
+sendReloadEvent :: AppState -> IO ()
+sendReloadEvent state =
+  atomically $ writeTChan (eventSink state) FrontendPleaseUpdateEverything
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo l = logWithSeverity l "INFO"
