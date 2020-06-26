@@ -1,8 +1,6 @@
 module Common.API where
 
-import Data.Aeson (Value (..))
 import Servant.API
-import Servant.API.WebSocketConduit
 
 import Common.Types
 
@@ -53,5 +51,3 @@ type DeploymentAPI' c =
     )
 
 type API = DeploymentAPI' CaptureName
-
-type WebSocketAPI = "event" :> WebSocketSource Value

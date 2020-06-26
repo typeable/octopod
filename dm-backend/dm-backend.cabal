@@ -37,6 +37,7 @@ library
                      , TypeApplications
                      , TypeOperators
   exposed-modules:
+      API
       DMC
       DMC.Args
       DMS
