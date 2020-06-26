@@ -53,6 +53,7 @@ executable frontend
   -- other-extensions:
   build-depends:       aeson
                      , base >=4.12 && <4.13
+                     , bytestring
                      , containers
                      , dm-common
                      , generic-lens
@@ -61,6 +62,7 @@ executable frontend
                      , lens
                      , reflex-dom
                      , reflex-dom-helpers
+                     , regex-tdfa
                      , servant
                      , servant-reflex
                      , text

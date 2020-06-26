@@ -2,12 +2,16 @@ module Page.NewStagingPopup where
 
 import Control.Lens (preview, _1, _2)
 import Control.Monad
+import Data.ByteString (ByteString)
 import Data.Functor
 import Data.Generics.Sum
 import Data.Map as M
 import Data.Monoid
-import Data.Text as T (Text, intercalate)
+import Data.Text as T (Text, intercalate, length)
+import Data.Text.Encoding as T
+import Prelude as P
 import Reflex.Dom
+import Text.Regex.TDFA
 
 import Common.Types
 import Frontend.API
@@ -22,8 +26,8 @@ newStagingPopup
   -> m (Event t ())
 newStagingPopup showEv hideEv = sidebar showEv hideEv $ mdo
   divClass "popup__body" $ mdo
-    (closeEv', saveEv) <- newStagingPopupHeader
-    deploymentDyn <- newStagingPopupBody respEv
+    (closeEv', saveEv) <- newStagingPopupHeader enabledDyn
+    (deploymentDyn, enabledDyn) <- newStagingPopupBody respEv
     respEv <- createEndpoint (Right <$> deploymentDyn) saveEv
     let
       successEv =
@@ -31,13 +35,16 @@ newStagingPopup showEv hideEv = sidebar showEv hideEv $ mdo
       closeEv = leftmost [ closeEv', successEv ]
     pure (never, closeEv)
 
-newStagingPopupHeader :: MonadWidget t m => m (Event t (), Event t ())
-newStagingPopupHeader =
+newStagingPopupHeader
+  :: MonadWidget t m
+  => Dynamic t Bool
+  -> m (Event t (), Event t ())
+newStagingPopupHeader enabledDyn =
   divClass "popup__head" $ do
     closeEv <- buttonClass "popup__close" "Close popup"
     elClass "h2" "popup__project" $ text "Create new staging"
     saveEv <- divClass "popup__operations" $
-      buttonClass "popup__action button button--save" "Save"
+      buttonClassEnabled "popup__action button button--save" "Save" enabledDyn
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
@@ -45,9 +52,9 @@ newStagingPopupHeader =
 newStagingPopupBody
   :: MonadWidget t m
   => Event t (ReqResult tag CommandResponse)
-  -> m (Dynamic t Deployment)
+  -> m (Dynamic t Deployment, Dynamic t Bool)
 newStagingPopupBody errEv =
-  divClass "staging" $ do
+  divClass "staging" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv
       otherFailureEv = AppError <$> fmapMaybe reqFailure errEv
@@ -57,16 +64,23 @@ newStagingPopupBody errEv =
       tagErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) errsEv
       toMaybe [] = Nothing
       toMaybe xs = Just $ T.intercalate ". " xs
-    nameErrDyn <- holdDyn Nothing $ toMaybe <$> nameErrEv
+      isNameValidDyn = nameValidation <$> nameDyn
+      badNameText = Just "Name is not correct"
+      badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
+      okNameEv = Nothing <$ (ffilter id $ updated isNameValidDyn)
+    nameErrDyn <- holdDyn Nothing $ leftmost
+      [ toMaybe <$> nameErrEv
+      , badNameEv
+      , okNameEv ]
     tagErrDyn <- holdDyn Nothing $ toMaybe <$> tagErrEv
     errorHeader appErrEv
     nameDyn <- dmTextInput "tag" "Name" "Name" nameErrDyn
     tagDyn <- dmTextInput "tag" "Tag" "Tag" tagErrDyn
     envVarsDyn <- envVarsInput
-    pure $ Deployment
+    pure $ (Deployment
       <$> (DeploymentName <$> nameDyn)
       <*> (DeploymentTag <$> tagDyn)
-      <*> envVarsDyn
+      <*> envVarsDyn, isNameValidDyn)
 
 errorHeader :: MonadWidget t m => Event t Text -> m ()
 errorHeader appErrEv = do
@@ -118,7 +132,7 @@ envVarsInput = do
       elClass "div" "overrides" $ mdo
         let
           emptyVar = ("", "")
-          addEv = clickEv $> Endo (\envs -> length envs =: emptyVar <> envs)
+          addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
         envsDyn <- foldDyn appEndo mempty $ leftmost [ addEv, updEv ]
         (_, updEv)  <- runEventWriterT $ listWithKey envsDyn envVarInput
         clickEv <- buttonClass "overrides__add dash dash--add" "Add an override"
@@ -139,3 +153,8 @@ envVarInput ix _ = do
       deleteEv = Endo (M.delete ix) <$ closeEv
       updEv = Endo . flip update ix . const . Just <$> envEv
     tellEvent $ leftmost [deleteEv, updEv]
+
+nameValidation :: Text -> Bool
+nameValidation name =
+  (T.length name >= 2 && T.length name <= 20)
+  && (T.encodeUtf8 name =~ ("^[a-z0-9\\-]+$" :: ByteString))
