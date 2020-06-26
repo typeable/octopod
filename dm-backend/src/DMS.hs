@@ -18,6 +18,7 @@ import           Data.Int (Int64)
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text (lines, pack, unpack, unwords)
+import           Data.Text.IO (hGetContents)
 import           Data.Traversable
 import           Database.PostgreSQL.Simple
 import           Network.Wai.Handler.Warp
@@ -151,7 +152,7 @@ server =
   ( listH :<|> createH :<|> getH :<|> editH
     :<|> deleteH :<|> updateH :<|> infoH :<|> statusH
     :<|> cleanupH :<|> restoreH
-  ) :<|> pingH :<|> cleanArchiveH :<|> projectNameH
+  ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
 
 listH :: AppM [DeploymentFullInfo]
 listH = do
@@ -197,13 +198,13 @@ createH dep = do
     Left (SqlError _ _ _ _ _)                               ->
       throwError err409 { errBody = appError "some database error" }
   void . liftIO . forkIO $ do
-    ec <- createDeployment dep st
-    createDeploymentLog pgPool dep "create" ec $ ArchivedFlag False
+    (ec, out, err) <- createDeployment dep st
+    createDeploymentLog pgPool dep "create" ec (ArchivedFlag False) out err
     sendReloadEvent st
     handleExitCode ec
   pure Success
 
-createDeployment :: Deployment -> AppState -> IO ExitCode
+createDeployment :: Deployment -> AppState -> IO (ExitCode, Stdout, Stderr)
 createDeployment dep st = do
   let
     log :: Text -> IO ()
@@ -219,9 +220,10 @@ createDeployment dep st = do
 
   liftIO $ do
     log $ "call " <> unwords (cmd : args)
-    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     log $ "deployment created, deployment: " <> (pack . show $ dep)
-    pure ec
+    pure (ec, out, err)
+
 
 getH :: DeploymentName -> AppM Deployment
 getH dName = do
@@ -236,7 +238,7 @@ selectDeploymentLogs p dName = do
   let
     q =
       "SELECT action::text, tag, envs, exit_code, \
-        \extract(epoch from created_at)::int \
+        \duration, extract(epoch from created_at)::int \
       \FROM deployment_logs \
       \WHERE deployment_id in (\
         \SELECT id FROM deployments WHERE name = ?\
@@ -245,9 +247,9 @@ selectDeploymentLogs p dName = do
       \LIMIT 20"
   retrievedLogs <- withResource p (\conn -> query conn q (Only dName))
   -- FIXME: use FromRow instance instead
-  for retrievedLogs $ \(a, t, e, ec, ts) -> do
+  for retrievedLogs $ \(a, t, e, ec, d, ts) -> do
     envPairs <- parseEnvs $ lines e
-    pure $ DeploymentLog a t envPairs ec ts
+    pure $ DeploymentLog a t envPairs ec (Duration d) ts
 
 selectDeployment
   :: PgPool
@@ -295,12 +297,12 @@ editH dName dEnvs = do
       void . liftIO . forkIO $ do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
-        ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+        (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
         log
           $ "deployment edited, name: " <> coerce dName
           <> ", envs: " <> formatEnvPairs dEnvs
         let dep = Deployment dName dTag dEnvs
-        createDeploymentLog pgPool dep "edit" ec $ ArchivedFlag False
+        createDeploymentLog pgPool dep "edit" ec (ArchivedFlag False) out err
         sendReloadEvent st
         handleExitCode ec
     _     ->
@@ -329,12 +331,13 @@ deleteH dName = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ deletionCommand st
+    arch    = ArchivedFlag True
   dep <- selectDeployment pgPool dName AllDeployments
   void . liftIO . forkIO $ do
     log $ "call " <> unwords (cmd : args)
-    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     void $ archiveDeployment pgPool dName
-    void $ createDeploymentLog pgPool dep "delete" ec $ ArchivedFlag True
+    void $ createDeploymentLog pgPool dep "delete" ec arch out err
     log $ "deployment deleted, name: " <> coerce dName
     sendReloadEvent st
     handleExitCode ec
@@ -373,14 +376,14 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
       void . liftIO . forkIO $ do
         void $ updateDeploymentNameAndTag pgPool dName dTag
         log $ "call " <> unwords (cmd : args)
-        ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+        (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
         log $ "deployment updated, name: "
           <> coerce dName <> ", tag: " <> coerce dTag
         void $ do
           let
             dep = Deployment dName dTag envPairs
             arch = ArchivedFlag False
-          createDeploymentLog pgPool dep "update" ec arch
+          createDeploymentLog pgPool dep "update" ec arch out err
         sendReloadEvent st
         handleExitCode ec
     _ ->
@@ -431,7 +434,8 @@ statusH dName = do
   void $ selectDeployment pgPool dName AllDeployments
   cmd <- checkingCommand <$> ask
   let args = [unpack . coerce $ dName]
-  ec <- liftIO $ withProcessWait (proc (unpack $ coerce cmd) args) waitProcess
+  (ec, out, err) <- liftIO $ runCommand (unpack $ coerce cmd) args
+  liftIO $ print out >> print err
   pure . DeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -456,7 +460,8 @@ cleanupDeployment dName st = do
     cmd     = coerce $ cleanupCommand st
   void . liftIO . forkIO $ do
     log $ "call " <> unwords (cmd : args)
-    ec <- withProcessWait (proc (unpack cmd) (unpack <$> args)) waitProcess
+    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+    print out >> print err
     void $ deleteDeploymentLogs pgPool dName
     void $ deleteDeployment pgPool dName
     log $ "deployment destroyed, name: " <> coerce dName
@@ -495,22 +500,39 @@ restoreH dName = do
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
   failIfImageNotFound $ tag dep
   void . liftIO . forkIO $ do
-    ec <- createDeployment dep st
+    (ec, out, err) <- createDeployment dep st
     let
       q =
         "UPDATE deployments SET archived = 'f', archived_at = null \
         \WHERE name = ?"
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
-    createDeploymentLog pgPool dep "restore" ec $ ArchivedFlag False
+    createDeploymentLog pgPool dep "restore" ec (ArchivedFlag False) out err
     sendReloadEvent st
     handleExitCode ec
   pure Success
 
-waitProcess :: (Show o, Show e) => Process i o e -> IO ExitCode
-waitProcess p = do
-  print . getStdout $ p
-  print . getStderr $ p
-  waitExitCode p
+getActionInfoH :: ActionId -> AppM ActionInfo
+getActionInfoH actionId = do
+  st <- ask
+  let
+    pgPool = pool st
+    actionId' = Only . unActionId $ actionId
+    q = "SELECT stdout, stderr FROM deployment_logs WHERE id = ?"
+  rows :: [(Text, Text)] <- liftIO $
+    withResource pgPool (\conn -> query conn q actionId')
+  case rows of
+    (out, err) : _ -> pure $ ActionInfo out err
+    _              ->
+      throwError err400 { errBody = appError "action not found" }
+
+runCommand :: FilePath -> [String] -> IO (ExitCode, Stdout, Stderr)
+runCommand cmd args = do
+  let proc' c a = setStdout createPipe . setStderr createPipe $ proc c a
+  withProcessWait (proc' cmd args) $ \p -> do
+    ec <- waitExitCode p
+    out <- hGetContents . getStdout $ p
+    err <- hGetContents . getStderr $ p
+    pure (ec, Stdout out, Stderr err)
 
 handleExitCode :: ExitCode -> IO ()
 handleExitCode ExitSuccess     = return ()
@@ -522,22 +544,33 @@ createDeploymentLog
   -> Action
   -> ExitCode
   -> ArchivedFlag
+  -> Stdout
+  -> Stderr
   -> IO ()
-createDeploymentLog pgPool (Deployment dName dTag dEnvs) act ec arch = do
+createDeploymentLog pgPool dep act ec arch out err = do
   let
+    (Deployment dName dTag dEnvs) = dep
+    rawEnvs = formatEnvPairs dEnvs
     exitCode' = case ec of
-      ExitSuccess     -> 0
-      ExitFailure err -> err
+      ExitSuccess         -> 0
+      ExitFailure errCode -> errCode
     arch' = unArchivedFlag arch
+    dur' :: Int
+    dur' = 0
+    out' = unStdout out
+    err' = unStderr err
     q =
       "INSERT INTO deployment_logs \
-      \(deployment_id, action, tag, envs, exit_code, archived) (\
-        \SELECT id, ?, ?, ?, ?, ? \
+      \(deployment_id, action, tag, envs, exit_code, archived, \
+      \duration, stdout, stderr) \
+      \(\
+        \SELECT id, ?, ?, ?, ?, ?, ?, ?, ? \
         \FROM deployments \
         \WHERE name = ? \
       \)"
   void $ withResource pgPool $ \conn ->
-    execute conn q (act, dTag, formatEnvPairs dEnvs, exitCode', arch', dName)
+    execute conn q
+      (act, dTag, rawEnvs, exitCode', arch', dur', out', err', dName)
 
 failIfImageNotFound :: DeploymentTag -> AppM ()
 failIfImageNotFound dTag = do

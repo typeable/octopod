@@ -15,7 +15,7 @@ type EnvPairs = [EnvPair]
 
 newtype DeploymentName = DeploymentName { unDeploymentName :: Text }
   deriving
-    ( Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
+    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
 newtype DeploymentTag = DeploymentTag { unDeploymentTag :: Text }
   deriving
@@ -25,6 +25,9 @@ newtype Action = Action { unAction :: Text }
   deriving (Show, FromJSON, ToJSON, IsString)
 
 newtype ArchivedFlag = ArchivedFlag { unArchivedFlag :: Bool }
+  deriving (Show, FromJSON, ToJSON)
+
+newtype Duration = Duration { unDuration :: Int }
   deriving (Show, FromJSON, ToJSON)
 
 newtype ProjectName = ProjectName { uProjectName :: Text }
@@ -43,6 +46,7 @@ data DeploymentLog = DeploymentLog
   , deploymentTag  :: DeploymentTag
   , deploymentEnvs :: EnvPairs
   , exitCode       :: Int
+  , duration       :: Duration
   , createdAt      :: Int
   }
   deriving (Generic, Show)
@@ -95,3 +99,21 @@ data CommandResponse
 data WSEvent = FrontendPleaseUpdateEverything
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake WSEvent
+
+newtype ActionId = ActionId { unActionId :: Int }
+  deriving
+    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
+
+newtype Stdout = Stdout { unStdout :: Text }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake Stdout
+
+newtype Stderr = Stderr { unStderr :: Text }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake Stderr
+
+data ActionInfo = ActionInfo
+  { stdout :: Text
+  , stderr :: Text }
+  deriving (Generic, Show)
+  deriving (FromJSON, ToJSON) via Snake ActionInfo

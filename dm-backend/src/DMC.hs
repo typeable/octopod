@@ -188,6 +188,8 @@ cleanupH :: DeploymentName -> ClientM CommandResponse
 
 restoreH :: DeploymentName -> ClientM CommandResponse
 
+_getActionInfoH :: ActionId -> ClientM ActionInfo
+
 _pingH :: ClientM NoContent
 
 cleanArchiveH :: ClientM CommandResponse
@@ -204,6 +206,7 @@ _projectName :: ClientM ProjectName
   :<|> _statusH
   :<|> cleanupH
   :<|> restoreH)
+    :<|> _getActionInfoH
     :<|> _pingH
     :<|> cleanArchiveH
     :<|> _projectName = client (Proxy @API)
