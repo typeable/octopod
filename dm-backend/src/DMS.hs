@@ -31,6 +31,7 @@ import           System.Log.FastLogger
 import           System.Process.Typed
 
 
+import           API
 import           Common.API
 import           DMS.Args
 import           DMS.AWS
@@ -419,7 +420,6 @@ pingH = do
   pgPool <- pool <$> ask
   _ :: [Only Int] <- liftIO $ withResource pgPool $ \conn ->
     query_ conn "SELECT 1"
-  sendReloadEvent
   pure NoContent
 
 projectNameH :: AppM ProjectName
