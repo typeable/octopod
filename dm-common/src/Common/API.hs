@@ -23,6 +23,9 @@ type CleanupEndpoint c =
 type RestoreEndpoint c =
   c :> "restore" :> Patch '[JSON] CommandResponse
 
+type GetActionInfoEndpoint =
+  "log" :> Capture "action_id" ActionId :> Get '[JSON] ActionInfo
+
 type PingEndpoint =
   "ping" :> GetNoContent '[PlainText] NoContent
 type CleanArchiveEndpoint =
@@ -45,6 +48,7 @@ type DeploymentAPI' c =
       :<|> CleanupEndpoint c
       :<|> RestoreEndpoint c
       )
+    :<|> GetActionInfoEndpoint
     :<|> PingEndpoint
     :<|> CleanArchiveEndpoint
     :<|> ProjectNameEndpoint
