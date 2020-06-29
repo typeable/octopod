@@ -1,6 +1,8 @@
 { sources ? import ./sources.nix
 , b2b-helm-pkgs ? import ../b2b-helm { }
 
+, dm-css ? ../dm-css
+
 , migrations ? "please use '--arg migration <value>'"
 , server-cert ? "please use '--arg server-cert <value>'"
 , server-key ? "please use '--arg server-key <value>'"
@@ -15,6 +17,7 @@ with {
   overlay = _: pkgs:
     with pkgs; rec {
       dm-backend = haskellPackages.dm-backend-static;
+      dm-frontend = haskellPackages.dm-frontend-static;
 
       cacert' = cacert.overrideAttrs (o: {
         fixupPhase = ''
@@ -24,8 +27,18 @@ with {
 
       dms-container = dockerTools.buildImage {
         name = "dms-container-slim";
-        contents =
-          [ dm-backend git b2b-helm-tool kubernetes-helm2-bin kubectl coreutils bash openssh gnugrep cacert' ];
+        contents = [
+          dm-backend
+          dm-frontend
+          git
+          b2b-helm-tool
+          kubernetes-helm2-bin
+          kubectl
+          coreutils
+          bash
+          openssh
+          gnugrep
+          cacert' ];
 
         runAsRoot = ''
           mkdir /tmp
@@ -55,6 +68,10 @@ with {
           mkdir -p /usr/local/bin
           cp ${kubernetes-helm2-bin}/helm /usr/local/bin/
           chmod +x /usr/local/bin/helm
+
+          mkdir -p /www/static/styles
+          cp -av ${dm-frontend}/bin/frontend.jsexe/* /www/
+          cp -av ${dm-css}/production/styles/style.css /www/static/styles/
         '';
 
         config = {
@@ -115,6 +132,9 @@ with {
 
           dm-backend-static = haskell.lib.justStaticExecutables
             (hsuper.callPackage ../default.nix { }).ghc.dm-backend;
+
+          dm-frontend-static = haskell.lib.justStaticExecutables
+            (hsuper.callPackage ../default.nix { }).ghcjs.dm-frontend;
         };
       };
     };
