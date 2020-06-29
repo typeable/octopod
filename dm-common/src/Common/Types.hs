@@ -15,7 +15,7 @@ type EnvPairs = [EnvPair]
 
 newtype DeploymentName = DeploymentName { unDeploymentName :: Text }
   deriving
-    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
+    ( Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq, Ord)
 
 newtype DeploymentTag = DeploymentTag { unDeploymentTag :: Text }
   deriving
@@ -79,11 +79,11 @@ data DeploymentUpdate = DeploymentUpdate
 data Status
   = Ok
   | Error
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake Status
 
 newtype DeploymentStatus = DeploymentStatus { status :: Status }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 
 data CommandResponse

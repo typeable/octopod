@@ -45,6 +45,7 @@ executable frontend
                      , OverloadedStrings
                      , ScopedTypeVariables
                      , StandaloneDeriving
+                     , TupleSections
                      , TypeApplications
                      , TypeOperators
                      , MonoLocalBinds
