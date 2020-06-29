@@ -7,8 +7,8 @@ import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
-import Data.Map as M (Map, fromList, partition, toList)
-import Data.Text as T (pack)
+import Data.Map as M (Map, fromList, partition, toList, filter)
+import Data.Text as T (Text, pack, toCaseFold, isPrefixOf)
 import Data.Time
 import Data.Time.Clock.POSIX
 import Obelisk.Route.Frontend
@@ -56,43 +56,44 @@ deploymentsWidget
   => m ()
 deploymentsWidget = do
   showNewStagingEv <- deploymentsWidgetWrapper $ mdo
-    showNewStagingEv' <- deploymentsHeadWidget
-    initDeploymentsListWidget
+    (showNewStagingEv', termDyn) <- deploymentsHeadWidget
+    initDeploymentsListWidget termDyn
     pure showNewStagingEv'
   void $ newStagingPopup showNewStagingEv never
 
-deploymentsHeadWidget :: MonadWidget t m => m (Event t ())
+deploymentsHeadWidget :: MonadWidget t m => m (Event t (), Dynamic t Text)
 deploymentsHeadWidget =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
     divClass "page__note" $ text "Updated <n> mins ago"
-    divClass "page__search input input--search input--has-clear-type" $ do
-      _search <- inputElement $ def
+    termDyn <- divClass "page__search input input--search input--has-clear-type" $ mdo
+      termDyn' <- inputElement $ def
         & initialAttributes .~
           (  "type" =: "text"
           <> "class" =: "input__widget"
           <> "placeholder" =: "Search for stagings" )
-      (_, _delete) <- elClass' "button" "input__clear-type spot spot--cancel" $
+        & inputElementConfig_setValue .~ ("" <$ domEvent Click deleteEl)
+      (deleteEl, _) <- elClass' "button" "input__clear-type spot spot--cancel" $
         text "Delete"
-      blank
-    (nsEl, _) <- elClass' "a" "page__add-staging button button--add popup-handler" $
-      text "New staging"
-    pure $ domEvent Click nsEl
+      pure termDyn'
+    (nsEl, _) <- elClass' "a"
+      "page__add-staging button button--add popup-handler" $ text "New staging"
+    pure $ (domEvent Click nsEl, value termDyn)
 
 initDeploymentsListWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => m ()
-initDeploymentsListWidget = dataWidgetWrapper $ do
+  => Dynamic t Text -> m ()
+initDeploymentsListWidget termDyn = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
     okEv = fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
   widgetHold_ loadingDeploymentsWidget $ leftmost
-    [ deploymentsListWidget <$> okEv
+    [ deploymentsListWidget termDyn <$> okEv
     , errDeploymentsWidget <$ errEv ]
 
 wsUpdate :: forall t m . MonadWidget t m => m (Event t ())
@@ -112,8 +113,10 @@ deploymentsListWidget
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => [DeploymentFullInfo] -> m ()
-deploymentsListWidget ds = mdo
+  => Dynamic t Text
+  -> [DeploymentFullInfo]
+  -> m ()
+deploymentsListWidget termDyn ds = mdo
   updAllEv <- wsUpdate
   updRespEv <- listEndpoint updAllEv
   let
@@ -124,15 +127,28 @@ deploymentsListWidget ds = mdo
     pb <- getPostBuild
     respEv <- statusEndpoint (constDyn $ Right k) $ leftmost [pb, () <$ updated d]
     let stEv = fmapMaybe reqSuccess respEv
-    pure $ (, stEv) <$> d
+    stDyn <- holdDyn Nothing $ Just <$>  stEv
+    pure $ (, stDyn) <$> d
   let dswstDyn = flatDynMapDyn stsDyn
   let
     isArchived = view (_1 . field @"archived")
+    filteredDyn = ffor2 termDyn dswstDyn $ \term dswst ->
+      M.filter (searchDeployments term . fst) dswst
     (archivedDsDyn, activeDsDyn) = splitDynPure $ M.partition isArchived
-      <$> dswstDyn
+      <$> filteredDyn
   clickedEv <- elementClick
   activeDeploymentsWidget clickedEv activeDsDyn
   archivedDeploymentsWidget clickedEv archivedDsDyn
+
+searchDeployments
+  :: Text -> DeploymentFullInfo -> Bool
+searchDeployments "" _   = True
+searchDeployments term d = term' `isPrefixOf` dname
+  || term' `isPrefixOf` dtag
+  where
+    term' = toCaseFold term
+    dtag = d ^. field @"deployment" . field @"tag" . coerced . to toCaseFold
+    dname = d ^. field @"deployment" . field @"name" . coerced . to toCaseFold
 
 flatDynMapDyn
   :: (Reflex t, Ord k)
@@ -150,7 +166,8 @@ activeDeploymentsWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t
-    (Map DeploymentName (DeploymentFullInfo, Event t DeploymentStatus))
+    (Map DeploymentName
+      (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus)))
   -> m ()
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
@@ -161,16 +178,14 @@ activeDeploymentsWidget clickedEv dsDyn =
         False -> void $ listWithKey dsDyn (activeDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
-statusWidget :: MonadWidget t m => Event t DeploymentStatus -> m ()
-statusWidget dsEv = do
-  let
-    loadingW = divClass "loading loading--status-alike" $ text "Loading"
-  mdsDyn <- holdDyn Nothing $ Just <$> dsEv
-  mdsDyn' <- holdUniqDyn mdsDyn
-  let uniqEv = fmapMaybe id $ updated mdsDyn'
-  widgetHold_ loadingW $ status <$> uniqEv <&> \case
-    CT.Ok -> divClass "status status--success" $ text "Success"
-    CT.Error -> divClass "status status--failure" $ text "Failure"
+statusWidget :: MonadWidget t m => Dynamic t (Maybe DeploymentStatus) -> m ()
+statusWidget stDyn = do
+  stDyn' <- holdUniqDyn stDyn
+  dyn_ $ stDyn' <&> \case
+    Nothing -> divClass "loading loading--status-alike" $ text "Loading"
+    Just st -> case status st of
+      CT.Ok -> divClass "status status--success" $ text "Success"
+      CT.Error -> divClass "status status--failure" $ text "Failure"
 
 activeDeploymentWidget
   ::
@@ -179,16 +194,16 @@ activeDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
-  -> Dynamic t (DeploymentFullInfo, Event t DeploymentStatus)
+  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus))
   -> m ()
 activeDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
-  let wstDyn = switchDyn $ snd <$> dDyn'
+  let stDyn = join $ snd <$> dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     (linkEl, _) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
-        statusWidget wstDyn
+        statusWidget stDyn
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
@@ -232,7 +247,8 @@ archivedDeploymentsWidget
   :: MonadWidget t m
   => Event t ClickedElement
   -> Dynamic t
-    (Map DeploymentName (DeploymentFullInfo, Event t DeploymentStatus))
+    (Map DeploymentName
+      (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus)))
   -> m ()
 archivedDeploymentsWidget clickedEv dsDyn = do
   showDyn <- toggleButton
@@ -268,7 +284,7 @@ tableHeader = do
 archivedDeploymentWidget
   :: MonadWidget t m
   => Event t ClickedElement
-  -> Dynamic t (DeploymentFullInfo, Event t DeploymentStatus)
+  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus))
   -> m ()
 archivedDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
