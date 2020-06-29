@@ -23,22 +23,22 @@ apiClients = clientWithOpts
   (Proxy @API)
   (Proxy @m)
   (Proxy @())
-#ifdef DEVELOPMENT
-  (constDyn $ SR.BaseFullUrl SR.Https "dm-genfly-app.stage.thebestagent.pro" 443 "/")
-#else
-  (constDyn $ SR.BasePath "/")
-#endif
+  (constDyn host)
   tweakRequest
   where
     tweakRequest = ClientOptions $ \req ->
-#ifdef DEVELOPMENT
       pure $ req
         & xhrRequest_config
         . xhrRequestConfig_headers
-        . at "Authorization" ?~ "Basic dWk6cVoxZGRKMHZpWkRMbXlKaG5JNVh1QnZMQnZ3MkMwUVBqOTRaZ0VwOQ=="
+        . at "Authorization" ?~ auth
+#ifdef DEVELOPMENT
+    host = SR.BaseFullUrl SR.Https "dm-genfly-app.stage.thebestagent.pro" 443 "/"
+    auth = "Basic dWk6cVoxZGRKMHZpWkRMbXlKaG5JNVh1QnZMQnZ3MkMwUVBqOTRaZ0VwOQ=="
 #else
-      pure req
+    host = SR.BaseFullUrl SR.Https "dm-genfly-app.stage.thebestagent.pro" 443 "/"
+    auth = "Basic dWk6cVoxZGRKMHZpWkRMbXlKaG5JNVh1QnZMQnZ3MkMwUVBqOTRaZ0VwOQ=="
 #endif
+
 
 listEndpoint
   :: MonadWidget t m
@@ -91,6 +91,11 @@ restoreEndpoint
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
   -> m (Event t (ReqResult () CommandResponse))
+getActionInfoEndpoint
+  :: MonadWidget t m
+  => Dynamic t (Either Text ActionId)
+  -> Event t ()
+  -> m (Event t (ReqResult () ActionInfo))
 pingEndpoint
   :: MonadWidget t m
   => Event t ()
@@ -113,6 +118,7 @@ projectName
   :<|> statusEndpoint
   :<|> cleanupEndpoint
   :<|> restoreEndpoint)
+  :<|> getActionInfoEndpoint
   :<|> pingEndpoint
   :<|> cleanArchiveEndpoint
   :<|> projectName = apiClients
