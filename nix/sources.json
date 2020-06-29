@@ -35,6 +35,18 @@
         "url": "https://github.com/NixOS/nixpkgs/archive/3eea039a964ecefbc657498b3829dfa19727f069.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "obelisk": {
+        "branch": "master",
+        "description": "Functional reactive web and mobile applications, with batteries included.",
+        "homepage": "https://reflex-frp.org",
+        "owner": "obsidiansystems",
+        "repo": "obelisk",
+        "rev": "4f2d3f1c1312d833ae814b7a86cf7b65ea0614ec",
+        "sha256": "1shk8yy5pbakcw8aq6b8s3g2xblzf24l78mq0ca0asnvifnp83yb",
+        "type": "tarball",
+        "url": "https://github.com/obsidiansystems/obelisk/archive/4f2d3f1c1312d833ae814b7a86cf7b65ea0614ec.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "servant-reflex": {
         "branch": "master",
         "description": "Generate reflex client functions for querying a servant API",

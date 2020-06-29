@@ -22,6 +22,9 @@
     amazonka-test = hsuper.callPackage nix/amazonka-test-1.6.1.nix {};
     deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
     servant-reflex = hsuper.callCabal2nix "servant-reflex" sources.servant-reflex { };
+    tabulation = hsuper.callCabal2nix "tabulation" "${sources.obelisk}/lib/tabulation" { };
+    obelisk-executable-config-lookup = hsuper.callCabal2nix "obelisk-executable-config-lookup" "${sources.obelisk}/lib/executable-config/lookup" { };
+    obelisk-route = hsuper.callCabal2nix "obelisk-route" "${sources.obelisk}/lib/route" { };
     servant = pkgs.haskell.lib.overrideCabal hsuper.servant (old: {
       postInstall = "";
     });

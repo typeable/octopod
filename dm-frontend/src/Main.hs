@@ -1,14 +1,27 @@
 module Main where
 
+import Obelisk.Route.Frontend
 import Reflex.Dom
 
+import Frontend.Route
 import Page.Deployments
-
 
 main :: IO ()
 main = mainWidgetWithHead headWidget $
-  deploymentsPage
+  routeWidget
 
+routeWidget :: MonadWidget t m => m ()
+routeWidget = do
+  let Right encoder = checkEncoder routeEncoder
+  pb <- getPostBuild
+  runRouteViewT encoder pb True $ mdo
+    subRoute_ $ \case
+      DashboardRoute -> do
+        r <- askRoute
+        dyn_ $ ffor r $ \case
+          Nothing -> deploymentsPage
+          Just _  -> blank
+    blank
 
 headWidget :: DomBuilder t m => m ()
 headWidget = do

@@ -11,15 +11,22 @@ import Data.Map as M (Map, fromList, partition, toList)
 import Data.Text as T (pack)
 import Data.Time
 import Data.Time.Clock.POSIX
+import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
 
 import Common.Types as CT
 import Frontend.API
+import Frontend.Route
 import Page.NewStagingPopup
 import Page.Utils
 
-deploymentsPage :: MonadWidget t m => m ()
+deploymentsPage
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
+  => m ()
 deploymentsPage = do
   headWidget
   deploymentsWidget
@@ -41,7 +48,12 @@ deploymentsWidgetWrapper m =
   divClass "page" $
     divClass "page__wrap container" m
 
-deploymentsWidget :: forall t m . MonadWidget t m => m ()
+deploymentsWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
+  => m ()
 deploymentsWidget = do
   showNewStagingEv <- deploymentsWidgetWrapper $ mdo
     showNewStagingEv' <- deploymentsHeadWidget
@@ -67,7 +79,12 @@ deploymentsHeadWidget =
       text "New staging"
     pure $ domEvent Click nsEl
 
-initDeploymentsListWidget :: forall t m . MonadWidget t m => m ()
+initDeploymentsListWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
+  => m ()
 initDeploymentsListWidget = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
@@ -90,7 +107,12 @@ wsUpdate = do
   ws <- webSocket "wss://dm-genfly-ws.stage.thebestagent.pro/event" wsConfig
   pure $ () <$ _webSocket_recv ws
 
-deploymentsListWidget :: forall t m . MonadWidget t m => [DeploymentFullInfo] -> m ()
+deploymentsListWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
+  => [DeploymentFullInfo] -> m ()
 deploymentsListWidget ds = mdo
   updAllEv <- wsUpdate
   updRespEv <- listEndpoint updAllEv
@@ -122,7 +144,10 @@ flatDynMapDyn x =
     f (k, d) = (k,) <$> d
 
 activeDeploymentsWidget
-  :: MonadWidget t m
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t
     (Map DeploymentName (DeploymentFullInfo, Event t DeploymentStatus))
@@ -148,7 +173,10 @@ statusWidget dsEv = do
     CT.Error -> divClass "status status--failure" $ text "Failure"
 
 activeDeploymentWidget
-  :: MonadWidget t m
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
   -> Dynamic t (DeploymentFullInfo, Event t DeploymentStatus)
@@ -157,7 +185,7 @@ activeDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
   let wstDyn = switchDyn $ snd <$> dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
-    el "tr" $ do
+    (linkEl, _) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
         statusWidget wstDyn
@@ -197,6 +225,8 @@ activeDeploymentWidget clickedEv dname dDyn' = do
               (  "class" =: "action action--delete"
               <> "type" =: "button") $ text "Move to archive"
         dropdownWidget' clickedEv btn body
+    let route = DashboardRoute :/ Just dname
+    setRoute $ route <$ domEvent Click linkEl
 
 archivedDeploymentsWidget
   :: MonadWidget t m

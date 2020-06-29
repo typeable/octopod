@@ -25,6 +25,7 @@ executable frontend
     cpp-options:       -DDEVELOPMENT
   main-is:             Main.hs
   other-modules:       Frontend.API
+                     , Frontend.Route
                      , Page.Deployments
                      , Page.NewStagingPopup
                      , Page.Utils
@@ -39,6 +40,7 @@ executable frontend
                      , DeriveGeneric
                      , DerivingVia
                      , DuplicateRecordFields
+                     , GADTs
                      , FlexibleContexts
                      , GeneralizedNewtypeDeriving
                      , LambdaCase
@@ -56,11 +58,13 @@ executable frontend
                      , base >=4.12 && <4.13
                      , bytestring
                      , containers
+                     , dependent-sum
                      , dm-common
                      , generic-lens
                      , ghcjs-dom
                      , jsaddle
                      , lens
+                     , obelisk-route
                      , reflex-dom
                      , reflex-dom-helpers
                      , regex-tdfa
