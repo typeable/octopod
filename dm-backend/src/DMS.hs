@@ -1,6 +1,7 @@
 module DMS (runDMS) where
 
 
+import           Chronos (Time, getTime, now)
 import           Control.Applicative
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.Async (race_)
@@ -178,6 +179,7 @@ listH = do
 
 createH :: Deployment -> AppM CommandResponse
 createH dep = do
+  t1 <- liftIO $ now
   st <- ask
   let
     pgPool                                                 = pool st
@@ -199,7 +201,11 @@ createH dep = do
       throwError err409 { errBody = appError "some database error" }
   void . liftIO . forkIO $ do
     (ec, out, err) <- createDeployment dep st
-    createDeploymentLog pgPool dep "create" ec (ArchivedFlag False) out err
+    t2 <- now
+    let
+      arch   = ArchivedFlag False
+      elTime = elapsedTime t2 t1
+    createDeploymentLog pgPool dep "create" ec arch elTime out err
     sendReloadEvent st
     handleExitCode ec
   pure Success
@@ -278,6 +284,7 @@ selectDeployment p dName lType = do
 
 editH :: DeploymentName -> EnvPairs -> AppM CommandResponse
 editH dName dEnvs = do
+  t1 <- liftIO $ now
   st <- ask
   let
     log :: Text -> IO ()
@@ -302,7 +309,11 @@ editH dName dEnvs = do
           $ "deployment edited, name: " <> coerce dName
           <> ", envs: " <> formatEnvPairs dEnvs
         let dep = Deployment dName dTag dEnvs
-        createDeploymentLog pgPool dep "edit" ec (ArchivedFlag False) out err
+        t2 <- now
+        let
+          arch   = ArchivedFlag False
+          elTime = elapsedTime t2 t1
+        createDeploymentLog pgPool dep "edit" ec arch elTime out err
         sendReloadEvent st
         handleExitCode ec
     _     ->
@@ -321,6 +332,7 @@ editH dName dEnvs = do
 
 deleteH :: DeploymentName -> AppM CommandResponse
 deleteH dName = do
+  t1 <- liftIO $ now
   st <- ask
   let
     log     = logInfo (logger st)
@@ -337,7 +349,9 @@ deleteH dName = do
     log $ "call " <> unwords (cmd : args)
     (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     void $ archiveDeployment pgPool dName
-    void $ createDeploymentLog pgPool dep "delete" ec arch out err
+    t2 <- now
+    let elTime = elapsedTime t2 t1
+    void $ createDeploymentLog pgPool dep "delete" ec arch elTime out err
     log $ "deployment deleted, name: " <> coerce dName
     sendReloadEvent st
     handleExitCode ec
@@ -354,6 +368,7 @@ archiveDeployment p dName = withResource p $ \conn -> do
 
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
+  t1 <- liftIO $ now
   st <- ask
   let pgPool = pool st
   retrieved <- liftIO $ selectEnvPairs pgPool dName
@@ -380,10 +395,12 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
         log $ "deployment updated, name: "
           <> coerce dName <> ", tag: " <> coerce dTag
         void $ do
+          t2 <- now
           let
-            dep = Deployment dName dTag envPairs
-            arch = ArchivedFlag False
-          createDeploymentLog pgPool dep "update" ec arch out err
+            dep    = Deployment dName dTag envPairs
+            arch   = ArchivedFlag False
+            elTime = elapsedTime t2 t1
+          createDeploymentLog pgPool dep "update" ec arch elTime out err
         sendReloadEvent st
         handleExitCode ec
     _ ->
@@ -495,6 +512,7 @@ cleanArchiveH = do
 
 restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
+  t1 <- liftIO $ now
   st <- ask
   let pgPool  = pool st
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
@@ -506,7 +524,11 @@ restoreH dName = do
         "UPDATE deployments SET archived = 'f', archived_at = null \
         \WHERE name = ?"
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
-    createDeploymentLog pgPool dep "restore" ec (ArchivedFlag False) out err
+    t2 <- now
+    let
+      arch   = ArchivedFlag False
+      elTime = elapsedTime t2 t1
+    createDeploymentLog pgPool dep "restore" ec arch elTime out err
     sendReloadEvent st
     handleExitCode ec
   pure Success
@@ -544,22 +566,23 @@ createDeploymentLog
   -> Action
   -> ExitCode
   -> ArchivedFlag
+  -> Duration
   -> Stdout
   -> Stderr
   -> IO ()
-createDeploymentLog pgPool dep act ec arch out err = do
+createDeploymentLog pgPool dep act ec arch dur out err = do
   let
     (Deployment dName dTag dEnvs) = dep
-    rawEnvs = formatEnvPairs dEnvs
-    exitCode' = case ec of
-      ExitSuccess         -> 0
-      ExitFailure errCode -> errCode
-    arch' = unArchivedFlag arch
-    dur' :: Int
-    dur' = 0
-    out' = unStdout out
-    err' = unStderr err
-    q =
+    rawEnvs                       = formatEnvPairs dEnvs
+    exitCode'                     =
+      case ec of
+        ExitSuccess         -> 0
+        ExitFailure errCode -> errCode
+    arch'                         = unArchivedFlag arch
+    dur'                          = unDuration dur
+    out'                          = unStdout out
+    err'                          = unStderr err
+    q                             =
       "INSERT INTO deployment_logs \
       \(deployment_id, action, tag, envs, exit_code, archived, \
       \duration, stdout, stderr) \
@@ -590,6 +613,10 @@ validationError nameErrors tagErrors =
 sendReloadEvent :: AppState -> IO ()
 sendReloadEvent state =
   atomically $ writeTChan (eventSink state) FrontendPleaseUpdateEverything
+
+elapsedTime :: Time -> Time -> Duration
+elapsedTime t1 t2 =
+  Duration . fromIntegral . (`div` 1000000) . abs $ getTime t2 - getTime t1
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo l = logWithSeverity l "INFO"
