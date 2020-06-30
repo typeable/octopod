@@ -21,8 +21,8 @@ elementClick = do
 dropdownWidget
   :: MonadWidget t m
   => m ()
-  -> m ()
-  -> m ()
+  -> m (Event t a)
+  -> m (Event t a)
 dropdownWidget btn body = mdo
   clickedEl <- elementClick
   dropdownWidget' clickedEl btn body
@@ -31,8 +31,8 @@ dropdownWidget'
   :: MonadWidget t m
   => Event t ClickedElement
   -> m ()
-  -> m ()
-  -> m ()
+  -> m (Event t a)
+  -> m (Event t a)
 dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
     DOM.contains (_element_raw btnEl) clicked
@@ -42,10 +42,10 @@ dropdownWidget' clickedEl btn body = mdo
     wrapperClassDyn = ffor openedDyn $ \case
       True -> "drop drop--actions drop--expanded"
       False -> "drop drop--actions"
-  btnEl <- fmap fst $ elDynClass' "div" wrapperClassDyn $ do
+  (btnEl, wEv) <- elDynClass' "div" wrapperClassDyn $ do
     btn
     divClass "drop__dropdown" body
-  blank
+  pure wEv
 
 showT :: Show a => a -> Text
 showT = pack . show

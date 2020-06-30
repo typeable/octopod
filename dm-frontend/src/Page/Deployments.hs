@@ -18,8 +18,10 @@ import Servant.Reflex
 import Common.Types as CT
 import Frontend.API
 import Frontend.Route
+import Page.ClassicPopup
 import Page.NewStagingPopup
 import Page.Utils
+
 
 deploymentsPage
   ::
@@ -200,10 +202,12 @@ activeDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
   let stDyn = join $ snd <$> dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
-    (linkEl, _) <- el' "tr" $ do
-      el "td" $ do
+    el "tr" $ do
+      (linkEl, _) <- el' "td" $ do
         text $ coerce dname
         statusWidget stDyn
+      let route = DashboardRoute :/ Just dname
+      setRoute $ route <$ domEvent Click linkEl
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
@@ -233,15 +237,16 @@ activeDeploymentWidget clickedEv dname dDyn' = do
             <> "type" =: "button"
             <> "id" =: elId) $ text "Actions"
           body = do
-            elAttr "button"
-              (  "class" =: "action action--edit"
-              <> "type" =: "button") $ text "Edit"
-            elAttr "button"
-              (  "class" =: "action action--delete"
-              <> "type" =: "button") $ text "Move to archive"
-        dropdownWidget' clickedEv btn body
-    let route = DashboardRoute :/ Just dname
-    setRoute $ route <$ domEvent Click linkEl
+            _ <- buttonClass "action action--edit" "Edit"
+            btnArcEv <- buttonClass "action action--delete" "Move to archive"
+            pure btnArcEv
+        btnEv <- dropdownWidget' clickedEv btn body
+        delEv <- confirmDeletePopup btnEv $ do
+          text "Are you sure  you want to delete"
+          el "br" blank
+          text $ coerce dname <> " staging?"
+        void $ deleteEndpoint (constDyn $ Right $ dname) delEv
+        blank
 
 archivedDeploymentsWidget
   :: MonadWidget t m
@@ -317,7 +322,9 @@ archivedDeploymentWidget clickedEv dDyn' = do
             <> "id" =: elId) $ text "Actions"
           body = elAttr "button"
             (  "class" =: "action action--delete"
-            <> "type" =: "button") $ text "Restore from archive"
+            <> "type" =: "button") $ do
+              text "Restore from archive"
+              pure never
         dropdownWidget' clickedEv btn body
 
 intToUTCTime :: Int -> UTCTime
