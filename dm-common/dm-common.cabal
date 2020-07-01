@@ -19,6 +19,7 @@ library
   exposed-modules:     Common
                      , Common.API
                      , Common.Types
+                     , Common.Utils
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -39,6 +40,8 @@ library
                      , bytestring
                      , deriving-aeson
                      , http-api-data
+                     , generic-lens
+                     , lens
                      , servant
                      , text
   hs-source-dirs:      src

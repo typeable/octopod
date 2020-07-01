@@ -1,7 +1,10 @@
 module Page.Utils where
 
-import Data.Monoid
+import Data.Map        (Map)
+import Data.Proxy      (Proxy(..))
 import Data.Text
+import Data.Time
+import Data.Time.Clock.POSIX
 import Control.Lens
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
@@ -9,6 +12,8 @@ import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
+
+import Common.Types as CT
 
 newtype ClickedElement =
   ClickedElement { unClickedElement :: Maybe DOM.Element }
@@ -36,15 +41,17 @@ dropdownWidget'
 dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
     DOM.contains (_element_raw btnEl) clicked
-  openedDyn <- foldDyn switchState False clickInsideEv
+  openedDyn <- foldDyn switchState False
+    $ leftmost [ clickInsideEv, True <$ domEvent Click btnEl ]
   let
     switchState ev cur = ev && not cur
     wrapperClassDyn = ffor openedDyn $ \case
-      True -> "drop drop--actions drop--expanded"
-      False -> "drop drop--actions"
-  (btnEl, wEv) <- elDynClass' "div" wrapperClassDyn $ do
-    btn
-    divClass "drop__dropdown" body
+      True -> "class" =: "drop drop--actions drop--expanded"
+      False -> "class" =: "drop drop--actions"
+  (btnEl, wEv) <- elDynAttrWithStopPropagationEvent' Click
+    "div" wrapperClassDyn $ do
+      btn
+      divClass "drop__dropdown" body
   pure wEv
 
 showT :: Show a => a -> Text
@@ -78,19 +85,6 @@ popupOverlay :: DomBuilder t m => m ()
 popupOverlay =
   elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
 
--- Lens convenience helpers
-(<^.>) :: Functor f => f a -> Getting b a b -> f b
-(<^.>) fa l = fa <&> (^. l)
-
-(<^?>) :: Functor f => f a -> Getting (First b) a b -> f (Maybe b)
-(<^?>) fa l = fa <&> (^? l)
-
-(<^..>) :: Functor f => f a -> Getting (Endo [b]) a b -> f [b]
-(<^..>) fa t = fa <&> (^.. t)
-
-infixl 8 <^.>, <^..>, <^?>
-
-
 eventWriterWrapper :: (MonadWidget t m, Semigroup e) => (Event t e -> EventWriterT t e m ()) -> m (Event t e)
 eventWriterWrapper m = mdo
   (_, ev) <- runEventWriterT (m ev)
@@ -122,3 +116,62 @@ buttonClassEnabled cl lbl dDyn = do
         <> "type" =: "button" <> "disabled" =: ""
   (bEl, _) <- elDynAttr' "button" attrDyn $ text lbl
   return $ domEvent Click bEl
+
+intToUTCTime :: Int -> UTCTime
+intToUTCTime = posixSecondsToUTCTime . realToFrac
+
+elDynAttrWithPreventDefaultEvent'
+  :: forall a en m t. (DomBuilder t m, PostBuild t m)
+  => EventName en              -- ^ Event on the element to configure with 'preventDefault'
+  -> Text                      -- ^ Element tag
+  -> Dynamic t (Map Text Text) -- ^ Element attributes
+  -> m a                       -- ^ Child of element
+  -> m (R.Element EventResult (DomBuilderSpace m) t, a) -- An element and the result of the child
+elDynAttrWithPreventDefaultEvent' ev = elDynAttrWithModifyConfig'
+  (\elCfg -> elCfg & elementConfig_eventSpec %~
+    addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) ev (const preventDefault))
+
+elDynAttrWithStopPropagationEvent'
+  :: forall a en m t. (DomBuilder t m, PostBuild t m)
+  => EventName en              -- ^ Event on the element to configure with 'preventDefault'
+  -> Text                      -- ^ Element tag
+  -> Dynamic t (Map Text Text) -- ^ Element attributes
+  -> m a                       -- ^ Child of element
+  -> m (R.Element EventResult (DomBuilderSpace m) t, a) -- An element and the result of the child
+elDynAttrWithStopPropagationEvent' ev = elDynAttrWithModifyConfig'
+  (\elCfg -> elCfg & elementConfig_eventSpec %~
+    addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) ev (const stopPropagation))
+
+elDynAttrWithModifyConfig'
+  :: (DomBuilder t m, PostBuild t m)
+  => (ElementConfig EventResult t (DomBuilderSpace m) -> ElementConfig EventResult t (DomBuilderSpace m))
+  -> Text
+  -> Dynamic t (Map Text Text)
+  -> m a
+  -> m (R.Element EventResult (DomBuilderSpace m) t, a)
+elDynAttrWithModifyConfig' f elementTag attrs child = do
+  modifyAttrs <- dynamicAttributesToModifyAttributes attrs
+  let cfg = def & modifyAttributes .~ fmapCheap mapKeysToAttributeName modifyAttrs
+  result <- R.element elementTag (f cfg) child
+  postBuild <- getPostBuild
+  notReadyUntil postBuild
+  pure result
+
+formatPosixToDate :: Int -> Text
+formatPosixToDate = pack
+  . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
+  . intToUTCTime
+
+formatPosixToDateTime :: Int -> Text
+formatPosixToDateTime = pack
+  . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
+  . intToUTCTime
+
+statusWidget :: MonadWidget t m => Dynamic t (Maybe DeploymentStatus) -> m ()
+statusWidget stDyn = do
+  stDyn' <- holdUniqDyn stDyn
+  dyn_ $ stDyn' <&> \case
+    Nothing -> divClass "loading loading--status-alike" $ text "Loading"
+    Just st -> case status st of
+      CT.Ok -> divClass "status status--success" $ text "Success"
+      CT.Error -> divClass "status status--failure" $ text "Failure"

@@ -27,6 +27,7 @@ executable frontend
   other-modules:       Frontend.API
                      , Frontend.Route
                      , Page.ClassicPopup
+                     , Page.Deployment
                      , Page.Deployments
                      , Page.NewStagingPopup
                      , Page.Utils

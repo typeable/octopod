@@ -3,19 +3,17 @@ module Page.Deployments
 
 import Control.Lens
 import Control.Monad
-import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
 import Data.Map as M (Map, fromList, partition, toList, filter)
-import Data.Text as T (Text, pack, toCaseFold, isPrefixOf)
-import Data.Time
-import Data.Time.Clock.POSIX
+import Data.Text as T (Text, toCaseFold, isPrefixOf)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
 
 import Common.Types as CT
+import Common.Utils
 import Frontend.API
 import Frontend.Route
 import Page.ClassicPopup
@@ -28,22 +26,9 @@ deploymentsPage
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => m ()
-deploymentsPage = do
-  headWidget
-  deploymentsWidget
-
-headWidget :: MonadWidget t m => m ()
-headWidget =
-  elClass "header" "header" $
-    divClass "header__wrap container" $ do
-      elClass "b" "header__logo" $
-        text "Deployment Manager"
-      elClass "div" "header__project" $ do
-        pb <- getPostBuild
-        respEv <- projectName pb
-        nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
-        dynText nameDyn
+  => Event t ()
+  -> m ()
+deploymentsPage = deploymentsWidget
 
 deploymentsWidgetWrapper :: MonadWidget t m => m a -> m a
 deploymentsWidgetWrapper m =
@@ -55,11 +40,12 @@ deploymentsWidget
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => m ()
-deploymentsWidget = do
+  => Event t ()
+  -> m ()
+deploymentsWidget updAllEv = do
   showNewStagingEv <- deploymentsWidgetWrapper $ mdo
     (showNewStagingEv', termDyn) <- deploymentsHeadWidget
-    initDeploymentsListWidget termDyn
+    initDeploymentsListWidget updAllEv termDyn
     pure showNewStagingEv'
   void $ newStagingPopup showNewStagingEv never
 
@@ -68,7 +54,7 @@ deploymentsHeadWidget =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
     divClass "page__note" $ text "Updated <n> mins ago"
-    termDyn <- divClass "page__search input input--search input--has-clear-type" $ mdo
+    termDyn <- divClass "page__action input input--search input--has-clear-type page__action--search" $ mdo
       termDyn' <- inputElement $ def
         & initialAttributes .~
           (  "type" =: "text"
@@ -79,7 +65,7 @@ deploymentsHeadWidget =
         text "Delete"
       pure termDyn'
     (nsEl, _) <- elClass' "a"
-      "page__add-staging button button--add popup-handler" $ text "New staging"
+      "page__action button button--add popup-handler" $ text "New staging"
     pure $ (domEvent Click nsEl, value termDyn)
 
 initDeploymentsListWidget
@@ -87,47 +73,38 @@ initDeploymentsListWidget
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => Dynamic t Text -> m ()
-initDeploymentsListWidget termDyn = dataWidgetWrapper $ do
+  => Event t ()
+  -> Dynamic t Text
+  -> m ()
+initDeploymentsListWidget updAllEv termDyn = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
     okEv = fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
   widgetHold_ loadingDeploymentsWidget $ leftmost
-    [ deploymentsListWidget termDyn <$> okEv
+    [ deploymentsListWidget updAllEv termDyn <$> okEv
     , errDeploymentsWidget <$ errEv ]
-
-wsUpdate :: forall t m . MonadWidget t m => m (Event t ())
-wsUpdate = do
-  let
-    wsConfig = WebSocketConfig
-      { _webSocketConfig_send = (never :: Event t [ByteString])
-      , _webSocketConfig_close = never
-      , _webSocketConfig_reconnect = True
-      , _webSocketConfig_protocols = []
-      }
-  ws <- webSocket "wss://dm-genfly-ws.stage.thebestagent.pro/event" wsConfig
-  pure $ () <$ _webSocket_recv ws
 
 deploymentsListWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
-  => Dynamic t Text
+  => Event t ()
+  -> Dynamic t Text
   -> [DeploymentFullInfo]
   -> m ()
-deploymentsListWidget termDyn ds = mdo
-  updAllEv <- wsUpdate
+deploymentsListWidget updAllEv termDyn ds = mdo
   updRespEv <- listEndpoint updAllEv
   let
     okUpdEv = fmapMaybe reqSuccess updRespEv
-    mkMap = M.fromList . fmap (\x -> (x ^. field @"deployment" . field @"name" , x) )
+    mkMap = M.fromList . fmap (\x -> (x ^. dfiName , x) )
   dsDyn <- fmap mkMap <$> holdDyn ds okUpdEv
   stsDyn <- listWithKey dsDyn $ \k d -> do
     pb <- getPostBuild
-    respEv <- statusEndpoint (constDyn $ Right k) $ leftmost [pb, () <$ updated d]
+    respEv <- statusEndpoint (constDyn $ Right k)
+      $ leftmost [pb, () <$ updated d]
     let stEv = fmapMaybe reqSuccess respEv
     stDyn <- holdDyn Nothing $ Just <$>  stEv
     pure $ (, stDyn) <$> d
@@ -150,7 +127,7 @@ searchDeployments term d = term' `isPrefixOf` dname
   where
     term' = toCaseFold term
     dtag = d ^. field @"deployment" . field @"tag" . coerced . to toCaseFold
-    dname = d ^. field @"deployment" . field @"name" . coerced . to toCaseFold
+    dname = d ^. dfiName . coerced . to toCaseFold
 
 flatDynMapDyn
   :: (Reflex t, Ord k)
@@ -180,15 +157,6 @@ activeDeploymentsWidget clickedEv dsDyn =
         False -> void $ listWithKey dsDyn (activeDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
-statusWidget :: MonadWidget t m => Dynamic t (Maybe DeploymentStatus) -> m ()
-statusWidget stDyn = do
-  stDyn' <- holdUniqDyn stDyn
-  dyn_ $ stDyn' <&> \case
-    Nothing -> divClass "loading loading--status-alike" $ text "Loading"
-    Just st -> case status st of
-      CT.Ok -> divClass "status status--success" $ text "Success"
-      CT.Error -> divClass "status status--failure" $ text "Failure"
-
 activeDeploymentWidget
   ::
     ( MonadWidget t m
@@ -202,17 +170,15 @@ activeDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
   let stDyn = join $ snd <$> dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
-    el "tr" $ do
-      (linkEl, _) <- el' "td" $ do
+    (linkEl, _) <- el' "tr" $ do
+      el "td" $ do
         text $ coerce dname
         statusWidget stDyn
-      let route = DashboardRoute :/ Just dname
-      setRoute $ route <$ domEvent Click linkEl
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
-            elAttr "a"
-              (  "class" =: "listing__item external bar"
+            void $ elDynAttrWithStopPropagationEvent' Click "a"
+              ( constDyn $ "class" =: "listing__item external bar"
               <> "href" =: ("https://" <> url)
               <> "target" =: "_blank") $ text url
       el "td" $
@@ -224,11 +190,9 @@ activeDeploymentWidget clickedEv dname dDyn' = do
               el "b" $ text $ var <> ": "
               text val
       el "td" $
-        text $ pack $ formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-          $ intToUTCTime createdAt
+        text $ formatPosixToDate createdAt
       el "td" $
-        text $ pack $ formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-          $ intToUTCTime updatedAt
+        text $ formatPosixToDate updatedAt
       el "td" $ do
         let
           elId = "deployment_row_" <> (coerce $ deployment ^. field @"name")
@@ -247,6 +211,9 @@ activeDeploymentWidget clickedEv dname dDyn' = do
           text $ coerce dname <> " staging?"
         void $ deleteEndpoint (constDyn $ Right $ dname) delEv
         blank
+    let route = DashboardRoute :/ Just dname
+    setRoute $ route <$ domEvent Click linkEl
+    blank
 
 archivedDeploymentsWidget
   :: MonadWidget t m
@@ -308,11 +275,9 @@ archivedDeploymentWidget clickedEv dDyn' = do
               el "b" $ text $ var <> ": "
               text val
       el "td" $
-        text $ pack $ formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-          $ intToUTCTime createdAt
+        text $ formatPosixToDate createdAt
       el "td" $
-        text $ pack $ formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-          $ intToUTCTime updatedAt
+        text $ formatPosixToDate updatedAt
       el "td" $ do
         let
           elId = "deployment_row_" <> (coerce $ deployment ^. field @"name")
@@ -327,12 +292,9 @@ archivedDeploymentWidget clickedEv dDyn' = do
               pure never
         dropdownWidget' clickedEv btn body
 
-intToUTCTime :: Int -> UTCTime
-intToUTCTime = posixSecondsToUTCTime . realToFrac
-
 tableWrapper :: MonadWidget t m => m a -> m a
 tableWrapper ma =
-  divClass "stagings-table" $
+  divClass "table table--stagings table--clickable" $
     el "table" $ do
       tableHeader
       el "tbody" ma
@@ -379,7 +341,7 @@ _badSearchWidget = do
 
 emptyTableBody :: MonadWidget t m => m () -> m ()
 emptyTableBody msg =
-  elClass "tr" "no-stagings-table" $
+  elClass "tr" "no-table" $
     elAttr "td" ("colspan" =: "7") msg
 
 dataWidgetWrapper :: MonadWidget t m => m a -> m a

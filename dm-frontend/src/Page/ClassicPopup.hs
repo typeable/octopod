@@ -26,13 +26,15 @@ popupWidget
   => m (Event t (), Event t ())
   -> m (Event t (), Event t ())
 popupWidget m =
-  elAttr "div" ("class" =: "classic-popup" <> "style" =: "display: block;") $
-    divClass "classic-popup__container" $
-      divClass "classic-popup__viewport" $
-        divClass "classic-popup__slot" $ do
-          (okEv, cancelEv) <- m
-          closeEv <- buttonClass "classic-popup__close" "Close"
-          pure $ (okEv, leftmost [cancelEv, closeEv])
+  fmap snd $
+    elDynAttrWithStopPropagationEvent' Click  "div"
+    (constDyn $ "class" =: "classic-popup" <> "style" =: "display: block;") $
+      divClass "classic-popup__container" $
+        divClass "classic-popup__viewport" $
+          divClass "classic-popup__slot" $ do
+            (okEv, cancelEv) <- m
+            closeEv <- buttonClass "classic-popup__close" "Close"
+            pure $ (okEv, leftmost [cancelEv, closeEv])
 
 confirmDeletePopup
   :: MonadWidget t m
