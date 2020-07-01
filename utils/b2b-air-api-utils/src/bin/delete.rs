@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 use std::process::{exit, Command};
 
-use genfly_utils::*;
+use b2b_air_api_utils::*;
 
 fn main() -> std::io::Result<()> {
     let matches = App::new("delete")

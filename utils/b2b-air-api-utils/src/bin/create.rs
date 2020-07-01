@@ -4,10 +4,10 @@ use std::fs;
 use std::path::Path;
 use std::process::{exit, Command};
 
-use genfly_utils::*;
+use b2b_air_api_utils::*;
 
 fn main() -> std::io::Result<()> {
-    let matches = App::new("update")
+    let matches = App::new("create")
         .version("0.1")
         .arg(
             Arg::with_name("project-name")
@@ -98,14 +98,22 @@ fn main() -> std::io::Result<()> {
     fs::copy(&b2b_heml, Path::new(&work_dir).join("b2b-helm"))?;
 
     let output = Command::new("b2b-helm")
+        .args(create_infra_atrs(base_domain, namespace, name))
+        .current_dir(&work_dir)
+        .output()
+        .expect("create infra");
+    let success2 = output.status.success();
+    print_command_result(output);
+
+    let output = Command::new("b2b-helm")
         .args(create_app_atrs(base_domain, namespace, name, tag, envs))
         .current_dir(&work_dir)
         .output()
         .expect("create app");
-    let success2 = output.status.success();
+    let success3 = output.status.success();
     print_command_result(output);
 
-    if !(success && success2) {
+    if !(success && success2 && success3) {
         exit(1)
     }
 

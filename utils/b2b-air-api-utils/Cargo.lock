@@ -21,6 +21,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "b2b-air-api-utils"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rand",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -45,14 +53,6 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
-]
-
-[[package]]
-name = "genfly-utils"
-version = "0.1.0"
-dependencies = [
- "clap",
- "rand",
 ]
 
 [[package]]

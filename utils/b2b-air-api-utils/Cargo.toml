@@ -1,5 +1,5 @@
 [package]
-name = "genfly-utils"
+name = "b2b-air-api-utils"
 version = "0.1.0"
 authors = ["Andrei Orlov <aaorlov1@gmail.com>"]
 edition = "2018"
