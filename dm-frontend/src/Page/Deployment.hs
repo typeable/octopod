@@ -7,13 +7,14 @@ import Data.Generics.Product (field)
 import Data.List as L (find)
 import Data.Text as T (Text, pack)
 import Obelisk.Route.Frontend
-import Reflex.Dom
+import Reflex.Dom as R
 import Servant.Reflex
 
 import Common.Types as CT
 import Common.Utils
 import Frontend.API
 import Frontend.Route
+import Page.EditStagingPopup
 import Page.Utils
 
 
@@ -43,26 +44,30 @@ deploymentWidget updEv dfi = do
       processResp (dfi ^. dfiName) respEv
   dfiDyn' <- holdDyn dfi okEv
   dfiDyn <- holdUniqDyn dfiDyn'
-  deploymentHead dfiDyn
+  editEv <- deploymentHead dfiDyn
   stagingNotification never
   deploymentBody updEv dfiDyn
+  void $ editStagingPopup editEv never
 
 deploymentHead
   :: MonadWidget t m
   => Dynamic t DeploymentFullInfo
-  -> m ()
+  -> m (Event t DeploymentFullInfo)
 deploymentHead dfiDyn =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ dynText $ dfiDyn <^.> dfiName . coerced
-    dyn_ $ dfiDyn <^.> field @"archived" <&> \case
+    editEvEv <- dyn $ dfiDyn <^.> field @"archived" <&> \case
       True -> do
         elClass "a" "page__action button button--secondary button--restore classic-popup-handler" $
           text "Recover from archive"
+        pure never
       False -> do
-        elClass "a" "page__action button button--edit popup-handler" $
+        (editEl, _) <- elClass' "a" "page__action button button--edit popup-handler" $
           text "Edit staging"
         elClass "a" "page__action button button--secondary button--delete classic-popup-handler" $
           text "Move to archive"
+        pure $ R.tag (current dfiDyn) $ domEvent Click editEl
+    switchHold never editEvEv
 
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a
 deploymentBodyWrapper m = divClass "page__body" $ divClass "staging" $ m

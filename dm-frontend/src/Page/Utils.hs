@@ -1,7 +1,8 @@
 module Page.Utils where
 
-import Data.Map        (Map)
-import Data.Proxy      (Proxy(..))
+import Data.Map (Map)
+import Data.Proxy (Proxy(..))
+import Data.Maybe (fromMaybe)
 import Data.Text
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -59,9 +60,9 @@ showT = pack . show
 
 sidebar
   :: MonadWidget t m
-  => Event t ()
+  => Event t d
   -> Event t ()
-  -> m (Event t a, Event t ())
+  -> (d -> m (Event t a, Event t ()))
   -> m (Event t a)
 sidebar showEv closeEv m = mdo
   let
@@ -77,7 +78,7 @@ sidebar showEv closeEv m = mdo
   resultEvDyn <- elDynClass "div" popupClassDyn $ do
     popupOverlay
     widgetHold blank' $ leftmost
-      [ m <$ showEv
+      [ m <$> showEv
       , blank' <$ deferDomClearEv ]
   pure $ switchDyn $ fst <$> resultEvDyn
 
@@ -175,3 +176,41 @@ statusWidget stDyn = do
     Just st -> case status st of
       CT.Ok -> divClass "status status--success" $ text "Success"
       CT.Error -> divClass "status status--failure" $ text "Failure"
+
+dmTextInput
+  :: MonadWidget t m
+  => Text
+  -> Text
+  -> Text
+  -> Maybe Text
+  -> Dynamic t (Maybe Text)
+  -> m (Dynamic t Text)
+dmTextInput clss lbl placeholder val errDyn =
+  elClass "section" "staging__section" $ do
+    elClass "h3" "staging__sub-heading" $ text lbl
+    elClass "div" "staging__widget" $
+      dmTextInput' clss placeholder val errDyn
+
+dmTextInput'
+  :: MonadWidget t m
+  => Text
+  -> Text
+  -> Maybe Text
+  -> Dynamic t (Maybe Text)
+  -> m (Dynamic t Text)
+dmTextInput' clss placeholder val errDyn = do
+  let
+    classDyn = errDyn <&> \case
+      Nothing -> clss <> " input"
+      Just _  -> clss <> " input input--error"
+  elDynClass "div" classDyn $ do
+    inp <- inputElement $ def
+      & initialAttributes .~
+        (  "type" =: "text"
+        <> "class" =: "input__widget"
+        <> "placeholder" =: placeholder )
+      & inputElementConfig_initialValue .~ fromMaybe "" val
+    dyn_ $ errDyn <&> \case
+      Nothing -> blank
+      Just x  -> divClass "input__output" $ text x
+    pure $ value inp

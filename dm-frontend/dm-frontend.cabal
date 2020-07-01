@@ -29,6 +29,7 @@ executable frontend
                      , Page.ClassicPopup
                      , Page.Deployment
                      , Page.Deployments
+                     , Page.EditStagingPopup
                      , Page.NewStagingPopup
                      , Page.Utils
   ghc-options:         -Wall
