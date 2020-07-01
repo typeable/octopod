@@ -389,7 +389,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
         cmd  = coerce $ updateCommand st
       failIfImageNotFound dTag
       void . liftIO . forkIO $ do
-        void $ updateDeploymentNameAndTag pgPool dName dTag
+        void $ updateDeployment pgPool dName dTag envPairs
         log $ "call " <> unwords (cmd : args)
         (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
         log $ "deployment updated, name: "
@@ -413,15 +413,17 @@ selectEnvPairs p dName = fmap (fmap fromOnly) $ withResource p $ \conn -> query
   "SELECT envs FROM deployments WHERE name = ?"
   (Only dName)
 
-updateDeploymentNameAndTag
+updateDeployment
   :: PgPool
   -> DeploymentName
   -> DeploymentTag
+  -> EnvPairs
   -> IO Int64
-updateDeploymentNameAndTag p dName dTag = withResource p $ \conn -> execute
+updateDeployment p dName dTag dEnvs =
+  withResource p $ \conn -> execute
   conn
-  "UPDATE deployments SET tag = ?, updated_at = now() WHERE name = ?"
-  (dTag, dName)
+  "UPDATE deployments SET tag = ?, envs = ?, updated_at = now() WHERE name = ?"
+  (dTag, formatEnvPairs dEnvs, dName)
 
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
