@@ -69,9 +69,10 @@ with {
           cp ${kubernetes-helm2-bin}/helm /usr/local/bin/
           chmod +x /usr/local/bin/helm
 
-          mkdir -p /www/static/styles
+          mkdir -p /www/static/{images,styles}
           cp -av ${dm-frontend}/bin/frontend.jsexe/* /www/
-          cp -av ${dm-css}/production/styles/style.css /www/static/styles/
+          cp -av ${dm-css}/production/images/* /www/static/images/
+          cp -av ${dm-css}/production/styles/* /www/static/styles/
         '';
 
         config = {
