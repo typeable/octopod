@@ -7,7 +7,7 @@ import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
 import Data.Map as M (Map, fromList, partition, toList, filter)
-import Data.Text as T (Text, toCaseFold, isPrefixOf)
+import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -183,12 +183,8 @@ activeDeploymentWidget clickedEv dname dDyn' = do
               <> "target" =: "_blank") $ text url
       el "td" $
         text $ coerce $ deployment ^. field @"tag"
-      el "td" $ do
-        divClass "listing" $
-          forM_ (deployment ^. field @"envs") $ \(var, val) ->
-            divClass "listing__item bar" $ do
-              el "b" $ text $ var <> ": "
-              text val
+      el "td" $
+        overridesWidget $ deployment ^. field @"envs"
       el "td" $
         text $ formatPosixToDate createdAt
       el "td" $
@@ -268,12 +264,8 @@ archivedDeploymentWidget clickedEv dDyn' = do
       el "td" $ text "..."
       el "td" $
         text $ coerce $ deployment ^. field @"tag"
-      el "td" $ do
-        divClass "listing" $
-          forM_ (deployment ^. field @"envs") $ \(var, val) ->
-            divClass "listing__item bar" $ do
-              el "b" $ text $ var <> ": "
-              text val
+      el "td" $
+        overridesWidget $ deployment ^. field @"envs"
       el "td" $
         text $ formatPosixToDate createdAt
       el "td" $
@@ -291,6 +283,38 @@ archivedDeploymentWidget clickedEv dDyn' = do
               text "Restore from archive"
               pure never
         dropdownWidget' clickedEv btn body
+
+overridesWidget :: MonadWidget t m => EnvPairs -> m ()
+overridesWidget envs = divClass "listing" $ do
+  let
+    visible = take 3 envs
+    envLength = length envs
+  listing visible
+  when (envLength > 3) $ mdo
+    let hidden = drop 3 envs
+    showDyn <- toggle False toggleEv
+    dyn_ $ showDyn <&> \case
+      True -> listing hidden
+      False -> blank
+    let
+      btnClassDyn = ifThenElseDyn showDyn
+        "listing__item expander bar expander--open"
+        "listing__item expander bar"
+      btnTextDyn = ifThenElseDyn showDyn "Hide"
+        $ "Show all (" <> (pack . show $ envLength) <> ")"
+    toggleEv <- buttonDynClass btnClassDyn btnTextDyn
+    blank
+  where
+    listing envs' = do
+      forM_ envs' $ \(var, val) ->
+        divClass "listing__item bar" $ do
+          el "b" $ text $ var <> ": "
+          text val
+
+ifThenElseDyn :: Reflex t => Dynamic t Bool -> b -> b -> Dynamic t b
+ifThenElseDyn bDyn t f = bDyn <&> \case
+  True -> t
+  False -> f
 
 tableWrapper :: MonadWidget t m => m a -> m a
 tableWrapper ma =

@@ -91,9 +91,10 @@ eventWriterWrapper m = mdo
   (_, ev) <- runEventWriterT (m ev)
   pure ev
 
-buttonClass :: DomBuilder t m => Text -> Text -> m (Event t ())
+buttonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
 buttonClass cl lbl = do
-  (bEl, _) <- elAttr' "button" ("class" =: cl <> "type" =: "button") $ text lbl
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button"
+    (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
   return $ domEvent Click bEl
 
 buttonDynClass
@@ -103,7 +104,8 @@ buttonDynClass
   -> m (Event t ())
 buttonDynClass clDyn lblDyn = do
   let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
-  (bEl, _) <- elDynAttr' "button" attrDyn $ dynText lblDyn
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+    dynText lblDyn
   return $ domEvent Click bEl
 
 buttonClassEnabled
@@ -115,7 +117,8 @@ buttonClassEnabled cl lbl dDyn = do
       True  -> "class" =: cl <> "type" =: "button"
       False ->  "class" =: (cl <> " button--disabled")
         <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttr' "button" attrDyn $ text lbl
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+    text lbl
   return $ domEvent Click bEl
 
 intToUTCTime :: Int -> UTCTime
