@@ -449,11 +449,14 @@ projectNameH = projectName <$> ask
 statusH :: DeploymentName -> AppM DeploymentStatus
 statusH dName = do
   st <- ask
-  let pgPool = pool st
+  let
+    pgPool = pool st
+    cmd    = checkingCommand st
+    args   =
+      [ "--namespace", coerce $ namespace st
+      , "--name", coerce $ dName ]
   void $ selectDeployment pgPool dName AllDeployments
-  cmd <- checkingCommand <$> ask
-  let args = [unpack . coerce $ dName]
-  (ec, out, err) <- liftIO $ runCommand (unpack $ coerce cmd) args
+  (ec, out, err) <- liftIO $ runCommand (unpack $ coerce cmd) (unpack <$> args)
   liftIO $ print out >> print err
   pure . DeploymentStatus $
     case ec of
