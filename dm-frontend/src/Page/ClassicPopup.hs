@@ -52,3 +52,4 @@ confirmDeletePopup showEv txt = do
             buttonClass "dialog__action button--secondary button" "Cancel"
           pure (okEv, cancelEv)
   classicPopup showEv body
+
