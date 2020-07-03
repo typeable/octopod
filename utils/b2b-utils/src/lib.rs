@@ -2,6 +2,8 @@ use rand::{
     distributions::{Alphanumeric, Distribution},
     thread_rng,
 };
+use serde_json::json;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::env;
 use std::fs;
@@ -248,10 +250,49 @@ pub fn delete_cert_atrs(namespace: &str, name: &str) -> Vec<String> {
     .collect::<Vec<_>>()
 }
 
+pub fn check_list(namespace: &str, name: &str) -> String {
+    json!({
+        "Deployments": names_to_check_list(deployment_names(name), namespace),
+        "StatefulSets": names_to_check_list(statefulset_names(name), namespace),
+    })
+    .to_string()
+}
+
 fn release_name(chart_name: &str, name: &str) -> String {
     format!("{}-{}", chart_name, name)
 }
 
 fn tagged_release(chart_name: &str, tag: &str) -> String {
     format!("{}:{}", chart_name, tag)
+}
+
+fn deployment_names(name: &str) -> Vec<String> {
+    vec![
+        format!("b2b-dm-staging-{}-app", name),
+        format!("b2b-dm-staging-{}-cron", name),
+        format!("b2b-dm-staging-{}-tasker", name),
+        format!("b2b-infra-dm-staging-{}-kibana", name),
+    ]
+}
+
+fn statefulset_names(name: &str) -> Vec<String> {
+    vec![
+        format!("b2b-infra-dm-staging-{}-elasticsearch", name),
+        format!("b2b-infra-dm-staging-{}-kafka-int", name),
+        format!("b2b-infra-dm-staging-{}-postgres", name),
+        format!("b2b-infra-dm-staging-{}-redis", name),
+        format!("b2b-infra-dm-staging-{}-zk", name),
+    ]
+}
+
+fn names_to_check_list(names: Vec<String>, namespace: &str) -> Vec<HashMap<String, String>> {
+    names
+        .iter()
+        .map(|n| {
+            let mut h = HashMap::new();
+            h.insert("ResourceName".to_string(), n.to_string());
+            h.insert("Namespace".to_string(), namespace.to_string());
+            h
+        })
+        .collect::<Vec<_>>()
 }
