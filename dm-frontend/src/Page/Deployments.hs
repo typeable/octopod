@@ -206,13 +206,14 @@ activeDeploymentWidget clickedEv dname dDyn' = do
           el "br" blank
           text $ coerce dname <> " staging?"
         void $ deleteEndpoint (constDyn $ Right $ dname) delEv
-        blank
     let route = DashboardRoute :/ Just dname
     setRoute $ route <$ domEvent Click linkEl
-    blank
 
 archivedDeploymentsWidget
-  :: MonadWidget t m
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t
     (Map DeploymentName
@@ -229,7 +230,7 @@ archivedDeploymentsWidget clickedEv dsDyn = do
       let emptyDyn' = L.null <$> dsDyn
       emptyDyn <- holdUniqDyn emptyDyn'
       dyn_ $ emptyDyn <&> \case
-        False -> void $ list dsDyn (archivedDeploymentWidget clickedEv)
+        False -> void $ listWithKey dsDyn (archivedDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
 tableHeader :: MonadWidget t m => m ()
@@ -250,14 +251,18 @@ tableHeader = do
         elClass "span" "visuallyhidden" $ text "Menu"
 
 archivedDeploymentWidget
-  :: MonadWidget t m
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m )
   => Event t ClickedElement
+  -> DeploymentName
   -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus))
   -> m ()
-archivedDeploymentWidget clickedEv dDyn' = do
+archivedDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
-    el "tr" $ do
+    (linkEl, _) <- el' "tr" $ do
       el "td" $ do
         text $ coerce $ deployment ^. field @"name"
         divClass "status status--archived" $ text "Archived"
@@ -277,12 +282,13 @@ archivedDeploymentWidget clickedEv dDyn' = do
             (  "class" =: "drop__handler"
             <> "type" =: "button"
             <> "id" =: elId) $ text "Actions"
-          body = elAttr "button"
-            (  "class" =: "action action--delete"
-            <> "type" =: "button") $ do
-              text "Restore from archive"
-              pure never
-        dropdownWidget' clickedEv btn body
+          body = do
+            btnArcEv <- buttonClass "action action--delete" "Restore from archive"
+            pure btnArcEv
+        btnEv <- dropdownWidget' clickedEv btn body
+        void $ restoreEndpoint (constDyn $ Right $ dname) btnEv
+    let route = DashboardRoute :/ Just dname
+    setRoute $ route <$ domEvent Click linkEl
 
 overridesWidget :: MonadWidget t m => EnvPairs -> m ()
 overridesWidget envs = divClass "listing" $ do

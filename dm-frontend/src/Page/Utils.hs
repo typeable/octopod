@@ -42,17 +42,24 @@ dropdownWidget'
 dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
     DOM.contains (_element_raw btnEl) clicked
-  openedDyn <- foldDyn switchState False
-    $ leftmost [ clickInsideEv, True <$ domEvent Click btnEl ]
+  openedDyn <- foldDyn switchState False $ leftmost
+    [ traceEvent "1" (clickInsideEv)
+    , traceEvent "2" (False <$ domEvent Click bodyEl)
+    , traceEvent "3" (True <$ domEvent Click btnEl) ]
   let
-    switchState ev cur = ev && not cur
+    -- switchState ev cur = ev && not cur
+    switchState True True = False
+    switchState True False = True
+    switchState False True = False
+    switchState False False = False
     wrapperClassDyn = ffor openedDyn $ \case
       True -> "class" =: "drop drop--actions drop--expanded"
       False -> "class" =: "drop drop--actions"
-  (btnEl, wEv) <- elDynAttrWithStopPropagationEvent' Click
+  (btnEl, (bodyEl, wEv)) <- elDynAttrWithStopPropagationEvent' Click
     "div" wrapperClassDyn $ do
       btn
-      divClass "drop__dropdown" body
+      elDynAttrWithStopPropagationEvent' Click "div"
+        (constDyn $ "class" =: "drop__dropdown") body
   pure wEv
 
 showT :: Show a => a -> Text

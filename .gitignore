@@ -5,3 +5,5 @@ result
 dms-docker
 *~
 dist-newstyle
+dm-config.json
+frontend-result

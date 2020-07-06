@@ -25,6 +25,7 @@ executable frontend
     cpp-options:       -DDEVELOPMENT
   main-is:             Main.hs
   other-modules:       Frontend.API
+                     , Frontend.GHCJS
                      , Frontend.Route
                      , Page.ClassicPopup
                      , Page.Deployment
@@ -61,8 +62,10 @@ executable frontend
                      , base >=4.12 && <4.13
                      , bytestring
                      , containers
+                     , deriving-aeson
                      , dependent-sum
                      , dm-common
+                     , exceptions
                      , generic-lens
                      , ghcjs-dom
                      , jsaddle

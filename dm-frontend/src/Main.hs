@@ -10,11 +10,30 @@ import Frontend.API
 import Frontend.Route
 import Page.Deployment
 import Page.Deployments
+import Frontend.GHCJS
+
+import Data.Text (pack)
 
 main :: IO ()
 main = mainWidgetWithHead headWidget $ do
-  headerWidget
-  routeWidget
+  initConfigWidget
+
+
+initConfigWidget :: (MonadWidget t m, Prerender js t m) => m ()
+initConfigWidget = do
+  pb <- getPostBuild
+  x <- performEvent (initConfig <$ pb)
+  widgetHold_ loadingWidget $ leftmost
+    [ (headerWidget >> routeWidget) <$ ffilter id x
+    , errorWidget <$ ffilter not x ]
+
+tstW :: MonadWidget t m => m ()
+tstW = do
+  pb <- getPostBuild
+  x <- performEvent (initConfig <$ pb)
+  xd <- holdDyn False x
+  dynText $ pack . show <$> xd
+  blank
 
 wsUpdate :: forall t m . MonadWidget t m => m (Event t ())
 wsUpdate = do
@@ -25,7 +44,8 @@ wsUpdate = do
       , _webSocketConfig_reconnect = True
       , _webSocketConfig_protocols = []
       }
-  ws <- webSocket "wss://dm-genfly-ws.stage.thebestagent.pro/event" wsConfig
+  wsUrl <- getWsUrl
+  ws <- webSocket wsUrl wsConfig
   pure $ () <$ _webSocket_recv ws
 
 routeWidget
@@ -74,3 +94,25 @@ headerWidget =
         respEv <- projectName pb
         nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
         dynText nameDyn
+
+emptyHeaderWidget :: MonadWidget t m => m ()
+emptyHeaderWidget =
+  elClass "header" "header" $
+    divClass "header__wrap container" $ do
+      elClass "b" "header__logo" $
+        text "Deployment Manager"
+      elClass "div" "header__project" blank
+
+loadingWidget :: MonadWidget t m => m ()
+loadingWidget =
+  divClass "no-page" $
+    divClass "no-page__inner" $
+      divClass "loading loading--enlarged loading--alternate" blank
+
+errorWidget :: MonadWidget t m => m ()
+errorWidget =
+  divClass "no-page" $
+    divClass "no-page__inner" $
+      divClass "null null--data" $ do
+        elClass "b" "null__heading" $ text "Cannot retrieve the data"
+        divClass "null__message" $ text "Try to reload page"

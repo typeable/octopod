@@ -42,8 +42,7 @@ deploymentWidget updEv dfi = do
   let
     (okEv, _errEv) =
       processResp (dfi ^. dfiName) respEv
-  dfiDyn' <- holdDyn dfi okEv
-  dfiDyn <- holdUniqDyn dfiDyn'
+  dfiDyn <- holdDyn dfi okEv
   editEv <- deploymentHead dfiDyn
   stagingNotification never
   deploymentBody updEv dfiDyn
@@ -55,11 +54,16 @@ deploymentHead
   -> m (Event t DeploymentFullInfo)
 deploymentHead dfiDyn =
   divClass "page__head" $ do
-    elClass "h1" "page__heading title" $ dynText $ dfiDyn <^.> dfiName . coerced
+    let dname = dfiDyn <^.> dfiName . coerced
+    elClass "h1" "page__heading title" $ dynText dname
     editEvEv <- dyn $ dfiDyn <^.> field @"archived" <&> \case
-      True -> do
-        elClass "a" "page__action button button--secondary button--restore classic-popup-handler" $
-          text "Recover from archive"
+      True -> mdo
+        btnEnabledDyn <- holdDyn True $ False <$ btnEv
+        btnEv <- buttonClassEnabled
+          "page__action button button--secondary button--restore classic-popup-handler"
+          "Recover from archive"
+          btnEnabledDyn
+        void $ restoreEndpoint (Right . coerce <$> dname) btnEv
         pure never
       False -> do
         (editEl, _) <- elClass' "a" "page__action button button--edit popup-handler" $
