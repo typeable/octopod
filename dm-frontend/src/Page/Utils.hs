@@ -178,12 +178,12 @@ formatPosixToDateTime = pack
   . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
   . intToUTCTime
 
-statusWidget :: MonadWidget t m => Dynamic t (Maybe DeploymentStatus) -> m ()
+statusWidget :: MonadWidget t m => Dynamic t (Maybe CurrentDeploymentStatus) -> m ()
 statusWidget stDyn = do
   stDyn' <- holdUniqDyn stDyn
   dyn_ $ stDyn' <&> \case
     Nothing -> divClass "loading loading--status-alike" $ text "Loading"
-    Just st -> case status st of
+    Just (CurrentDeploymentStatus st) -> case st of
       CT.Ok -> divClass "status status--success" $ text "Success"
       CT.Error -> divClass "status status--failure" $ text "Failure"
 

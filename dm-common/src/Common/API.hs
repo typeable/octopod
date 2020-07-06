@@ -17,7 +17,7 @@ type DeleteEndpoint c = c :> Delete '[JSON] CommandResponse
 type UpdateEndpoint c =
   c :> ReqBody '[JSON] DeploymentUpdate :> Put '[JSON] CommandResponse
 type InfoEndpoint c = c :> "info" :> Get '[JSON] [DeploymentInfo]
-type StatusEndpoint c = c :> "status" :> Get '[JSON] DeploymentStatus
+type StatusEndpoint c = c :> "status" :> Get '[JSON] CurrentDeploymentStatus
 type CleanupEndpoint c =
   c :> "cleanup" :> Delete '[JSON] CommandResponse
 type RestoreEndpoint c =

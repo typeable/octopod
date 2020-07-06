@@ -146,7 +146,7 @@ activeDeploymentsWidget
   => Event t ClickedElement
   -> Dynamic t
     (Map DeploymentName
-      (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus)))
+      (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus)))
   -> m ()
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
@@ -164,7 +164,7 @@ activeDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
-  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus))
+  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus))
   -> m ()
 activeDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'
@@ -217,7 +217,7 @@ archivedDeploymentsWidget
   => Event t ClickedElement
   -> Dynamic t
     (Map DeploymentName
-      (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus)))
+      (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus)))
   -> m ()
 archivedDeploymentsWidget clickedEv dsDyn = do
   showDyn <- toggleButton
@@ -257,7 +257,7 @@ archivedDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
-  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe DeploymentStatus))
+  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus))
   -> m ()
 archivedDeploymentWidget clickedEv dname dDyn' = do
   dDyn <- holdUniqDyn $ fst <$> dDyn'

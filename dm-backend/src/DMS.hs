@@ -3,7 +3,7 @@ module DMS (runDMS) where
 
 import           Chronos (Time, getTime, now)
 import           Control.Applicative
-import           Control.Concurrent (forkIO)
+import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.Async (race_)
 import           Control.Concurrent.STM
 import           Control.Exception (throwIO, try, Exception)
@@ -94,8 +94,8 @@ runDMS = do
     (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   channel <- liftIO . atomically $ newBroadcastTChan
   let
-    app'         =
-      app $ AppState
+    appSt        =
+      AppState
         pgPool
         logger'
         channel
@@ -108,6 +108,7 @@ runDMS = do
         deletionCmd
         checkingCmd
         cleanupCmd
+    app'         = app appSt
     wsApp'       = wsApp channel
     serverPort   = dmsPort opts
     uiServerPort = unServerPort $ dmsUIPort opts
@@ -120,6 +121,7 @@ runDMS = do
       (run uiServerPort app')
       `race_` (runTLS tlsOpts warpOpts app')
       `race_` (run wsServerPort wsApp')
+      `race_` (runStatusUpdater appSt)
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -160,16 +162,17 @@ listH = do
   AppState {pool = p, logger = l, baseDomain = d} <- ask
 
   retrieved <- liftIO $ withResource p $ \conn -> query_ conn q
-  deployments <- liftIO $ for retrieved $ \(n, t, e, a, ct, ut) -> do
+  deployments <- liftIO $ for retrieved $ \(n, t, e, a, ct, ut, st) -> do
     es <- parseEnvs (lines e)
-    pure $ DeploymentFullInfo (Deployment n t es) a ct ut (depUrls d n)
+    pure $
+      DeploymentFullInfo (Deployment n t es) (read st) a ct ut (depUrls d n)
 
   liftIO . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
     q                    =
       "SELECT name, tag, envs, archived, extract(epoch from created_at)::int, \
-        \extract(epoch from updated_at)::int \
+        \extract(epoch from updated_at)::int, status::text \
       \FROM deployments ORDER BY name"
     depUrls domain dName =
       [ ("app", appUrl domain dName)
@@ -446,19 +449,20 @@ pingH = do
 projectNameH :: AppM ProjectName
 projectNameH = projectName <$> ask
 
-statusH :: DeploymentName -> AppM DeploymentStatus
+statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
   st <- ask
   let
     pgPool = pool st
+    log    = logInfo (logger st)
     cmd    = checkingCommand st
     args   =
       [ "--namespace", coerce $ namespace st
       , "--name", coerce $ dName ]
   void $ selectDeployment pgPool dName AllDeployments
-  (ec, out, err) <- liftIO $ runCommand (unpack $ coerce cmd) (unpack <$> args)
-  liftIO $ print out >> print err
-  pure . DeploymentStatus $
+  liftIO $ log $ "call " <> unwords (coerce cmd : args)
+  ec <- liftIO $ runCommandWithoutPipes (unpack $ coerce cmd) (unpack <$> args)
+  pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
       _           -> Error
@@ -561,6 +565,12 @@ runCommand cmd args = do
     err <- hGetContents . getStderr $ p
     pure (ec, Stdout out, Stderr err)
 
+runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
+runCommandWithoutPipes cmd args = do
+  withProcessWait (proc cmd args) $ \p -> do
+    ec <- waitExitCode p
+    pure ec
+
 handleExitCode :: ExitCode -> IO ()
 handleExitCode ExitSuccess     = return ()
 handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
@@ -622,6 +632,60 @@ sendReloadEvent state =
 elapsedTime :: Time -> Time -> Duration
 elapsedTime t1 t2 =
   Duration . fromIntegral . (`div` 1000000) . abs $ getTime t2 - getTime t1
+
+runStatusUpdater :: AppState -> IO ()
+runStatusUpdater state = do
+  let
+    pgPool      = pool state
+    checkingCmd = checkingCommand state
+    ns          = namespace state
+    interval    = 30 :: Int
+    select_deps =
+      "SELECT name, status::text, \
+      \extract(epoch from now())::int - \
+        \extract(epoch from status_updated_at)::int \
+      \FROM deployments \
+      \WHERE checked_at < now() - interval '?' second"
+    update_status  =
+      "UPDATE deployments \
+      \SET status = ?, status_updated_at = now(), checked_at = now() \
+      \WHERE name = ?"
+    update_checked_at  =
+      "UPDATE deployments SET checked_at = now() WHERE name = ?"
+
+  forever $ do
+    rows :: [(DeploymentName, Text, Int)] <- liftIO $
+      withResource pgPool $ \conn -> query conn select_deps (Only interval)
+    let
+      checkList :: [(DeploymentName, DeploymentStatus, Timestamp)] =
+        (\(n, s, t) -> (n, read . unpack $ s, coerce t)) <$> rows
+    checkResult <- for checkList $ \(dName, dStatus, ts) -> do
+      let
+        args = unpack <$> coerce ns : coerce dName : []
+        cmd  = unpack . coerce $ checkingCmd
+      ec <- runCommandWithoutPipes cmd args
+      pure (dName, newStatus ec dStatus ts, ts)
+    void $
+      for (zip checkList checkResult) $ \((dName, oldSt, _), (_, newSt, _)) ->
+        withResource pgPool $ \conn ->
+          if oldSt == newSt
+            then execute conn update_checked_at (Only dName)
+            else execute conn update_status (show newSt, dName)
+    if checkList == checkResult
+      then pure ()
+      else sendReloadEvent state
+    threadDelay 5000000
+
+updatePeriod :: Timestamp
+updatePeriod = Timestamp 600
+
+newStatus :: ExitCode -> DeploymentStatus -> Timestamp -> DeploymentStatus
+newStatus ExitSuccess     _             _                      = Running
+newStatus (ExitFailure _) Running       _                      = Failure
+newStatus (ExitFailure _) CreatePending ts | ts > updatePeriod = Failure
+newStatus (ExitFailure _) UpdatePending ts | ts > updatePeriod = Failure
+newStatus (ExitFailure _) DeletePending _                      = Failure
+newStatus (ExitFailure _) oldStatus     _                      = oldStatus
 
 logInfo :: TimedFastLogger -> Text -> IO ()
 logInfo l = logWithSeverity l "INFO"
