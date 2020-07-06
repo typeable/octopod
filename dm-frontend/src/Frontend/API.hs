@@ -14,30 +14,29 @@ import Servant.Reflex as SR
 
 import Common.API
 import Common.Types
+import Frontend.GHCJS
 
 
 apiClients
   :: forall t m. MonadWidget t m
   => SR.Client t m API ()
-apiClients = clientWithOpts
-  (Proxy @API)
-  (Proxy @m)
-  (Proxy @())
-  (constDyn host)
-  tweakRequest
+apiClients =
+  clientWithOpts
+    (Proxy @API)
+    (Proxy @m)
+    (Proxy @())
+    (constDyn host)
+    tweakRequest
   where
-    tweakRequest = ClientOptions $ \req ->
+    tweakRequest = ClientOptions $ \req -> do
+      url <- getAppUrl
+      auth <- getAppAuth
       pure $ req
         & xhrRequest_config
         . xhrRequestConfig_headers
         . at "Authorization" ?~ auth
-#ifdef DEVELOPMENT
-    host = SR.BaseFullUrl SR.Https "dm-genfly-app.stage.thebestagent.pro" 443 "/"
-    auth = "Basic dWk6cVoxZGRKMHZpWkRMbXlKaG5JNVh1QnZMQnZ3MkMwUVBqOTRaZ0VwOQ=="
-#else
-    host = SR.BaseFullUrl SR.Https "dm-genfly-app.stage.thebestagent.pro" 443 "/"
-    auth = "Basic dWk6cVoxZGRKMHZpWkRMbXlKaG5JNVh1QnZMQnZ3MkMwUVBqOTRaZ0VwOQ=="
-#endif
+        & xhrRequest_url %~ (T.replace "#PLACEHOLDER#" url)
+    host = SR.BaseFullUrl SR.Https "#PLACEHOLDER#" 443 "/"
 
 
 listEndpoint

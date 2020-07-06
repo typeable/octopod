@@ -28,13 +28,15 @@ proxy /api localhost:3002 {
   transparent
 }
 
+mime .json 	application/json
+rewrite /config.json /dm-config.json
+
 rewrite /ghcjs /frontend-result/bin/frontend.jsexe/index.html
 
 proxy / localhost:3003 {
   transparent
   websocket
-  except /dm-css/ /frontend-result/
+  except /dm-css/ /frontend-result/ /dm-config.json
 }
-
 
 log / stdout
