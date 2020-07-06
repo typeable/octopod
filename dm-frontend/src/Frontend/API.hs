@@ -80,7 +80,7 @@ statusEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
-  -> m (Event t (ReqResult () DeploymentStatus))
+  -> m (Event t (ReqResult () CurrentDeploymentStatus))
 cleanupEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
