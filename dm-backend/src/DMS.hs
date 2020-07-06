@@ -190,9 +190,9 @@ createH dep = do
     createDep p Deployment { name = n, tag = t, envs = e } =
       withResource p $ \conn -> execute
         conn
-        "INSERT INTO deployments (name, tag, envs) VALUES (?, ?, ?)"
+        "INSERT INTO deployments (name, tag, envs, status) VALUES (?, ?, ?, ?)"
         -- FIXME: make EnvPairs a newtype and give it ToField instance
-        (n, t, formatEnvPairs e)
+        (n, t, formatEnvPairs e, show CreatePending)
   failIfImageNotFound $ tag dep
   res :: Either SqlError Int64 <- liftIO . try $ createDep pgPool dep
   case res of
@@ -329,9 +329,11 @@ editH dName dEnvs = do
     updateEditDeployment   :: PgPool -> IO Int64
     updateEditDeployment p = withResource p $ \conn -> execute
       conn
-      "UPDATE deployments SET envs = ?, updated_at = now() WHERE name = ?"
+      "UPDATE deployments \
+      \SET envs = ?, updated_at = now(), status = ?, status_updated_at = now() \
+      \WHERE name = ?"
       -- FIXME: make EnvPairs a newtype and give it ToField instance
-      (formatEnvPairs dEnvs, dName)
+      (formatEnvPairs dEnvs, show UpdatePending, dName)
 
 deleteH :: DeploymentName -> AppM CommandResponse
 deleteH dName = do
@@ -365,9 +367,10 @@ archiveDeployment p dName = withResource p $ \conn -> do
   let
     q =
       "UPDATE deployments \
-      \SET archived = 't', archived_at = now() \
+      \SET archived = 't', archived_at = now(), \
+        \status = ?, status_updated_at = now() \
       \WHERE name = ?"
-  execute conn q (Only dName)
+  execute conn q (show DeletePending, dName)
 
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
@@ -425,8 +428,11 @@ updateDeployment
 updateDeployment p dName dTag dEnvs =
   withResource p $ \conn -> execute
   conn
-  "UPDATE deployments SET tag = ?, envs = ?, updated_at = now() WHERE name = ?"
-  (dTag, formatEnvPairs dEnvs, dName)
+  "UPDATE deployments \
+  \SET tag = ?, envs = ?, updated_at = now(), \
+    \status = ?, status_updated_at = now() \
+  \WHERE name = ?"
+  (dTag, formatEnvPairs dEnvs, show UpdatePending, dName)
 
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
