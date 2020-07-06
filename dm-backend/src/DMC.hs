@@ -28,6 +28,7 @@ import           System.IO.Temp
 import           System.Process.Typed
 
 import           Common.API
+import           Common.Utils (dfiName)
 import           DMC.Args
 import           TLS (makeClientManager)
 import           Types
@@ -92,7 +93,7 @@ handleList = do
   liftIO $ do
     resp <- runClientM listH clientEnv
     let
-      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _ _ _) = dName
+      getName dep = dep ^.dfiName
       names = T.unlines . coerce . (getName <$>) <$> resp
     handleResponse T.putStr names
 

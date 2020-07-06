@@ -641,7 +641,9 @@ runStatusUpdater state = do
     ns          = namespace state
     interval    = 30 :: Int
     select_deps =
-      "SELECT name, status::text, extract(epoch from status_updated_at)::int \
+      "SELECT name, status::text, \
+      \extract(epoch from now())::int - \
+        \extract(epoch from status_updated_at)::int \
       \FROM deployments \
       \WHERE checked_at < now() - interval '?' second"
     update_status  =
