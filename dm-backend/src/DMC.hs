@@ -92,7 +92,7 @@ handleList = do
   liftIO $ do
     resp <- runClientM listH clientEnv
     let
-      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _ _) = dName
+      getName (DeploymentFullInfo (Deployment dName _ _) _ _ _ _ _) = dName
       names = T.unlines . coerce . (getName <$>) <$> resp
     handleResponse T.putStr names
 
@@ -182,7 +182,7 @@ updateH :: DeploymentName -> DeploymentUpdate -> ClientM CommandResponse
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
-_statusH :: DeploymentName -> ClientM DeploymentStatus
+_statusH :: DeploymentName -> ClientM CurrentDeploymentStatus
 
 cleanupH :: DeploymentName -> ClientM CommandResponse
 

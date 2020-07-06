@@ -67,7 +67,8 @@ with {
 
           mkdir -p /usr/local/bin
           cp ${kubernetes-helm2-bin}/helm /usr/local/bin/
-          chmod +x /usr/local/bin/helm
+          cp -av ${kubernetes-kubedog-bin} /usr/local/bin/kubedog
+          chmod +x /usr/local/bin/*
 
           mkdir -p /www/static/{images,styles}
           cp -av ${dm-frontend}/bin/frontend.jsexe/* /www/
@@ -125,6 +126,11 @@ with {
       kubernetes-helm2-bin = fetchzip {
         url = "https://get.helm.sh/helm-v2.16.5-linux-amd64.tar.gz";
         sha256 = "1r91i8gy3zsgwx1fr2n6syspjrqv822ngf54db8xycskv4p5mxxj";
+      };
+
+      kubernetes-kubedog-bin = fetchurl {
+        url = "https://dl.bintray.com/flant/kubedog/v0.3.4/kubedog-linux-amd64-v0.3.4";
+        sha256 = "13fza85xvg0g5l5013ackfkzisfsmmh3xhawncl3xb94f71s536p";
       };
 
       haskellPackages = pkgs.haskellPackages.override {

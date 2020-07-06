@@ -30,8 +30,20 @@ newtype ArchivedFlag = ArchivedFlag { unArchivedFlag :: Bool }
 newtype Duration = Duration { unDuration :: Int }
   deriving (Show, FromJSON, ToJSON)
 
+newtype Timestamp = Timestamp { unTimestamp :: Int }
+  deriving (Show, Eq, Ord, FromJSON, ToJSON)
+
 newtype ProjectName = ProjectName { uProjectName :: Text }
   deriving (Show, FromJSON, ToJSON)
+
+data DeploymentStatus
+  = Running
+  | Failure
+  | CreatePending
+  | UpdatePending
+  | DeletePending
+  deriving (Generic, Read, Show, Eq)
+  deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 
 data Deployment = Deployment
   { name :: DeploymentName
@@ -62,6 +74,7 @@ data DeploymentInfo = DeploymentInfo
 
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
+  , status     :: DeploymentStatus
   , archived   :: Bool
   , createdAt  :: Int
   , updatedAt  :: Int
@@ -77,15 +90,16 @@ data DeploymentUpdate = DeploymentUpdate
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
 
-data Status
+data CurrentStatus
   = Ok
   | Error
   deriving (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake Status
+  deriving (FromJSON, ToJSON) via Snake CurrentStatus
 
-newtype DeploymentStatus = DeploymentStatus { status :: Status }
+newtype CurrentDeploymentStatus =
+  CurrentDeploymentStatus { status :: CurrentStatus }
   deriving (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake DeploymentStatus
+  deriving (FromJSON, ToJSON) via Snake CurrentDeploymentStatus
 
 data CommandResponse
   = Success
