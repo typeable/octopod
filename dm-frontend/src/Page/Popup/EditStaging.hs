@@ -1,4 +1,4 @@
-module Page.EditStagingPopup where
+module Page.Popup.EditStaging where
 
 import Control.Lens (preview, _2, (^.), coerced, to)
 import Control.Monad

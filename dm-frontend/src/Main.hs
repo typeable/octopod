@@ -1,6 +1,7 @@
 module Main where
 
 import Data.ByteString (ByteString)
+import Data.Text (pack)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -10,9 +11,9 @@ import Frontend.API
 import Frontend.Route
 import Page.Deployment
 import Page.Deployments
+import Page.Utils
 import Frontend.GHCJS
 
-import Data.Text (pack)
 
 main :: IO ()
 main = mainWidgetWithHead headWidget $ do
@@ -109,12 +110,10 @@ loadingWidget :: MonadWidget t m => m ()
 loadingWidget =
   divClass "no-page" $
     divClass "no-page__inner" $
-      divClass "loading loading--enlarged loading--alternate" blank
+      loadingCommonWidget
 
 errorWidget :: MonadWidget t m => m ()
 errorWidget =
   divClass "no-page" $
     divClass "no-page__inner" $
-      divClass "null null--data" $ do
-        elClass "b" "null__heading" $ text "Cannot retrieve the data"
-        divClass "null__message" $ text "Try to reload page"
+      errorCommonWidget

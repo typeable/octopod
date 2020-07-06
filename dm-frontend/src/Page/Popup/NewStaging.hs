@@ -1,4 +1,4 @@
-module Page.NewStagingPopup where
+module Page.Popup.NewStaging where
 
 import Control.Lens (preview, _1, _2)
 import Control.Monad

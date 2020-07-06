@@ -14,7 +14,8 @@ import Common.Types as CT
 import Common.Utils
 import Frontend.API
 import Frontend.Route
-import Page.EditStagingPopup
+import Page.Popup.EditStaging
+import Page.Popup.StagingLogs
 import Page.Utils
 
 
@@ -26,8 +27,7 @@ deploymentPage
     , Prerender js t m )
   => Event t ()
   -> DeploymentName -> m ()
-deploymentPage updAllEv dname = pageWrapper $ do
-  backButton
+deploymentPage updAllEv dname = do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let (okEv, errEv) = processResp dname respEv
@@ -36,17 +36,26 @@ deploymentPage updAllEv dname = pageWrapper $ do
     , deploymentWidget updAllEv <$> okEv ]
 
 
-deploymentWidget :: MonadWidget t m => Event t () -> DeploymentFullInfo -> m ()
+deploymentWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m
+    , Prerender js t m)
+  => Event t ()
+  -> DeploymentFullInfo
+  -> m ()
 deploymentWidget updEv dfi = do
-  respEv <- listEndpoint updEv
-  let
-    (okEv, _errEv) =
-      processResp (dfi ^. dfiName) respEv
-  dfiDyn <- holdDyn dfi okEv
-  editEv <- deploymentHead dfiDyn
-  stagingNotification never
-  deploymentBody updEv dfiDyn
+  (editEv, logsEv) <- pageWrapper $ do
+    respEv <- listEndpoint updEv
+    let (okEv, _errEv) = processResp (dfi ^. dfiName) respEv
+    dfiDyn <- holdDyn dfi okEv
+    editEv <- deploymentHead dfiDyn
+    stagingNotification never
+    logsEv <- deploymentBody updEv dfiDyn
+    pure (editEv, logsEv)
   void $ editStagingPopup editEv never
+  void $ stagingLogsPopup logsEv never
 
 deploymentHead
   :: MonadWidget t m
@@ -80,7 +89,7 @@ deploymentBody
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentFullInfo
-  -> m ()
+  -> m (Event t ActionId)
 deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   let nameDyn = dfiDyn <^.> dfiName
   divClass "staging__summary" $ do
@@ -134,7 +143,6 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
               dynText varDyn
               text ": "
             dynText valDyn
-
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text "Actions"
     divClass "staging__widget" $
@@ -145,19 +153,19 @@ actionsTable
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentName
-  -> m ()
+  -> m (Event t ActionId)
 actionsTable updEv nameDyn = do
   pb <- getPostBuild
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let
     okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
-  el "table" $ do
+  logsEvDyn <- el "table" $ do
     actionsTableHead
-    widgetHold_ actionsTableLoading $ leftmost
+    widgetHold actionsTableLoading $ leftmost
       [ actionsTableError <$ errEv
       , actionsTableData updEv nameDyn <$> okEv ]
-  blank
+  pure $ switchDyn logsEvDyn
 
 actionsTableHead :: MonadWidget t m => m ()
 actionsTableHead =
@@ -172,51 +180,54 @@ actionsTableHead =
       el "th" $ elClass "span" "visuallyhidden" $ text "Show logs action"
 
 
-actionsTableLoading :: MonadWidget t m => m ()
-actionsTableLoading =
+actionsTableLoading :: MonadWidget t m => m (Event t ActionId)
+actionsTableLoading = do
   el "tbody" $
     elClass "tr" "no-table" $
       elAttr "td" ("colspan" =: "7") $
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
+  pure never
 
-actionsTableError:: MonadWidget t m => m ()
-actionsTableError =
+actionsTableError:: MonadWidget t m => m (Event t ActionId)
+actionsTableError = do
   el "tbody" $
     elClass "tr" "no-table" $
       elAttr "td" ("colspan" =: "7") $
         divClass "null null--data" $ do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload page"
+  pure never
 
 actionsTableData
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentName
   -> [DeploymentLog]
-  -> m ()
+  -> m (Event t ActionId)
 actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
   let
     okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
   logsDyn <- holdDyn initLogs okEv
-  el "tbody" $
-    void $ simpleList logsDyn $ \logDyn ->
-      dyn_ $ actinRow <$> logDyn
+  logsEvDyn <- el "tbody" $
+    simpleList logsDyn $ \logDyn -> do
+      logsEvEv <- dyn $ actinRow <$> logDyn
+      switchHold never logsEvEv
+  pure $ switchDyn $ leftmost <$> logsEvDyn
 
-actinRow :: MonadWidget t m => DeploymentLog -> m ()
+actinRow :: MonadWidget t m => DeploymentLog -> m (Event t ActionId)
 actinRow DeploymentLog{..} = do
   el "tr" $ do
     el "td" $ text $ coerce action
     el "td" $ text $ coerce deploymentTag
-    el "td" $ divClass "listing" $ do
-      forM_ deploymentEnvs $ \(var, val) ->
-        divClass "listing__item bar" $ do
-          el "b" $ text $ var <> ":"
-          text val
+    el "td" $ overridesWidget deploymentEnvs
     el "td" $ text $ pack . show $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ pack . show . unDuration $ duration
+    el "td" $ do
+      bEv <- buttonClass "dash dash--smaller dash--next popup-handler" "Logs"
+      pure $ actionId <$ bEv
 
 backButton
   ::
@@ -250,28 +261,47 @@ data DeploymentPageNotification
   = DPMOk Text
   | DPMError Text
 
-loadingWidget :: MonadWidget t m => DeploymentName -> m ()
-loadingWidget dname = do
+loadingWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m
+    , Prerender js t m)
+  => DeploymentName
+  -> m ()
+loadingWidget dname = pageWrapper $ do
   divClass "page__head" $
     elClass "h1" "page__heading title" $ text $ coerce dname
   divClass "page__body" $
     divClass "no-staging" $
-      divClass "loading loading--enlarged loading--alternate" $
-        text "Loading..."
+      loadingCommonWidget
 
-errorWidget :: MonadWidget t m => DeploymentName -> m ()
-errorWidget dname = do
+errorWidget
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m
+    , Prerender js t m)
+  => DeploymentName
+  -> m ()
+errorWidget dname = pageWrapper $ do
   divClass "page__head" $
     elClass "h1" "page__heading title" $ text $ coerce dname
   divClass "page__body" $
     divClass "no-staging" $
-      divClass "null null--data" $
-        divClass "null__content" $ do
-          elClass "b" "null__heading" $ text "Cannot retrieve the data"
-          divClass "null__message" $ text "Try to reload page"
+      errorCommonWidget
 
-pageWrapper :: MonadWidget t m => m a -> m a
-pageWrapper m = divClass "page" $ divClass "page__wrap container" $ m
+pageWrapper
+  ::
+    ( MonadWidget t m
+    , RouteToUrl (R Routes) m
+    , SetRoute t (R Routes) m
+    , Prerender js t m)
+  => m a
+  -> m a
+pageWrapper m = divClass "page" $ divClass "page__wrap container" $ do
+  backButton
+  m
 
 stagingNotification
   :: MonadWidget t m => Event t DeploymentPageNotification -> m ()

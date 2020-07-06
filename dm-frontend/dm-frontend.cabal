@@ -30,8 +30,9 @@ executable frontend
                      , Page.ClassicPopup
                      , Page.Deployment
                      , Page.Deployments
-                     , Page.EditStagingPopup
-                     , Page.NewStagingPopup
+                     , Page.Popup.EditStaging
+                     , Page.Popup.NewStaging
+                     , Page.Popup.StagingLogs
                      , Page.Utils
   ghc-options:         -Wall
                        -Werror

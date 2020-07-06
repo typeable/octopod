@@ -1,12 +1,13 @@
 module Page.Utils where
 
+import Control.Lens
+import Control.Monad
 import Data.Map (Map)
 import Data.Proxy (Proxy(..))
 import Data.Maybe (fromMaybe)
-import Data.Text
+import Data.Text as T (Text, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
-import Control.Lens
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
@@ -43,15 +44,11 @@ dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
     DOM.contains (_element_raw btnEl) clicked
   openedDyn <- foldDyn switchState False $ leftmost
-    [ traceEvent "1" (clickInsideEv)
-    , traceEvent "2" (False <$ domEvent Click bodyEl)
-    , traceEvent "3" (True <$ domEvent Click btnEl) ]
+    [ clickInsideEv
+    , False <$ domEvent Click bodyEl
+    , True <$ domEvent Click btnEl ]
   let
-    -- switchState ev cur = ev && not cur
-    switchState True True = False
-    switchState True False = True
-    switchState False True = False
-    switchState False False = False
+    switchState ev cur = ev && not cur
     wrapperClassDyn = ffor openedDyn $ \case
       True -> "class" =: "drop drop--actions drop--expanded"
       False -> "class" =: "drop drop--actions"
@@ -224,3 +221,48 @@ dmTextInput' clss placeholder val errDyn = do
       Nothing -> blank
       Just x  -> divClass "input__output" $ text x
     pure $ value inp
+
+
+loadingCommonWidget :: MonadWidget t m => m ()
+loadingCommonWidget =
+  divClass "loading loading--enlarged loading--alternate" $
+    text "Loading..."
+
+errorCommonWidget :: MonadWidget t m => m ()
+errorCommonWidget =
+  divClass "null null--data" $
+    divClass "null__content" $ do
+      elClass "b" "null__heading" $ text "Cannot retrieve the data"
+      divClass "null__message" $ text "Try to reload page"
+
+overridesWidget :: MonadWidget t m => EnvPairs -> m ()
+overridesWidget envs = divClass "listing" $ do
+  let
+    visible = take 3 envs
+    envLength = length envs
+  listing visible
+  when (envLength > 3) $ mdo
+    let hidden = drop 3 envs
+    showDyn <- toggle False toggleEv
+    dyn_ $ showDyn <&> \case
+      True -> listing hidden
+      False -> blank
+    let
+      btnClassDyn = ifThenElseDyn showDyn
+        "listing__item expander bar expander--open"
+        "listing__item expander bar"
+      btnTextDyn = ifThenElseDyn showDyn "Hide"
+        $ "Show all (" <> (pack . show $ envLength) <> ")"
+    toggleEv <- buttonDynClass btnClassDyn btnTextDyn
+    blank
+  where
+    listing envs' = do
+      forM_ envs' $ \(var, val) ->
+        divClass "listing__item bar" $ do
+          el "b" $ text $ var <> ": "
+          text val
+
+ifThenElseDyn :: Reflex t => Dynamic t Bool -> b -> b -> Dynamic t b
+ifThenElseDyn bDyn t f = bDyn <&> \case
+  True -> t
+  False -> f

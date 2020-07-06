@@ -7,7 +7,7 @@ import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
 import Data.Map as M (Map, fromList, partition, toList, filter)
-import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
+import Data.Text as T (Text, toCaseFold, isPrefixOf)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -17,7 +17,7 @@ import Common.Utils
 import Frontend.API
 import Frontend.Route
 import Page.ClassicPopup
-import Page.NewStagingPopup
+import Page.Popup.NewStaging
 import Page.Utils
 
 
@@ -290,38 +290,6 @@ archivedDeploymentWidget clickedEv dname dDyn' = do
     let route = DashboardRoute :/ Just dname
     setRoute $ route <$ domEvent Click linkEl
 
-overridesWidget :: MonadWidget t m => EnvPairs -> m ()
-overridesWidget envs = divClass "listing" $ do
-  let
-    visible = take 3 envs
-    envLength = length envs
-  listing visible
-  when (envLength > 3) $ mdo
-    let hidden = drop 3 envs
-    showDyn <- toggle False toggleEv
-    dyn_ $ showDyn <&> \case
-      True -> listing hidden
-      False -> blank
-    let
-      btnClassDyn = ifThenElseDyn showDyn
-        "listing__item expander bar expander--open"
-        "listing__item expander bar"
-      btnTextDyn = ifThenElseDyn showDyn "Hide"
-        $ "Show all (" <> (pack . show $ envLength) <> ")"
-    toggleEv <- buttonDynClass btnClassDyn btnTextDyn
-    blank
-  where
-    listing envs' = do
-      forM_ envs' $ \(var, val) ->
-        divClass "listing__item bar" $ do
-          el "b" $ text $ var <> ": "
-          text val
-
-ifThenElseDyn :: Reflex t => Dynamic t Bool -> b -> b -> Dynamic t b
-ifThenElseDyn bDyn t f = bDyn <&> \case
-  True -> t
-  False -> f
-
 tableWrapper :: MonadWidget t m => m a -> m a
 tableWrapper ma =
   divClass "table table--stagings table--clickable" $
@@ -338,17 +306,12 @@ initTableWrapper ma = do
 loadingDeploymentsWidget :: MonadWidget t m => m ()
 loadingDeploymentsWidget =
   initTableWrapper $
-    divClass "loading loading--enlarged loading--alternate" $
-      text "Loading..."
+    loadingCommonWidget
 
 errDeploymentsWidget :: MonadWidget t m => m ()
 errDeploymentsWidget =
   initTableWrapper $
-    divClass "null null--data" $ do
-      elClass "b" "null__heading" $
-        text "Cannot retrieve the data"
-      divClass "null__message" $
-        text "Try to reload page"
+    errorCommonWidget
 
 noDeploymentsWidget' :: MonadWidget t m => m () -> m () -> m ()
 noDeploymentsWidget' h b =
