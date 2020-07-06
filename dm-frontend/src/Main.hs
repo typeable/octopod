@@ -81,6 +81,8 @@ headWidget = do
   elAttr "link"
     (  "href" =: "/static/styles/style.css"
     <> "rel" =: "stylesheet") blank
+  elAttr "script"
+    (  "src" =: "/static/vendors/outline/outline.js" ) blank
 
 
 headerWidget :: MonadWidget t m => m ()

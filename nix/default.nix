@@ -70,10 +70,11 @@ with {
           cp -av ${kubernetes-kubedog-bin} /usr/local/bin/kubedog
           chmod +x /usr/local/bin/*
 
-          mkdir -p /www/static/{images,styles}
+          mkdir -p /www/static/{images,styles,vendors/outline}
           cp -av ${dm-frontend}/bin/frontend.jsexe/* /www/
           cp -av ${dm-css}/production/images/* /www/static/images/
           cp -av ${dm-css}/production/styles/* /www/static/styles/
+          cp -av ${dm-css}/production/vendors/outline/* /www/static/vendors/outline/
         '';
 
         config = {
