@@ -3,8 +3,9 @@ module DMS (runDMS) where
 
 import           Chronos (Time, getTime, now)
 import           Control.Applicative
-import           Control.Concurrent (forkIO, threadDelay)
+import           Control.Concurrent (forkFinally, threadDelay)
 import           Control.Concurrent.Async (race_)
+import           Control.Concurrent.MVar
 import           Control.Concurrent.STM
 import           Control.Exception (throwIO, try, Exception)
 import           Control.Monad
@@ -16,6 +17,7 @@ import           Data.Aeson (Value (..), encode, toJSON)
 import           Data.Coerce
 import           Data.Conduit (ConduitT, yield)
 import           Data.Int (Int64)
+import           Data.IORef
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text (lines, pack, unpack, unwords)
@@ -31,6 +33,7 @@ import           Servant
 import           System.Environment (lookupEnv)
 import           System.Exit
 import           System.Log.FastLogger
+import           System.Posix.Signals (sigTERM)
 import           System.Process.Typed
 
 
@@ -38,6 +41,8 @@ import           API
 import           Common.API
 import           DMS.Args
 import           DMS.AWS
+import           DMS.Logger
+import           DMS.Unix
 import           Orphans ()
 import           TLS (createTLSOpts)
 import           Types
@@ -47,18 +52,21 @@ type PgPool = Pool Connection
 type AppM   = ReaderT AppState Handler
 
 data AppState = AppState
-  { pool             :: PgPool
-  , logger           :: TimedFastLogger
-  , eventSink        :: TChan WSEvent
-  , projectName      :: ProjectName
-  , baseDomain       :: Domain
-  , namespace        :: Namespace
-  , archiveRetention :: ArchiveRetention
-  , creationCommand  :: Command
-  , updateCommand    :: Command
-  , deletionCommand  :: Command
-  , checkingCommand  :: Command
-  , cleanupCommand   :: Command }
+  { pool                          :: PgPool
+  , logger                        :: TimedFastLogger
+  , eventSink                     :: TChan WSEvent
+  , bgWorkersCounter              :: IORef Int
+  , gracefulShudownActivated      :: IORef Bool
+  , shutdownSem                   :: MVar ()
+  , projectName                   :: ProjectName
+  , baseDomain                    :: Domain
+  , namespace                     :: Namespace
+  , archiveRetention              :: ArchiveRetention
+  , creationCommand               :: Command
+  , updateCommand                 :: Command
+  , deletionCommand               :: Command
+  , checkingCommand               :: Command
+  , cleanupCommand                :: Command }
 
 data DeploymentException
   = DeploymentFailed Int
@@ -74,9 +82,15 @@ data DeploymentListType
 
 runDMS :: IO ()
 runDMS = do
-  timeCache <- newTimeCache "%Y-%m-%d %T%z"
-  (logger', _) <- newTimedFastLogger timeCache (LogStdout defaultBufSize)
+  logger' <- newLogger
   logInfo logger' "started"
+  bgWorkersC <- newIORef 0
+  gracefulShudownAct <- newIORef False
+  shutdownS <- newEmptyMVar
+  void $ do
+    let
+      termHandler = terminationHandler bgWorkersC gracefulShudownAct shutdownS
+    installShutdownHandler logger' [sigTERM] termHandler
   opts <- parseArgs
   let
     a ?! e = a >>= maybe (die e) pure
@@ -99,6 +113,9 @@ runDMS = do
         pgPool
         logger'
         channel
+        bgWorkersC
+        gracefulShudownAct
+        shutdownS
         projName
         domain
         ns
@@ -122,6 +139,7 @@ runDMS = do
       `race_` (runTLS tlsOpts warpOpts app')
       `race_` (run wsServerPort wsApp')
       `race_` (runStatusUpdater appSt)
+      `race_` (runShutdownHandler appSt)
 
 initConnectionPool :: ByteString -> Int -> IO PgPool
 initConnectionPool dbConnStr =
@@ -182,6 +200,7 @@ listH = do
 
 createH :: Deployment -> AppM CommandResponse
 createH dep = do
+  failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
   let
@@ -202,7 +221,7 @@ createH dep = do
         { errBody = validationError ["deployment already exists"] [] }
     Left (SqlError _ _ _ _ _)                               ->
       throwError err409 { errBody = appError "some database error" }
-  void . liftIO . forkIO $ do
+  liftIO . runBgWorker st $ do
     (ec, out, err) <- createDeployment dep st
     t2 <- now
     let
@@ -287,6 +306,7 @@ selectDeployment p dName lType = do
 
 editH :: DeploymentName -> EnvPairs -> AppM CommandResponse
 editH dName dEnvs = do
+  failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
   let
@@ -304,7 +324,7 @@ editH dName dEnvs = do
           , "--tag", coerce dTag
           ] ++ concat [["--env", concatPair p] | p <- dEnvs]
         cmd  = coerce $ updateCommand st
-      void . liftIO . forkIO $ do
+      liftIO . runBgWorker st $ do
         void $ updateEditDeployment pgPool
         log $ "call " <> unwords (cmd : args)
         (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
@@ -337,6 +357,7 @@ editH dName dEnvs = do
 
 deleteH :: DeploymentName -> AppM CommandResponse
 deleteH dName = do
+  failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
   let
@@ -350,7 +371,7 @@ deleteH dName = do
     cmd     = coerce $ deletionCommand st
     arch    = ArchivedFlag True
   dep <- selectDeployment pgPool dName AllDeployments
-  void . liftIO . forkIO $ do
+  liftIO . runBgWorker st $ do
     log $ "call " <> unwords (cmd : args)
     (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     void $ archiveDeployment pgPool dName
@@ -374,6 +395,7 @@ archiveDeployment p dName = withResource p $ \conn -> do
 
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
+  failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
   let pgPool = pool st
@@ -394,7 +416,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
           ] ++ concat [["--env", concatPair e] | e <- envPairs]
         cmd  = coerce $ updateCommand st
       failIfImageNotFound dTag
-      void . liftIO . forkIO $ do
+      liftIO . runBgWorker st $ do
         void $ updateDeployment pgPool dName dTag envPairs
         log $ "call " <> unwords (cmd : args)
         (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
@@ -475,11 +497,12 @@ statusH dName = do
 
 cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
+  failIfGracefulShudownActivated
   st <- ask
-  cleanupDeployment dName st
+  liftIO . runBgWorker st $ cleanupDeployment dName st
   pure Success
 
-cleanupDeployment :: DeploymentName -> AppState -> AppM ()
+cleanupDeployment :: DeploymentName -> AppState -> IO ()
 cleanupDeployment dName st = do
   let
     log     = logInfo (logger st)
@@ -490,15 +513,14 @@ cleanupDeployment dName st = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ cleanupCommand st
-  void . liftIO . forkIO $ do
-    log $ "call " <> unwords (cmd : args)
-    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
-    print out >> print err
-    void $ deleteDeploymentLogs pgPool dName
-    void $ deleteDeployment pgPool dName
-    log $ "deployment destroyed, name: " <> coerce dName
-    sendReloadEvent st
-    handleExitCode ec
+  log $ "call " <> unwords (cmd : args)
+  (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+  print out >> print err
+  void $ deleteDeploymentLogs pgPool dName
+  void $ deleteDeployment pgPool dName
+  log $ "deployment destroyed, name: " <> coerce dName
+  sendReloadEvent st
+  handleExitCode ec
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
@@ -513,6 +535,7 @@ deleteDeployment p n = withResource p $ \conn ->
 
 cleanArchiveH :: AppM CommandResponse
 cleanArchiveH = do
+  failIfGracefulShudownActivated
   st <- ask
   let
     pgPool  = pool st
@@ -522,17 +545,19 @@ cleanArchiveH = do
       \WHERE archived = 't' AND archived_at + interval '?' second < now()"
   retrieved :: [Only DeploymentName] <- liftIO $
     withResource pgPool $ \conn -> query conn q (Only archRetention)
-  void $ for retrieved $ \(Only dName) -> cleanupDeployment dName st
+  void . liftIO $ for retrieved $ \(Only dName) ->
+    runBgWorker st $ cleanupDeployment dName st
   pure Success
 
 restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
+  failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
   let pgPool  = pool st
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
   failIfImageNotFound $ tag dep
-  void . liftIO . forkIO $ do
+  liftIO . runBgWorker st $ do
     (ec, out, err) <- createDeployment dep st
     let
       q =
@@ -693,15 +718,33 @@ newStatus (ExitFailure _) UpdatePending ts | ts > updatePeriod = Failure
 newStatus (ExitFailure _) DeletePending _                      = Failure
 newStatus (ExitFailure _) oldStatus     _                      = oldStatus
 
-logInfo :: TimedFastLogger -> Text -> IO ()
-logInfo l = logWithSeverity l "INFO"
+failIfGracefulShudownActivated :: AppM ()
+failIfGracefulShudownActivated = do
+  gracefulShudownAct <- gracefulShudownActivated <$> ask
+  gracefulShudown <- liftIO . readIORef $ gracefulShudownAct
+  if gracefulShudown
+    then throwError err405 { errBody = appError "graceful shutdown activated" }
+    else pure ()
 
-logWarning :: TimedFastLogger -> Text -> IO ()
-logWarning l = logWithSeverity l "WARN"
+terminationHandler :: IORef Int -> IORef Bool -> MVar () -> IO ()
+terminationHandler bgWorkersC gracefulShudownAct shutdownS = do
+  atomicWriteIORef gracefulShudownAct True
+  c <- readIORef bgWorkersC
+  if c == 0
+    then putMVar shutdownS ()
+    else pure ()
 
-logWithSeverity :: ToLogStr msg => TimedFastLogger -> ByteString -> msg -> IO ()
-logWithSeverity l severity msg = l $ \ft -> metadata ft <> message
+runShutdownHandler :: AppState -> IO ()
+runShutdownHandler = takeMVar . shutdownSem
+
+runBgWorker :: AppState -> IO () -> IO ()
+runBgWorker state act = void $ forkFinally act' cleanup
   where
-    metadata :: ByteString -> LogStr
-    metadata ft = foldMap toLogStr ["[", ft, " ", severity, "] "]
-    message     = toLogStr msg <> toLogStr ("\n" :: ByteString)
+    act' =
+      atomicModifyIORef' (bgWorkersCounter state) (\c -> (c + 1, c)) >> act
+    cleanup _ = do
+      c <- atomicModifyIORef' (bgWorkersCounter state) (\c -> (c - 1, c - 1))
+      gracefulShudown <- readIORef (gracefulShudownActivated state)
+      if gracefulShudown && c == 0
+        then putMVar (shutdownSem state) ()
+        else pure ()

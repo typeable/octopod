@@ -42,6 +42,8 @@ library
       DMC.Args
       DMS
       DMS.Args
+      DMS.Logger
+      DMS.Unix
       DMS.AWS
       Orphans
       TLS
@@ -85,7 +87,9 @@ library
     , text
     , tls
     , transformers
+    , transformers-base
     , typed-process
+    , unix
     , warp
     , warp-tls
     , x509
@@ -133,7 +137,9 @@ executable dmc-exe
     , text
     , tls
     , transformers
+    , transformers-base
     , typed-process
+    , unix
     , warp
     , warp-tls
     , x509
@@ -180,7 +186,9 @@ executable dms-exe
     , text
     , tls
     , transformers
+    , transformers-base
     , typed-process
+    , unix
     , warp
     , warp-tls
     , x509
@@ -227,7 +235,9 @@ test-suite dm-test
     , text
     , tls
     , transformers
+    , transformers-base
     , typed-process
+    , unix
     , warp
     , warp-tls
     , x509
