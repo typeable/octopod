@@ -125,6 +125,36 @@ buttonClassEnabled cl lbl dDyn = do
     text lbl
   return $ domEvent Click bEl
 
+aButtonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
+aButtonClass cl lbl = do
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a"
+    (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
+  return $ domEvent Click bEl
+
+aButtonDynClass
+  :: (DomBuilder t m, PostBuild t m)
+  => Dynamic t Text
+  -> Dynamic t Text
+  -> m (Event t ())
+aButtonDynClass clDyn lblDyn = do
+  let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a" attrDyn $
+    dynText lblDyn
+  return $ domEvent Click bEl
+
+aButtonClassEnabled
+  :: (DomBuilder t m, PostBuild t m)
+  => Text -> Text -> Dynamic t Bool -> m (Event t ())
+aButtonClassEnabled cl lbl dDyn = do
+  let
+    attrDyn = ffor dDyn $ \case
+      True  -> "class" =: cl <> "type" =: "button"
+      False ->  "class" =: (cl <> " button--disabled")
+        <> "type" =: "button" <> "disabled" =: ""
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a" attrDyn $
+    text lbl
+  return $ domEvent Click bEl
+
 intToUTCTime :: Int -> UTCTime
 intToUTCTime = posixSecondsToUTCTime . realToFrac
 
@@ -175,14 +205,29 @@ formatPosixToDateTime = pack
   . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
   . intToUTCTime
 
-statusWidget :: MonadWidget t m => Dynamic t (Maybe CurrentDeploymentStatus) -> m ()
-statusWidget stDyn = do
+currentStatusWidget
+  :: MonadWidget t m
+  => Dynamic t (Maybe CurrentDeploymentStatus)
+  -> m ()
+currentStatusWidget stDyn = do
   stDyn' <- holdUniqDyn stDyn
   dyn_ $ stDyn' <&> \case
     Nothing -> divClass "loading loading--status-alike" $ text "Loading"
     Just (CurrentDeploymentStatus st) -> case st of
       CT.Ok -> divClass "status status--success" $ text "Success"
       CT.Error -> divClass "status status--failure" $ text "Failure"
+
+statusWidget :: MonadWidget t m => Dynamic t DeploymentStatus -> m ()
+statusWidget stDyn = do
+  stDyn' <- holdUniqDyn stDyn
+  let
+    pendingWidget = divClass "status status--pending"
+  dyn_ $ stDyn' <&> \case
+    Running -> divClass "status status--success" $ text "Running"
+    Failure -> divClass "status status--failure" $ text "Failure"
+    CreatePending -> pendingWidget $ text "Creating..."
+    UpdatePending -> pendingWidget $ text "Updating..."
+    DeletePending -> pendingWidget $ text "Deleting..."
 
 dmTextInput
   :: MonadWidget t m

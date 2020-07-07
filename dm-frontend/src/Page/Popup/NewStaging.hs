@@ -53,7 +53,7 @@ newStagingPopupBody
   :: MonadWidget t m
   => Event t (ReqResult tag CommandResponse)
   -> m (Dynamic t Deployment, Dynamic t Bool)
-newStagingPopupBody errEv =
+newStagingPopupBody errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv

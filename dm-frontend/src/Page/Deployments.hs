@@ -6,7 +6,7 @@ import Control.Monad
 import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
-import Data.Map as M (Map, fromList, partition, toList, filter)
+import Data.Map as M (Map, fromList, partition, filter)
 import Data.Text as T (Text, toCaseFold, isPrefixOf)
 import Obelisk.Route.Frontend
 import Reflex.Dom
@@ -101,18 +101,10 @@ deploymentsListWidget updAllEv termDyn ds = mdo
     okUpdEv = fmapMaybe reqSuccess updRespEv
     mkMap = M.fromList . fmap (\x -> (x ^. dfiName , x) )
   dsDyn <- fmap mkMap <$> holdDyn ds okUpdEv
-  stsDyn <- listWithKey dsDyn $ \k d -> do
-    pb <- getPostBuild
-    respEv <- statusEndpoint (constDyn $ Right k)
-      $ leftmost [pb, () <$ updated d]
-    let stEv = fmapMaybe reqSuccess respEv
-    stDyn <- holdDyn Nothing $ Just <$>  stEv
-    pure $ (, stDyn) <$> d
-  let dswstDyn = flatDynMapDyn stsDyn
   let
-    isArchived = view (_1 . field @"archived")
-    filteredDyn = ffor2 termDyn dswstDyn $ \term dswst ->
-      M.filter (searchDeployments term . fst) dswst
+    isArchived = view (field @"archived")
+    filteredDyn = ffor2 termDyn dsDyn $ \term ds' ->
+      M.filter (searchDeployments term) ds'
     (archivedDsDyn, activeDsDyn) = splitDynPure $ M.partition isArchived
       <$> filteredDyn
   clickedEv <- elementClick
@@ -129,15 +121,6 @@ searchDeployments term d = term' `isPrefixOf` dname
     dtag = d ^. field @"deployment" . field @"tag" . coerced . to toCaseFold
     dname = d ^. dfiName . coerced . to toCaseFold
 
-flatDynMapDyn
-  :: (Reflex t, Ord k)
-  => Dynamic t (Map k (Dynamic t a))
-  -> Dynamic t (Map k a)
-flatDynMapDyn x =
-  fmap M.fromList . join $ distributeListOverDyn . fmap f . M.toList <$> x
-  where
-    f (k, d) = (k,) <$> d
-
 activeDeploymentsWidget
   ::
     ( MonadWidget t m
@@ -145,8 +128,7 @@ activeDeploymentsWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t
-    (Map DeploymentName
-      (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus)))
+    (Map DeploymentName DeploymentFullInfo)
   -> m ()
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
@@ -164,16 +146,15 @@ activeDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
-  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus))
+  -> Dynamic t (DeploymentFullInfo)
   -> m ()
 activeDeploymentWidget clickedEv dname dDyn' = do
-  dDyn <- holdUniqDyn $ fst <$> dDyn'
-  let stDyn = join $ snd <$> dDyn'
+  dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     (linkEl, _) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
-        statusWidget stDyn
+        statusWidget $ constDyn status
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
@@ -216,8 +197,7 @@ archivedDeploymentsWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t
-    (Map DeploymentName
-      (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus)))
+    (Map DeploymentName DeploymentFullInfo)
   -> m ()
 archivedDeploymentsWidget clickedEv dsDyn = do
   showDyn <- toggleButton
@@ -257,10 +237,10 @@ archivedDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> DeploymentName
-  -> Dynamic t (DeploymentFullInfo, Dynamic t (Maybe CurrentDeploymentStatus))
+  -> Dynamic t DeploymentFullInfo
   -> m ()
 archivedDeploymentWidget clickedEv dname dDyn' = do
-  dDyn <- holdUniqDyn $ fst <$> dDyn'
+  dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     (linkEl, _) <- el' "tr" $ do
       el "td" $ do

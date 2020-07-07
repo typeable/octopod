@@ -65,21 +65,28 @@ deploymentHead dfiDyn =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
     elClass "h1" "page__heading title" $ dynText dname
-    editEvEv <- dyn $ dfiDyn <^.> field @"archived" <&> \case
+    editEvEv <- dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
       True -> mdo
-        btnEnabledDyn <- holdDyn True $ False <$ btnEv
-        btnEv <- buttonClassEnabled
+        let btnState = not $ isPending $ dfi ^. field @"status"
+        btnEnabledDyn <- holdDyn btnState $ False <$ btnEv
+        btnEv <- aButtonClassEnabled
           "page__action button button--secondary button--restore classic-popup-handler"
           "Recover from archive"
           btnEnabledDyn
         void $ restoreEndpoint (Right . coerce <$> dname) btnEv
         pure never
-      False -> do
-        (editEl, _) <- elClass' "a" "page__action button button--edit popup-handler" $
-          text "Edit staging"
-        elClass "a" "page__action button button--secondary button--delete classic-popup-handler" $
-          text "Move to archive"
-        pure $ R.tag (current dfiDyn) $ domEvent Click editEl
+      False -> mdo
+        let btnState = not $ isPending $ dfi ^. field @"status"
+        btnEnabledDyn <- holdDyn btnState $ False <$ leftmost [ editEv, archEv ]
+        editEv <- aButtonClassEnabled
+          "page__action button button--edit popup-handler"
+          "Edit staging"
+          btnEnabledDyn
+        archEv <- aButtonClassEnabled
+          "page__action button button--secondary button--delete classic-popup-handler"
+          "Move to archive"
+          btnEnabledDyn
+        pure $ R.tag (current dfiDyn) editEv
     switchHold never editEvEv
 
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a
@@ -96,11 +103,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
     divClass "staging__stat" $ do
       elClass "b" "staging__param" $ text "Status"
       divClass "staging__value" $ do
-        pb <- getPostBuild
-        respEv <- statusEndpoint (Right <$> nameDyn) $ leftmost [pb, updEv]
-        let statusEv = fmapMaybe reqSuccess respEv
-        statusDyn <- holdDyn Nothing $ Just <$> statusEv
-        statusWidget statusDyn
+        statusWidget $ dfiDyn <^.> field @"status"
     divClass "staging__stat" $ do
       elClass "b" "staging__param" $ text "Created"
       divClass "staging__value" $ do

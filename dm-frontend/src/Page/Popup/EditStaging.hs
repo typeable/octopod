@@ -56,7 +56,7 @@ editStagingPopupBody
   => DeploymentFullInfo
   -> Event t (ReqResult tag CommandResponse)
   -> m (Dynamic t DeploymentUpdate)
-editStagingPopupBody dfi errEv =
+editStagingPopupBody dfi errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv

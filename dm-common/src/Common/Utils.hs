@@ -20,3 +20,11 @@ infixl 8 <^.>, <^..>, <^?>
 
 dfiName :: Getter DeploymentFullInfo DeploymentName
 dfiName = field @"deployment" . field @"name"
+
+isPending :: DeploymentStatus -> Bool
+isPending = \case
+  Running -> False
+  Failure -> False
+  CreatePending -> True
+  UpdatePending -> True
+  DeletePending -> True
