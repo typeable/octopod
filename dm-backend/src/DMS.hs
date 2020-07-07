@@ -692,7 +692,9 @@ runStatusUpdater state = do
         (\(n, s, t) -> (n, read . unpack $ s, coerce t)) <$> rows
     checkResult <- for checkList $ \(dName, dStatus, ts) -> do
       let
-        args = unpack <$> coerce ns : coerce dName : []
+        args =
+          [ "--namespace", unpack . coerce $ ns
+          , "--name", unpack . coerce $ dName ]
         cmd  = unpack . coerce $ checkingCmd
       ec <- runCommandWithoutPipes cmd args
       pure (dName, newStatus ec dStatus ts, ts)
