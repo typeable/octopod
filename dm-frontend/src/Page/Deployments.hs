@@ -3,11 +3,13 @@ module Page.Deployments
 
 import Control.Lens
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Coerce
 import Data.Generics.Product (field)
 import Data.List as L (null)
 import Data.Map as M (Map, fromList, partition, filter)
-import Data.Text as T (Text, toCaseFold, isPrefixOf)
+import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
+import Data.Time (getCurrentTime, diffUTCTime)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -44,16 +46,19 @@ deploymentsWidget
   -> m ()
 deploymentsWidget updAllEv = do
   showNewStagingEv <- deploymentsWidgetWrapper $ mdo
-    (showNewStagingEv', termDyn) <- deploymentsHeadWidget
-    initDeploymentsListWidget updAllEv termDyn
+    (showNewStagingEv', termDyn) <- deploymentsHeadWidget okUpdEv
+    okUpdEv <- initDeploymentsListWidget updAllEv termDyn
     pure showNewStagingEv'
   void $ newStagingPopup showNewStagingEv never
 
-deploymentsHeadWidget :: MonadWidget t m => m (Event t (), Dynamic t Text)
-deploymentsHeadWidget =
+deploymentsHeadWidget
+  :: MonadWidget t m
+  => Event t ()
+  -> m (Event t (), Dynamic t Text)
+deploymentsHeadWidget okUpdEv =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
-    divClass "page__note" $ text "Updated <n> mins ago"
+    lastUpdateWidget okUpdEv
     termDyn <- divClass "page__action input input--search input--has-clear-type page__action--search" $ mdo
       termDyn' <- inputElement $ def
         & initialAttributes .~
@@ -68,6 +73,30 @@ deploymentsHeadWidget =
       "page__action button button--add popup-handler" $ text "New staging"
     pure $ (domEvent Click nsEl, value termDyn)
 
+lastUpdateWidget :: MonadWidget t m => Event t () -> m ()
+lastUpdateWidget okUpdEv = do
+  updTimeEv <- performEvent $ liftIO getCurrentTime <$ okUpdEv
+  initTime <- liftIO getCurrentTime
+  updTimeB <- hold initTime updTimeEv
+  tickEv <- tickLossyFromPostBuildTime 1
+  let
+    diffEv = attachWith calcMins updTimeB tickEv
+    calcMins lastUpd TickInfo{..} = let
+      diffSec = diffUTCTime _tickInfo_lastUTC lastUpd
+      diffMin = diffSec / 60
+      in floor diffMin :: Int
+    mkMsg ms
+      | ms < 1 = "Updated just now"
+      | isSingular ms = "Updated " <> (show' $ ms) <> " minute ago"
+      | ms < 60 = "Updated " <> (show' $ ms) <> " minutes ago"
+      | isSingular (ms `div` 60) =
+        "Updated " <> (show'$ ms `div` 60) <> " hour ago"
+      | otherwise = "Updated " <> (show' $ ms `div` 60) <> " hours ago"
+    isSingular x = x `mod` 100 /= 11 && x `mod` 10 == 1
+    show' = pack . show
+  diffDyn <- holdDyn 0 diffEv
+  divClass "page__note" $ dynText $ mkMsg <$> diffDyn
+
 initDeploymentsListWidget
   ::
     ( MonadWidget t m
@@ -75,16 +104,18 @@ initDeploymentsListWidget
     , SetRoute t (R Routes) m )
   => Event t ()
   -> Dynamic t Text
-  -> m ()
+  -> m (Event t ())
 initDeploymentsListWidget updAllEv termDyn = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
     okEv = fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
-  widgetHold_ loadingDeploymentsWidget $ leftmost
+    w m = m >> pure never
+  okUpdEvDyn <- widgetHold (w loadingDeploymentsWidget) $ leftmost
     [ deploymentsListWidget updAllEv termDyn <$> okEv
-    , errDeploymentsWidget <$ errEv ]
+    , (w errDeploymentsWidget) <$ errEv ]
+  pure $ switchDyn okUpdEvDyn
 
 deploymentsListWidget
   ::
@@ -94,7 +125,7 @@ deploymentsListWidget
   => Event t ()
   -> Dynamic t Text
   -> [DeploymentFullInfo]
-  -> m ()
+  -> m (Event t ())
 deploymentsListWidget updAllEv termDyn ds = mdo
   updRespEv <- listEndpoint updAllEv
   let
@@ -110,6 +141,7 @@ deploymentsListWidget updAllEv termDyn ds = mdo
   clickedEv <- elementClick
   activeDeploymentsWidget clickedEv activeDsDyn
   archivedDeploymentsWidget clickedEv archivedDsDyn
+  pure $ () <$ okUpdEv
 
 searchDeployments
   :: Text -> DeploymentFullInfo -> Bool
