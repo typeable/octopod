@@ -14,6 +14,7 @@ import Common.Types as CT
 import Common.Utils
 import Frontend.API
 import Frontend.Route
+import Page.ClassicPopup
 import Page.Popup.EditStaging
 import Page.Popup.StagingLogs
 import Page.Utils
@@ -77,7 +78,7 @@ deploymentHead dfiDyn =
         pure never
       False -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
-        btnEnabledDyn <- holdDyn btnState $ False <$ leftmost [ editEv, archEv ]
+        btnEnabledDyn <- holdDyn btnState $ False <$ delEv
         editEv <- aButtonClassEnabled
           "page__action button button--edit popup-handler"
           "Edit staging"
@@ -86,6 +87,12 @@ deploymentHead dfiDyn =
           "page__action button button--secondary button--delete classic-popup-handler"
           "Move to archive"
           btnEnabledDyn
+        delEv <- confirmDeletePopup archEv $ do
+          text "Are you sure  you want to delete"
+          el "br" blank
+          dynText dname
+          text " staging?"
+        void $ deleteEndpoint (Right . coerce <$> dname) delEv
         pure $ R.tag (current dfiDyn) editEv
     switchHold never editEvEv
 
