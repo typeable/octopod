@@ -89,7 +89,7 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
-envVarsInput :: MonadWidget t m => m (Dynamic t EnvPairs)
+envVarsInput :: forall t m . MonadWidget t m => m (Dynamic t EnvPairs)
 envVarsInput = do
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text "Overrides"
@@ -100,7 +100,10 @@ envVarsInput = do
           addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
         envsDyn <- foldDyn appEndo mempty $ leftmost [ addEv, updEv ]
         (_, updEv)  <- runEventWriterT $ listWithKey envsDyn envVarInput
-        clickEv <- buttonClass "overrides__add dash dash--add" "Add an override"
+        let addDisabledDyn = all ( (/= "") . fst ) . M.elems <$> envsDyn
+        clickEv <- buttonClassEnabled'
+          "overrides__add dash dash--add" "Add an override" addDisabledDyn
+          "dash--disabled"
         pure $ elems <$> envsDyn
 
 envVarInput

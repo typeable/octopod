@@ -125,6 +125,19 @@ buttonClassEnabled cl lbl dDyn = do
     text lbl
   return $ domEvent Click bEl
 
+buttonClassEnabled'
+  :: (DomBuilder t m, PostBuild t m)
+  => Text -> Text -> Dynamic t Bool -> Text -> m (Event t ())
+buttonClassEnabled' cl lbl dDyn disClass = do
+  let
+    attrDyn = ffor dDyn $ \case
+      True  -> "class" =: cl <> "type" =: "button"
+      False ->  "class" =: (cl <> " " <> disClass)
+        <> "type" =: "button" <> "disabled" =: ""
+  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+    text lbl
+  return $ domEvent Click bEl
+
 aButtonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
 aButtonClass cl lbl = do
   (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a"

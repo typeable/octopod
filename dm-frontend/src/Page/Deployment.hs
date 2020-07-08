@@ -78,7 +78,7 @@ deploymentHead dfiDyn =
         pure never
       False -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
-        btnEnabledDyn <- holdDyn btnState $ False <$ delEv
+        btnEnabledDyn <- holdDyn btnState never
         editEv <- aButtonClassEnabled
           "page__action button button--edit popup-handler"
           "Edit staging"

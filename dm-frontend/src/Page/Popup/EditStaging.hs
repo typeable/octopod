@@ -50,7 +50,6 @@ editStagingPopupHeader dname =
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
-
 editStagingPopupBody
   :: MonadWidget t m
   => DeploymentFullInfo
@@ -95,7 +94,10 @@ envVarsInput evs = do
           addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
         envsDyn <- foldDyn appEndo initEnvs $ leftmost [ addEv, updEv ]
         (_, updEv)  <- runEventWriterT $ listWithKey envsDyn envVarInput
-        clickEv <- buttonClass "overrides__add dash dash--add" "Add an override"
+        let addDisabledDyn = all ( (/= "") . fst ) . M.elems <$> envsDyn
+        clickEv <- buttonClassEnabled'
+          "overrides__add dash dash--add" "Add an override" addDisabledDyn
+          "dash--disabled"
         pure $ elems <$> envsDyn
 
 envVarInput
