@@ -8,6 +8,7 @@ import Control.Lens
 import Data.Aeson
 import Data.Proxy
 import Data.Text as T
+import GHC.TypeLits
 import Reflex.Dom as R
 import Servant.API as S
 import Servant.Reflex as SR
@@ -35,8 +36,8 @@ apiClients =
         & xhrRequest_config
         . xhrRequestConfig_headers
         . at "Authorization" ?~ auth
-        & xhrRequest_url %~ (T.replace "#PLACEHOLDER#" url)
-    host = SR.BaseFullUrl SR.Https "#PLACEHOLDER#" 443 "/"
+        & xhrRequest_url %~ (T.append url)
+    host = SR.BasePath "/"
 
 
 listEndpoint
@@ -134,3 +135,6 @@ commandResponse = \case
     getArrayBufferBody = \case
       XhrResponseBody_ArrayBuffer x -> Just x
       _                             -> Nothing
+
+wsPath :: Text
+wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)

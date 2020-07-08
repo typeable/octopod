@@ -55,3 +55,5 @@ type DeploymentAPI' c =
     )
 
 type API = DeploymentAPI' CaptureName
+
+type ApiWSPath = "event"

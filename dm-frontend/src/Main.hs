@@ -45,7 +45,8 @@ wsUpdate = do
       , _webSocketConfig_reconnect = True
       , _webSocketConfig_protocols = []
       }
-  wsUrl <- getWsUrl
+  wsHost <- getWsUrl
+  let wsUrl = wsHost <> "/" <> wsPath
   ws <- webSocket wsUrl wsConfig
   pure $ () <$ _webSocket_recv ws
 

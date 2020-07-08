@@ -71,6 +71,7 @@ executable frontend
                      , ghcjs-dom
                      , jsaddle
                      , lens
+                     , network-uri
                      , obelisk-route
                      , reflex-dom
                      , reflex-dom-helpers
