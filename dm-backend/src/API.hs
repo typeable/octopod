@@ -4,4 +4,6 @@ import Data.Aeson (Value (..))
 import Servant.API
 import Servant.API.WebSocketConduit
 
-type WebSocketAPI = "event" :> WebSocketSource Value
+import Common.API (ApiWSPath)
+
+type WebSocketAPI = ApiWSPath :> WebSocketSource Value
