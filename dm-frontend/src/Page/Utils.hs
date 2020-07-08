@@ -248,37 +248,43 @@ dmTextInput
   -> Text
   -> Text
   -> Maybe Text
-  -> Dynamic t (Maybe Text)
-  -> m (Dynamic t Text)
-dmTextInput clss lbl placeholder val errDyn =
+  -> Event t Text
+  -> m (Dynamic t Text, Dynamic t Bool)
+dmTextInput clss lbl placeholder val errEv =
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text lbl
     elClass "div" "staging__widget" $
-      dmTextInput' clss placeholder val errDyn
+      dmTextInput' clss placeholder val errEv
 
 dmTextInput'
   :: MonadWidget t m
   => Text
   -> Text
   -> Maybe Text
-  -> Dynamic t (Maybe Text)
-  -> m (Dynamic t Text)
-dmTextInput' clss placeholder val errDyn = do
+  -> Event t Text
+  -> m (Dynamic t Text, Dynamic t Bool)
+dmTextInput' clss placeholder val errEv = mdo
   let
-    classDyn = errDyn <&> \case
-      Nothing -> clss <> " input"
-      Just _  -> clss <> " input input--error"
-  elDynClass "div" classDyn $ do
+    inpClass = " input"
+    inpErrClass = " input input--error"
+  isValid <- holdDyn True $ leftmost
+    [ False <$ errEv
+    , True <$ updated valDyn ]
+  classDyn <- holdDyn inpClass $ leftmost
+    [ (clss <> inpErrClass) <$ errEv
+    , (clss <> inpClass) <$ updated valDyn ]
+  valDyn <- elDynClass "div" classDyn $ do
     inp <- inputElement $ def
       & initialAttributes .~
         (  "type" =: "text"
         <> "class" =: "input__widget"
         <> "placeholder" =: placeholder )
       & inputElementConfig_initialValue .~ fromMaybe "" val
-    dyn_ $ errDyn <&> \case
-      Nothing -> blank
-      Just x  -> divClass "input__output" $ text x
+    widgetHold_ blank $ leftmost
+      [ divClass "input__output" . text <$> errEv
+      , blank <$ updated valDyn ]
     pure $ value inp
+  pure (valDyn, isValid)
 
 
 loadingCommonWidget :: MonadWidget t m => m ()

@@ -1,6 +1,6 @@
 module Page.Popup.EditStaging where
 
-import Control.Lens (preview, _2, (^.), coerced, to)
+import Control.Lens (preview, (^.), coerced, to, _2)
 import Control.Monad
 import Data.Coerce
 import Data.Functor
@@ -10,7 +10,7 @@ import Data.Map as M
 import Data.Monoid
 import Data.Text as T (Text, intercalate)
 import Prelude as P
-import Reflex.Dom
+import Reflex.Dom as R
 
 import Common.Types
 import Common.Utils
@@ -27,8 +27,8 @@ editStagingPopup
 editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
-    (closeEv', saveEv) <- editStagingPopupHeader dname
-    (deploymentDyn) <- editStagingPopupBody dfi respEv
+    (closeEv', saveEv) <- editStagingPopupHeader dname validDyn
+    (deploymentDyn, validDyn) <- editStagingPopupBody dfi respEv
     respEv <- updateEndpoint (constDyn $ Right dname)
       (Right <$> deploymentDyn) saveEv
     let
@@ -40,13 +40,14 @@ editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
 editStagingPopupHeader
   :: MonadWidget t m
   => DeploymentName
+  -> Dynamic t Bool
   -> m (Event t (), Event t ())
-editStagingPopupHeader dname =
+editStagingPopupHeader dname validDyn =
   divClass "popup__head" $ do
     closeEv <- buttonClass "popup__close" "Close popup"
     elClass "h2" "popup__project" $ text $ "Edit " <> coerce dname
     saveEv <- divClass "popup__operations" $
-      buttonClass "popup__action button button--save" "Save"
+      buttonClassEnabled "popup__action button button--save" "Save" validDyn
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
@@ -54,26 +55,29 @@ editStagingPopupBody
   :: MonadWidget t m
   => DeploymentFullInfo
   -> Event t (ReqResult tag CommandResponse)
-  -> m (Dynamic t DeploymentUpdate)
+  -> m (Dynamic t DeploymentUpdate, Dynamic t Bool)
 editStagingPopupBody dfi errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv
-      otherFailureEv = AppError <$> fmapMaybe reqFailure errEv
-      errsEv = leftmost [commandResponseEv, otherFailureEv]
-      appErrEv = fmapMaybe (preview (_Ctor @"AppError")) errsEv
-      tagErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) errsEv
-      toMaybe [] = Nothing
-      toMaybe xs = Just $ T.intercalate ". " xs
+      appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
       dfiTag = dfi ^. field @"deployment" . field @"tag" . coerced . to Just
       dfiVars = dfi ^. field @"deployment" . field @"envs"
-    tagErrDyn <- holdDyn Nothing $ toMaybe <$> tagErrEv
+      tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
-    tagDyn <- dmTextInput "tag" "Tag" "Tag" dfiTag tagErrDyn
+    (tagDyn, tOkEv) <- dmTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
     envVarsDyn <- envVarsInput dfiVars
-    pure $ DeploymentUpdate
+    validDyn <- holdDyn True $ updated tOkEv
+    pure $ (DeploymentUpdate
       <$> (DeploymentTag <$> tagDyn)
-      <*> (Just <$> envVarsDyn)
+      <*> (Just <$> envVarsDyn), validDyn)
+  where
+    getTagError crEv tagDyn = let
+      tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) crEv
+      tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
+      badTagText = "Tag should not be empty"
+      badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
+      in leftmost [tagErrEv, badNameEv]
 
 errorHeader :: MonadWidget t m => Event t Text -> m ()
 errorHeader appErrEv = do
@@ -108,8 +112,8 @@ envVarInput
 envVarInput ix epDyn = do
   ep <- sample $ current epDyn
   divClass "overrides__item" $ do
-    keyDyn <- dmTextInput' "overrides__key" "key" (Just $ fst ep) (constDyn Nothing)
-    valDyn <- dmTextInput' "overrides__value" "value" (Just $ snd ep) (constDyn Nothing)
+    (keyDyn, _) <- dmTextInput' "overrides__key" "key" (Just $ fst ep) never
+    (valDyn, _) <- dmTextInput' "overrides__value" "value" (Just $ snd ep) never
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let
       envEv = updated $ zipDyn keyDyn valDyn

@@ -10,7 +10,7 @@ import Data.Monoid
 import Data.Text as T (Text, intercalate, length)
 import Data.Text.Encoding as T
 import Prelude as P
-import Reflex.Dom
+import Reflex.Dom as R
 import Text.Regex.TDFA
 
 import Common.Types
@@ -57,30 +57,32 @@ newStagingPopupBody errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv
-      otherFailureEv = AppError <$> fmapMaybe reqFailure errEv
-      errsEv = leftmost [commandResponseEv, otherFailureEv]
-      appErrEv = fmapMaybe (preview (_Ctor @"AppError")) errsEv
-      nameErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _1 )) errsEv
-      tagErrEv = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) errsEv
-      toMaybe [] = Nothing
-      toMaybe xs = Just $ T.intercalate ". " xs
-      isNameValidDyn = nameValidation <$> nameDyn
-      badNameText = Just "Name is not correct"
-      badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
-      okNameEv = Nothing <$ (ffilter id $ updated isNameValidDyn)
-    nameErrDyn <- holdDyn Nothing $ leftmost
-      [ toMaybe <$> nameErrEv
-      , badNameEv
-      , okNameEv ]
-    tagErrDyn <- holdDyn Nothing $ toMaybe <$> tagErrEv
+      appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
+      nameErrEv = getNameError commandResponseEv nameDyn
+      tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
-    nameDyn <- dmTextInput "tag" "Name" "Name" Nothing nameErrDyn
-    tagDyn <- dmTextInput "tag" "Tag" "Tag" Nothing tagErrDyn
+    (nameDyn, nOkDyn) <- dmTextInput "tag" "Name" "Name" Nothing nameErrEv
+    (tagDyn, tOkDyn) <- dmTextInput "tag" "Tag" "Tag" Nothing tagErrEv
     envVarsDyn <- envVarsInput
+    validDyn <- holdDyn False $ updated $ zipDynWith (&&) nOkDyn tOkDyn
     pure $ (Deployment
       <$> (DeploymentName <$> nameDyn)
       <*> (DeploymentTag <$> tagDyn)
-      <*> envVarsDyn, isNameValidDyn)
+      <*> envVarsDyn, validDyn)
+  where
+    getNameError crEv nameDyn = let
+      nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1 )) crEv
+      isNameValidDyn = nameValidation <$> nameDyn
+      badNameText = "Name is not correct"
+      badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
+      nameErrEv = ffilter (/= "") $ T.intercalate ". " <$> nameErrEv'
+      in leftmost [nameErrEv, badNameEv]
+    getTagError crEv tagDyn = let
+      tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) crEv
+      tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
+      badTagText = "Tag should not be empty"
+      badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
+      in leftmost [tagErrEv, badNameEv]
 
 errorHeader :: MonadWidget t m => Event t Text -> m ()
 errorHeader appErrEv = do
@@ -113,8 +115,8 @@ envVarInput
   -> m ()
 envVarInput ix _ = do
   divClass "overrides__item" $ do
-    keyDyn <- dmTextInput' "overrides__key" "key" Nothing (constDyn Nothing)
-    valDyn <- dmTextInput' "overrides__value" "value" Nothing (constDyn Nothing)
+    (keyDyn, _) <- dmTextInput' "overrides__key" "key" Nothing never
+    (valDyn, _) <- dmTextInput' "overrides__value" "value" Nothing never
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let
       envEv = updated $ zipDyn keyDyn valDyn
