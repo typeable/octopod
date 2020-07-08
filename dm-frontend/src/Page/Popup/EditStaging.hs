@@ -27,14 +27,18 @@ editStagingPopup
 editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
-    (closeEv', saveEv) <- editStagingPopupHeader dname validDyn
+    (closeEv', saveEv) <- editStagingPopupHeader dname enabledDyn
     (deploymentDyn, validDyn) <- editStagingPopupBody dfi respEv
     respEv <- updateEndpoint (constDyn $ Right dname)
       (Right <$> deploymentDyn) saveEv
+    sentDyn <- holdDyn False $ leftmost
+      [ True <$ saveEv
+      , False <$ respEv ]
     let
       successEv =
         fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
       closeEv = leftmost [ closeEv', successEv ]
+      enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (never, closeEv)
 
 editStagingPopupHeader

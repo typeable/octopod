@@ -204,11 +204,15 @@ activeDeploymentWidget clickedEv dname dDyn' = do
         text $ formatPosixToDate updatedAt
       el "td" $ do
         let
+          disabledAttr = if isPending status
+            then "disabled" =: ""
+            else mempty
           elId = "deployment_row_" <> (coerce $ deployment ^. field @"name")
           btn = elAttr "button"
             (  "class" =: "drop__handler"
             <> "type" =: "button"
-            <> "id" =: elId) $ text "Actions"
+            <> "id" =: elId
+            <> disabledAttr) $ text "Actions"
           body = do
             _ <- buttonClass "action action--edit" "Edit"
             btnArcEv <- buttonClass "action action--delete" "Move to archive"

@@ -27,12 +27,16 @@ newStagingPopup
 newStagingPopup showEv hideEv = sidebar showEv hideEv $ const $ mdo
   divClass "popup__body" $ mdo
     (closeEv', saveEv) <- newStagingPopupHeader enabledDyn
-    (deploymentDyn, enabledDyn) <- newStagingPopupBody respEv
+    (deploymentDyn, validDyn) <- newStagingPopupBody respEv
     respEv <- createEndpoint (Right <$> deploymentDyn) saveEv
+    sentDyn <- holdDyn False $ leftmost
+      [ True <$ saveEv
+      , False <$ respEv ]
     let
       successEv =
         fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
       closeEv = leftmost [ closeEv', successEv ]
+      enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (never, closeEv)
 
 newStagingPopupHeader

@@ -270,7 +270,7 @@ dmTextInput' clss placeholder val errEv = mdo
   isValid <- holdDyn True $ leftmost
     [ False <$ errEv
     , True <$ updated valDyn ]
-  classDyn <- holdDyn inpClass $ leftmost
+  classDyn <- holdDyn (clss <> inpClass) $ leftmost
     [ (clss <> inpErrClass) <$ errEv
     , (clss <> inpClass) <$ updated valDyn ]
   valDyn <- elDynClass "div" classDyn $ do
