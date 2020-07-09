@@ -234,10 +234,16 @@ actinRow DeploymentLog{..} = do
     el "td" $ overridesWidget deploymentEnvs
     el "td" $ text $ pack . show $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
-    el "td" $ text $ pack . show . unDuration $ duration
+    el "td" $ text $ formatDuration duration
     el "td" $ do
       bEv <- buttonClass "dash dash--smaller dash--next popup-handler" "Logs"
       pure $ actionId <$ bEv
+
+formatDuration :: Duration -> Text
+formatDuration (Duration d) = m <> "m " <> s <> "s"
+  where
+    m = pack . show $ d `div` (1000 * 60)
+    s = pack . show $ d `div` (1000)
 
 backButton
   ::
