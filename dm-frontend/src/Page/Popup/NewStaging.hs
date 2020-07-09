@@ -130,5 +130,5 @@ envVarInput ix _ = do
 
 nameValidation :: Text -> Bool
 nameValidation name =
-  (T.length name >= 2 && T.length name <= 20)
-  && (T.encodeUtf8 name =~ ("^[a-z0-9\\-]+$" :: ByteString))
+  (T.length name >= 2 && T.length name <= 17)
+  && (T.encodeUtf8 name =~ ("^[a-z][a-z0-9\\-]*$" :: ByteString))
