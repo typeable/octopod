@@ -218,10 +218,11 @@ createH dep = do
     Right _                                                 -> pure ()
     Left (SqlError code _ _ _ _) | code == unique_violation ->
       throwError err400
-        { errBody = validationError ["deployment already exists"] [] }
+        { errBody = validationError ["Deployment already exists"] [] }
     Left (SqlError _ _ _ _ _)                               ->
-      throwError err409 { errBody = appError "some database error" }
+      throwError err409 { errBody = appError "Some database error" }
   liftIO . runBgWorker st $ do
+    sendReloadEvent st
     (ec, out, err) <- createDeployment dep st
     t2 <- now
     let
@@ -300,9 +301,9 @@ selectDeployment p dName lType = do
   case deps of
     [dep] -> pure dep
     []    -> throwError err404
-      { errBody = validationError ["name not found"] [] }
+      { errBody = validationError ["Name not found"] [] }
     _     -> throwError err406
-      { errBody = validationError ["more than one name found"] [] }
+      { errBody = validationError ["More than one name found"] [] }
 
 editH :: DeploymentName -> EnvPairs -> AppM CommandResponse
 editH dName dEnvs = do
@@ -326,6 +327,7 @@ editH dName dEnvs = do
         cmd  = coerce $ updateCommand st
       liftIO . runBgWorker st $ do
         void $ updateEditDeployment pgPool
+        sendReloadEvent st
         log $ "call " <> unwords (cmd : args)
         (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
         log
@@ -375,6 +377,7 @@ deleteH dName = do
     log $ "call " <> unwords (cmd : args)
     (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     void $ archiveDeployment pgPool dName
+    sendReloadEvent st
     t2 <- now
     let elTime = elapsedTime t2 t1
     void $ createDeploymentLog pgPool dep "delete" ec arch elTime out err
@@ -418,6 +421,7 @@ updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
       failIfImageNotFound dTag
       liftIO . runBgWorker st $ do
         void $ updateDeployment pgPool dName dTag envPairs
+        sendReloadEvent st
         log $ "call " <> unwords (cmd : args)
         (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
         log $ "deployment updated, name: "
@@ -564,6 +568,7 @@ restoreH dName = do
         "UPDATE deployments SET archived = 'f', archived_at = null \
         \WHERE name = ?"
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
+    sendReloadEvent st
     t2 <- now
     let
       arch   = ArchivedFlag False
@@ -585,7 +590,7 @@ getActionInfoH aId = do
   case rows of
     (out, err) : _ -> pure $ ActionInfo out err
     _              ->
-      throwError err400 { errBody = appError "action not found" }
+      throwError err400 { errBody = appError "Action not found" }
 
 runCommand :: FilePath -> [String] -> IO (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
@@ -647,7 +652,7 @@ failIfImageNotFound dTag = do
   case foundTag of
     Just _  -> pure ()
     Nothing ->
-      throwError err400 { errBody = validationError [] ["tag not found"] }
+      throwError err400 { errBody = validationError [] ["Tag not found"] }
 
 appError :: Text -> BSL.ByteString
 appError = encode . AppError
@@ -725,7 +730,7 @@ failIfGracefulShudownActivated = do
   gracefulShudownAct <- gracefulShudownActivated <$> ask
   gracefulShudown <- liftIO . readIORef $ gracefulShudownAct
   if gracefulShudown
-    then throwError err405 { errBody = appError "graceful shutdown activated" }
+    then throwError err405 { errBody = appError "Graceful shutdown activated" }
     else pure ()
 
 terminationHandler :: IORef Int -> IORef Bool -> MVar () -> IO ()
