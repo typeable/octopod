@@ -77,7 +77,8 @@ newStagingPopupBody errEv = divClass "popup__content" $
     getNameError crEv nameDyn = let
       nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1 )) crEv
       isNameValidDyn = nameValidation <$> nameDyn
-      badNameText = "Name is not correct"
+      badNameText = "Staging name length should be longer than 2 characters \
+      \and under 17 characters and begin with a letter."
       badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
       nameErrEv = ffilter (/= "") $ T.intercalate ". " <$> nameErrEv'
       in leftmost [nameErrEv, badNameEv]
