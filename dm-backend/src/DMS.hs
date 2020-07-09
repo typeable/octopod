@@ -591,9 +591,9 @@ runCommand :: FilePath -> [String] -> IO (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
   let proc' c a = setStdout createPipe . setStderr createPipe $ proc c a
   withProcessWait (proc' cmd args) $ \p -> do
-    ec <- waitExitCode p
     out <- hGetContents . getStdout $ p
     err <- hGetContents . getStderr $ p
+    ec <- waitExitCode p
     pure (ec, Stdout out, Stderr err)
 
 runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
