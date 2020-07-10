@@ -30,6 +30,8 @@ fn main() -> std::io::Result<()> {
         .expect("could not get namepace");
     let name = matches.value_of("name").expect("could not get name");
 
+    print_utils_version();
+
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
 

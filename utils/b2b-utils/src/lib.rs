@@ -57,6 +57,19 @@ pub fn whereis(cmd: &str) -> Option<String> {
         })
 }
 
+pub fn print_utils_version() {
+    println!(
+        "utils sha256: {}",
+        String::from_utf8(version().to_vec()).expect("get version")
+    );
+}
+
+pub fn version() -> &'static [u8] {
+    // version file can create so:
+    // $ git rev-parse HEAD > src/version
+    include_bytes!("version")
+}
+
 pub fn print_command_result(output: Output) {
     println!("status: {}", output.status);
     println!(
