@@ -65,6 +65,8 @@ fn main() -> std::io::Result<()> {
         .map(|e| e.try_into().expect("get valid key=value"))
         .collect::<Vec<EnvPair>>();
 
+    print_utils_version();
+
     println!("project_name: {:?}", project_name);
     println!("base_domain: {:?}", base_domain);
     println!("namespace: {:?}", namespace);
@@ -95,6 +97,17 @@ fn main() -> std::io::Result<()> {
     let success = output.status.success();
     print_command_result(output);
 
+    let output = Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .current_dir(&work_dir)
+        .output()
+        .expect("get hash of HEAD");
+    let success2 = output.status.success();
+    println!(
+        "b2b-helm sha256: {}",
+        String::from_utf8(output.stdout).expect("get sha256 of HEAD")
+    );
+
     fs::copy(&b2b_heml, Path::new(&work_dir).join("b2b-helm"))?;
 
     let output = Command::new("b2b-helm")
@@ -102,7 +115,7 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("create infra");
-    let success2 = output.status.success();
+    let success3 = output.status.success();
     print_command_result(output);
 
     let output = Command::new("b2b-helm")
@@ -110,10 +123,10 @@ fn main() -> std::io::Result<()> {
         .current_dir(&work_dir)
         .output()
         .expect("create app");
-    let success3 = output.status.success();
+    let success4 = output.status.success();
     print_command_result(output);
 
-    if !(success && success2 && success3) {
+    if !(success && success2 && success3 && success4) {
         exit(1)
     }
 

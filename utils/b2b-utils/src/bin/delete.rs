@@ -32,6 +32,9 @@ fn main() -> std::io::Result<()> {
     let project_name = matches.value_of("project-name").expect("get project-name");
     let namespace = matches.value_of("namespace").expect("get namepace");
     let name = matches.value_of("name").expect("get name");
+
+    print_utils_version();
+
     println!("project_name: {:?}", project_name);
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
