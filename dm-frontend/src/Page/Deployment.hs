@@ -4,7 +4,6 @@ import Control.Lens
 import Control.Monad
 import Data.Coerce
 import Data.Generics.Product (field)
-import Data.List as L (find)
 import Data.Text as T (Text, pack)
 import Obelisk.Route.Frontend
 import Reflex.Dom as R
@@ -30,8 +29,8 @@ deploymentPage
   -> DeploymentName -> m ()
 deploymentPage updAllEv dname = do
   pb <- getPostBuild
-  respEv <- listEndpoint pb
-  let (okEv, errEv) = processResp dname respEv
+  respEv <- fullInfoEndpoint (constDyn $ Right dname) pb
+  let (okEv, errEv) = processResp respEv
   widgetHold_ (loadingWidget dname) $ leftmost
     [ errorWidget dname <$ errEv
     , deploymentWidget updAllEv <$> okEv ]
@@ -48,8 +47,8 @@ deploymentWidget
   -> m ()
 deploymentWidget updEv dfi = do
   (editEv, logsEv) <- pageWrapper $ do
-    respEv <- listEndpoint updEv
-    let (okEv, _errEv) = processResp (dfi ^. dfiName) respEv
+    respEv <- fullInfoEndpoint (constDyn $ Right $ dfi ^. dfiName) updEv
+    let (okEv, _errEv) = processResp respEv
     dfiDyn <- holdDyn dfi okEv
     editEv <- deploymentHead dfiDyn
     stagingNotification never
@@ -260,17 +259,13 @@ backButton = do
 
 processResp
   :: Reflex t
-  => DeploymentName
-  -> Event t (ReqResult tag [DeploymentFullInfo])
+  => Event t (ReqResult tag DeploymentFullInfo)
   -> (Event t DeploymentFullInfo, Event t ())
-processResp dname respEv =
+processResp respEv =
   let
     respOkEv = fmapMaybe reqSuccess respEv
-    errEv' = fmapMaybe reqFailure respEv
-    findFunc dfi = dfi ^. dfiName == dname
-    okEv = fmapMaybe (find findFunc) respOkEv
-    errEv = leftmost [ () <$ errEv', () <$ difference respOkEv okEv ]
-  in (okEv, errEv)
+    errEv = fmapMaybe reqFailure respEv
+  in (respOkEv, () <$ errEv)
 
 
 data DeploymentPageNotification
