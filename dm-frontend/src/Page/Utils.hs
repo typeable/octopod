@@ -43,19 +43,16 @@ dropdownWidget'
 dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
     DOM.contains (_element_raw btnEl) clicked
-  openedDyn <- foldDyn switchState False $ leftmost
-    [ clickInsideEv
-    , False <$ domEvent Click bodyEl
-    , True <$ domEvent Click btnEl ]
+  openedDyn <- foldDyn switchState False $ clickInsideEv
   let
     switchState ev cur = ev && not cur
     wrapperClassDyn = ffor openedDyn $ \case
       True -> "class" =: "drop drop--actions drop--expanded"
       False -> "class" =: "drop drop--actions"
-  (btnEl, (bodyEl, wEv)) <- elDynAttrWithStopPropagationEvent' Click
+  (btnEl, (_, wEv)) <- elDynAttr'
     "div" wrapperClassDyn $ do
       btn
-      elDynAttrWithStopPropagationEvent' Click "div"
+      elDynAttr' "div"
         (constDyn $ "class" =: "drop__dropdown") body
   pure wEv
 
@@ -97,7 +94,7 @@ eventWriterWrapper m = mdo
 
 buttonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
 buttonClass cl lbl = do
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button"
+  (bEl, _) <- elDynAttr' "button"
     (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
   return $ domEvent Click bEl
 
@@ -108,7 +105,7 @@ buttonDynClass
   -> m (Event t ())
 buttonDynClass clDyn lblDyn = do
   let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+  (bEl, _) <- elDynAttr' "button" attrDyn $
     dynText lblDyn
   return $ domEvent Click bEl
 
@@ -121,7 +118,7 @@ buttonClassEnabled cl lbl dDyn = do
       True  -> "class" =: cl <> "type" =: "button"
       False ->  "class" =: (cl <> " button--disabled")
         <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+  (bEl, _) <- elDynAttr' "button" attrDyn $
     text lbl
   return $ domEvent Click bEl
 
@@ -134,13 +131,13 @@ buttonClassEnabled' cl lbl dDyn disClass = do
       True  -> "class" =: cl <> "type" =: "button"
       False ->  "class" =: (cl <> " " <> disClass)
         <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "button" attrDyn $
+  (bEl, _) <- elDynAttr' "button" attrDyn $
     text lbl
   return $ domEvent Click bEl
 
 aButtonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
 aButtonClass cl lbl = do
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a"
+  (bEl, _) <- elDynAttr' "a"
     (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
   return $ domEvent Click bEl
 
@@ -151,7 +148,7 @@ aButtonDynClass
   -> m (Event t ())
 aButtonDynClass clDyn lblDyn = do
   let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a" attrDyn $
+  (bEl, _) <- elDynAttr' "a" attrDyn $
     dynText lblDyn
   return $ domEvent Click bEl
 
@@ -164,7 +161,7 @@ aButtonClassEnabled cl lbl dDyn = do
       True  -> "class" =: cl <> "type" =: "button"
       False ->  "class" =: (cl <> " button--disabled")
         <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttrWithStopPropagationEvent' Click "a" attrDyn $
+  (bEl, _) <- elDynAttr' "a" attrDyn $
     text lbl
   return $ domEvent Click bEl
 

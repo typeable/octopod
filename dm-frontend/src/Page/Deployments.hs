@@ -187,15 +187,15 @@ activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
     let dname = deployment ^. field @"name"
-    (linkEl, _) <- el' "tr" $ do
+    (linkEl, btnEv) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
         statusWidget $ constDyn status
       el "td" $ do
         divClass "listing" $
           forM_ urls $ \(_, url) ->
-            void $ elDynAttrWithStopPropagationEvent' Click "a"
-              ( constDyn $ "class" =: "listing__item external bar"
+            void $ elAttr' "a"
+              (  "class" =: "listing__item external bar"
               <> "href" =: ("https://" <> url)
               <> "target" =: "_blank") $ text url
       el "td" $
@@ -221,14 +221,14 @@ activeDeploymentWidget clickedEv dDyn' = do
             _ <- buttonClass "action action--edit" "Edit"
             btnArcEv <- buttonClass "action action--delete" "Move to archive"
             pure btnArcEv
-        btnEv <- dropdownWidget' clickedEv btn body
-        delEv <- confirmDeletePopup btnEv $ do
-          text "Are you sure  you want to delete"
-          el "br" blank
-          text $ coerce dname <> " staging?"
-        void $ deleteEndpoint (constDyn $ Right $ dname) delEv
+        dropdownWidget' clickedEv btn body
+    delEv <- confirmDeletePopup btnEv $ do
+      text "Are you sure you want to delete"
+      el "br" blank
+      text $ coerce dname <> " staging?"
+    void $ deleteEndpoint (constDyn $ Right $ dname) delEv
     let route = DashboardRoute :/ Just dname
-    setRoute $ route <$ domEvent Click linkEl
+    setRoute $ route <$ domEvent Dblclick linkEl
 
 archivedDeploymentsWidget
   ::
@@ -349,7 +349,7 @@ archivedDeploymentWidget clickedEv dDyn' = do
         btnEv <- dropdownWidget' clickedEv btn body
         void $ restoreEndpoint (constDyn $ Right $ dname) btnEv
     let route = DashboardRoute :/ Just dname
-    setRoute $ route <$ domEvent Click linkEl
+    setRoute $ route <$ domEvent Dblclick linkEl
 
 tableWrapper :: MonadWidget t m => (Dynamic t SortDir -> m a) -> m a
 tableWrapper ma =

@@ -88,7 +88,7 @@ deploymentHead dfiDyn =
           "Move to archive"
           btnEnabledDyn
         delEv <- confirmDeletePopup archEv $ do
-          text "Are you sure  you want to delete"
+          text "Are you sure you want to delete"
           el "br" blank
           dynText dname
           text " staging?"

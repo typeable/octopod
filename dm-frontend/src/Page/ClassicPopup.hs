@@ -27,8 +27,8 @@ popupWidget
   -> m (Event t (), Event t ())
 popupWidget m =
   fmap snd $
-    elDynAttrWithStopPropagationEvent' Click  "div"
-    (constDyn $ "class" =: "classic-popup" <> "style" =: "display: block;") $
+    elAttr' "div"
+    ("class" =: "classic-popup" <> "style" =: "display: block;") $
       divClass "classic-popup__container" $
         divClass "classic-popup__viewport" $
           divClass "classic-popup__slot" $ do
