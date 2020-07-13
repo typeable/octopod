@@ -2,14 +2,17 @@ module Page.Deployments
   ( deploymentsPage ) where
 
 import Control.Lens
+import Control.Lens.Extras
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Coerce
 import Data.Generics.Product (field)
+import Data.Generics.Sum (_Ctor)
 import Data.List as L (null, sortBy)
 import Data.Map as M (Map, fromList, partition, filter, elems)
 import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
 import Data.Time (getCurrentTime, diffUTCTime)
+import GHC.Generics (Generic)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -19,6 +22,7 @@ import Common.Utils
 import Frontend.API
 import Frontend.Route
 import Page.ClassicPopup
+import Page.Popup.EditStaging
 import Page.Popup.NewStaging
 import Page.Utils
 
@@ -45,11 +49,12 @@ deploymentsWidget
   => Event t ()
   -> m ()
 deploymentsWidget updAllEv = do
-  showNewStagingEv <- deploymentsWidgetWrapper $ mdo
+  (showNewStagingEv, editEv) <- deploymentsWidgetWrapper $ mdo
     (showNewStagingEv', termDyn) <- deploymentsHeadWidget okUpdEv
-    okUpdEv <- initDeploymentsListWidget updAllEv termDyn
-    pure showNewStagingEv'
+    (okUpdEv, editEv) <- initDeploymentsListWidget updAllEv termDyn
+    pure (showNewStagingEv', editEv)
   void $ newStagingPopup showNewStagingEv never
+  void $ editStagingPopup editEv never
 
 deploymentsHeadWidget
   :: MonadWidget t m
@@ -105,18 +110,18 @@ initDeploymentsListWidget
     , SetRoute t (R Routes) m )
   => Event t ()
   -> Dynamic t Text
-  -> m (Event t ())
+  -> m (Event t (), Event t DeploymentFullInfo)
 initDeploymentsListWidget updAllEv termDyn = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
     okEv = fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
-    w m = m >> pure never
-  okUpdEvDyn <- widgetHold (w loadingDeploymentsWidget) $ leftmost
+    w m = m >> pure (never, never)
+  evsDyn <- widgetHold (w loadingDeploymentsWidget) $ leftmost
     [ deploymentsListWidget updAllEv termDyn <$> okEv
     , (w errDeploymentsWidget) <$ errEv ]
-  pure $ switchDyn okUpdEvDyn
+  pure (switchDyn $ fst <$> evsDyn, switchDyn $ snd <$> evsDyn)
 
 deploymentsListWidget
   ::
@@ -126,7 +131,7 @@ deploymentsListWidget
   => Event t ()
   -> Dynamic t Text
   -> [DeploymentFullInfo]
-  -> m (Event t ())
+  -> m (Event t (), Event t DeploymentFullInfo)
 deploymentsListWidget updAllEv termDyn ds = mdo
   updRespEv <- listEndpoint updAllEv
   let
@@ -140,9 +145,9 @@ deploymentsListWidget updAllEv termDyn ds = mdo
     (archivedDsDyn, activeDsDyn) = splitDynPure $ M.partition isArchived
       <$> filteredDyn
   clickedEv <- elementClick
-  activeDeploymentsWidget clickedEv activeDsDyn
+  editEv <- activeDeploymentsWidget clickedEv activeDsDyn
   archivedDeploymentsWidget clickedEv archivedDsDyn
-  pure $ () <$ okUpdEv
+  pure (() <$ okUpdEv, editEv)
 
 searchDeployments
   :: Text -> DeploymentFullInfo -> Bool
@@ -160,9 +165,8 @@ activeDeploymentsWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -> Dynamic t
-    (Map DeploymentName DeploymentFullInfo)
-  -> m ()
+  -> Dynamic t (Map DeploymentName DeploymentFullInfo)
+  -> m (Event t DeploymentFullInfo)
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
     tableWrapper $ \sortDyn -> do
@@ -170,10 +174,19 @@ activeDeploymentsWidget clickedEv dsDyn =
         emptyDyn' = L.null <$> dsDyn
         dsSortedDyn = zipDynWith sortDeployments dsDyn sortDyn
       emptyDyn <- holdUniqDyn emptyDyn'
-      dyn_ $ emptyDyn <&> \case
-        False -> void $ list dsSortedDyn
-          (activeDeploymentWidget clickedEv)
-        True  -> emptyTableBody $ noDeploymentsWidget
+      editEvEv <- dyn $ emptyDyn <&> \case
+        False -> do
+          editEvs <- simpleList dsSortedDyn (activeDeploymentWidget clickedEv)
+          pure $ switchDyn $ leftmost <$> editEvs
+        True  -> do
+          emptyTableBody $ noDeploymentsWidget
+          pure never
+      switchHold never editEvEv
+
+data StagingAction
+  = ArchiveStaging
+  | EditStaging
+  deriving (Show, Eq, Generic)
 
 activeDeploymentWidget
   ::
@@ -182,12 +195,12 @@ activeDeploymentWidget
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
   -> Dynamic t (DeploymentFullInfo)
-  -> m ()
+  -> m (Event t DeploymentFullInfo)
 activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
-  dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
+  editEvEv <- dyn $ ffor dDyn $ \d@DeploymentFullInfo{..} -> do
     let dname = deployment ^. field @"name"
-    (linkEl, btnEv) <- el' "tr" $ do
+    (linkEl, dropdownEv) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
         statusWidget $ constDyn status
@@ -218,17 +231,23 @@ activeDeploymentWidget clickedEv dDyn' = do
             <> "id" =: elId
             <> disabledAttr) $ text "Actions"
           body = do
-            _ <- buttonClass "action action--edit" "Edit"
+            btnEditEv <- buttonClass "action action--edit" "Edit"
             btnArcEv <- buttonClass "action action--delete" "Move to archive"
-            pure btnArcEv
+            pure $
+              leftmost [ ArchiveStaging <$ btnArcEv, EditStaging <$ btnEditEv ]
         dropdownWidget' clickedEv btn body
-    delEv <- confirmDeletePopup btnEv $ do
-      text "Are you sure you want to delete"
+    let
+      archEv = () <$ ffilter (is (_Ctor @"ArchiveStaging")) dropdownEv
+      editEv = d <$ ffilter (is (_Ctor @"EditStaging")) dropdownEv
+    delEv <- confirmDeletePopup archEv $ do
+      text "Are you sure  you want to delete"
       el "br" blank
       text $ coerce dname <> " staging?"
     void $ deleteEndpoint (constDyn $ Right $ dname) delEv
     let route = DashboardRoute :/ Just dname
     setRoute $ route <$ domEvent Dblclick linkEl
+    pure editEv
+  switchHold never editEvEv
 
 archivedDeploymentsWidget
   ::
@@ -252,15 +271,15 @@ archivedDeploymentsWidget clickedEv dsDyn = do
         dsSortedDyn = zipDynWith sortDeployments dsDyn sortDyn
       emptyDyn <- holdUniqDyn emptyDyn'
       dyn_ $ emptyDyn <&> \case
-        False -> void $ list dsSortedDyn
+        False -> void $ simpleList dsSortedDyn
           (archivedDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
 sortDeployments
   :: Map DeploymentName DeploymentFullInfo
   -> SortDir
-  -> Map Int DeploymentFullInfo
-sortDeployments ds s = M.fromList $ zip [1..] $ L.sortBy sortFunc items
+  -> [DeploymentFullInfo]
+sortDeployments ds s =  L.sortBy sortFunc items
   where
     items = M.elems ds
     sortFunc a b = case s of
