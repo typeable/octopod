@@ -6,8 +6,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Coerce
 import Data.Generics.Product (field)
-import Data.List as L (null)
-import Data.Map as M (Map, fromList, partition, filter)
+import Data.List as L (null, sortBy)
+import Data.Map as M (Map, fromList, partition, filter, elems)
 import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
 import Data.Time (getCurrentTime, diffUTCTime)
 import Obelisk.Route.Frontend
@@ -59,7 +59,8 @@ deploymentsHeadWidget okUpdEv =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
     lastUpdateWidget okUpdEv
-    termDyn <- divClass "page__action input input--search input--has-clear-type page__action--search" $ mdo
+    termDyn <- divClass "page__action input input--search input--has-clear-type\
+    \ page__action--search" $ mdo
       termDyn' <- inputElement $ def
         & initialAttributes .~
           (  "type" =: "text"
@@ -164,11 +165,14 @@ activeDeploymentsWidget
   -> m ()
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
-    tableWrapper $ do
-      let emptyDyn' = L.null <$> dsDyn
+    tableWrapper $ \sortDyn -> do
+      let
+        emptyDyn' = L.null <$> dsDyn
+        dsSortedDyn = zipDynWith sortDeployments dsDyn sortDyn
       emptyDyn <- holdUniqDyn emptyDyn'
       dyn_ $ emptyDyn <&> \case
-        False -> void $ listWithKey dsDyn (activeDeploymentWidget clickedEv)
+        False -> void $ list dsSortedDyn
+          (activeDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
 activeDeploymentWidget
@@ -177,12 +181,12 @@ activeDeploymentWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -> DeploymentName
   -> Dynamic t (DeploymentFullInfo)
   -> m ()
-activeDeploymentWidget clickedEv dname dDyn' = do
+activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
+    let dname = deployment ^. field @"name"
     (linkEl, _) <- el' "tr" $ do
       el "td" $ do
         text $ coerce dname
@@ -207,7 +211,7 @@ activeDeploymentWidget clickedEv dname dDyn' = do
           disabledAttr = if isPending status
             then "disabled" =: ""
             else mempty
-          elId = "deployment_row_" <> (coerce $ deployment ^. field @"name")
+          elId = "deployment_row_" <> (coerce dname)
           btn = elAttr "button"
             (  "class" =: "drop__handler"
             <> "type" =: "button"
@@ -242,29 +246,69 @@ archivedDeploymentsWidget clickedEv dsDyn = do
       True  -> "data__archive data__archive--open"
       False -> "data__archive"
   elDynClass "div" classDyn $
-    tableWrapper $ do
-      let emptyDyn' = L.null <$> dsDyn
+    tableWrapper $ \sortDyn -> do
+      let
+        emptyDyn' = L.null <$> dsDyn
+        dsSortedDyn = zipDynWith sortDeployments dsDyn sortDyn
       emptyDyn <- holdUniqDyn emptyDyn'
       dyn_ $ emptyDyn <&> \case
-        False -> void $ listWithKey dsDyn (archivedDeploymentWidget clickedEv)
+        False -> void $ list dsSortedDyn
+          (archivedDeploymentWidget clickedEv)
         True  -> emptyTableBody $ noDeploymentsWidget
 
-tableHeader :: MonadWidget t m => m ()
+sortDeployments
+  :: Map DeploymentName DeploymentFullInfo
+  -> SortDir
+  -> Map Int DeploymentFullInfo
+sortDeployments ds s = M.fromList $ zip [1..] $ L.sortBy sortFunc items
+  where
+    items = M.elems ds
+    sortFunc a b = case s of
+      SortAsc get -> compare (a ^. get) (b ^. get)
+      SortDesc get -> compare (b ^. get) (a ^. get)
+
+
+data SortDir where
+  SortAsc  :: Ord a => Getter DeploymentFullInfo a -> SortDir
+  SortDesc :: Ord a => Getter DeploymentFullInfo a -> SortDir
+
+toggleSort :: SortDir -> SortDir
+toggleSort = \case
+  SortAsc x  -> SortDesc x
+  SortDesc x -> SortAsc x
+
+tableHeader :: MonadWidget t m => m (Dynamic t SortDir)
 tableHeader = do
   el "thead" $
     el "tr" $ do
-      el "th" $ text "Name"
+      nameSortDyn <- sortHeader dfiName "Name"
       el "th" $ text "Links"
       el "th" $ text "Tag"
       el "th" $ text "Overrides"
-      el "th" $ do
-        _sortBtn <- elAttr "button"
-          (  "class" =: "sort sort--active sort--asc"
-          <> "type" =: "button" ) $ text "Created"
-        blank
-      el "th" $ text "Changed"
+      createSortDyn <- sortHeader (field @"createdAt") "Created"
+      updateSortDyn <- sortHeader (field @"updatedAt") "Changed"
       el "th" $
         elClass "span" "visuallyhidden" $ text "Menu"
+      let sortEv = leftmost $ fmap updated [nameSortDyn, createSortDyn, updateSortDyn]
+      sortDyn <- holdDyn (SortAsc dfiName) sortEv
+      pure sortDyn
+
+
+sortHeader
+  :: (MonadWidget t m, Ord a)
+  => Getter DeploymentFullInfo a
+  -> Text
+  -> m (Dynamic t SortDir)
+sortHeader f l = do
+  el "th" $ mdo
+    dateSortDyn' <- foldDyn ($) (SortDesc f)
+      $ toggleSort <$ sortBtnEv
+    let
+      classDyn = dateSortDyn' <&> \case
+        SortDesc _ -> "sort sort--active sort--desc"
+        SortAsc _  -> "sort sort--active sort--asc"
+    sortBtnEv <- buttonDynClass classDyn (pure l)
+    pure dateSortDyn'
 
 archivedDeploymentWidget
   ::
@@ -272,15 +316,15 @@ archivedDeploymentWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -> DeploymentName
   -> Dynamic t DeploymentFullInfo
   -> m ()
-archivedDeploymentWidget clickedEv dname dDyn' = do
+archivedDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $ ffor dDyn $ \DeploymentFullInfo{..} -> do
+    let dname = deployment ^. field @"name"
     (linkEl, _) <- el' "tr" $ do
       el "td" $ do
-        text $ coerce $ deployment ^. field @"name"
+        text $ coerce dname
         divClass "status status--archived" $ text "Archived"
       el "td" $ text "..."
       el "td" $
@@ -293,30 +337,31 @@ archivedDeploymentWidget clickedEv dname dDyn' = do
         text $ formatPosixToDate updatedAt
       el "td" $ do
         let
-          elId = "deployment_row_" <> (coerce $ deployment ^. field @"name")
+          elId = "deployment_row_" <> (coerce dname)
           btn = elAttr "button"
             (  "class" =: "drop__handler"
             <> "type" =: "button"
             <> "id" =: elId) $ text "Actions"
           body = do
-            btnArcEv <- buttonClass "action action--delete" "Restore from archive"
+            btnArcEv <- buttonClass
+              "action action--delete" "Restore from archive"
             pure btnArcEv
         btnEv <- dropdownWidget' clickedEv btn body
         void $ restoreEndpoint (constDyn $ Right $ dname) btnEv
     let route = DashboardRoute :/ Just dname
     setRoute $ route <$ domEvent Click linkEl
 
-tableWrapper :: MonadWidget t m => m a -> m a
+tableWrapper :: MonadWidget t m => (Dynamic t SortDir -> m a) -> m a
 tableWrapper ma =
   divClass "table table--stagings table--clickable" $
     el "table" $ do
-      tableHeader
-      el "tbody" ma
+      sDyn <- tableHeader
+      el "tbody" $ ma sDyn
 
 initTableWrapper :: MonadWidget t m => m () -> m ()
 initTableWrapper ma = do
   divClass "data_primary" $
-    tableWrapper $
+    tableWrapper $ const $
       emptyTableBody $ ma
 
 loadingDeploymentsWidget :: MonadWidget t m => m ()

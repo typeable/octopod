@@ -83,7 +83,8 @@ deploymentHead dfiDyn =
           "Edit staging"
           btnEnabledDyn
         archEv <- aButtonClassEnabled
-          "page__action button button--secondary button--delete classic-popup-handler"
+          "page__action button button--secondary button--delete \
+          \classic-popup-handler"
           "Move to archive"
           btnEnabledDyn
         delEv <- confirmDeletePopup archEv $ do
