@@ -183,6 +183,8 @@ updateH :: DeploymentName -> DeploymentUpdate -> ClientM CommandResponse
 
 infoH :: DeploymentName -> ClientM [DeploymentInfo]
 
+_fullInfoH :: DeploymentName -> ClientM DeploymentFullInfo
+
 _statusH :: DeploymentName -> ClientM CurrentDeploymentStatus
 
 cleanupH :: DeploymentName -> ClientM CommandResponse
@@ -204,6 +206,7 @@ _projectName :: ClientM ProjectName
   :<|> deleteH
   :<|> updateH
   :<|> infoH
+  :<|> _fullInfoH
   :<|> _statusH
   :<|> cleanupH
   :<|> restoreH)

@@ -80,6 +80,11 @@ data DeploymentListType
   | ArchivedOnlyDeployments
   deriving (Show)
 
+data FullInfoListType
+  = FullInfoForAll
+  | FullInfoOnlyForOne DeploymentName
+  deriving (Show)
+
 runDMS :: IO ()
 runDMS = do
   logger' <- newLogger
@@ -171,15 +176,29 @@ eventS channel = do
 server :: ServerT API AppM
 server =
   ( listH :<|> createH :<|> getH :<|> editH
-    :<|> deleteH :<|> updateH :<|> infoH :<|> statusH
+    :<|> deleteH :<|> updateH :<|> infoH :<|> fullInfoH :<|> statusH
     :<|> cleanupH :<|> restoreH
   ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
 
 listH :: AppM [DeploymentFullInfo]
-listH = do
+listH = getFullInfo FullInfoForAll
+
+fullInfoH :: DeploymentName -> AppM DeploymentFullInfo
+fullInfoH dName = do
+  fullInfoList <- getFullInfo $ FullInfoOnlyForOne dName
+  case fullInfoList of
+    fullInfo : _ -> pure fullInfo
+    []           -> throwError err404
+      { errBody = validationError ["Name not found"] [] }
+
+getFullInfo :: FullInfoListType -> AppM [DeploymentFullInfo]
+getFullInfo listType = do
   AppState {pool = p, logger = l, baseDomain = d} <- ask
 
-  retrieved <- liftIO $ withResource p $ \conn -> query_ conn q
+  retrieved <- liftIO $ withResource p $ \conn ->
+    case listType of
+      FullInfoForAll             -> query_ conn qAll
+      FullInfoOnlyForOne (dName) -> query conn qOne (Only dName)
   deployments <- liftIO $ for retrieved $ \(n, t, e, a, ct, ut, st) -> do
     es <- parseEnvs (lines e)
     pure $
@@ -188,10 +207,15 @@ listH = do
   liftIO . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
-    q                    =
+    qAll                 =
       "SELECT name, tag, envs, archived, extract(epoch from created_at)::int, \
         \extract(epoch from updated_at)::int, status::text \
       \FROM deployments ORDER BY name"
+    qOne                 =
+      "SELECT name, tag, envs, archived, extract(epoch from created_at)::int, \
+        \extract(epoch from updated_at)::int, status::text \
+      \FROM deployments \
+      \WHERE name = ?"
     depUrls domain dName =
       [ ("app", appUrl domain dName)
       , ("kibana", "kibana." <> appUrl domain dName)
@@ -672,26 +696,26 @@ elapsedTime t1 t2 =
 runStatusUpdater :: AppState -> IO ()
 runStatusUpdater state = do
   let
-    pgPool      = pool state
-    checkingCmd = checkingCommand state
-    ns          = namespace state
-    interval    = 30 :: Int
-    select_deps =
+    pgPool          = pool state
+    checkingCmd     = checkingCommand state
+    ns              = namespace state
+    interval        = 30 :: Int
+    selectDeps      =
       "SELECT name, status::text, \
       \extract(epoch from now())::int - \
         \extract(epoch from status_updated_at)::int \
       \FROM deployments \
       \WHERE checked_at < now() - interval '?' second"
-    update_status  =
+    updateStatus    =
       "UPDATE deployments \
       \SET status = ?, status_updated_at = now(), checked_at = now() \
       \WHERE name = ?"
-    update_checked_at  =
+    updateCheckedAt =
       "UPDATE deployments SET checked_at = now() WHERE name = ?"
 
   forever $ do
     rows :: [(DeploymentName, Text, Int)] <- liftIO $
-      withResource pgPool $ \conn -> query conn select_deps (Only interval)
+      withResource pgPool $ \conn -> query conn selectDeps (Only interval)
     let
       checkList :: [(DeploymentName, DeploymentStatus, Timestamp)] =
         (\(n, s, t) -> (n, read . unpack $ s, coerce t)) <$> rows
@@ -707,8 +731,8 @@ runStatusUpdater state = do
       for (zip checkList checkResult) $ \((dName, oldSt, _), (_, newSt, _)) ->
         withResource pgPool $ \conn ->
           if oldSt == newSt
-            then execute conn update_checked_at (Only dName)
-            else execute conn update_status (show newSt, dName)
+            then execute conn updateCheckedAt (Only dName)
+            else execute conn updateStatus (show newSt, dName)
     if checkList == checkResult
       then pure ()
       else sendReloadEvent state

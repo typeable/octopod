@@ -76,6 +76,11 @@ infoEndpoint
   => Dynamic t (Either Text DeploymentName)
   -> Event t ()
   -> m (Event t (ReqResult () [DeploymentInfo]))
+fullInfoEndpoint
+  :: MonadWidget t m
+  => Dynamic t (Either Text DeploymentName)
+  -> Event t ()
+  -> m (Event t (ReqResult () DeploymentFullInfo))
 statusEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
@@ -115,6 +120,7 @@ projectName
   :<|> deleteEndpoint
   :<|> updateEndpoint
   :<|> infoEndpoint
+  :<|> fullInfoEndpoint
   :<|> statusEndpoint
   :<|> cleanupEndpoint
   :<|> restoreEndpoint)
