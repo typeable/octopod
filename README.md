@@ -18,6 +18,7 @@ Multi-staging Deployment Manager (DM). MD consists of the client and server part
 12. [ ] Project Icon. Depends on 11.
 13. [ ] README.md mentioning all the documents mentioned above and cross-linking all documentation chapters.
 14. [ ] Proper documentation in the code. Haddocks.
+15. [ ] Information about the DM project available on the typeable.io website.
 
 # Nix Installation
 
