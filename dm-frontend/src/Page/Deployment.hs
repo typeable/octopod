@@ -45,30 +45,31 @@ deploymentWidget
   => Event t ()
   -> DeploymentFullInfo
   -> m ()
-deploymentWidget updEv dfi = do
+deploymentWidget updEv dfi = mdo
   (editEv, logsEv) <- pageWrapper $ do
     respEv <- fullInfoEndpoint (constDyn $ Right $ dfi ^. dfiName) updEv
     let (okEv, _errEv) = processResp respEv
     dfiDyn <- holdDyn dfi okEv
-    editEv <- deploymentHead dfiDyn
+    editEv' <- deploymentHead dfiDyn sentEv
     stagingNotification never
-    logsEv <- deploymentBody updEv dfiDyn
-    pure (editEv, logsEv)
-  void $ editStagingPopup editEv never
+    logsEv' <- deploymentBody updEv dfiDyn
+    pure (editEv', logsEv')
+  sentEv <- editStagingPopup editEv never
   void $ stagingLogsPopup logsEv never
 
 deploymentHead
   :: MonadWidget t m
   => Dynamic t DeploymentFullInfo
+  -> Event t Bool
   -> m (Event t DeploymentFullInfo)
-deploymentHead dfiDyn =
+deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
     elClass "h1" "page__heading title" $ dynText dname
     editEvEv <- dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
       True -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
-        btnEnabledDyn <- holdDyn btnState $ False <$ btnEv
+        btnEnabledDyn <- holdDyn btnState $ leftmost [ False <$ btnEv, sentEv ]
         btnEv <- aButtonClassEnabled
           "page__action button button--secondary button--restore classic-popup-handler"
           "Recover from archive"
@@ -77,7 +78,7 @@ deploymentHead dfiDyn =
         pure never
       False -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
-        btnEnabledDyn <- holdDyn btnState never
+        btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
         editEv <- aButtonClassEnabled
           "page__action button button--edit popup-handler"
           "Edit staging"

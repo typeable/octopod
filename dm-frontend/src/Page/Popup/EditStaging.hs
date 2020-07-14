@@ -23,7 +23,7 @@ editStagingPopup
   :: MonadWidget t m
   => Event t DeploymentFullInfo
   -> Event t ()
-  -> m (Event t ())
+  -> m (Event t Bool)
 editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
@@ -39,7 +39,7 @@ editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
         fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
       closeEv = leftmost [ closeEv', successEv ]
       enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
-    pure (never, closeEv)
+    pure (updated sentDyn, closeEv)
 
 editStagingPopupHeader
   :: MonadWidget t m
