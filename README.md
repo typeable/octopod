@@ -2,9 +2,19 @@
 
 Multi-staging Deployment Manager (DM). MD consists of the client and server parts (DMC and DMS  accordingly).
 
-# Installation
+# Documentation checklist
 
-1. Install Nix
+1. [ ] Case study(Project Management Perspective). We discuss three common cases: production + staging, production + staging + dev boxes, production + multiple stagings.
+2. [ ] Case study(Technical perspective). We consider different of approaches mentioned in 1. We cover isolation, reliability, time management.
+3. [ ] Technical architecture. Description of all components. Diagrams. We should talk about the choice of running of top Kubernetes and Helm, asynchronous architecture, status updates.
+4. [ ] User guide. Mentions all the major actions user can do, talks about container/app level overrides, logging.
+5. [ ] Deployment guide for Helm-based projects. Includes a description of all the necessary steps to deploy the DM in such an environment, `examples/helm` with code
+6. [ ] Deployment guide for Helmless projects. Includes a description of all the necessary steps to deploy the DM in such an environment, `examples/k8s` with code
+7. [ ] Motivating example dealing with cloud APIs, secret storages projects. Includes a motivation and examples of writing a wrapper passing the secrets to the app managed by DM, `examples/secrets` with code
+8. [ ] Announcement blog post containing key points from 1 and 2, linking the documentation 3-6.
+9. [ ] Video showcasing the common use-case: create a new staging, it ends up in the `running` status, we show the resources on the View Staging page, click on them and go visit the app. Then we edit it, let it update(we skip it in the video), go to the app again and showcase the change somehow.
+10. [ ] Slideshow presentation accompanying the DM demo.
+
 
 ```bash
 curl https://nixos.org/nix/install | sh
