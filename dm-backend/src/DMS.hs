@@ -39,6 +39,7 @@ import           System.Process.Typed
 
 import           API
 import           Common.API
+import           Common.Validation (isNameValid)
 import           DMS.Args
 import           DMS.AWS
 import           DMS.Logger
@@ -225,6 +226,12 @@ getFullInfo listType = do
 createH :: Deployment -> AppM CommandResponse
 createH dep = do
   failIfGracefulShudownActivated
+  unless (isNameValid $ name dep) $ do
+    let
+      badNameText = "Staging name length should be longer than 2 characters \
+      \and under 17 characters and begin with a letter."
+    throwError err400
+      { errBody = validationError [badNameText] [] }
   t1 <- liftIO $ now
   st <- ask
   let

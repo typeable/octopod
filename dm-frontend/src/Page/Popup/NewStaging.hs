@@ -2,18 +2,16 @@ module Page.Popup.NewStaging where
 
 import Control.Lens (preview, _1, _2)
 import Control.Monad
-import Data.ByteString (ByteString)
 import Data.Functor
 import Data.Generics.Sum
 import Data.Map as M
 import Data.Monoid
-import Data.Text as T (Text, intercalate, length)
-import Data.Text.Encoding as T
+import Data.Text as T (Text, intercalate)
 import Prelude as P
 import Reflex.Dom as R
-import Text.Regex.TDFA
 
 import Common.Types
+import Common.Validation (isNameValid)
 import Frontend.API
 import Page.Utils
 import Servant.Reflex
@@ -76,7 +74,7 @@ newStagingPopupBody errEv = divClass "popup__content" $
   where
     getNameError crEv nameDyn = let
       nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1 )) crEv
-      isNameValidDyn = nameValidation <$> nameDyn
+      isNameValidDyn = isNameValid . DeploymentName <$> nameDyn
       badNameText = "Staging name length should be longer than 2 characters \
       \and under 17 characters and begin with a letter."
       badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
@@ -129,7 +127,3 @@ envVarInput ix _ = do
       updEv = Endo . flip update ix . const . Just <$> envEv
     tellEvent $ leftmost [deleteEv, updEv]
 
-nameValidation :: Text -> Bool
-nameValidation name =
-  (T.length name >= 2 && T.length name <= 17)
-  && (T.encodeUtf8 name =~ ("^[a-z][a-z0-9\\-]*$" :: ByteString))

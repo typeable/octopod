@@ -20,6 +20,7 @@ library
                      , Common.API
                      , Common.Types
                      , Common.Utils
+                     , Common.Validation
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -42,6 +43,7 @@ library
                      , http-api-data
                      , generic-lens
                      , lens
+                     , regex-tdfa
                      , servant
                      , text
   hs-source-dirs:      src

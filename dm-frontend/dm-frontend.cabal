@@ -75,7 +75,6 @@ executable frontend
                      , obelisk-route
                      , reflex-dom
                      , reflex-dom-helpers
-                     , regex-tdfa
                      , servant
                      , servant-reflex
                      , text
