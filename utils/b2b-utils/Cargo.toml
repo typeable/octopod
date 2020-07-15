@@ -9,6 +9,10 @@ clap = "2.33.1"
 rand = "0.7.3"
 serde = "1.0.114"
 serde_json = "1.0.56"
+fs_extra = "1.1.0"
+walkdir = "2.3.1"
+sha2 = "0.9.1"
+hex = "0.4.2"
 
 [[bin]]
 name = "create"

@@ -29,9 +29,13 @@ fn main() -> std::io::Result<()> {
         )
         .get_matches();
 
-    let project_name = matches.value_of("project-name").expect("get project-name");
-    let namespace = matches.value_of("namespace").expect("get namepace");
-    let name = matches.value_of("name").expect("get name");
+    let project_name = matches
+        .value_of("project-name")
+        .expect("could not get project-name");
+    let namespace = matches
+        .value_of("namespace")
+        .expect("could not get namepace");
+    let name = matches.value_of("name").expect("could not get name");
 
     print_utils_version();
 
@@ -42,14 +46,14 @@ fn main() -> std::io::Result<()> {
     let output = Command::new("helm")
         .args(delete_app_atrs(name))
         .output()
-        .expect("delete app");
+        .expect("could not delete app");
     let success = output.status.success();
     print_command_result(output);
 
     let output = Command::new("helm")
         .args(delete_infra_atrs(name))
         .output()
-        .expect("delete infra");
+        .expect("could not delete infra");
     let success2 = output.status.success();
     print_command_result(output);
 
