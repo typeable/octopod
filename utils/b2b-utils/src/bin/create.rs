@@ -54,15 +54,21 @@ fn main() -> std::io::Result<()> {
         )
         .get_matches();
 
-    let project_name = matches.value_of("project-name").expect("get project-name");
-    let base_domain = matches.value_of("base-domain").expect("get base-domain");
-    let namespace = matches.value_of("namespace").expect("get namepace");
-    let name = matches.value_of("name").expect("get name");
-    let tag = matches.value_of("tag").expect("get tag");
+    let project_name = matches
+        .value_of("project-name")
+        .expect("could not get project-name");
+    let base_domain = matches
+        .value_of("base-domain")
+        .expect("could not get base-domain");
+    let namespace = matches
+        .value_of("namespace")
+        .expect("could not get namepace");
+    let name = matches.value_of("name").expect("could not get name");
+    let tag = matches.value_of("tag").expect("could not get tag");
     let envs = matches
         .values_of("env")
         .unwrap_or_else(Default::default)
-        .map(|e| e.try_into().expect("get valid key=value"))
+        .map(|e| e.try_into().expect("could not get valid key=value"))
         .collect::<Vec<EnvPair>>();
 
     print_utils_version();
@@ -74,8 +80,6 @@ fn main() -> std::io::Result<()> {
     println!("tag: {:?}", tag);
     println!("envs: {:?}", envs);
 
-    let b2b_heml = whereis("b2b-helm").expect("get b2b-helm path");
-
     let tmp_dir = tmp_dir();
     let work_dir = Path::new("/tmp").join(tmp_dir);
     println!("use {:?} dir", work_dir);
@@ -83,46 +87,45 @@ fn main() -> std::io::Result<()> {
     let _guard = TmpDirGuard::new(&work_dir);
     fs::create_dir(&work_dir)?;
 
-    let output = Command::new("git")
-        .args(&[
-            "clone",
-            "--recursive",
-            "--depth=1",
-            "git@github.com:Aviora/b2b-helm.git",
-            ".",
-        ])
+    let success = clone_and_prepare_repo(&work_dir);
+    let success2 = print_sha256_repo(&work_dir);
+
+    let envs_str = envs.iter().fold(String::new(), |mut acc, x| {
+        acc.push_str(&x.to_string());
+        acc
+    });
+    let args = [project_name, base_domain, namespace, name, tag, &envs_str];
+    let app_checksum = calc_app_checksum(&work_dir, &args)?;
+    let infra_checksum = calc_infra_checksum(&work_dir, &args)?;
+
+    println!("app checksum: {}", app_checksum);
+    println!("infra checksum: {}", infra_checksum);
+
+    let output = Command::new("helm")
+        .args(create_infra_atrs(
+            base_domain,
+            namespace,
+            name,
+            &infra_checksum,
+        ))
         .current_dir(&work_dir)
         .output()
-        .expect("clone repo");
-    let success = output.status.success();
-    print_command_result(output);
-
-    let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
-        .current_dir(&work_dir)
-        .output()
-        .expect("get hash of HEAD");
-    let success2 = output.status.success();
-    println!(
-        "b2b-helm sha256: {}",
-        String::from_utf8(output.stdout).expect("get sha256 of HEAD")
-    );
-
-    fs::copy(&b2b_heml, Path::new(&work_dir).join("b2b-helm"))?;
-
-    let output = Command::new("b2b-helm")
-        .args(create_infra_atrs(base_domain, namespace, name))
-        .current_dir(&work_dir)
-        .output()
-        .expect("create infra");
+        .expect("could not create infra");
     let success3 = output.status.success();
     print_command_result(output);
 
-    let output = Command::new("b2b-helm")
-        .args(create_app_atrs(base_domain, namespace, name, tag, envs))
+    let output = Command::new("helm")
+        .args(create_app_atrs(
+            base_domain,
+            namespace,
+            name,
+            tag,
+            envs,
+            &app_checksum,
+        ))
         .current_dir(&work_dir)
         .output()
-        .expect("create app");
+        .expect("could not create app");
     let success4 = output.status.success();
     print_command_result(output);
 
