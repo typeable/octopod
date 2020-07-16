@@ -294,7 +294,7 @@ errorCommonWidget =
   divClass "null null--data" $
     divClass "null__content" $ do
       elClass "b" "null__heading" $ text "Cannot retrieve the data"
-      divClass "null__message" $ text "Try to reload page"
+      divClass "null__message" $ text "Try to reload the page"
 
 overridesWidget :: MonadWidget t m => EnvPairs -> m ()
 overridesWidget envs = divClass "listing" $ do

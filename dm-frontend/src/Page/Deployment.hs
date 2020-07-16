@@ -207,7 +207,7 @@ actionsTableError = do
       elAttr "td" ("colspan" =: "7") $
         divClass "null null--data" $ do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
-          divClass "null__message" $ text "Try to reload page"
+          divClass "null__message" $ text "Try to reload the page"
   pure never
 
 actionsTableData
