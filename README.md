@@ -21,6 +21,7 @@ Multi-staging Deployment Manager (DM). DM consists of the client and server part
 15. [ ] Information about the DM project available on the typeable.io website.
 16. [ ] Security model and K8S RBAC configuration for the staging cluster
 17. [ ] Superuser documentation - command line utils
+18. [ ] Integration into existing development flows
 
 # Nix Installation
 
