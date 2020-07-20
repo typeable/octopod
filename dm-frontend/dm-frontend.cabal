@@ -3,14 +3,14 @@
 
 name:                dm-frontend
 version:             0.1.0.0
--- synopsis:
--- description:
-license:             BSD3
+description:         Please see the README on GitHub at <https://github.com/githubuser/dm#readme>
+homepage:            https://github.com/https://github.com/Aviora/dm#readme
+bug-reports:         https://github.com/https://github.com/Aviora/dm/issues
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Anisimov Nikita
 maintainer:          anisimoff.nikita@gmail.com
--- copyright:
--- category:
+copyright:           2020 LLC Typeable
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
 cabal-version:       >=1.10
@@ -27,12 +27,12 @@ executable frontend
   other-modules:       Frontend.API
                      , Frontend.GHCJS
                      , Frontend.Route
+                     , Frontend.Utils
                      , Page.ClassicPopup
                      , Page.Deployment
                      , Page.Deployments
                      , Page.Popup.EditStaging
                      , Page.Popup.NewStaging
-                     , Page.Utils
   ghc-options:         -Wall
                        -Werror
                        -Wno-missing-home-modules

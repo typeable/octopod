@@ -16,7 +16,7 @@ import Reflex.Dom as R
 import Common.Types
 import Common.Utils
 import Frontend.API
-import Page.Utils
+import Frontend.Utils
 import Servant.Reflex
 
 

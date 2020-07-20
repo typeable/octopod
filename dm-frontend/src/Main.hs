@@ -1,7 +1,6 @@
 module Main where
 
 import Data.ByteString (ByteString)
-import Data.Text (pack)
 import Obelisk.Route.Frontend
 import Reflex.Dom
 import Servant.Reflex
@@ -11,7 +10,7 @@ import Frontend.API
 import Frontend.Route
 import Page.Deployment
 import Page.Deployments
-import Page.Utils
+import Frontend.Utils
 import Frontend.GHCJS
 
 
@@ -33,7 +32,7 @@ tstW = do
   pb <- getPostBuild
   x <- performEvent (initConfig <$ pb)
   xd <- holdDyn False x
-  dynText $ pack . show <$> xd
+  dynText $ showT <$> xd
   blank
 
 wsUpdate :: forall t m . MonadWidget t m => m (Event t ())

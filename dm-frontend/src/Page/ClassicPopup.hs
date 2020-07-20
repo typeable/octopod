@@ -2,7 +2,7 @@ module Page.ClassicPopup where
 
 import Reflex.Dom
 
-import Page.Utils
+import Frontend.Utils
 
 
 classicPopup

@@ -4,7 +4,7 @@ import Control.Lens
 import Control.Monad
 import Data.Coerce
 import Data.Generics.Product (field)
-import Data.Text as T (Text, pack)
+import Data.Text as T (Text)
 import Obelisk.Route.Frontend
 import Reflex.Dom as R
 import Servant.Reflex
@@ -13,9 +13,9 @@ import Common.Types as CT
 import Common.Utils
 import Frontend.API
 import Frontend.Route
+import Frontend.Utils
 import Page.ClassicPopup
 import Page.Popup.EditStaging
-import Page.Utils
 
 
 deploymentPage
@@ -247,14 +247,18 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ coerce deploymentTag
     el "td" $ overridesWidget $ coerce $ deploymentAppOverrides
     el "td" $ overridesWidget $ coerce $ deploymentStagingOverrides
+<<<<<<< HEAD
+=======
+    el "td" $ text $ showT $ exitCode
+>>>>>>> frontend utils haddocks
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
 formatDuration :: Duration -> Text
 formatDuration (Duration d) = m <> "m " <> s <> "s"
   where
-    m = pack . show $ d `div` (1000 * 60)
-    s = pack . show $ d `div` (1000)
+    m = showT $ d `div` (1000 * 60)
+    s = showT $ d `div` (1000)
 
 backButton
   ::

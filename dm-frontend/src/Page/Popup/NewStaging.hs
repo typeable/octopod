@@ -14,7 +14,7 @@ import Reflex.Dom as R
 import Common.Types
 import Common.Validation (isNameValid)
 import Frontend.API
-import Page.Utils
+import Frontend.Utils
 import Servant.Reflex
 
 

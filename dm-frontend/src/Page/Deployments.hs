@@ -10,7 +10,7 @@ import Data.Generics.Product (field)
 import Data.Generics.Sum (_Ctor)
 import Data.List as L (null, sortBy)
 import Data.Map as M (Map, fromList, partition, filter, elems)
-import Data.Text as T (Text, toCaseFold, isPrefixOf, pack)
+import Data.Text as T (Text, toCaseFold, isPrefixOf)
 import Data.Time (getCurrentTime, diffUTCTime)
 import GHC.Generics (Generic)
 import Obelisk.Route.Frontend
@@ -24,7 +24,7 @@ import Frontend.Route
 import Page.ClassicPopup
 import Page.Popup.EditStaging
 import Page.Popup.NewStaging
-import Page.Utils
+import Frontend.Utils
 
 deploymentsPage
   ::
@@ -113,7 +113,7 @@ lastUpdateWidget okUpdEv = do
         "Updated " <> (show'$ ms `div` 60) <> " hour ago"
       | otherwise = "Updated " <> (show' $ ms `div` 60) <> " hours ago"
     isSingular x = x `mod` 100 /= 11 && x `mod` 10 == 1
-    show' = pack . show
+    show' = showT
   diffDyn <- holdDyn 0 diffEv
   divClass "page__note" $ dynText $ mkMsg <$> diffDyn
 
