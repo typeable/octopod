@@ -50,8 +50,12 @@ deploymentsWidget
   -> m ()
 deploymentsWidget updAllEv = do
   (showNewStagingEv, editEv) <- deploymentsWidgetWrapper $ mdo
+    pageNotification $ leftmost
+      [ DPMError "Staging list update failed, staging list\
+        \ may be slightly outdated." <$ errUpdEv
+      , DPMClear <$ okUpdEv ]
     (showNewStagingEv', termDyn) <- deploymentsHeadWidget okUpdEv
-    (okUpdEv, editEv) <- initDeploymentsListWidget updAllEv termDyn
+    (okUpdEv, errUpdEv, editEv) <- initDeploymentsListWidget updAllEv termDyn
     pure (showNewStagingEv', editEv)
   void $ newStagingPopup showNewStagingEv never
   void $ editStagingPopup editEv never
@@ -110,18 +114,22 @@ initDeploymentsListWidget
     , SetRoute t (R Routes) m )
   => Event t ()
   -> Dynamic t Text
-  -> m (Event t (), Event t DeploymentFullInfo)
+  -> m (Event t (), Event t (), Event t DeploymentFullInfo)
 initDeploymentsListWidget updAllEv termDyn = dataWidgetWrapper $ do
   pb <- getPostBuild
   respEv <- listEndpoint pb
   let
     okEv = fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
-    w m = m >> pure (never, never)
+    w m = m >> pure (never, never, never)
   evsDyn <- widgetHold (w loadingDeploymentsWidget) $ leftmost
     [ deploymentsListWidget updAllEv termDyn <$> okEv
     , (w errDeploymentsWidget) <$ errEv ]
-  pure (switchDyn $ fst <$> evsDyn, switchDyn $ snd <$> evsDyn)
+  let
+    okUpdEv = switchDyn $ evsDyn <^.> _1
+    errUpdEv = switchDyn $ evsDyn <^.> _2
+    editEv = switchDyn $ evsDyn <^.> _3
+  pure (okUpdEv, errUpdEv, editEv)
 
 deploymentsListWidget
   ::
@@ -131,11 +139,13 @@ deploymentsListWidget
   => Event t ()
   -> Dynamic t Text
   -> [DeploymentFullInfo]
-  -> m (Event t (), Event t DeploymentFullInfo)
+  -> m (Event t (), Event t (), Event t DeploymentFullInfo)
 deploymentsListWidget updAllEv termDyn ds = mdo
-  updRespEv <- listEndpoint updAllEv
+  retryEv <- delay 10 errUpdEv
+  updRespEv <- listEndpoint $ leftmost [updAllEv, () <$ retryEv]
   let
     okUpdEv = fmapMaybe reqSuccess updRespEv
+    errUpdEv = traceEvent "34" $ fmapMaybe reqFailure updRespEv
     mkMap = M.fromList . fmap (\x -> (x ^. dfiName , x) )
   dsDyn <- fmap mkMap <$> holdDyn ds okUpdEv
   let
@@ -147,7 +157,7 @@ deploymentsListWidget updAllEv termDyn ds = mdo
   clickedEv <- elementClick
   editEv <- activeDeploymentsWidget clickedEv activeDsDyn
   archivedDeploymentsWidget clickedEv archivedDsDyn
-  pure (() <$ okUpdEv, editEv)
+  pure (() <$ okUpdEv, () <$ errUpdEv, editEv)
 
 searchDeployments
   :: Text -> DeploymentFullInfo -> Bool

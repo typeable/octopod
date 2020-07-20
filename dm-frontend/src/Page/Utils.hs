@@ -327,3 +327,25 @@ ifThenElseDyn :: Reflex t => Dynamic t Bool -> b -> b -> Dynamic t b
 ifThenElseDyn bDyn t f = bDyn <&> \case
   True -> t
   False -> f
+
+data DeploymentPageNotification
+  = DPMOk Text
+  | DPMError Text
+  | DPMClear
+
+pageNotification
+  :: MonadWidget t m => Event t DeploymentPageNotification -> m ()
+pageNotification notEv = mdo
+  let
+    messageWidget (DPMOk txt) = messageClassWidget txt "notification--success"
+    messageWidget (DPMError txt) = messageClassWidget txt "notification--danger"
+    messageWidget DPMClear = pure never
+    messageClassWidget txt cl =
+      divClass ("page__output notification " <> cl) $ do
+        text txt
+        buttonClass "notification__close" ""
+    closeEv = switchDyn closeEvDyn
+  closeEvDyn <- widgetHold (pure never) $ leftmost
+    [ messageWidget <$> notEv
+    , pure never <$ closeEv ]
+  blank

@@ -46,12 +46,16 @@ deploymentWidget
   -> DeploymentFullInfo
   -> m ()
 deploymentWidget updEv dfi = mdo
-  (editEv, logsEv) <- pageWrapper $ do
-    respEv <- fullInfoEndpoint (constDyn $ Right $ dfi ^. dfiName) updEv
-    let (okEv, _errEv) = processResp respEv
+  (editEv, logsEv) <- pageWrapper $ mdo
+    retryEv <- delay 10 errEv
+    respEv <- fullInfoEndpoint (constDyn $ Right $ dfi ^. dfiName)
+      $ leftmost [ updEv, retryEv ]
+    let (okEv, errEv) = processResp respEv
     dfiDyn <- holdDyn dfi okEv
     editEv' <- deploymentHead dfiDyn sentEv
-    stagingNotification never
+    pageNotification $ leftmost
+      [ DPMError "Couldn't update status of staging" <$ errEv
+      , DPMClear <$ okEv ]
     logsEv' <- deploymentBody updEv dfiDyn
     pure (editEv', logsEv')
   sentEv <- editStagingPopup editEv never
@@ -269,11 +273,6 @@ processResp respEv =
     errEv = fmapMaybe reqFailure respEv
   in (respOkEv, () <$ errEv)
 
-
-data DeploymentPageNotification
-  = DPMOk Text
-  | DPMError Text
-
 loadingWidget
   ::
     ( MonadWidget t m
@@ -315,19 +314,3 @@ pageWrapper
 pageWrapper m = divClass "page" $ divClass "page__wrap container" $ do
   backButton
   m
-
-stagingNotification
-  :: MonadWidget t m => Event t DeploymentPageNotification -> m ()
-stagingNotification notEv = mdo
-  let
-    messageWidget (DPMOk txt) = messageClassWidget txt "notification--success"
-    messageWidget (DPMError txt) = messageClassWidget txt "notification--danger"
-    messageClassWidget txt cl =
-      divClass ("page__output notification " <> cl) $ do
-        text txt
-        buttonClass "notification__close" ""
-    closeEv = switchDyn closeEvDyn
-  closeEvDyn <- widgetHold (pure never) $ leftmost
-    [ messageWidget <$> notEv
-    , pure never <$ closeEv ]
-  blank
