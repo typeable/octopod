@@ -6,7 +6,7 @@ version:             0.1.0.0
 description:         Please see the README on GitHub at <https://github.com/githubuser/dm#readme>
 homepage:            https://github.com/https://github.com/Aviora/dm#readme
 bug-reports:         https://github.com/https://github.com/Aviora/dm/issues
-license:             BSD-3-Clause
+license:             BSD3
 license-file:        LICENSE
 author:              Anisimov Nikita
 maintainer:          anisimoff.nikita@gmail.com
