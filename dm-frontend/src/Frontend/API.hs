@@ -1,3 +1,11 @@
+{-|
+Module      : Frontend.GHCJS
+Description : API requests.
+
+This module contains client functions that perform API requests (these functions
+are generated from servant API) and functions that work with these requests.
+-}
+
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE CPP #-}
@@ -17,7 +25,8 @@ import Common.API
 import Common.Types
 import Frontend.GHCJS
 
-
+-- | 'apiClients' generates API requests. Before each request API host and API
+-- authentication token are read from session storage.
 apiClients
   :: forall t m. MonadWidget t m
   => SR.Client t m API ()
@@ -116,6 +125,7 @@ projectName
   :<|> cleanArchiveEndpoint
   :<|> projectName = apiClients
 
+-- | Parser for kubectl command response.
 commandResponse :: ReqResult tag CommandResponse -> Maybe CommandResponse
 commandResponse = \case
   ResponseSuccess _ a _   -> Just a
@@ -129,6 +139,7 @@ commandResponse = \case
       XhrResponseBody_ArrayBuffer x -> Just x
       _                             -> Nothing
 
+-- | Gets path of websocket url.
 wsPath :: Text
 wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)
 

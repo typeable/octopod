@@ -1,10 +1,10 @@
 {-|
 Module      : Frontend.Route
-Description : Project router definition.
+Description : Router setup.
 
-This module contains type-level routing scheme and encoder for route. Alse there
-is a  'Wrapped' instance definition for 'DeploymentName'. This helps to simplify
-router encoder. Routing is provided by package @obelisk-router@.
+This module contains a type-level routing scheme and a router encoder. Also
+there is an instance of 'Wrapped' definition for 'DeploymentName'. This helps to
+simplify router encoder. Routing is provided by package @obelisk-router@.
 -}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -28,10 +28,7 @@ import Common.Types
 
 makeWrapped ''DeploymentName
 
--- | Definition of router scheme:
--- @
--- stagings/\<deployment_name\>
--- @
+-- | Routing scheme definition.
 data Routes :: * -> * where
   DashboardRoute :: Routes (Maybe DeploymentName)
 deriving instance Show (Routes a)
@@ -40,7 +37,7 @@ concat <$> mapM deriveRouteComponent
   [ ''Routes
   ]
 
--- | Encoder and decoder for routes.
+-- | URL encoder and decoder.
 routeEncoder
   :: Encoder (Either Text) Identity (R Routes) PageName
 routeEncoder = handleEncoder (const (DashboardRoute :/ Nothing)) $
