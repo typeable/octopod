@@ -2,7 +2,6 @@ module Common.Types where
 
 import Data.Bifunctor
 import Data.ByteString (ByteString)
-import Data.Int (Int64)
 import Data.String
 import Data.Text as T
 import Data.Traversable

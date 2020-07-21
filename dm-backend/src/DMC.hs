@@ -40,22 +40,28 @@ runDMC = do
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      CreateC  tName tTag tSetApp tSetSt _ _ -> do
+      CreateC  tName tTag tSetApp tSetSt _ _                         -> do
         setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
         setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
         handleCreate $ Deployment (coerce tName) (coerce tTag) setApp setSt
-      ListC         _     _        -> handleList
-      DeleteC       tName _    _   -> handleDelete . coerce $ tName
+      ListC         _     _                                          ->
+        handleList
+      DeleteC       tName _    _                                     ->
+        handleDelete . coerce $ tName
       UpdateC       tName tTag tSetApp tUnsetApp tSetSt tUnsetSt _ _ -> do
         setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
         setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
         unsetApp <- liftIO $ parseUnsetApplicationOverrides Public tUnsetApp
         unsetSt <- liftIO $ parseUnsetStagingOverrides Public tUnsetSt
         handleUpdate (coerce tName) (coerce tTag) setApp unsetApp setSt unsetSt
-      InfoC         tName _    _   -> handleInfo . coerce $ tName
-      CleanupC      tName _    _   -> handleCleanup . coerce $ tName
-      RestoreC      tName _    _   -> handleRestore . coerce $ tName
-      CleanArchiveC _     _        -> handleCleanArchive
+      InfoC         tName _    _                                     ->
+        handleInfo . coerce $ tName
+      CleanupC      tName _    _                                     ->
+        handleCleanup . coerce $ tName
+      RestoreC      tName _    _                                     ->
+        handleRestore . coerce $ tName
+      CleanArchiveC _     _                                          ->
+        handleCleanArchive
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
