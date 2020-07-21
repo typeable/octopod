@@ -16,11 +16,12 @@ import qualified Data.ByteString.Lazy as BSL
 import           Data.Aeson (Value (..), encode, toJSON)
 import           Data.Coerce
 import           Data.Conduit (ConduitT, yield)
+import           Data.Foldable (foldrM)
 import           Data.Int (Int64)
 import           Data.IORef
 import           Data.Maybe
 import           Data.Pool
-import           Data.Text (lines, pack, unpack, unwords)
+import           Data.Text (pack, unpack, unwords)
 import           Data.Text.IO (hGetContents)
 import           Data.Traversable
 import           Database.PostgreSQL.Simple
@@ -176,9 +177,8 @@ eventS channel = do
 
 server :: ServerT API AppM
 server =
-  ( listH :<|> createH :<|> getH :<|> editH
-    :<|> deleteH :<|> updateH :<|> infoH :<|> fullInfoH :<|> statusH
-    :<|> cleanupH :<|> restoreH
+  ( listH :<|> createH :<|> deleteH :<|> updateH
+    :<|> infoH :<|> fullInfoH :<|> statusH :<|> cleanupH :<|> restoreH
   ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
 
 listH :: AppM [DeploymentFullInfo]
@@ -195,28 +195,28 @@ fullInfoH dName = do
 getFullInfo :: FullInfoListType -> AppM [DeploymentFullInfo]
 getFullInfo listType = do
   AppState {pool = p, logger = l, baseDomain = d} <- ask
-
-  retrieved <- liftIO $ withResource p $ \conn ->
-    case listType of
+  deployments <- liftIO $ withResource p $ \conn -> do
+    rows <- case listType of
       FullInfoForAll             -> query_ conn qAll
       FullInfoOnlyForOne (dName) -> query conn qOne (Only dName)
-  deployments <- liftIO $ for retrieved $ \(n, t, e, a, ct, ut, st) -> do
-    es <- parseEnvs (lines e)
-    pure $
-      DeploymentFullInfo (Deployment n t es) (read st) a ct ut (depUrls d n)
-
+    for rows $ \(n, t, a, ct, ut, st) -> do
+      (appOvs, stOvs) <- selectOverrides conn n
+      pure $ do
+        let dep = (Deployment n t appOvs stOvs)
+        DeploymentFullInfo dep (read st) a ct ut (depUrls d n)
   liftIO . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
     qAll                 =
-      "SELECT name, tag, envs, archived, extract(epoch from created_at)::int, \
+      "SELECT name, tag, archived, extract(epoch from created_at)::int, \
         \extract(epoch from updated_at)::int, status::text \
       \FROM deployments ORDER BY name"
     qOne                 =
-      "SELECT name, tag, envs, archived, extract(epoch from created_at)::int, \
+      "SELECT name, tag, archived, extract(epoch from created_at)::int, \
         \extract(epoch from updated_at)::int, status::text \
       \FROM deployments \
       \WHERE name = ?"
+    -- FIXME: move to b2b-utils
     depUrls domain dName =
       [ ("app", appUrl domain dName)
       , ("kibana", "kibana." <> appUrl domain dName)
@@ -235,23 +235,29 @@ createH dep = do
   t1 <- liftIO $ now
   st <- ask
   let
-    pgPool                                                 = pool st
-    createDep :: PgPool -> Deployment -> IO Int64
-    createDep p Deployment { name = n, tag = t, envs = e } =
-      withResource p $ \conn -> execute
-        conn
-        "INSERT INTO deployments (name, tag, envs, status) VALUES (?, ?, ?, ?)"
-        -- FIXME: make EnvPairs a newtype and give it ToField instance
-        (n, t, formatEnvPairs e, show CreatePending)
+    q                                            =
+      "INSERT INTO deployments (name, tag, status) \
+      \VALUES (?, ?, ?) RETURNING id"
+    pgPool                                       = pool st
+    createDep :: PgPool -> Deployment -> IO [Only Int]
+    createDep p Deployment { name = n, tag = t } =
+      withResource p $ \conn ->
+        query conn q (n, t, show CreatePending)
   failIfImageNotFound $ tag dep
-  res :: Either SqlError Int64 <- liftIO . try $ createDep pgPool dep
-  case res of
-    Right _                                                 -> pure ()
+  res :: Either SqlError [Only Int] <- liftIO . try $ createDep pgPool dep
+  dId <- case res of
+    Right ((Only depId) : _)                                ->
+      pure . DeploymentId $ depId
+    Right []                                                ->
+      throwError err404
+        { errBody = validationError ["Name not found"] [] }
     Left (SqlError code _ _ _ _) | code == unique_violation ->
       throwError err400
         { errBody = validationError ["Deployment already exists"] [] }
     Left (SqlError _ _ _ _ _)                               ->
       throwError err409 { errBody = appError "Some database error" }
+  liftIO . withResource pgPool $ \conn ->
+    upsertNewOverrides conn dId (appOverrides dep) (stagingOverrides dep)
   liftIO . runBgWorker st $ do
     sendReloadEvent st
     (ec, out, err) <- createDeployment dep st
@@ -275,7 +281,8 @@ createDeployment dep st = do
       , "--namespace", coerce $ namespace st
       , "--name", coerce $ name dep
       , "--tag", coerce $ tag dep
-      ] ++ concat [["--env", concatPair e] | e <- envs dep]
+      ] ++ applicationOverridesToArgs (appOverrides dep)
+        ++ stagingOverridesToArgs (stagingOverrides dep)
     cmd  = coerce $ creationCommand st
 
   liftIO $ do
@@ -284,109 +291,63 @@ createDeployment dep st = do
     log $ "deployment created, deployment: " <> (pack . show $ dep)
     pure (ec, out, err)
 
+applicationOverrideToArg :: ApplicationOverride -> [Text]
+applicationOverrideToArg o = ["--app-env-override", overrideToArg . coerce $ o]
 
-getH :: DeploymentName -> AppM Deployment
-getH dName = do
-  st <- ask
-  dep <- selectDeployment (pool st) dName AllDeployments
-  liftIO $ do
-    logInfo (logger st) $ "get deployment: " <> (pack . show $ dep)
-    return dep
+applicationOverridesToArgs :: ApplicationOverrides -> [Text]
+applicationOverridesToArgs ovs = concat [applicationOverrideToArg o | o <- ovs ]
 
-selectDeploymentLogs :: PgPool -> DeploymentName -> IO [DeploymentLog]
-selectDeploymentLogs p dName = do
+stagingOverrideToArg :: StagingOverride -> [Text]
+stagingOverrideToArg o = ["--staging-override", overrideToArg . coerce $ o]
+
+stagingOverridesToArgs :: StagingOverrides -> [Text]
+stagingOverridesToArgs ovs = concat [stagingOverrideToArg o | o <- ovs]
+
+selectDeploymentLogs
+  :: PgPool
+  -> DeploymentId
+  -> IO [DeploymentLog]
+selectDeploymentLogs pgPool dId = do
   let
     q =
-      "SELECT id, action::text, tag, envs, exit_code, \
+      "SELECT id, action::text, tag, exit_code, \
         \duration, extract(epoch from created_at)::int \
       \FROM deployment_logs \
-      \WHERE deployment_id in (\
-        \SELECT id FROM deployments WHERE name = ?\
-      \) \
+      \WHERE deployment_id = ? \
       \ORDER BY created_at DESC \
       \LIMIT 20"
-  retrievedLogs <- withResource p (\conn -> query conn q (Only dName))
-  -- FIXME: use FromRow instance instead
-  for retrievedLogs $ \(ai, a, t, e, ec, d, ts) -> do
-    envPairs <- parseEnvs $ lines e
-    pure $ DeploymentLog (ActionId ai) a t envPairs ec (Duration d) ts
+  withResource pgPool $ \conn -> do
+    rows <- query conn q (Only . unDeploymentId $ dId)
+    -- FIXME: use FromRow instance instead
+    for rows $ \(ai, a, t, ec, d, ts) -> do
+      (appOvs, stOvs) <- selectLogOverrides conn (ActionId ai)
+      pure $ DeploymentLog (ActionId ai) a t appOvs stOvs ec (Duration d) ts
 
 selectDeployment
   :: PgPool
   -> DeploymentName
   -> DeploymentListType
   -> AppM Deployment
-selectDeployment p dName lType = do
+selectDeployment pgPool dName lType = do
   let
     q AllDeployments          =
-      "SELECT name, tag, envs FROM deployments \
+      "SELECT name, tag FROM deployments \
       \WHERE name = ?"
     q ArchivedOnlyDeployments =
-      "SELECT name, tag, envs FROM deployments \
+      "SELECT name, tag FROM deployments \
       \WHERE name = ? AND archived = 't'"
 
-  deps <- liftIO $ do
-    retrieved <- withResource p $ \conn ->
-      query conn (q lType) (Only dName)
-    for retrieved $ \(n, t, e) -> Deployment n t <$> parseEnvs (lines e)
+  deps <- liftIO . withResource pgPool $ \conn -> do
+    retrieved <- query conn (q lType) (Only dName)
+    for retrieved $ \(n, t) -> do
+      (appOvs, stOvs) <- selectOverrides conn n
+      pure $ Deployment n t appOvs stOvs
   case deps of
     [dep] -> pure dep
     []    -> throwError err404
       { errBody = validationError ["Name not found"] [] }
     _     -> throwError err406
       { errBody = validationError ["More than one name found"] [] }
-
-editH :: DeploymentName -> EnvPairs -> AppM CommandResponse
-editH dName dEnvs = do
-  failIfGracefulShudownActivated
-  t1 <- liftIO $ now
-  st <- ask
-  let
-    log :: Text -> IO ()
-    log          = logInfo (logger st)
-    pgPool       = pool st
-  liftIO $ getTag pgPool >>= \case
-    dTag : _ -> do
-      let
-        args =
-          [ "--project-name", coerce $ projectName st
-          , "--base-domain", coerce $ baseDomain st
-          , "--namespace", coerce $ namespace st
-          , "--name", coerce dName
-          , "--tag", coerce dTag
-          ] ++ concat [["--env", concatPair p] | p <- dEnvs]
-        cmd  = coerce $ updateCommand st
-      liftIO . runBgWorker st $ do
-        void $ updateEditDeployment pgPool
-        sendReloadEvent st
-        log $ "call " <> unwords (cmd : args)
-        (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
-        log
-          $ "deployment edited, name: " <> coerce dName
-          <> ", envs: " <> formatEnvPairs dEnvs
-        let dep = Deployment dName dTag dEnvs
-        t2 <- now
-        let
-          arch   = ArchivedFlag False
-          elTime = elapsedTime t2 t1
-        createDeploymentLog pgPool dep "edit" ec arch elTime out err
-        sendReloadEvent st
-        handleExitCode ec
-    _     ->
-      liftIO . logWarning (logger st) $ "tag not found, name: " <> coerce dName
-  return Success
-  where
-    getTag                 :: PgPool -> IO [DeploymentTag]
-    getTag p               = fmap (fmap fromOnly) $ withResource p $ \conn ->
-      query conn "SELECT tag FROM deployments WHERE name = ?" (Only dName)
-    updateEditDeployment   :: PgPool -> IO Int64
-    updateEditDeployment p = withResource p $ \conn -> execute
-      conn
-      "UPDATE deployments \
-      \SET envs = ?, updated_at = now(), status = ?, status_updated_at = now() \
-      \WHERE name = ?"
-      -- FIXME: make EnvPairs a newtype and give it ToField instance
-      (formatEnvPairs dEnvs, show UpdatePending, dName)
 
 deleteH :: DeploymentName -> AppM CommandResponse
 deleteH dName = do
@@ -428,76 +389,190 @@ archiveDeployment p dName = withResource p $ \conn -> do
   execute conn q (show DeletePending, dName)
 
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
-updateH dName DeploymentUpdate { newTag = dTag, newEnvs = nEnvs } = do
+updateH dName dUpdate = do
   failIfGracefulShudownActivated
   t1 <- liftIO $ now
   st <- ask
-  let pgPool = pool st
-  retrieved <- liftIO $ selectEnvPairs pgPool dName
-  case retrieved of
-    storedEnv : _ -> do
-      envPairs <- liftIO $ case nEnvs of
-        Nothing -> parseEnvs $ lines storedEnv
-        Just dEnvs  -> pure dEnvs
+  let
+    DeploymentUpdate
+      { newTag = dTag
+      , newAppOverrides = newAppOvs
+      , oldAppOverrides = oldAppOvs
+      , newStagingOverrides = newStOvs
+      , oldStagingOverrides = oldStOvs } = dUpdate
+    pgPool = pool st
+    log  = logInfo (logger st)
+
+  dId <- selectDeploymentId pgPool dName
+  failIfImageNotFound dTag
+  liftIO . runBgWorker st $ do
+    (appOvs, stOvs) <- withResource pgPool $ \conn ->
+      withTransaction conn $ do
+        deleteOldOverrides conn dId oldAppOvs oldStOvs
+        upsertNewOverrides conn dId newAppOvs newStOvs
+        void $ updateDeployment conn dName dTag
+        selectOverrides conn dName
+    sendReloadEvent st
+    let
+      args =
+        [ "--project-name", coerce $ projectName st
+        , "--base-domain", coerce $ baseDomain st
+        , "--namespace", coerce $ namespace st
+        , "--name", coerce $ dName
+        , "--tag", coerce $ dTag
+        ] ++ applicationOverridesToArgs appOvs
+          ++ stagingOverridesToArgs stOvs
+      cmd  = coerce $ updateCommand st
+    log $ "call " <> unwords (cmd : args)
+    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+    log $ "deployment updated, name: "
+      <> coerce dName <> ", tag: " <> coerce dTag
+    void $ do
+      t2 <- now
       let
-        log  = logInfo (logger st)
-        args =
-          [ "--project-name", coerce $ projectName st
-          , "--base-domain", coerce $ baseDomain st
-          , "--namespace", coerce $ namespace st
-          , "--name", coerce $ dName
-          , "--tag", coerce $ dTag
-          ] ++ concat [["--env", concatPair e] | e <- envPairs]
-        cmd  = coerce $ updateCommand st
-      failIfImageNotFound dTag
-      liftIO . runBgWorker st $ do
-        void $ updateDeployment pgPool dName dTag envPairs
-        sendReloadEvent st
-        log $ "call " <> unwords (cmd : args)
-        (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
-        log $ "deployment updated, name: "
-          <> coerce dName <> ", tag: " <> coerce dTag
-        void $ do
-          t2 <- now
-          let
-            dep    = Deployment dName dTag envPairs
-            arch   = ArchivedFlag False
-            elTime = elapsedTime t2 t1
-          createDeploymentLog pgPool dep "update" ec arch elTime out err
-        sendReloadEvent st
-        handleExitCode ec
-    _ ->
-      liftIO . logWarning (logger st) $ "envs not found, name: " <> coerce dName
+        dep    = Deployment dName dTag appOvs stOvs
+        arch   = ArchivedFlag False
+        elTime = elapsedTime t2 t1
+      createDeploymentLog pgPool dep "update" ec arch elTime out err
+    sendReloadEvent st
+    handleExitCode ec
   return Success
 
-selectEnvPairs :: PgPool -> DeploymentName -> IO [Text]
-selectEnvPairs p dName = fmap (fmap fromOnly) $ withResource p $ \conn -> query
-  conn
-  "SELECT envs FROM deployments WHERE name = ?"
-  (Only dName)
+selectOverrides
+  :: Connection
+  -> DeploymentName
+  -> IO (ApplicationOverrides, StagingOverrides)
+selectOverrides conn dName = do
+  let
+    q                                         =
+      "SELECT key, value, scope::text, visibility::text \
+      \FROM deployment_overrides \
+      \WHERE deployment_id = ( \
+        \SELECT id FROM deployments WHERE name = ? \
+      \)"
+    parseVis :: Text -> OverrideVisibility
+    parseVis                                   = read . unpack
+    parseScope :: Text -> OverrideScope
+    parseScope                                 = read . unpack
+    toOverrides (k, v, s, vis) (appOvs, stOvs) =
+      pure $ case parseScope s of
+        App     ->
+          (ApplicationOverride (Override k v $ parseVis vis) : appOvs, stOvs)
+        Staging ->
+          (appOvs, StagingOverride (Override k v $ parseVis vis) : stOvs)
+  rows <- query conn q (Only dName)
+  foldrM toOverrides ([], []) rows
+
+selectLogOverrides
+  :: Connection
+  -> ActionId
+  -> IO (ApplicationOverrides, StagingOverrides)
+selectLogOverrides conn aId = do
+  let
+    q                                         =
+      "SELECT key, value, scope::text, visibility::text \
+      \FROM deployment_log_overrides \
+      \WHERE deployment_log_id = ?"
+    parseVis :: Text -> OverrideVisibility
+    parseVis                                   = read . unpack
+    parseScope :: Text -> OverrideScope
+    parseScope                                 = read . unpack
+    toOverrides (k, v, s, vis) (appOvs, stOvs) =
+      pure $ case parseScope s of
+        App     ->
+          (ApplicationOverride (Override k v $ parseVis vis) : appOvs, stOvs)
+        Staging ->
+          (appOvs, StagingOverride (Override k v $ parseVis vis) : stOvs)
+  rows <- query conn q (Only . unActionId $ aId)
+  foldrM toOverrides ([], []) rows
+
+deleteOldOverrides
+  :: Connection
+  -> DeploymentId
+  -> ApplicationOverrides
+  -> StagingOverrides
+  -> IO ()
+deleteOldOverrides conn dId appOvs stOvs = do
+  let
+    q    =
+      "DELETE FROM deployment_overrides \
+      \WHERE deployment_id = ? AND key = ? AND scope = ?"
+    dId' = unDeploymentId dId
+  void $ for appOvs $ \o -> do
+    let
+      oKey   = overrideKey . unApplicationOverride $ o
+      oScope = show App
+    execute conn q (dId', oKey, oScope)
+  void $ for stOvs $ \o -> do
+    let
+      oKey   = overrideKey . unStagingOverride $ o
+      oScope = show Staging
+    execute conn q (dId', oKey, oScope)
+
+selectDeploymentId :: PgPool -> DeploymentName -> AppM DeploymentId
+selectDeploymentId pgPool dName = do
+  dIds :: [(Only Int)] <- liftIO $ withResource pgPool $ \conn ->
+    query conn "SELECT id FROM deployments WHERE name = ?" (Only dName)
+  case dIds of
+    [(Only dId)] -> pure . DeploymentId $ dId
+    []    -> throwError err404
+      { errBody = validationError ["Name not found"] [] }
+    _     -> throwError err406
+      { errBody = validationError ["More than one name found"] [] }
+
+upsertNewOverrides
+  :: Connection
+  -> DeploymentId
+  -> ApplicationOverrides
+  -> StagingOverrides
+  -> IO ()
+upsertNewOverrides conn dId appOvs stOvs  = do
+  let
+    q   =
+      "INSERT INTO deployment_overrides \
+      \(key, value, deployment_id, scope, visibility) \
+      \VALUES (?, ?, ?, ?, ?) \
+      \ON CONFLICT (key, deployment_id, scope) \
+      \DO \
+        \UPDATE SET value = ?, visibility = ?, updated_at = now()"
+    dId' = unDeploymentId dId
+  void $ for appOvs $ \o -> do
+    let
+      oKey   = overrideKey . unApplicationOverride $ o
+      oValue = overrideValue . unApplicationOverride $ o
+      oScope = show App
+      oVis   = show . overrideVisibility . unApplicationOverride $ o
+    execute conn q (oKey, oValue, dId', oScope, oVis, oValue, oVis)
+  void $ for stOvs $ \o -> do
+    let
+      oKey   = overrideKey . unStagingOverride $ o
+      oValue = overrideValue . unStagingOverride $ o
+      oScope = show Staging
+      oVis   = show . overrideVisibility . unStagingOverride $ o
+    execute conn q (oKey, oValue, dId', oScope, oVis, oValue, oVis)
 
 updateDeployment
-  :: PgPool
+  :: Connection
   -> DeploymentName
   -> DeploymentTag
-  -> EnvPairs
   -> IO Int64
-updateDeployment p dName dTag dEnvs =
-  withResource p $ \conn -> execute
-  conn
-  "UPDATE deployments \
-  \SET tag = ?, envs = ?, updated_at = now(), \
-    \status = ?, status_updated_at = now() \
-  \WHERE name = ?"
-  (dTag, formatEnvPairs dEnvs, show UpdatePending, dName)
+updateDeployment conn dName dTag = do
+  let
+    q =
+      "UPDATE deployments \
+      \SET tag = ?, updated_at = now(), \
+        \status = ?, status_updated_at = now() \
+      \WHERE name = ?"
+  execute conn q (dTag, show UpdatePending, dName)
 
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
   st <- ask
   let pgPool = pool st
   dep <- selectDeployment pgPool dName AllDeployments
+  dId <- selectDeploymentId pgPool dName
   liftIO $ do
-    depLogs <- selectDeploymentLogs pgPool dName
+    depLogs <- selectDeploymentLogs pgPool dId
     let depInfo = DeploymentInfo dep $ reverse depLogs
     logInfo (logger st) $ "get deployment info: " <> (pack . show $ depInfo)
     pure [depInfo]
@@ -551,11 +626,22 @@ cleanupDeployment dName st = do
   log $ "call " <> unwords (cmd : args)
   (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
   print out >> print err
+  void $ deleteDeploymentLogOverrides pgPool dName
   void $ deleteDeploymentLogs pgPool dName
   void $ deleteDeployment pgPool dName
   log $ "deployment destroyed, name: " <> coerce dName
   sendReloadEvent st
   handleExitCode ec
+
+deleteDeploymentLogOverrides :: PgPool -> DeploymentName -> IO Int64
+deleteDeploymentLogOverrides p n = withResource p $ \conn -> execute
+  conn
+  "DELETE FROM deployment_log_overrides WHERE deployment_log_id in ( \
+    \SELECT id FROM deployment_logs WHERE deployment_id in ( \
+      \SELECT id FROM deployments where name = ? \
+    \) \
+  \)"
+  (Only n)
 
 deleteDeploymentLogs :: PgPool -> DeploymentName -> IO Int64
 deleteDeploymentLogs p n = withResource p $ \conn -> execute
@@ -654,28 +740,49 @@ createDeploymentLog
   -> IO ()
 createDeploymentLog pgPool dep act ec arch dur out err = do
   let
-    (Deployment dName dTag dEnvs) = dep
-    rawEnvs                       = formatEnvPairs dEnvs
-    exitCode'                     =
+    (Deployment dName dTag appOvs stOvs) = dep
+    exitCode'                            =
       case ec of
         ExitSuccess         -> 0
         ExitFailure errCode -> errCode
-    arch'                         = unArchivedFlag arch
-    dur'                          = unDuration dur
-    out'                          = unStdout out
-    err'                          = unStderr err
-    q                             =
+    arch'                                = unArchivedFlag arch
+    dur'                                 = unDuration dur
+    out'                                 = unStdout out
+    err'                                 = unStderr err
+    qInsertLog                           =
       "INSERT INTO deployment_logs \
-      \(deployment_id, action, tag, envs, exit_code, archived, \
+      \(deployment_id, action, tag, exit_code, archived, \
       \duration, stdout, stderr) \
       \(\
-        \SELECT id, ?, ?, ?, ?, ?, ?, ?, ? \
+        \SELECT id, ?, ?, ?, ?, ?, ?, ? \
         \FROM deployments \
         \WHERE name = ? \
-      \)"
+      \) RETURNING id"
+    qInsertLogOverride                   =
+      "INSERT INTO deployment_log_overrides \
+      \(key, value, deployment_log_id, scope, visibility) \
+      \VALUES (?, ?, ?, ?, ?)"
+
   void $ withResource pgPool $ \conn ->
-    execute conn q
-      (act, dTag, rawEnvs, exitCode', arch', dur', out', err', dName)
+    withTransaction conn $ do
+      aIds :: [Only Int] <- query conn qInsertLog
+        (act, dTag, exitCode', arch', dur', out', err', dName)
+      void $ for appOvs $ \o -> do
+        let
+          [Only aId]  = aIds
+          oKey        = overrideKey . unApplicationOverride $ o
+          oValue      = overrideValue . unApplicationOverride $ o
+          oScope      = show App
+          oVis        = show . overrideVisibility . unApplicationOverride $ o
+        execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
+      void $ for stOvs $ \o -> do
+        let
+          [Only aId]  = aIds
+          oKey        = overrideKey . unStagingOverride $ o
+          oValue      = overrideValue . unStagingOverride $ o
+          oScope      = show Staging
+          oVis        = show . overrideVisibility . unStagingOverride $ o
+        execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
 
 failIfImageNotFound :: DeploymentTag -> AppM ()
 failIfImageNotFound dTag = do

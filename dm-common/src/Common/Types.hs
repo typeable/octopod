@@ -2,6 +2,7 @@ module Common.Types where
 
 import Data.Bifunctor
 import Data.ByteString (ByteString)
+import Data.Int (Int64)
 import Data.String
 import Data.Text as T
 import Data.Traversable
@@ -13,13 +14,49 @@ type EnvPair = (Text, Text)
 
 type EnvPairs = [EnvPair]
 
+data Override = Override
+  { overrideKey           :: Text
+  , overrideValue         :: Text
+  , overrideVisibility    :: OverrideVisibility
+  }
+  deriving (Generic, Show, Eq)
+  deriving (FromJSON, ToJSON) via Snake Override
+
+type Overrides = [Override]
+
+data OverrideScope
+  = App
+  | Staging
+  deriving (Generic, Show, Read, Eq)
+  deriving (FromJSON, ToJSON) via Snake OverrideScope
+
+data OverrideVisibility
+  = Private
+  | Public
+  deriving (Generic, Show, Read, Eq)
+  deriving (FromJSON, ToJSON) via Snake OverrideVisibility
+
+newtype ApplicationOverride =
+  ApplicationOverride { unApplicationOverride :: Override }
+  deriving (Show, Eq, FromJSON, ToJSON)
+
+type ApplicationOverrides = [ApplicationOverride]
+
+newtype StagingOverride = StagingOverride { unStagingOverride :: Override }
+  deriving (Show, Eq, FromJSON, ToJSON)
+
+type StagingOverrides = [StagingOverride]
+
+newtype DeploymentId = DeploymentId { unDeploymentId :: Int }
+  deriving (Show)
+
 newtype DeploymentName = DeploymentName { unDeploymentName :: Text }
   deriving
-    ( Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq, Ord)
+    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq, Ord)
 
 newtype DeploymentTag = DeploymentTag { unDeploymentTag :: Text }
   deriving
-    ( Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
+    (Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
 newtype Action = Action { unAction :: Text }
   deriving (Show, FromJSON, ToJSON, IsString)
@@ -46,21 +83,23 @@ data DeploymentStatus
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 
 data Deployment = Deployment
-  { name :: DeploymentName
-  , tag  :: DeploymentTag
-  , envs :: EnvPairs
+  { name             :: DeploymentName
+  , tag              :: DeploymentTag
+  , appOverrides     :: ApplicationOverrides
+  , stagingOverrides :: StagingOverrides
   }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake Deployment
 
 data DeploymentLog = DeploymentLog
-  { actionId       :: ActionId
-  , action         :: Action
-  , deploymentTag  :: DeploymentTag
-  , deploymentEnvs :: EnvPairs
-  , exitCode       :: Int
-  , duration       :: Duration
-  , createdAt      :: Int
+  { actionId                   :: ActionId
+  , action                     :: Action
+  , deploymentTag              :: DeploymentTag
+  , deploymentAppOverrides     :: ApplicationOverrides
+  , deploymentStagingOverrides :: StagingOverrides
+  , exitCode                   :: Int
+  , duration                   :: Duration
+  , createdAt                  :: Int
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentLog
@@ -84,8 +123,11 @@ data DeploymentFullInfo = DeploymentFullInfo
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
 data DeploymentUpdate = DeploymentUpdate
-  { newTag :: DeploymentTag
-  , newEnvs :: Maybe EnvPairs
+  { newTag              :: DeploymentTag
+  , newAppOverrides     :: ApplicationOverrides
+  , oldAppOverrides     :: ApplicationOverrides
+  , newStagingOverrides :: StagingOverrides
+  , oldStagingOverrides :: StagingOverrides
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate

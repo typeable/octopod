@@ -73,6 +73,7 @@ library
     , lens
     , mtl
     , network-uri
+    , optparse-applicative
     , optparse-generic
     , postgresql-error-codes
     , postgresql-simple
@@ -123,6 +124,7 @@ executable dmc-exe
     , http-client-tls
     , mtl
     , network-uri
+    , optparse-applicative
     , optparse-generic
     , postgresql-error-codes
     , postgresql-simple
@@ -172,6 +174,7 @@ executable dms-exe
     , http-client-tls
     , mtl
     , network-uri
+    , optparse-applicative
     , optparse-generic
     , postgresql-error-codes
     , postgresql-simple
@@ -221,6 +224,7 @@ test-suite dm-test
     , http-client-tls
     , mtl
     , network-uri
+    , optparse-applicative
     , optparse-generic
     , postgresql-error-codes
     , postgresql-simple
