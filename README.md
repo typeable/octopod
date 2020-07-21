@@ -22,6 +22,7 @@ Multi-staging Deployment Manager (DM). DM consists of the client and server part
 16. [ ] Security model and K8S RBAC configuration for the staging cluster
 17. [ ] Superuser documentation - command line utils
 18. [ ] Integration into existing development flows
+19. [ ] Build binary distributions
 
 # Nix Installation
 
