@@ -183,7 +183,12 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
       divClass "table table--actions" $
         actionsTable updEv nameDyn
 
-allEnvsWidget :: MonadWidget t m => Text -> Dynamic t Overrides -> m ()
+-- | Widget that shows overrides list. It does not depend on their type.
+allEnvsWidget
+  :: MonadWidget t m
+  => Text                -- ^ Widget header.
+  -> Dynamic t Overrides -- ^ Overrides list.
+  -> m ()
 allEnvsWidget headerText envsDyn = do
   elClass "h3" "staging__sub-heading" $ text headerText
   divClass "staging__widget" $
@@ -198,9 +203,13 @@ allEnvsWidget headerText envsDyn = do
             text ": "
           dynText valDyn
 
+-- ^ Widget with table of actions perfomed on staging. It requests staging data.
+-- If request failures it shows error page, else it calls 'actionsTableData',
+-- passing a recieved data.
 actionsTable
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentName
   -> m ()
 actionsTable updEv nameDyn = do
@@ -215,6 +224,7 @@ actionsTable updEv nameDyn = do
       [ actionsTableError <$ errEv
       , actionsTableData updEv nameDyn <$> okEv ]
 
+-- | Header of actions table.
 actionsTableHead :: MonadWidget t m => m ()
 actionsTableHead =
   el "thead" $
@@ -227,7 +237,7 @@ actionsTableHead =
       el "th" $ text "Created"
       el "th" $ text "Deployment duration"
 
-
+-- | Loading widget for actions table.
 actionsTableLoading :: MonadWidget t m => m ()
 actionsTableLoading = do
   el "tbody" $
@@ -236,6 +246,7 @@ actionsTableLoading = do
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
 
+-- | Error widget for actions table.
 actionsTableError:: MonadWidget t m => m ()
 actionsTableError = do
   el "tbody" $
@@ -245,11 +256,15 @@ actionsTableError = do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload the page"
 
+-- | Actions table body. It updates this data every time when passed event
+-- fires.
 actionsTableData
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentName
   -> [DeploymentLog]
+  -- ^ Initial logs.
   -> m ()
 actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
@@ -260,6 +275,7 @@ actionsTableData updEv nameDyn initLogs = do
     void $ simpleList logsDyn $ \logDyn -> do
       dyn_ $ actinRow <$> logDyn
 
+-- | Data row of actions table.
 actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog{..} = do
   el "tr" $ do
@@ -275,12 +291,16 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
-formatDuration :: Duration -> Text
+-- | Convert action duration to human readable format.
+formatDuration
+  :: Duration -- ^ Duration in miliseconds.
+  -> Text
 formatDuration (Duration d) = m <> "m " <> s <> "s"
   where
     m = showT $ d `div` (1000 * 60)
     s = showT $ d `div` (1000)
 
+-- | Widget with button returning to stagings list page.
 backButton
   ::
     ( MonadWidget t m
@@ -309,6 +329,7 @@ loadingWidget dname = pageWrapper $ do
     divClass "no-staging" $
       loadingCommonWidget
 
+-- | Widget with error placeholder.
 errorWidget
   ::
     ( MonadWidget t m
@@ -324,6 +345,7 @@ errorWidget dname = pageWrapper $ do
     divClass "no-staging" $
       errorCommonWidget
 
+-- | Div wrappers.
 pageWrapper
   ::
     ( MonadWidget t m
