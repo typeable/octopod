@@ -126,7 +126,9 @@ projectName
   :<|> projectName = apiClients
 
 -- | Parser for kubectl command response.
-commandResponse :: ReqResult tag CommandResponse -> Maybe CommandResponse
+commandResponse
+  :: ReqResult tag CommandResponse -- ^ Request result with command response.
+  -> Maybe CommandResponse
 commandResponse = \case
   ResponseSuccess _ a _   -> Just a
   ResponseFailure _ _ xhr ->

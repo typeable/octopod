@@ -65,7 +65,10 @@ initConfig :: MonadJSM m => m Bool
 initConfig = liftJSM $ catchAll (initConfig' >> pure True) (const $ pure False)
 
 -- | Gets value from session storage by key.
-getVar :: MonadJSM m => JSString -> m T.Text
+getVar
+  :: MonadJSM m
+  => JSString -- ^ Key in session storage.
+  -> m T.Text
 getVar k = do
   w <- currentWindowUnchecked
   stor <- getSessionStorage w

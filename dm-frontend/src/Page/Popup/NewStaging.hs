@@ -1,4 +1,12 @@
-module Page.Popup.NewStaging where
+{-|
+Module      : Page.Popup.NewStaging
+Description : New staging sidebar.
+
+This module contains definition of @new staging@ sidebar.
+-}
+
+
+module Page.Popup.NewStaging (newStagingPopup) where
 
 import Control.Lens (preview, _1, _2)
 import Control.Monad
@@ -18,12 +26,13 @@ import Frontend.Utils
 import Servant.Reflex
 
 
+-- | The root function for @new staging@ sidebar.
 newStagingPopup
   :: MonadWidget t m
-  => Event t ()
-  -> Event t ()
-  -> m (Event t ())
-newStagingPopup showEv hideEv = sidebar showEv hideEv $ const $ mdo
+  => Event t ()     -- ^ @Show@ event.
+  -> Event t ()     -- ^ @Close@ event.
+  -> m ()
+newStagingPopup showEv hideEv = void $ sidebar showEv hideEv $ const $ mdo
   divClass "popup__body" $ mdo
     (closeEv', saveEv) <- newStagingPopupHeader enabledDyn
     (deploymentDyn, validDyn) <- newStagingPopupBody respEv
@@ -38,6 +47,7 @@ newStagingPopup showEv hideEv = sidebar showEv hideEv $ const $ mdo
       enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (never, closeEv)
 
+-- | The header of sidebar contains control buttons: @Save@ and @Close@.
 newStagingPopupHeader
   :: MonadWidget t m
   => Dynamic t Bool
@@ -51,11 +61,15 @@ newStagingPopupHeader enabledDyn =
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
-
+-- | The body of sidebar contains creation form. There are name field, tag field
+-- and overrides fields. Name field is validated by next regexp:
+-- @^[a-z][a-z0-9\\-]{1,16}$@.
 newStagingPopupBody
   :: MonadWidget t m
   => Event t (ReqResult tag CommandResponse)
+  -- ^ Request failure event.
   -> m (Dynamic t Deployment, Dynamic t Bool)
+  -- ^ Returns new deployment and validation state.
 newStagingPopupBody errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
@@ -90,14 +104,23 @@ newStagingPopupBody errEv = divClass "popup__content" $
       badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
       in leftmost [tagErrEv, badNameEv]
 
-errorHeader :: MonadWidget t m => Event t Text -> m ()
+-- | The error widget in case request failure.
+errorHeader
+  :: MonadWidget t m
+  => Event t Text -- ^ Message text.
+  -> m ()
 errorHeader appErrEv = do
   widgetHold_ blank $ appErrEv <&> \appErr -> do
     divClass "staging__output notification notification--danger" $ do
       el "b" $ text "App error: "
       text appErr
 
-envVarsInput :: MonadWidget t m => Text -> m (Dynamic t [Override])
+-- | Widget with fields for overrides. This widget support an adding and
+-- a removing key-value pairs.
+envVarsInput
+  :: MonadWidget t m
+  => Text -- ^ Widget header.
+  -> m (Dynamic t [Override])
 envVarsInput headerText = do
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text headerText
@@ -114,10 +137,12 @@ envVarsInput headerText = do
           "dash--disabled"
         pure $ elems <$> envsDyn
 
+-- | Widget for variable key and value. It returns an event carrying an update
+-- of overrides list via 'EventWriter'.
 envVarInput
   :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
-  => Int
-  -> Dynamic t Override
+  => Int                -- ^ Index of variable in overrides list.
+  -> Dynamic t Override -- ^ Current variable key and value.
   -> m ()
 envVarInput ix _ = do
   divClass "overrides__item" $ do

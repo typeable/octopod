@@ -1,3 +1,10 @@
+{-|
+Module      : Page.Deployment
+Description : Staing page.
+
+This module contains definition of staging page.
+-}
+
 module Page.Deployment (deploymentPage) where
 
 import Control.Lens
@@ -17,15 +24,18 @@ import Frontend.Utils
 import Page.ClassicPopup
 import Page.Popup.EditStaging
 
-
+-- | The root widget of staging page. It requests staging data. If request
+-- failures it shows error page, else it calls 'deploymentWidget', passing
+-- a recieved data.
 deploymentPage
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
     , Prerender js t m )
-  => Event t ()
-  -> DeploymentName -> m ()
+  => Event t ()     -- ^ Event notifying about the need to update data.
+  -> DeploymentName -- ^ Name of current deployment.
+  -> m ()
 deploymentPage updAllEv dname = do
   pb <- getPostBuild
   respEv <- fullInfoEndpoint (constDyn $ Right dname) pb
@@ -34,15 +44,17 @@ deploymentPage updAllEv dname = do
     [ errorWidget dname <$ errEv
     , deploymentWidget updAllEv <$> okEv ]
 
-
+-- | Staging page widget that takes initial staging data. It updates this data
+-- every time when passed event fires. If update failures then a notification
+-- widget with appears at the top of the page.
 deploymentWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
     , Prerender js t m)
-  => Event t ()
-  -> DeploymentFullInfo
+  => Event t ()         -- ^ Event notifying about the need to update data.
+  -> DeploymentFullInfo -- ^ Initial staging data.
   -> m ()
 deploymentWidget updEv dfi = mdo
   editEv <- pageWrapper $ mdo
@@ -60,11 +72,20 @@ deploymentWidget updEv dfi = mdo
   sentEv <- editStagingPopup editEv never
   blank
 
+-- | Header of staging page. It contains stating name and control buttons that
+-- depends on staging status:
+--  * @Archived@ status: @restore@ button.
+--  * @Running@ status: @archive staging@ and @edit staging@ buttons.
+-- If it's a pending status (Creating, Updating, etc) then all buttons are
+-- inactive.
 deploymentHead
   :: MonadWidget t m
   => Dynamic t DeploymentFullInfo
+  -- ^ Staging data.
   -> Event t Bool
+  -- ^ Event with flag showing current state of request.
   -> m (Event t DeploymentFullInfo)
+  -- ^ @Edit@ event.
 deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
@@ -100,13 +121,17 @@ deploymentHead dfiDyn sentEv =
         pure $ R.tag (current dfiDyn) editEv
     switchHold never editEvEv
 
+-- | Div wrappers.
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a
 deploymentBodyWrapper m = divClass "page__body" $ divClass "staging" $ m
 
+-- | Body of staging page.
 deploymentBody
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentFullInfo
+  -- ^ Staging data.
   -> m ()
 deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   let nameDyn = dfiDyn <^.> dfiName
@@ -247,10 +272,6 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ coerce deploymentTag
     el "td" $ overridesWidget $ coerce $ deploymentAppOverrides
     el "td" $ overridesWidget $ coerce $ deploymentStagingOverrides
-<<<<<<< HEAD
-=======
-    el "td" $ text $ showT $ exitCode
->>>>>>> frontend utils haddocks
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
