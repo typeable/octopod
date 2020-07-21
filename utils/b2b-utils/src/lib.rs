@@ -44,17 +44,17 @@ impl Drop for TmpDirGuard {
 }
 
 #[derive(Debug, Clone)]
-pub struct EnvPair {
+pub struct Override {
     pub key: String,
     pub value: String,
 }
 
-impl TryFrom<&str> for EnvPair {
+impl TryFrom<&str> for Override {
     type Error = &'static str;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let parts = s.split('=').collect::<Vec<_>>();
         if parts.len() == 2 {
-            Ok(EnvPair {
+            Ok(Override {
                 key: parts[0].to_string(),
                 value: parts[1].to_string(),
             })
@@ -64,7 +64,7 @@ impl TryFrom<&str> for EnvPair {
     }
 }
 
-impl ToString for EnvPair {
+impl ToString for Override {
     fn to_string(&self) -> String {
         format!("{}={}", self.key, self.value)
     }
@@ -258,7 +258,8 @@ pub fn create_app_atrs(
     namespace: &str,
     name: &str,
     tag: &str,
-    envs: Vec<EnvPair>,
+    app_env_overrides: Vec<Override>,
+    staging_overrides: Vec<Override>,
     checksum: &str,
 ) -> Vec<String> {
     let rn = release_name(APP_CHART_NAME, name);
@@ -323,7 +324,7 @@ pub fn create_app_atrs(
     .map(ToString::to_string)
     .collect::<Vec<_>>();
 
-    let mut env_atrs = envs
+    let mut app_atrs = app_env_overrides
         .into_iter()
         .map(|e| {
             vec![
@@ -333,7 +334,14 @@ pub fn create_app_atrs(
         })
         .flatten()
         .collect::<Vec<_>>();
-    atrs.append(&mut env_atrs);
+    atrs.append(&mut app_atrs);
+
+    let mut staging_atrs = staging_overrides
+        .into_iter()
+        .map(|e| vec!["--set".to_string(), e.to_string()])
+        .flatten()
+        .collect::<Vec<_>>();
+    atrs.append(&mut staging_atrs);
 
     atrs
 }
