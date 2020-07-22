@@ -44,7 +44,10 @@ BEGIN
             _v = split_part(_r2.env, '=', 2);
             IF _k != '' THEN
                 INSERT INTO deployment_overrides (key, value, deployment_id, scope, visibility)
-                VALUES (_k, _v, _r.id, 'App', 'Public');
+                VALUES (_k, _v, _r.id, 'App', 'Public')
+                ON CONFLICT (key, deployment_id, scope)
+                DO
+                    UPDATE SET value = _v, updated_at = now();
             END IF;
         END LOOP;
     END LOOP;
@@ -64,7 +67,10 @@ BEGIN
             _v = split_part(_r2.env, '=', 2);
             IF _k != '' THEN
                 INSERT INTO deployment_log_overrides (key, value, deployment_log_id, scope, visibility)
-                VALUES (_k, _v, _r.id, 'App', 'Public');
+                VALUES (_k, _v, _r.id, 'App', 'Public')
+                ON CONFLICT (key, deployment_log_id, scope)
+                DO
+                    UPDATE SET value = _v, updated_at = now();
             END IF;
         END LOOP;
     END LOOP;
