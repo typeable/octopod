@@ -25,7 +25,7 @@ main :: IO ()
 main = mainWidgetWithHead headWidget $ do
   initConfigWidget
 
--- | Recieves config file. If requests failures than it shows error message.
+-- | Receives config file. If request failures than it shows error message.
 initConfigWidget :: (MonadWidget t m, Prerender js t m) => m ()
 initConfigWidget = do
   pb <- getPostBuild

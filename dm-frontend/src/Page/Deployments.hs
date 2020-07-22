@@ -33,7 +33,7 @@ import Page.Popup.NewStaging
 import Frontend.Utils
 
 
--- | The root widget of stagings list page. It requests data about all stagings.
+-- | The root widget of stagings list page. It requests data of all stagings.
 -- If request failures it shows error page, else it calls 'deploymentsWidget',
 -- passing a recieved data.
 deploymentsPage
@@ -74,7 +74,7 @@ deploymentsWidget updAllEv dfis = do
   void $ newStagingPopup showNewStagingEv never
   void $ editStagingPopup editEv never
 
--- | Div wrappers for page.
+-- | Div wrappers.
 deploymentsWidgetWrapper :: MonadWidget t m => m a -> m a
 deploymentsWidgetWrapper m =
   divClass "page" $
@@ -191,7 +191,6 @@ activeDeploymentsWidget
   -- ^ Event that carries clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   -> Dynamic t [DeploymentFullInfo]
-  -- ^ 'Map' of deployments.
   -> m (Event t DeploymentFullInfo)
   -- ^ Returns event carrying editable staging to @edit staging@ sidebar.
 activeDeploymentsWidget clickedEv dsDyn =
@@ -210,7 +209,7 @@ activeDeploymentsWidget clickedEv dsDyn =
           pure never
       switchHold never editEvEv
 
--- | This type helps to determine item selected in dropdown in table row.
+-- | This type helps to determine selected item in dropdown in table row.
 data StagingAction
   = ArchiveStaging
   | EditStaging
@@ -227,7 +226,8 @@ activeDeploymentWidget
   -- `dropdownWidget'`.
   -> Dynamic t (DeploymentFullInfo)
   -> m (Event t DeploymentFullInfo)
-  -- ^ Returns event carrying editable staging to @edit staging@ sidebar.
+  -- ^ Returns event carrying editable staging that is required by
+  -- @edit staging@ sidebar.
 activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   editEvEv <- dyn $ ffor dDyn $ \d@DeploymentFullInfo{..} -> do
@@ -434,14 +434,14 @@ initTableWrapper ma = do
     tableWrapper $ const $
       emptyTableBody $ ma
 
--- | Page with loading placeholder.
+-- | Widget with loading spinner.
 loadingDeploymentsWidget :: MonadWidget t m => m ()
 loadingDeploymentsWidget =
   deploymentsWidgetWrapper $ do
     void $ deploymentsHeadWidget False never
     dataWidgetWrapper $ initTableWrapper $ loadingCommonWidget
 
--- | Page with error placeholder.
+-- | Widget with error message.
 errDeploymentsWidget :: MonadWidget t m => m ()
 errDeploymentsWidget = deploymentsWidgetWrapper $ dataWidgetWrapper $
   initTableWrapper $
