@@ -269,16 +269,6 @@ backButton = do
     attrs = constDyn $ "class" =: "page__back dash dash--back dash--smaller"
   routeLinkDynAttr attrs backRoute $ text "All stagings"
 
-processResp
-  :: Reflex t
-  => Event t (ReqResult tag DeploymentFullInfo)
-  -> (Event t DeploymentFullInfo, Event t ())
-processResp respEv =
-  let
-    respOkEv = fmapMaybe reqSuccess respEv
-    errEv = fmapMaybe reqFailure respEv
-  in (respOkEv, () <$ errEv)
-
 loadingWidget
   ::
     ( MonadWidget t m
