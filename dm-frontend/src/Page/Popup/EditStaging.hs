@@ -134,7 +134,6 @@ envVarsInput
   -> Overrides               -- ^ Current staging overrides.
   -> m (Dynamic t Overrides) -- ^ Updated staging overrides.
 envVarsInput overridesHeader evs = do
-envVarsInput evs = do
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text overridesHeader
     elClass "div" "staging__widget" $
