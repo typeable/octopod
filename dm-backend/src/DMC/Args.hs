@@ -12,100 +12,113 @@ import Types
 
 data Args
   = Create
-    { name                  :: Text
-    , tag                   :: Text
-    , setAppOverrides       :: [Text]
-    , setStagingOverrides   :: [Text]
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tag                       :: Text
+    , setAppOverrides           :: [Text]
+    , setStagingOverrides       :: [Text]
+    , setAppSecretOverrides     :: [Text]
+    , setStagingSecretOverrides :: [Text]
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | List
-    { tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | Delete
-    { name                  :: Text
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | Update
-    { name                  :: Text
-    , tag                   :: Text
-    , setAppOverrides       :: [Text]
-    , unsetAppOverrides     :: [Text]
-    , setStagingOverrides   :: [Text]
-    , unsetStagingOverrides :: [Text]
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tag                       :: Text
+    , setAppOverrides           :: [Text]
+    , unsetAppOverrides         :: [Text]
+    , setStagingOverrides       :: [Text]
+    , unsetStagingOverrides     :: [Text]
+    , setAppSecretOverrides     :: [Text]
+    , setStagingSecretOverrides :: [Text]
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | Info
-    { name                  :: Text
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | Cleanup
-    { name                  :: Text
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | Restore
-    { name                  :: Text
-    , tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { name                      :: Text
+    , tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   | CleanArchive
-    { tlsCertPath           :: Maybe ByteString
-    , tlsKeyPath            :: Maybe ByteString }
+    { tlsCertPath               :: Maybe ByteString
+    , tlsKeyPath                :: Maybe ByteString }
   deriving stock (Show)
 
 data DMCArgs
   = CreateC
-    { deploymentName                 :: Text
-    , deploymentTag                  :: Text
-    , deploymentSetAppOverrides      :: [Text]
-    , deploymentSetStaingOverrides   :: [Text]
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , deploymentTag                      :: Text
+    , deploymentSetAppOverrides          :: [Text]
+    , deploymentSetStaingOverrides       :: [Text]
+    , deploymentSetAppSecretOverrides    :: [Text]
+    , deploymentSetStaingSecretOverrides :: [Text]
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | ListC
-    { dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | DeleteC
-    { deploymentName                 :: Text
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | UpdateC
-    { deploymentName                 :: Text
-    , deploymentTag                  :: Text
-    , deploymentSetAppOverrides      :: [Text]
-    , deploymentUnsetAppOverrides    :: [Text]
-    , deploymentSetStaingOverrides   :: [Text]
-    , deploymentUnsetStaingOverrides :: [Text]
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , deploymentTag                      :: Text
+    , deploymentSetAppOverrides          :: [Text]
+    , deploymentUnsetAppOverrides        :: [Text]
+    , deploymentSetStaingOverrides       :: [Text]
+    , deploymentUnsetStaingOverrides     :: [Text]
+    , deploymentSetAppSecretOverrides    :: [Text]
+    , deploymentSetStaingSecretOverrides :: [Text]
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | InfoC
-    { deploymentName                 :: Text
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | CleanupC
-    { deploymentName                 :: Text
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | RestoreC
-    { deploymentName                 :: Text
-    , dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { deploymentName                     :: Text
+    , dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   | CleanArchiveC
-    { dmcTLSCertPath                 :: Maybe TLSCertPath
-    , dmcTLSKeyPath                  :: Maybe TLSKeyPath }
+    { dmcTLSCertPath                     :: Maybe TLSCertPath
+    , dmcTLSKeyPath                      :: Maybe TLSKeyPath }
   deriving stock (Show)
 
 parseArgs :: IO DMCArgs
 parseArgs = do
   args <- execParser opts
   pure $ case args of
-    Create       n t e o c k       ->
-      CreateC n t e o (coerce <$> c) (coerce <$> k)
-    List         c k               -> ListC (coerce <$> c) (coerce <$> k)
-    Delete       n c k             -> DeleteC n (coerce <$> c) (coerce <$> k)
-    Update       n t e ue o uo c k ->
-      UpdateC n t e ue o uo (coerce <$> c) (coerce <$> k)
-    Info         n c k             -> InfoC n (coerce <$> c) (coerce <$> k)
-    Cleanup      n c k             -> CleanupC n (coerce <$> c) (coerce <$> k)
-    Restore      n c k             -> RestoreC n (coerce <$> c) (coerce <$> k)
-    CleanArchive c k               ->
+    Create       n t e o se so c k ->
+      CreateC n t e o se so (coerce <$> c) (coerce <$> k)
+    List         c k                     ->
+      ListC (coerce <$> c) (coerce <$> k)
+    Delete       n c k                   ->
+      DeleteC n (coerce <$> c) (coerce <$> k)
+    Update       n t e ue o uo se so c k ->
+      UpdateC n t e ue o uo se so (coerce <$> c) (coerce <$> k)
+    Info         n c k                   ->
+      InfoC n (coerce <$> c) (coerce <$> k)
+    Cleanup      n c k                   ->
+      CleanupC n (coerce <$> c) (coerce <$> k)
+    Restore      n c k                   ->
+      RestoreC n (coerce <$> c) (coerce <$> k)
+    CleanArchive c k                     ->
       CleanArchiveC (coerce <$> c) (coerce <$> k)
   where
     opts = info (commandArgs <**> helper) fullDesc
@@ -131,11 +144,19 @@ createArgs =
   <*> many (strOption
     (long "set-app-env-override"
     <> short 'e'
-    <> help "application level override"))
+    <> help "set application level public override"))
   <*> many (strOption
     (long "set-staging-override"
     <> short 'o'
-    <> help "staging level override"))
+    <> help "set staging level public override"))
+  <*> many (strOption
+    (long "set-app-env-secret-override"
+    <> short 'a'
+    <> help "set application level secret override"))
+  <*> many (strOption
+    (long "set-staging-secret-override"
+    <> short 's'
+    <> help "set staging level secret override"))
   <*> optional (strOption (long "tlsCertPath" <> help "TLS certificate path"))
   <*> optional (strOption (long "tlsKeyPath" <> help "TLS key path"))
 
@@ -160,19 +181,27 @@ updateArgs =
   <*> many (strOption
     (long "set-app-env-override"
     <> short 'e'
-    <> help "application level override"))
+    <> help "set application level public override"))
   <*> many (strOption
     (long "unset-app-env-override"
     <> short 'E'
-    <> help "application level override"))
+    <> help "unset application level public or private override"))
   <*> many (strOption
     (long "set-staging-override"
     <> short 'o'
-    <> help "staging level override"))
+    <> help "set staging level public override"))
   <*> many (strOption
     (long "unset-staging-override"
     <> short 'O'
-    <> help "staging level override"))
+    <> help "unset staging level public or private override"))
+  <*> many (strOption
+    (long "set-app-env-secret-override"
+    <> short 'a'
+    <> help "set application level secret override"))
+  <*> many (strOption
+    (long "set-staging-secret-override"
+    <> short 's'
+    <> help "set staging level secret override"))
   <*> optional (strOption (long "tlsCertPath" <> help "TLS certificate path"))
   <*> optional (strOption (long "tlsKeyPath" <> help "TLS key path"))
 

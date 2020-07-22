@@ -17,6 +17,7 @@ import           Data.Aeson (Value (..), encode, toJSON)
 import           Data.Coerce
 import           Data.Conduit (ConduitT, yield)
 import           Data.Foldable (foldrM)
+import           Data.Functor ((<&>))
 import           Data.Int (Int64)
 import           Data.IORef
 import           Data.Maybe
@@ -133,6 +134,7 @@ runDMS = do
         checkingCmd
         cleanupCmd
     app'         = app appSt
+    powerApp'    = powerApp appSt
     wsApp'       = wsApp channel
     serverPort   = dmsPort opts
     uiServerPort = unServerPort $ dmsUIPort opts
@@ -143,7 +145,7 @@ runDMS = do
     warpOpts     = setPort (unServerPort serverPort) defaultSettings
     in
       (run uiServerPort app')
-      `race_` (runTLS tlsOpts warpOpts app')
+      `race_` (runTLS tlsOpts warpOpts powerApp')
       `race_` (run wsServerPort wsApp')
       `race_` (runStatusUpdater appSt)
       `race_` (runShutdownHandler appSt)
@@ -160,6 +162,23 @@ app s = serve api $ hoistServer api (nt s) server
   where
     api = Proxy @API
 
+server :: ServerT API AppM
+server =
+  ( listH :<|> createH :<|> deleteH :<|> updateH
+    :<|> infoH :<|> fullInfoH :<|> statusH :<|> cleanupH :<|> restoreH
+  ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
+
+powerApp :: AppState -> Application
+powerApp s = serve api $ hoistServer api (nt s) powerServer
+  where
+    api = Proxy @PowerAPI
+
+powerServer :: ServerT PowerAPI AppM
+powerServer =
+  ( powerListH :<|> createH :<|> deleteH :<|> updateH
+    :<|> powerInfoH :<|> powerFullInfoH :<|> statusH :<|> cleanupH :<|> restoreH
+  ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
+
 wsApp :: TChan WSEvent -> Application
 wsApp channel = serve api $ wsServer channel
   where
@@ -175,22 +194,43 @@ eventS channel = do
     event <- liftIO . atomically . readTChan $ dupChannel
     yield . toJSON $ event
 
-server :: ServerT API AppM
-server =
-  ( listH :<|> createH :<|> deleteH :<|> updateH
-    :<|> infoH :<|> fullInfoH :<|> statusH :<|> cleanupH :<|> restoreH
-  ) :<|> getActionInfoH :<|> pingH :<|> cleanArchiveH :<|> projectNameH
-
 listH :: AppM [DeploymentFullInfo]
-listH = getFullInfo FullInfoForAll
+listH = hideSecretsInFullInfos <$> getFullInfo FullInfoForAll
+
+powerListH :: AppM [DeploymentFullInfo]
+powerListH = getFullInfo FullInfoForAll
 
 fullInfoH :: DeploymentName -> AppM DeploymentFullInfo
 fullInfoH dName = do
+  fullInfoList <- hideSecretsInFullInfos <$>
+    getFullInfo (FullInfoOnlyForOne dName)
+  case fullInfoList of
+    fullInfo : _ -> pure fullInfo
+    []           -> throwError err404
+      { errBody = validationError ["Name not found"] [] }
+
+powerFullInfoH :: DeploymentName -> AppM DeploymentFullInfo
+powerFullInfoH dName = do
   fullInfoList <- getFullInfo $ FullInfoOnlyForOne dName
   case fullInfoList of
     fullInfo : _ -> pure fullInfo
     []           -> throwError err404
       { errBody = validationError ["Name not found"] [] }
+
+hideSecretsInFullInfos :: [DeploymentFullInfo] -> [DeploymentFullInfo]
+hideSecretsInFullInfos dFullInfos =  do
+  dFullInfos <&> \(DeploymentFullInfo dep s a ct ut u) ->
+    let
+      hideSecrets (Deployment n t appOvs stOvs) =
+        Deployment n t (hideS appOvs) (hideS stOvs)
+      hideS o                                   =
+        coerce o <&> \(Override k v vis) ->
+          let
+            v' = case vis of
+              Private -> "*"
+              Public  -> v
+          in coerce $ Override k v' vis
+    in DeploymentFullInfo (hideSecrets dep) s a ct ut u
 
 getFullInfo :: FullInfoListType -> AppM [DeploymentFullInfo]
 getFullInfo listType = do
@@ -568,14 +608,45 @@ updateDeployment conn dName dTag = do
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
   st <- ask
+  dInfo <- getInfo dName
+  liftIO . logInfo (logger st) $
+    "get deployment info: " <> (pack . show $ dInfo)
+  pure [hideSecretsInInfo dInfo]
+
+powerInfoH :: DeploymentName -> AppM [DeploymentInfo]
+powerInfoH dName = do
+  st <- ask
+  dInfo <- getInfo dName
+  liftIO . logInfo (logger st) $
+    "get deployment info: " <> (pack . show $ dInfo)
+  pure [dInfo]
+
+hideSecretsInInfo :: DeploymentInfo -> DeploymentInfo
+hideSecretsInInfo (DeploymentInfo dep dLogs) =
+  let
+    dep'    =
+      let (Deployment n t ao so) = dep
+      in Deployment n t (hideS ao) (hideS so)
+    dLogs'  = dLogs <&> \(DeploymentLog ai a t ao so ec d ct) ->
+      DeploymentLog ai a t (hideS ao) (hideS so) ec d ct
+    hideS o = coerce o <&> \(Override k v vis) ->
+      let
+        v' = case vis of
+          Private -> "*"
+          Public  -> v
+      in coerce $ Override k v' vis
+  in DeploymentInfo dep' dLogs'
+
+getInfo :: DeploymentName -> AppM DeploymentInfo
+getInfo dName = do
+  st <- ask
   let pgPool = pool st
   dep <- selectDeployment pgPool dName AllDeployments
   dId <- selectDeploymentId pgPool dName
   liftIO $ do
     depLogs <- selectDeploymentLogs pgPool dId
     let depInfo = DeploymentInfo dep $ reverse depLogs
-    logInfo (logger st) $ "get deployment info: " <> (pack . show $ depInfo)
-    pure [depInfo]
+    pure depInfo
 
 pingH :: AppM NoContent
 pingH = do
