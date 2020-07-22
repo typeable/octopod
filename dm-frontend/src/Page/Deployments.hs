@@ -214,7 +214,9 @@ activeDeploymentWidget clickedEv dDyn' = do
       el "td" $
         text $ coerce $ deployment ^. field @"tag"
       el "td" $
-        overridesWidget $ deployment ^. field @"envs"
+        overridesWidget $ deployment ^. field @"appOverrides" . coerced
+      el "td" $
+        overridesWidget $ deployment ^. field @"stagingOverrides" . coerced
       el "td" $
         text $ formatPosixToDate createdAt
       el "td" $
@@ -303,7 +305,8 @@ tableHeader = do
       nameSortDyn <- sortHeader dfiName "Name"
       el "th" $ text "Links"
       el "th" $ text "Tag"
-      el "th" $ text "Overrides"
+      el "th" $ text "App overrides"
+      el "th" $ text "Staging overrides"
       createSortDyn <- sortHeader (field @"createdAt") "Created"
       updateSortDyn <- sortHeader (field @"updatedAt") "Changed"
       el "th" $
@@ -349,7 +352,9 @@ archivedDeploymentWidget clickedEv dDyn' = do
       el "td" $
         text $ coerce $ deployment ^. field @"tag"
       el "td" $
-        overridesWidget $ deployment ^. field @"envs"
+        overridesWidget $ deployment ^. field @"appOverrides" . coerced
+      el "td" $
+        overridesWidget $ deployment ^. field @"stagingOverrides" . coerced
       el "td" $
         text $ formatPosixToDate createdAt
       el "td" $

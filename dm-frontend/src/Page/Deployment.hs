@@ -141,24 +141,35 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
               <> "target" =: "_blank" )
           elDynAttr "a" attrDyn $ dynText urlDyn
   elClass "section" "staging__section" $ do
-    let envsDyn = dfiDyn <^.> field @"deployment" . field @"envs"
-    elClass "h3" "staging__sub-heading" $ text "Overrides"
-    divClass "staging__widget" $
-      divClass "listing" $
-        void $ simpleList envsDyn $ \envDyn -> do
-          let
-            varDyn = fst <$> envDyn
-            valDyn = snd <$> envDyn
-          divClass "listing__item bar bar--larger" $ do
-            el "b" $ do
-              dynText varDyn
-              text ": "
-            dynText valDyn
+    let
+      envsDyn = dfiDyn <^.> field @"deployment"
+        . field @"appOverrides" . coerced
+    allEnvsWidget "App overrides" envsDyn
+  elClass "section" "staging__section" $ do
+    let
+      envsDyn = dfiDyn <^.> field @"deployment"
+        . field @"stagingOverrides" . coerced
+    allEnvsWidget "Staging overrides" envsDyn
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text "Actions"
     divClass "staging__widget" $
       divClass "table table--actions" $
         actionsTable updEv nameDyn
+
+allEnvsWidget :: MonadWidget t m => Text -> Dynamic t Overrides -> m ()
+allEnvsWidget headerText envsDyn = do
+  elClass "h3" "staging__sub-heading" $ text headerText
+  divClass "staging__widget" $
+    divClass "listing" $
+      void $ simpleList envsDyn $ \envDyn -> do
+        let
+          varDyn = overrideKey <$> envDyn
+          valDyn = overrideValue <$> envDyn
+        divClass "listing__item bar bar--larger" $ do
+          el "b" $ do
+            dynText varDyn
+            text ": "
+          dynText valDyn
 
 actionsTable
   :: MonadWidget t m
@@ -232,7 +243,8 @@ actinRow DeploymentLog{..} = do
   el "tr" $ do
     el "td" $ text $ coerce action
     el "td" $ text $ coerce deploymentTag
-    el "td" $ overridesWidget deploymentEnvs
+    el "td" $ overridesWidget $ coerce $ deploymentAppOverrides
+    el "td" $ overridesWidget $ coerce $ deploymentStagingOverrides
     el "td" $ text $ pack . show $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
