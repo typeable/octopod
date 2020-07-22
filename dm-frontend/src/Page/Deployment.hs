@@ -1,6 +1,6 @@
 {-|
 Module      : Page.Deployment
-Description : Staing page.
+Description : Staging page.
 
 This module contains definition of staging page.
 -}

@@ -1,3 +1,10 @@
+{-|
+Module      : Page.Deployments
+Description : Stagings table page.
+
+This module contains definition of stagings table page.
+-}
+
 module Page.Deployments
   ( deploymentsPage ) where
 
