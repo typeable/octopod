@@ -6,6 +6,7 @@ import Data.Coerce
 import Data.Functor
 import Data.Generics.Product
 import Data.Generics.Sum
+import Data.List (deleteFirstsBy)
 import Data.Map as M
 import Data.Monoid
 import Data.Text as T (Text, intercalate)
@@ -66,20 +67,26 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
       commandResponseEv = fmapMaybe commandResponse errEv
       appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
       dfiTag = dfi ^. field @"deployment" . field @"tag" . coerced . to Just
-      dfiAppVars = dfi ^. field @"deployment" . field @"appOverrides"
-      dfiStagingVars = dfi ^. field @"deployment" . field @"stagingOverrides"
+      dfiAppVars = dfi ^. field @"deployment" . field @"appOverrides" . coerced
+      dfiStagingVars =
+        dfi ^. field @"deployment" . field @"stagingOverrides" . coerced
       tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
     (tagDyn, tOkEv) <- dmTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
-    _appVarsDyn <- envVarsInput $ coerce <$> dfiAppVars
-    _stagingVarsDyn <- envVarsInput $ coerce <$> dfiStagingVars
+    appVarsDyn <- envVarsInput dfiAppVars
+    stagingVarsDyn <- envVarsInput dfiStagingVars
+    let
+      oldAppVarDyn = coerce <$> getOldVars dfiAppVars <$> appVarsDyn
+      newAppVarDyn = coerce <$> getNewVars dfiAppVars <$> appVarsDyn
+      oldStagingVarDyn = coerce <$> getOldVars dfiAppVars <$> stagingVarsDyn
+      newStagingVarDyn = coerce <$> getNewVars dfiAppVars <$> stagingVarsDyn
     validDyn <- holdDyn True $ updated tOkEv
     pure $ (DeploymentUpdate
       <$> (DeploymentTag <$> tagDyn)
-      <*> undefined
-      <*> undefined
-      <*> undefined
-      <*> undefined, validDyn)
+      <*> newAppVarDyn
+      <*> oldAppVarDyn
+      <*> newStagingVarDyn
+      <*> oldStagingVarDyn, validDyn)
   where
     getTagError crEv tagDyn = let
       tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) crEv
@@ -87,6 +94,9 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
       badTagText = "Tag should not be empty"
       badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
       in leftmost [tagErrEv, badNameEv]
+    getOldVars i u = deleteFirstsBy cmpKey i u
+    getNewVars i u = deleteFirstsBy (==) u i
+    cmpKey (Override k1 _ v1) (Override k2 _ v2) = k1 == k2 && v1 == v2
 
 errorHeader :: MonadWidget t m => Event t Text -> m ()
 errorHeader appErrEv = do
