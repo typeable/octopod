@@ -387,7 +387,7 @@ archivedDeploymentWidget clickedEv dDyn' = do
 
 tableWrapper :: MonadWidget t m => (Dynamic t SortDir -> m a) -> m a
 tableWrapper ma =
-  divClass "table table--stagings table--clickable" $
+  divClass "table table--stagings table--clickable table--double-click" $
     el "table" $ do
       sDyn <- tableHeader
       el "tbody" $ ma sDyn
@@ -430,7 +430,7 @@ _badSearchWidget = do
 emptyTableBody :: MonadWidget t m => m () -> m ()
 emptyTableBody msg =
   elClass "tr" "no-table" $
-    elAttr "td" ("colspan" =: "7") msg
+    elAttr "td" ("colspan" =: "8") msg
 
 dataWidgetWrapper :: MonadWidget t m => m a -> m a
 dataWidgetWrapper ma = divClass "page__body" $ divClass "data" ma

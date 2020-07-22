@@ -15,7 +15,6 @@ import Frontend.API
 import Frontend.Route
 import Page.ClassicPopup
 import Page.Popup.EditStaging
-import Page.Popup.StagingLogs
 import Page.Utils
 
 
@@ -46,7 +45,7 @@ deploymentWidget
   -> DeploymentFullInfo
   -> m ()
 deploymentWidget updEv dfi = mdo
-  (editEv, logsEv) <- pageWrapper $ mdo
+  editEv <- pageWrapper $ mdo
     retryEv <- delay 10 errEv
     respEv <- fullInfoEndpoint (constDyn $ Right $ dfi ^. dfiName)
       $ leftmost [ updEv, retryEv ]
@@ -56,10 +55,10 @@ deploymentWidget updEv dfi = mdo
     pageNotification $ leftmost
       [ DPMError "Couldn't update status of staging" <$ errEv
       , DPMClear <$ okEv ]
-    logsEv' <- deploymentBody updEv dfiDyn
-    pure (editEv', logsEv')
+    deploymentBody updEv dfiDyn
+    pure (editEv')
   sentEv <- editStagingPopup editEv never
-  void $ stagingLogsPopup logsEv never
+  blank
 
 deploymentHead
   :: MonadWidget t m
@@ -108,7 +107,7 @@ deploymentBody
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentFullInfo
-  -> m (Event t ActionId)
+  -> m ()
 deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   let nameDyn = dfiDyn <^.> dfiName
   divClass "staging__summary" $ do
@@ -129,8 +128,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   elClass "section" "staging__section" $ do
     let tagDyn = dfiDyn <^.> field @"deployment" . field @"tag" . coerced
     elClass "h3" "staging__sub-heading" $ text "Tag"
-    divClass "staging__widget" $
-      divClass "bar bar--larger" $ dynText tagDyn
+    divClass "staging__widget" $ dynText tagDyn
   elClass "section" "staging__section" $ do
     let urlsDyn = dfiDyn <^.> field @"urls"
     elClass "h3" "staging__sub-heading" $ text "Links"
@@ -164,12 +162,12 @@ allEnvsWidget :: MonadWidget t m => Text -> Dynamic t Overrides -> m ()
 allEnvsWidget headerText envsDyn = do
   elClass "h3" "staging__sub-heading" $ text headerText
   divClass "staging__widget" $
-    divClass "listing" $
+    divClass "listing listing--for-text listing--larger" $
       void $ simpleList envsDyn $ \envDyn -> do
         let
           varDyn = overrideKey <$> envDyn
           valDyn = overrideValue <$> envDyn
-        divClass "listing__item bar bar--larger" $ do
+        divClass "listing__item" $ do
           el "b" $ do
             dynText varDyn
             text ": "
@@ -179,19 +177,18 @@ actionsTable
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentName
-  -> m (Event t ActionId)
+  -> m ()
 actionsTable updEv nameDyn = do
   pb <- getPostBuild
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let
     okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
     errEv = fmapMaybe reqFailure respEv
-  logsEvDyn <- el "table" $ do
+  el "table" $ do
     actionsTableHead
-    widgetHold actionsTableLoading $ leftmost
+    widgetHold_ actionsTableLoading $ leftmost
       [ actionsTableError <$ errEv
       , actionsTableData updEv nameDyn <$> okEv ]
-  pure $ switchDyn logsEvDyn
 
 actionsTableHead :: MonadWidget t m => m ()
 actionsTableHead =
@@ -199,23 +196,22 @@ actionsTableHead =
     el "tr" $ do
       el "th" $ text "Action type"
       el "th" $ text "Image tag"
-      el "th" $ text "Overrides"
+      el "th" $ text "App overrides"
+      el "th" $ text "Staging overrides"
       el "th" $ text "Exit code"
-      el "th" $ text "Created at"
+      el "th" $ text "Created"
       el "th" $ text "Deployment duration"
-      el "th" $ elClass "span" "visuallyhidden" $ text "Show logs action"
 
 
-actionsTableLoading :: MonadWidget t m => m (Event t ActionId)
+actionsTableLoading :: MonadWidget t m => m ()
 actionsTableLoading = do
   el "tbody" $
     elClass "tr" "no-table" $
       elAttr "td" ("colspan" =: "7") $
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
-  pure never
 
-actionsTableError:: MonadWidget t m => m (Event t ActionId)
+actionsTableError:: MonadWidget t m => m ()
 actionsTableError = do
   el "tbody" $
     elClass "tr" "no-table" $
@@ -223,38 +219,36 @@ actionsTableError = do
         divClass "null null--data" $ do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload the page"
-  pure never
 
 actionsTableData
   :: MonadWidget t m
   => Event t ()
   -> Dynamic t DeploymentName
   -> [DeploymentLog]
-  -> m (Event t ActionId)
+  -> m ()
 actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
   let
     okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
   logsDyn <- holdDyn initLogs okEv
-  logsEvDyn <- el "tbody" $
-    simpleList logsDyn $ \logDyn -> do
-      logsEvEv <- dyn $ actinRow <$> logDyn
-      switchHold never logsEvEv
-  pure $ switchDyn $ leftmost <$> logsEvDyn
+  el "tbody" $
+    void $ simpleList logsDyn $ \logDyn -> do
+      dyn_ $ actinRow <$> logDyn
 
-actinRow :: MonadWidget t m => DeploymentLog -> m (Event t ActionId)
+actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog{..} = do
   el "tr" $ do
-    el "td" $ text $ coerce action
+    el "td" $ do
+      text $ coerce action
+      let
+        statusClass = "status " <>
+          if exitCode == 0 then "status--success" else "status--failure"
+      divClass statusClass blank
     el "td" $ text $ coerce deploymentTag
     el "td" $ overridesWidget $ coerce $ deploymentAppOverrides
     el "td" $ overridesWidget $ coerce $ deploymentStagingOverrides
-    el "td" $ text $ pack . show $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
-    el "td" $ do
-      bEv <- buttonClass "dash dash--smaller dash--next popup-handler" "Logs"
-      pure $ actionId <$ bEv
 
 formatDuration :: Duration -> Text
 formatDuration (Duration d) = m <> "m " <> s <> "s"
