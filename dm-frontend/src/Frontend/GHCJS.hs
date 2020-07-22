@@ -20,13 +20,13 @@ import GHCJS.DOM.Window
 
 appUrlKey, wsUrlKey, appAuthKey :: JSString
 appUrlKey = "app"
--- ^ API host keys for session storage.
+-- ^ API host key in session storage.
 wsUrlKey = "ws"
--- ^ Websocket host key for session storage.
+-- ^ Websocket host key in session storage.
 appAuthKey = "auth"
--- ^ API auth token key for session storage.
+-- ^ API auth token key in session storage.
 
--- | There is an internal project settings that contain a host for API requests,
+-- | There is a project settings that contain a host for API requests,
 -- websocket host and API authentication token.
 data ProjectConfig = ProjectConfig
   { appUrl :: String  -- ^ API host.
@@ -43,7 +43,7 @@ data BadConfig = BadConfig
 instance Exception BadConfig
 
 -- | Reads settings from config file and puts them into storage session. Throws
--- 'BadConfig' in case the config file can't be parsed.
+-- 'BadConfig' in case of the config file can't be parsed.
 initConfig' :: JSM ()
 initConfig' = do
   w <- currentWindowUnchecked
@@ -60,15 +60,15 @@ initConfig' = do
     A.Error _ -> throwM BadConfig
 
 -- | Reads settings from config file and puts them into storage session. If
--- config file can't be parsed returns False, else True.
+-- config file can't be parsed returns 'False', else 'True'.
 initConfig :: MonadJSM m => m Bool
 initConfig = liftJSM $ catchAll (initConfig' >> pure True) (const $ pure False)
 
--- | Gets value from session storage by key.
+-- | Gets value from session storage by key. Throws error if key doesn't exist.
 getVar
   :: MonadJSM m
   => JSString -- ^ Key in session storage.
-  -> m T.Text
+  -> m T.Text -- ^ Value from session storage.
 getVar k = do
   w <- currentWindowUnchecked
   stor <- getSessionStorage w
@@ -79,7 +79,7 @@ getVar k = do
 getAppUrl :: MonadJSM m => m T.Text
 getAppUrl = getVar appUrlKey
 
--- | Gets API auth from session storage.
+-- | Gets API auth token from session storage.
 getAppAuth :: MonadJSM m => m T.Text
 getAppAuth = getVar appAuthKey
 

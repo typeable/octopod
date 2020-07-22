@@ -3,7 +3,7 @@ Module      : Frontend.GHCJS
 Description : API requests.
 
 This module contains client functions that perform API requests (these functions
-are generated from servant API) and functions that work with these requests.
+are generated from servant API) and functions that work with requests results.
 -}
 
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -145,10 +145,13 @@ commandResponse = \case
 wsPath :: Text
 wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)
 
+-- | Helper for event with request result.
 processResp
   :: Reflex t
   => Event t (ReqResult tag a)
+  -- ^ Event with request result.
   -> (Event t a, Event t ())
+  -- ^ (Success event with obtained data, failure event).
 processResp respEv =
   let
     respOkEv = fmapMaybe reqSuccess respEv

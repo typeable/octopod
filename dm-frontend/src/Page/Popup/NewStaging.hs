@@ -104,7 +104,7 @@ newStagingPopupBody errEv = divClass "popup__content" $
       badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
       in leftmost [tagErrEv, badNameEv]
 
--- | The error widget in case request failure.
+-- | The error widget in case of request failure.
 errorHeader
   :: MonadWidget t m
   => Event t Text -- ^ Message text.
@@ -115,7 +115,7 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
--- | Widget with fields for overrides. This widget support an adding and
+-- | Widget with fields for overrides. This widget supports an adding and
 -- a removing key-value pairs.
 envVarsInput
   :: MonadWidget t m

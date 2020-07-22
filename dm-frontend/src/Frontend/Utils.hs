@@ -2,7 +2,7 @@
 Module      : Frontend.Utils
 Description : Client utils and helpers.
 
-This module contains common types, functions and operators which are used by
+This module contains common types, functions and operators that are used by
 frontend modules.
 -}
 
@@ -25,29 +25,29 @@ import Reflex.Dom as R
 
 import Common.Types as CT
 
--- | Wrapper for @Maybe DOM.Element@.
+-- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement =
   ClickedElement { unClickedElement :: Maybe DOM.Element }
 
--- | Returns click event bind to document.
+-- | Returns click event bind to document. Event carries 'ClickedElement'.
 elementClick :: MonadWidget t m =>  m (Event t ClickedElement)
 elementClick = do
   doc <- currentDocumentUnchecked
   wrapDomEvent doc (`on` Events.click) $ ClickedElement <$> target
 
--- | Dropdown widget that binds its own document click event.
+-- | Dropdown widget that binds its own @document click@ event.
 dropdownWidget
   :: MonadWidget t m
   => m ()
   -- ^ Button widget that opens dropdown widget.
   -> m (Event t a)
-  -- ^ Widget with dropdown list that returns event carrying users choice.
+  -- ^ Widget with dropdown list that returns event carrying users select.
   -> m (Event t a)
 dropdownWidget btn body = mdo
   clickedEl <- elementClick
   dropdownWidget' clickedEl btn body
 
--- | Similar to 'dropdownWidget' but uses document click event that may be
+-- | Similar to 'dropdownWidget' but uses @document click@ event that may be
 -- shared between other widgets.
 dropdownWidget'
   :: MonadWidget t m
@@ -74,11 +74,10 @@ dropdownWidget' clickedEl btn body = mdo
         (constDyn $ "class" =: "drop__dropdown") body
   pure wEv
 
--- | Like `show` but returns `Text`.
 showT :: Show a => a -> Text
 showT = pack . show
 
--- | Wrapper for sidebar that provides opening and closing support.
+-- | Wrapper for sidebar, that provides opening and closing support.
 sidebar
   :: MonadWidget t m
   => Event t d
@@ -86,7 +85,7 @@ sidebar
   -> Event t ()
   -- ^ Close event.
   -> (d -> m (Event t a, Event t ()))
-  -- ^ Sidebar body which returns data in first event and close event.
+  -- ^ Sidebar body which returns data with first event and close event.
   -> m (Event t a)
 sidebar showEv closeEv m = mdo
   let
@@ -138,7 +137,7 @@ buttonDynClass clDyn lblDyn = do
     dynText lblDyn
   return $ domEvent Click bEl
 
--- | Advanced version of 'buttonClass' with disabling support.
+-- | Advanced version of 'buttonClass' with disabled state.
 buttonClassEnabled
   :: (DomBuilder t m, PostBuild t m)
   => Text
@@ -146,7 +145,7 @@ buttonClassEnabled
   -> Text
   -- ^ Label text.
   -> Dynamic t Bool
-  -- ^ Enable flag.
+  -- ^ Enabled flag.
   -> m (Event t ())
 buttonClassEnabled cl lbl dDyn = do
   let
@@ -167,7 +166,7 @@ buttonClassEnabled'
   -> Text
   -- ^ Label text.
   -> Dynamic t Bool
-  -- ^ Enable flag.
+  -- ^ Enabled flag.
   -> Text
   -- ^ Custom classes for disabled state.
   -> m (Event t ())
@@ -218,7 +217,7 @@ aButtonClassEnabled
   -> Text
   -- ^ Label text.
   -> Dynamic t Bool
-  -- ^ Enable flag.
+  -- ^ Enabled flag.
   -> m (Event t ())
 aButtonClassEnabled cl lbl dDyn = do
   let
@@ -230,7 +229,7 @@ aButtonClassEnabled cl lbl dDyn = do
     text lbl
   return $ domEvent Click bEl
 
--- | Converter from posix seconds as `Int` to `UTCTime`.
+-- | Converter from posix seconds to `UTCTime`.
 intToUTCTime :: Int -> UTCTime
 intToUTCTime = posixSecondsToUTCTime . realToFrac
 
@@ -307,7 +306,7 @@ statusWidget stDyn = do
     UpdatePending -> pendingWidget $ text "Updating..."
     DeletePending -> pendingWidget $ text "Deleting..."
 
--- | Text input field with label that is shared between forms in sidebars.
+-- | Text input field with label.
 dmTextInput
   :: MonadWidget t m
   => Text
@@ -317,7 +316,7 @@ dmTextInput
   -> Text
   -- ^ Placeholder for input field.
   -> Maybe Text
-  -- ^ Possible init value.
+  -- ^ Initial value.
   -> Event t Text
   -- ^ Event carrying error message.
   -> m (Dynamic t Text, Dynamic t Bool)
@@ -409,7 +408,7 @@ overridesWidget envs = divClass "listing listing--for-text" $ do
           el "b" $ text $ var <> ": "
           text val
 
--- | if-then-else helper for cases when bool value is wrapped in `Dynamic`.
+-- | @if-then-else@ helper for cases when bool value is wrapped in `Dynamic`.
 ifThenElseDyn
   :: Reflex t
   => Dynamic t Bool

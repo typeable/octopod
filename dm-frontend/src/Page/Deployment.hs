@@ -25,7 +25,7 @@ import Page.ClassicPopup
 import Page.Popup.EditStaging
 
 -- | The root widget of staging page. It requests staging data. If request
--- failures it shows error page, else it calls 'deploymentWidget', passing
+-- failures it shows error page, else it calls 'deploymentWidget', passing there
 -- a recieved data.
 deploymentPage
   ::
@@ -46,7 +46,7 @@ deploymentPage updAllEv dname = do
 
 -- | Staging page widget that takes initial staging data. It updates this data
 -- every time when passed event fires. If update failures then a notification
--- widget with appears at the top of the page.
+-- widget appears at the top of the page.
 deploymentWidget
   ::
     ( MonadWidget t m
@@ -204,7 +204,7 @@ allEnvsWidget headerText envsDyn = do
           dynText valDyn
 
 -- ^ Widget with table of actions perfomed on staging. It requests staging data.
--- If request failures it shows error page, else it calls 'actionsTableData',
+-- If request failures it shows error message, else it calls 'actionsTableData',
 -- passing a recieved data.
 actionsTable
   :: MonadWidget t m
@@ -237,7 +237,7 @@ actionsTableHead =
       el "th" $ text "Created"
       el "th" $ text "Deployment duration"
 
--- | Loading widget for actions table.
+-- | Widget with loading spinner for actions table.
 actionsTableLoading :: MonadWidget t m => m ()
 actionsTableLoading = do
   el "tbody" $
@@ -246,7 +246,7 @@ actionsTableLoading = do
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
 
--- | Error widget for actions table.
+-- | Widget with error message for actions table.
 actionsTableError:: MonadWidget t m => m ()
 actionsTableError = do
   el "tbody" $
@@ -256,8 +256,7 @@ actionsTableError = do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload the page"
 
--- | Actions table body. It updates this data every time when passed event
--- fires.
+-- | Actions table body. It updates data every time when passed event fires.
 actionsTableData
   :: MonadWidget t m
   => Event t ()
@@ -291,7 +290,7 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
--- | Convert action duration to human readable format.
+-- | Convert action duration from milliseconds to human readable format.
 formatDuration
   :: Duration -- ^ Duration in miliseconds.
   -> Text
@@ -300,7 +299,7 @@ formatDuration (Duration d) = m <> "m " <> s <> "s"
     m = showT $ d `div` (1000 * 60)
     s = showT $ d `div` (1000)
 
--- | Widget with button returning to stagings list page.
+-- | Widget with button that returns to stagings list page.
 backButton
   ::
     ( MonadWidget t m
@@ -314,6 +313,7 @@ backButton = do
     attrs = constDyn $ "class" =: "page__back dash dash--back dash--smaller"
   routeLinkDynAttr attrs backRoute $ text "All stagings"
 
+-- | Widget with loading spinner for page.
 loadingWidget
   ::
     ( MonadWidget t m
@@ -329,7 +329,7 @@ loadingWidget dname = pageWrapper $ do
     divClass "no-staging" $
       loadingCommonWidget
 
--- | Widget with error placeholder.
+-- | Widget with error placeholder for page.
 errorWidget
   ::
     ( MonadWidget t m

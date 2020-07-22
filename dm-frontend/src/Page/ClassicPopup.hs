@@ -10,7 +10,7 @@ import Reflex.Dom
 
 import Frontend.Utils
 
--- | The root function for popup.
+-- | The root function of popup.
 classicPopup
   :: MonadWidget t m
   => Event t ()                 -- ^ @Show@ event.
@@ -27,8 +27,8 @@ classicPopup showEv m = mdo
     , popupWidget m <$ showEv ]
   pure okEv
 
--- | Wrapper for popup widget that darkens background and supports
--- @close@ button.
+-- | Wrapper for popup widget that darkens background, makes background
+-- unclickable and supports @close@ button.
 popupWidget
   :: MonadWidget t m
   => m (Event t (), Event t ())
