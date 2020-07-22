@@ -73,8 +73,8 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
       tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
     (tagDyn, tOkEv) <- dmTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
-    appVarsDyn <- envVarsInput dfiAppVars
-    stagingVarsDyn <- envVarsInput dfiStagingVars
+    appVarsDyn <- envVarsInput "App overrides" dfiAppVars
+    stagingVarsDyn <- envVarsInput "Stagings overrides" dfiStagingVars
     let
       oldAppVarDyn = coerce <$> getOldVars dfiAppVars <$> appVarsDyn
       newAppVarDyn = coerce <$> getNewVars dfiAppVars <$> appVarsDyn
@@ -105,10 +105,14 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
-envVarsInput :: MonadWidget t m => Overrides -> m (Dynamic t Overrides)
-envVarsInput evs = do
+envVarsInput
+  :: MonadWidget t m
+  => Text
+  -> Overrides
+  -> m (Dynamic t Overrides)
+envVarsInput overridesHeader evs = do
   elClass "section" "staging__section" $ do
-    elClass "h3" "staging__sub-heading" $ text "Overrides"
+    elClass "h3" "staging__sub-heading" $ text overridesHeader
     elClass "div" "staging__widget" $
       elClass "div" "overrides" $ mdo
         let

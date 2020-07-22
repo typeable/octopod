@@ -26,7 +26,6 @@ import Page.Popup.EditStaging
 import Page.Popup.NewStaging
 import Page.Utils
 
-
 deploymentsPage
   ::
     ( MonadWidget t m
@@ -34,12 +33,13 @@ deploymentsPage
     , SetRoute t (R Routes) m )
   => Event t ()
   -> m ()
-deploymentsPage = deploymentsWidget
-
-deploymentsWidgetWrapper :: MonadWidget t m => m a -> m a
-deploymentsWidgetWrapper m =
-  divClass "page" $
-    divClass "page__wrap container" m
+deploymentsPage updAllEv = do
+  pb <- getPostBuild
+  respEv <- listEndpoint pb
+  let (okEv, errEv) = processResp respEv
+  widgetHold_ loadingDeploymentsWidget $ leftmost
+    [ deploymentsWidget updAllEv <$> okEv
+    , errDeploymentsWidget <$ errEv ]
 
 deploymentsWidget
   ::
@@ -47,34 +47,44 @@ deploymentsWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ()
+  -> [DeploymentFullInfo]
   -> m ()
-deploymentsWidget updAllEv = do
+deploymentsWidget updAllEv dfis = do
   (showNewStagingEv, editEv) <- deploymentsWidgetWrapper $ mdo
     pageNotification $ leftmost
       [ DPMError "Staging list update failed, staging list\
         \ may be slightly outdated." <$ errUpdEv
       , DPMClear <$ okUpdEv ]
-    (showNewStagingEv', termDyn) <- deploymentsHeadWidget okUpdEv
-    (okUpdEv, errUpdEv, editEv) <- initDeploymentsListWidget updAllEv termDyn
+    (showNewStagingEv', termDyn) <- deploymentsHeadWidget True okUpdEv
+    (okUpdEv, errUpdEv, editEv) <- deploymentsListWidget updAllEv termDyn dfis
     pure (showNewStagingEv', editEv)
   void $ newStagingPopup showNewStagingEv never
   void $ editStagingPopup editEv never
 
+deploymentsWidgetWrapper :: MonadWidget t m => m a -> m a
+deploymentsWidgetWrapper m =
+  divClass "page" $
+    divClass "page__wrap container" m
+
 deploymentsHeadWidget
   :: MonadWidget t m
-  => Event t ()
+  => Bool
+  -> Event t ()
   -> m (Event t (), Dynamic t Text)
-deploymentsHeadWidget okUpdEv =
+deploymentsHeadWidget enabledSearch okUpdEv =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
     lastUpdateWidget okUpdEv
     termDyn <- divClass "page__action input input--search input--has-clear-type\
     \ page__action--search" $ mdo
+      let
+        enabledSearchAttr = if enabledSearch then mempty else "disabled" =: ""
       termDyn' <- inputElement $ def
         & initialAttributes .~
           (  "type" =: "text"
           <> "class" =: "input__widget"
-          <> "placeholder" =: "Search for stagings" )
+          <> "placeholder" =: "Search for stagings"
+          <> enabledSearchAttr)
         & inputElementConfig_setValue .~ ("" <$ domEvent Click deleteEl)
       (deleteEl, _) <- elClass' "button" "input__clear-type spot spot--cancel" $
         text "Delete"
@@ -107,30 +117,6 @@ lastUpdateWidget okUpdEv = do
   diffDyn <- holdDyn 0 diffEv
   divClass "page__note" $ dynText $ mkMsg <$> diffDyn
 
-initDeploymentsListWidget
-  ::
-    ( MonadWidget t m
-    , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
-  => Event t ()
-  -> Dynamic t Text
-  -> m (Event t (), Event t (), Event t DeploymentFullInfo)
-initDeploymentsListWidget updAllEv termDyn = dataWidgetWrapper $ do
-  pb <- getPostBuild
-  respEv <- listEndpoint pb
-  let
-    okEv = fmapMaybe reqSuccess respEv
-    errEv = fmapMaybe reqFailure respEv
-    w m = m >> pure (never, never, never)
-  evsDyn <- widgetHold (w loadingDeploymentsWidget) $ leftmost
-    [ deploymentsListWidget updAllEv termDyn <$> okEv
-    , (w errDeploymentsWidget) <$ errEv ]
-  let
-    okUpdEv = switchDyn $ evsDyn <^.> _1
-    errUpdEv = switchDyn $ evsDyn <^.> _2
-    editEv = switchDyn $ evsDyn <^.> _3
-  pure (okUpdEv, errUpdEv, editEv)
-
 deploymentsListWidget
   ::
     ( MonadWidget t m
@@ -140,7 +126,7 @@ deploymentsListWidget
   -> Dynamic t Text
   -> [DeploymentFullInfo]
   -> m (Event t (), Event t (), Event t DeploymentFullInfo)
-deploymentsListWidget updAllEv termDyn ds = mdo
+deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
   retryEv <- delay 10 errUpdEv
   updRespEv <- listEndpoint $ leftmost [updAllEv, () <$ retryEv]
   let
@@ -387,7 +373,7 @@ archivedDeploymentWidget clickedEv dDyn' = do
 
 tableWrapper :: MonadWidget t m => (Dynamic t SortDir -> m a) -> m a
 tableWrapper ma =
-  divClass "table table--stagings table--clickable" $
+  divClass "table table--stagings table--clickable table--double-click" $
     el "table" $ do
       sDyn <- tableHeader
       el "tbody" $ ma sDyn
@@ -400,11 +386,12 @@ initTableWrapper ma = do
 
 loadingDeploymentsWidget :: MonadWidget t m => m ()
 loadingDeploymentsWidget =
-  initTableWrapper $
-    loadingCommonWidget
+  deploymentsWidgetWrapper $ do
+    void $ deploymentsHeadWidget False never
+    dataWidgetWrapper $ initTableWrapper $ loadingCommonWidget
 
 errDeploymentsWidget :: MonadWidget t m => m ()
-errDeploymentsWidget =
+errDeploymentsWidget = deploymentsWidgetWrapper $ dataWidgetWrapper $
   initTableWrapper $
     errorCommonWidget
 
@@ -417,20 +404,10 @@ noDeploymentsWidget' h b =
 noDeploymentsWidget :: MonadWidget t m => m ()
 noDeploymentsWidget = noDeploymentsWidget' (text "No stagings") blank
 
-_badSearchWidget :: MonadWidget t m => m ()
-_badSearchWidget = do
-  let
-    h = text "No results found"
-    b = do
-      text "It seems we can’t find any results"
-      el "br" blank
-      text "based on your search"
-  noDeploymentsWidget' h b
-
 emptyTableBody :: MonadWidget t m => m () -> m ()
 emptyTableBody msg =
   elClass "tr" "no-table" $
-    elAttr "td" ("colspan" =: "7") msg
+    elAttr "td" ("colspan" =: "8") msg
 
 dataWidgetWrapper :: MonadWidget t m => m a -> m a
 dataWidgetWrapper ma = divClass "page__body" $ divClass "data" ma

@@ -297,7 +297,7 @@ errorCommonWidget =
       divClass "null__message" $ text "Try to reload the page"
 
 overridesWidget :: MonadWidget t m => Overrides -> m ()
-overridesWidget envs = divClass "listing" $ do
+overridesWidget envs = divClass "listing listing--for-text" $ do
   let
     visible = take 3 envs
     envLength = length envs
@@ -310,16 +310,16 @@ overridesWidget envs = divClass "listing" $ do
       False -> blank
     let
       btnClassDyn = ifThenElseDyn showDyn
-        "listing__item expander bar expander--open"
-        "listing__item expander bar"
+        "listing__more expander expander--open"
+        "listing__more expander"
       btnTextDyn = ifThenElseDyn showDyn "Hide"
-        $ "Show all (" <> (pack . show $ envLength) <> ")"
+        $ "Show all (" <> (showT $ envLength) <> ")"
     toggleEv <- buttonDynClass btnClassDyn btnTextDyn
     blank
   where
     listing envs' = do
       forM_ envs' $ \(Override var val _) ->
-        divClass "listing__item bar" $ do
+        divClass "listing__item" $ do
           el "b" $ text $ var <> ": "
           text val
 

@@ -131,3 +131,13 @@ commandResponse = \case
 
 wsPath :: Text
 wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)
+
+processResp
+  :: Reflex t
+  => Event t (ReqResult tag a)
+  -> (Event t a, Event t ())
+processResp respEv =
+  let
+    respOkEv = fmapMaybe reqSuccess respEv
+    errEv = fmapMaybe reqFailure respEv
+  in (respOkEv, () <$ errEv)
