@@ -7,7 +7,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import qualified Data.ByteString.Char8 as BSC
 import           Data.Coerce
-import           Data.Foldable
 import           Data.Generics.Product
 import           Data.Maybe (fromMaybe)
 import           Data.Proxy
@@ -23,9 +22,6 @@ import           Servant.Client
 import           Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(..))
 import           System.Environment (lookupEnv)
-import           System.IO
-import           System.IO.Temp
-import           System.Process.Typed
 
 import           Common.API
 import           Common.Utils (dfiName)
@@ -44,17 +40,28 @@ runDMC = do
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      CreateC  tName tTag tEnvs _ _ -> do
-        envPairs <- liftIO $ parseEnvs tEnvs
-        handleCreate $ Deployment (coerce tName) (coerce tTag) envPairs
-      ListC         _     _        -> handleList
-      EditC         tName _    _   -> handleEdit . coerce $ tName
-      DeleteC       tName _    _   -> handleDelete . coerce $ tName
-      UpdateC       tName tTag _ _ -> handleUpdate (coerce tName) (coerce tTag)
-      InfoC         tName _    _   -> handleInfo . coerce $ tName
-      CleanupC      tName _    _   -> handleCleanup . coerce $ tName
-      RestoreC      tName _    _   -> handleRestore . coerce $ tName
-      CleanArchiveC _     _        -> handleCleanArchive
+      CreateC  tName tTag tSetApp tSetSt _ _                         -> do
+        setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
+        setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
+        handleCreate $ Deployment (coerce tName) (coerce tTag) setApp setSt
+      ListC         _     _                                          ->
+        handleList
+      DeleteC       tName _    _                                     ->
+        handleDelete . coerce $ tName
+      UpdateC       tName tTag tSetApp tUnsetApp tSetSt tUnsetSt _ _ -> do
+        setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
+        setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
+        unsetApp <- liftIO $ parseUnsetApplicationOverrides Public tUnsetApp
+        unsetSt <- liftIO $ parseUnsetStagingOverrides Public tUnsetSt
+        handleUpdate (coerce tName) (coerce tTag) setApp unsetApp setSt unsetSt
+      InfoC         tName _    _                                     ->
+        handleInfo . coerce $ tName
+      CleanupC      tName _    _                                     ->
+        handleCleanup . coerce $ tName
+      RestoreC      tName _    _                                     ->
+        handleRestore . coerce $ tName
+      CleanArchiveC _     _                                          ->
+        handleCleanArchive
 
 dmsHostName :: String
 dmsHostName = "dm.stage.thebestagent.pro"
@@ -97,45 +104,30 @@ handleList = do
       names = T.unlines . coerce . (getName <$>) <$> resp
     handleResponse T.putStr names
 
-handleEdit :: DeploymentName -> ReaderT ClientEnv IO ()
-handleEdit dName = do
-  clientEnv <- ask
-  liftIO $ do
-    editorPath <- lookupEnv "EDITOR"
-    case editorPath of
-      Just editor -> do
-        res <- flip runClientM clientEnv $ getH dName
-        case res of
-          Right (Deployment _ _ dEnvs) -> do
-            envPairs <- editEnvs editor dEnvs
-            response <- runClientM (editH dName envPairs) clientEnv
-            handleResponse (const $ pure ()) response
-          Left err                     ->
-            P.print $ "request failed, reason: " <> show err
-      Nothing     -> error "environment variable $EDITOR not found"
-
-editEnvs :: FilePath -> EnvPairs -> IO EnvPairs
-editEnvs editor currentEnvPairs = withTempFile "" "dmc" $ \filePath handle -> do
-  for_ currentEnvPairs $ \(k, v) -> (T.hPutStrLn handle $ k <> "=" <> v)
-  hFlush handle
-  withProcessWait_ (proc editor [filePath]) $ \_ ->
-    T.hPutStrLn handle "processing update..."
-  rawEnvs <- T.lines <$> T.readFile filePath
-  envPairs <- parseEnvs rawEnvs
-  T.putStrLn "sending update..."
-  pure envPairs
-
 handleDelete :: DeploymentName -> ReaderT ClientEnv IO ()
 handleDelete dName = do
   clientEnv <- ask
   liftIO $
     handleResponse (const $ pure ()) =<< runClientM (deleteH dName) clientEnv
 
-handleUpdate :: DeploymentName -> DeploymentTag -> ReaderT ClientEnv IO ()
-handleUpdate dName dTag = do
+handleUpdate
+  :: DeploymentName
+  -> DeploymentTag
+  -> ApplicationOverrides
+  -> ApplicationOverrides
+  -> StagingOverrides
+  -> StagingOverrides
+  -> ReaderT ClientEnv IO ()
+handleUpdate dName dTag dNewAppOvs dOldAppOvs dNewStOvs dOldStOvs = do
   clientEnv <- ask
   liftIO $ do
-    let dUpdate = DeploymentUpdate { newTag = dTag, newEnvs = Nothing }
+    let
+      dUpdate = DeploymentUpdate
+        { newTag = dTag
+        , newAppOverrides = dNewAppOvs
+        , oldAppOverrides = dOldAppOvs
+        , newStagingOverrides = dNewStOvs
+        , oldStagingOverrides = dOldStOvs }
     response <- runClientM (updateH dName dUpdate) clientEnv
     handleResponse (const $ pure ()) response
 
@@ -173,10 +165,6 @@ listH :: ClientM [DeploymentFullInfo]
 
 createH :: Deployment -> ClientM CommandResponse
 
-getH :: DeploymentName -> ClientM Deployment
-
-editH :: DeploymentName -> EnvPairs -> ClientM CommandResponse
-
 deleteH :: DeploymentName -> ClientM CommandResponse
 
 updateH :: DeploymentName -> DeploymentUpdate -> ClientM CommandResponse
@@ -201,8 +189,6 @@ _projectName :: ClientM ProjectName
 
 ( listH
   :<|> createH
-  :<|> getH
-  :<|> editH
   :<|> deleteH
   :<|> updateH
   :<|> infoH
@@ -223,10 +209,13 @@ handleResponse _ (Left err)                        =
   T.putStrLn $ "command failed due to unknown reason: " <> T.pack (show err)
 
 printInfo :: DeploymentInfo -> IO ()
-printInfo (DeploymentInfo (Deployment dName dTag envPairs) dLogs) = do
+printInfo (DeploymentInfo (Deployment dName dTag dAppOvs dStOvs) dLogs) = do
   T.putStrLn "Current settings:"
   T.putStrLn $ "tag: " <> coerce dTag
-  T.putStrLn $ "envs: " <> formatEnvPairs envPairs
+  T.putStrLn $ "application overrides: "
+    <> (formatOverrides $ coerce <$> dAppOvs)
+  T.putStrLn $ "staging overrides: "
+    <> (formatOverrides $ coerce <$> dStOvs)
   T.putStrLn
     $ "URL: https://" <> coerce dName <> ".stage.thebestagent.pro"
   T.putStrLn ""
@@ -240,6 +229,9 @@ ppDeploymentLog dLog = T.putStrLn . T.unwords $
       $ dLog ^. field @"createdAt" * 10 ^ (9 :: Int))
   , dLog ^. field @"action" . coerced
   , dLog ^. field @"deploymentTag" . coerced
-  , dLog ^. field @"deploymentEnvs" . to formatEnvPairs
+  , dLog ^. field @"deploymentAppOverrides"
+    . to (formatOverrides . (coerce <$>))
+  , dLog ^. field @"deploymentStagingOverrides"
+    . to (formatOverrides . (coerce <$>))
   , dLog ^. field @"exitCode" . re _Show . packed
   ]

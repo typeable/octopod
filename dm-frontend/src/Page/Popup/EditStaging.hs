@@ -6,6 +6,7 @@ import Data.Coerce
 import Data.Functor
 import Data.Generics.Product
 import Data.Generics.Sum
+import Data.List (deleteFirstsBy)
 import Data.Map as M
 import Data.Monoid
 import Data.Text as T (Text, intercalate)
@@ -66,15 +67,26 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
       commandResponseEv = fmapMaybe commandResponse errEv
       appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
       dfiTag = dfi ^. field @"deployment" . field @"tag" . coerced . to Just
-      dfiVars = dfi ^. field @"deployment" . field @"envs"
+      dfiAppVars = dfi ^. field @"deployment" . field @"appOverrides" . coerced
+      dfiStagingVars =
+        dfi ^. field @"deployment" . field @"stagingOverrides" . coerced
       tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
     (tagDyn, tOkEv) <- dmTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
-    envVarsDyn <- envVarsInput dfiVars
+    appVarsDyn <- envVarsInput dfiAppVars
+    stagingVarsDyn <- envVarsInput dfiStagingVars
+    let
+      oldAppVarDyn = coerce <$> getOldVars dfiAppVars <$> appVarsDyn
+      newAppVarDyn = coerce <$> getNewVars dfiAppVars <$> appVarsDyn
+      oldStagingVarDyn = coerce <$> getOldVars dfiAppVars <$> stagingVarsDyn
+      newStagingVarDyn = coerce <$> getNewVars dfiAppVars <$> stagingVarsDyn
     validDyn <- holdDyn True $ updated tOkEv
     pure $ (DeploymentUpdate
       <$> (DeploymentTag <$> tagDyn)
-      <*> (Just <$> envVarsDyn), validDyn)
+      <*> newAppVarDyn
+      <*> oldAppVarDyn
+      <*> newStagingVarDyn
+      <*> oldStagingVarDyn, validDyn)
   where
     getTagError crEv tagDyn = let
       tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2 )) crEv
@@ -82,6 +94,9 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
       badTagText = "Tag should not be empty"
       badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
       in leftmost [tagErrEv, badNameEv]
+    getOldVars i u = deleteFirstsBy cmpKey i u
+    getNewVars i u = deleteFirstsBy (==) u i
+    cmpKey (Override k1 _ v1) (Override k2 _ v2) = k1 == k2 && v1 == v2
 
 errorHeader :: MonadWidget t m => Event t Text -> m ()
 errorHeader appErrEv = do
@@ -90,7 +105,7 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
-envVarsInput :: MonadWidget t m => EnvPairs -> m (Dynamic t EnvPairs)
+envVarsInput :: MonadWidget t m => Overrides -> m (Dynamic t Overrides)
 envVarsInput evs = do
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text "Overrides"
@@ -98,29 +113,31 @@ envVarsInput evs = do
       elClass "div" "overrides" $ mdo
         let
           initEnvs = fromList $ zip [0..] evs
-          emptyVar = ("", "")
+          emptyVar = Override "" "" Public
           addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
         envsDyn <- foldDyn appEndo initEnvs $ leftmost [ addEv, updEv ]
         (_, updEv)  <- runEventWriterT $ listWithKey envsDyn envVarInput
-        let addDisabledDyn = all ( (/= "") . fst ) . M.elems <$> envsDyn
+        let addDisabledDyn = all ( (/= "") . overrideKey ) . M.elems <$> envsDyn
         clickEv <- buttonClassEnabled'
           "overrides__add dash dash--add" "Add an override" addDisabledDyn
           "dash--disabled"
         pure $ elems <$> envsDyn
 
 envVarInput
-  :: (EventWriter t (Endo (Map Int EnvPair)) m, MonadWidget t m)
+  :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
   => Int
-  -> Dynamic t EnvPair
+  -> Dynamic t Override
   -> m ()
 envVarInput ix epDyn = do
   ep <- sample $ current epDyn
   divClass "overrides__item" $ do
-    (keyDyn, _) <- dmTextInput' "overrides__key" "key" (Just $ fst ep) never
-    (valDyn, _) <- dmTextInput' "overrides__value" "value" (Just $ snd ep) never
+    (keyDyn, _) <-
+      dmTextInput' "overrides__key" "key" (Just $ overrideKey ep) never
+    (valDyn, _) <-
+      dmTextInput' "overrides__value" "value" (Just $ overrideValue ep) never
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let
-      envEv = updated $ zipDyn keyDyn valDyn
+      envEv = updated $ zipDynWith (\k v -> Override k v Public) keyDyn valDyn
       deleteEv = Endo (M.delete ix) <$ closeEv
       updEv = Endo . flip update ix . const . Just <$> envEv
     tellEvent $ leftmost [deleteEv, updEv]

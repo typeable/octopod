@@ -49,17 +49,6 @@ createEndpoint
   => Dynamic t (Either Text Deployment)
   -> Event t ()
   -> m (Event t (ReqResult () CommandResponse))
-getEndpoint
-  :: MonadWidget t m
-  => Dynamic t (Either Text DeploymentName)
-  -> Event t ()
-  -> m (Event t (ReqResult () Deployment))
-editEndpoint
-  :: MonadWidget t m
-  => Dynamic t (Either Text DeploymentName)
-  -> Dynamic t (Either Text [EnvPair])
-  -> Event t ()
-  -> m (Event t (ReqResult () CommandResponse))
 deleteEndpoint
   :: MonadWidget t m
   => Dynamic t (Either Text DeploymentName)
@@ -115,8 +104,6 @@ projectName
   -> m (Event t (ReqResult () ProjectName))
 (listEndpoint
   :<|> createEndpoint
-  :<|> getEndpoint
-  :<|> editEndpoint
   :<|> deleteEndpoint
   :<|> updateEndpoint
   :<|> infoEndpoint

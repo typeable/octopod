@@ -42,24 +42,20 @@ make build
 
 ```bash
 $ result/bin/dmc-exe --help
-DMC
-
-Usage: dmc-exe (create | list | edit | delete | update | info | cleanup |
-                 restore | cleanarchive)
+Usage: dmc-exe COMMAND
 
 Available options:
   -h,--help                Show this help text
 
 Available commands:
-  create
-  list
-  edit
-  delete
-  update
-  info
-  cleanup
-  restore
-  cleanarchive
+  create                   create a new staging
+  list                     get names all stagings
+  delete                   delete the staging
+  update                   update the staging
+  info                     get the staging info
+  cleanup                  cleanup the staging
+  restore                  restore the staging
+  clean-archive            cleanup all archived stagings
 ```
 
 # Interact with DMS
@@ -114,12 +110,12 @@ cd /tmp/b2b-helm/charts/admin && helm install --name dm-cert-control ./cert-cont
 # How to deploy a new staging
 
 ```bash
-dmc create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -e ENV_VAR2=env_val2
+dmc create -n STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -o ENV_VAR2=env_val2
 ```
 
 Or use Docker:
 ```bash
-docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest create --name STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -e ENV_VAR2=env_val2
+docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest create -n STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -o ENV_VAR2=env_val2
 ```
 
 Note that in our ECR(hosted docker registry) we use a convention of
@@ -130,28 +126,13 @@ intermediate steps.
 # How to override an environment variable in an application
 
 ```bash
-dmc edit --name STAGING_NAME
+dmc update -n STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -o ENV_VAR2=env_val2 -E ENV_VAR3 -O ENV_VAR4
 ```
 
 Or use Docker:
 ```bash
-# use Vim
-docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest edit --name STAGING_NAME
-
-# use Emacs
-docker run -ti -e EDITOR=emacs --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest edit --name STAGING_NAME
+docker run -ti --rm 560065381221.dkr.ecr.us-east-1.amazonaws.com/dmc:latest update -n STAGING_NAME -t DOCKER_IMAGE_TAG -e ENV_VAR1=env_val1 -o ENV_VAR2=env_val2 -E ENV_VAR3 -O ENV_VAR4
 ```
-
-`dmc edit` opens an `$EDITOR` where you can override staging variables. To
-override an environment variable `FOO` with a value `foo`, add a line like this:
-
-```
-FOO=foo
-```
-
-To commit the changes, save the file and quit your default `$EDITOR`. `:wq` in
-vim. Note that to discard your changes, you have to exit your `$EDITOR` with a
-not-zero exit code. You can do this by typing `:cq` in vim.
 
 # How clean up Docker cache
 

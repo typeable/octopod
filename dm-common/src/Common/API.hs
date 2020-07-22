@@ -10,9 +10,6 @@ type CaptureName = Capture "name" DeploymentName
 type ListEndpoint = Get '[JSON] [DeploymentFullInfo]
 type CreateEndpoint =
   ReqBody '[JSON] Deployment :> Post '[JSON] CommandResponse
-type GetEndpoint c = c :> Get '[JSON] Deployment
-type EditEndpoint c =
-  c :> ReqBody '[JSON] EnvPairs :> Patch '[JSON] CommandResponse
 type DeleteEndpoint c = c :> Delete '[JSON] CommandResponse
 type UpdateEndpoint c =
   c :> ReqBody '[JSON] DeploymentUpdate :> Put '[JSON] CommandResponse
@@ -40,8 +37,6 @@ type DeploymentAPI' c =
     ( "deployments" :>
       (    ListEndpoint
       :<|> CreateEndpoint
-      :<|> GetEndpoint c
-      :<|> EditEndpoint c
       :<|> DeleteEndpoint c
       :<|> UpdateEndpoint c
       :<|> InfoEndpoint c

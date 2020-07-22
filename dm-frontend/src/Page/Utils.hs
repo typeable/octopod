@@ -296,7 +296,7 @@ errorCommonWidget =
       elClass "b" "null__heading" $ text "Cannot retrieve the data"
       divClass "null__message" $ text "Try to reload the page"
 
-overridesWidget :: MonadWidget t m => EnvPairs -> m ()
+overridesWidget :: MonadWidget t m => Overrides -> m ()
 overridesWidget envs = divClass "listing" $ do
   let
     visible = take 3 envs
@@ -318,7 +318,7 @@ overridesWidget envs = divClass "listing" $ do
     blank
   where
     listing envs' = do
-      forM_ envs' $ \(var, val) ->
+      forM_ envs' $ \(Override var val _) ->
         divClass "listing__item bar" $ do
           el "b" $ text $ var <> ": "
           text val

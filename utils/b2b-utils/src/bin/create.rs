@@ -45,9 +45,17 @@ fn main() -> std::io::Result<()> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("env")
-                .long("env")
+            Arg::with_name("app-env-override")
+                .long("app-env-override")
                 .short("e")
+                .required(false)
+                .multiple(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("staging-override")
+                .long("staging-override")
+                .short("o")
                 .required(false)
                 .multiple(true)
                 .takes_value(true),
@@ -65,11 +73,16 @@ fn main() -> std::io::Result<()> {
         .expect("could not get namepace");
     let name = matches.value_of("name").expect("could not get name");
     let tag = matches.value_of("tag").expect("could not get tag");
-    let envs = matches
-        .values_of("env")
+    let app_env_overrides = matches
+        .values_of("app-env-override")
         .unwrap_or_else(Default::default)
         .map(|e| e.try_into().expect("could not get valid key=value"))
-        .collect::<Vec<EnvPair>>();
+        .collect::<Vec<Override>>();
+    let staging_overrides = matches
+        .values_of("staging-override")
+        .unwrap_or_else(Default::default)
+        .map(|e| e.try_into().expect("could not get valid key=value"))
+        .collect::<Vec<Override>>();
 
     print_utils_version();
 
@@ -78,7 +91,8 @@ fn main() -> std::io::Result<()> {
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
     println!("tag: {:?}", tag);
-    println!("envs: {:?}", envs);
+    println!("app_env_overrides: {:?}", app_env_overrides);
+    println!("staging_overrides: {:?}", staging_overrides);
 
     let tmp_dir = tmp_dir();
     let work_dir = Path::new("/tmp").join(tmp_dir);
@@ -90,11 +104,23 @@ fn main() -> std::io::Result<()> {
     let success = clone_and_prepare_repo(&work_dir);
     let success2 = print_sha256_repo(&work_dir);
 
-    let envs_str = envs.iter().fold(String::new(), |mut acc, x| {
+    let app_env_overrides_str = app_env_overrides.iter().fold(String::new(), |mut acc, x| {
         acc.push_str(&x.to_string());
         acc
     });
-    let args = [project_name, base_domain, namespace, name, tag, &envs_str];
+    let staging_overrides_str = staging_overrides.iter().fold(String::new(), |mut acc, x| {
+        acc.push_str(&x.to_string());
+        acc
+    });
+    let args = [
+        project_name,
+        base_domain,
+        namespace,
+        name,
+        tag,
+        &app_env_overrides_str,
+        &staging_overrides_str,
+    ];
     let app_checksum = calc_app_checksum(&work_dir, &args)?;
     let infra_checksum = calc_infra_checksum(&work_dir, &args)?;
 
@@ -120,7 +146,8 @@ fn main() -> std::io::Result<()> {
             namespace,
             name,
             tag,
-            envs,
+            app_env_overrides,
+            staging_overrides,
             &app_checksum,
         ))
         .current_dir(&work_dir)
