@@ -2,7 +2,7 @@
 Module      : Page.Deployment
 Description : Runner.
 
-This module contains app routing and main runner.
+This module contains app routing and main.
 -}
 
 module Main where
@@ -25,7 +25,8 @@ main :: IO ()
 main = mainWidgetWithHead headWidget $ do
   initConfigWidget
 
--- | Receives config file. If request failures than it shows error message.
+-- | Receives the config file.
+-- If request fails then an error message is displayed.
 initConfigWidget :: (MonadWidget t m, Prerender js t m) => m ()
 initConfigWidget = do
   pb <- getPostBuild
@@ -34,7 +35,7 @@ initConfigWidget = do
     [ (headerWidget >> routeWidget) <$ ffilter id x
     , errorWidget <$ ffilter not x ]
 
--- | Setup websockets. WS url is obtained from session storage.
+-- | Sets up websockets. WS url is obtained from session storage.
 wsUpdate :: forall t m . MonadWidget t m => m (Event t ())
 wsUpdate = do
   let
@@ -49,8 +50,8 @@ wsUpdate = do
   ws <- webSocket wsUrl wsConfig
   pure $ () <$ _webSocket_recv ws
 
--- | Widget that controls app routing. It uses routing scheme defined in
---  'Frontend.Route'.
+-- | Widget that controls app routing.
+-- It uses the routing scheme defined in 'Frontend.Route'.
 routeWidget
   ::
     ( MonadWidget t m
@@ -69,7 +70,7 @@ routeWidget = do
           Just dn -> deploymentPage updAllEv dn
     blank
 
--- | Content of head element in DOM.
+-- | Content of the @head@ DOM element.
 headWidget :: DomBuilder t m => m ()
 headWidget = do
   elAttr "meta" ( "charset" =: "urf8 ") blank
@@ -88,7 +89,7 @@ headWidget = do
   elAttr "script"
     (  "src" =: "/static/vendors/outline/outline.js" ) blank
 
--- | Common header of all pages with project name.
+-- | Common headers of all pages. Displays the project name.
 headerWidget :: MonadWidget t m => m ()
 headerWidget =
   elClass "header" "header" $
@@ -101,14 +102,14 @@ headerWidget =
         nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
         dynText nameDyn
 
--- | Widget with loading spinner.
+-- | Widget with a loading spinner.
 loadingWidget :: MonadWidget t m => m ()
 loadingWidget =
   divClass "no-page" $
     divClass "no-page__inner" $
       loadingCommonWidget
 
--- | Widget with error message.
+-- | Widget with an error message.
 errorWidget :: MonadWidget t m => m ()
 errorWidget =
   divClass "no-page" $

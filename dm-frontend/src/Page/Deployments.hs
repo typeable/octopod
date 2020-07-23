@@ -2,7 +2,7 @@
 Module      : Page.Deployments
 Description : Stagings table page.
 
-This module contains definition of stagings table page.
+This module contains the definition of the stagings table page.
 -}
 
 module Page.Deployments
@@ -33,9 +33,9 @@ import Page.Popup.NewStaging
 import Frontend.Utils
 
 
--- | The root widget of stagings list page. It requests data of all stagings.
--- If request failures it shows error page, else it calls 'deploymentsWidget',
--- passing a recieved data.
+-- | The root widget of the stagings list page. It requests data of all stagings.
+-- If a request fails it shows an error, otherwise it calls 'deploymentsWidget',
+-- passing a received data.
 deploymentsPage
   ::
     ( MonadWidget t m
@@ -51,9 +51,9 @@ deploymentsPage updAllEv = do
     [ deploymentsWidget updAllEv <$> okEv
     , errDeploymentsWidget <$ errEv ]
 
--- | Widget that's shown after successful initial request. It contains header
--- with active search field, stagings list and sidebars: @new staging@ and
--- @edit staging@.
+-- | Widget that's shown after initial request succeeds. It contains the header
+-- with an active search field, stagings list and sidebars: \"new staging\" and
+-- \"edit staging\".
 deploymentsWidget
   ::
     ( MonadWidget t m
@@ -80,9 +80,9 @@ deploymentsWidgetWrapper m =
   divClass "page" $
     divClass "page__wrap container" m
 
--- | Header of current page. It contains a timer that shows how much time has
--- passed since the last update, search field and button that opens
--- @New staging@ sidebar.
+-- | Header of the current page. It contains a timer that shows how much time has
+-- passed since the last update, a search field and z button that opens
+-- \"New staging\" sidebar.
 deploymentsHeadWidget
   :: MonadWidget t m
   => Bool
@@ -90,8 +90,8 @@ deploymentsHeadWidget
   -> Event t ()
   -- ^ Event that fires after successful list update.
   -> m (Event t (), Dynamic t Text)
-  -- ^ Returns event notifying that @new staging@ sidebar should be open and
-  -- search term.
+  -- ^ Returns an event notifying that the \"new staging\" sidebar should be open and
+  -- the search term within it.
 deploymentsHeadWidget enabledSearch okUpdEv =
   divClass "page__head" $ do
     elClass "h1" "page__heading title" $ text "All stagings"
@@ -138,9 +138,9 @@ lastUpdateWidget okUpdEv = do
   diffDyn <- holdDyn 0 diffEv
   divClass "page__note" $ dynText $ mkMsg <$> diffDyn
 
--- | Widget with all available stagings that takes initial data. It updates
--- this data every time when passed event fires. If update failures then
--- a notification widget with appears at the top of the page.
+-- | Widget with all available stagings. It updates
+-- the staging information every time when the supplied event fires.
+-- If an update fails, a notification widget appears at the top of the page.
 deploymentsListWidget
   ::
     ( MonadWidget t m
@@ -148,7 +148,7 @@ deploymentsListWidget
     , SetRoute t (R Routes) m )
   => Event t ()
   -> Dynamic t Text
-  -> [DeploymentFullInfo]
+  -> [DeploymentFullInfo] -- ^ Initial staging data
   -> m (Event t (), Event t (), Event t DeploymentFullInfo)
 deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
   retryEv <- delay 10 errUpdEv
@@ -168,7 +168,7 @@ deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
   archivedDeploymentsWidget clickedEv archivedDsDyn
   pure (() <$ okUpdEv, () <$ errUpdEv, editEv)
 
--- | Compare stagings fields (name and tag) with search term.
+-- | Compares stagings fields (name and tag) with a search term.
 searchDeployments
   :: Text               -- ^ Search term.
   -> DeploymentFullInfo -- ^ Staging data.
@@ -188,11 +188,11 @@ activeDeploymentsWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -- ^ Event that carries clicked DOM element. This event is required by
+  -- ^ Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   -> Dynamic t [DeploymentFullInfo]
   -> m (Event t DeploymentFullInfo)
-  -- ^ Returns event carrying editable staging to @edit staging@ sidebar.
+  -- ^ Returns an event carrying editable staging to \"edit staging\" sidebar.
 activeDeploymentsWidget clickedEv dsDyn =
   divClass "data__primary" $
     tableWrapper $ \sortDyn -> do
@@ -209,7 +209,7 @@ activeDeploymentsWidget clickedEv dsDyn =
           pure never
       switchHold never editEvEv
 
--- | This type helps to determine selected item in dropdown in table row.
+-- | This type helps determine which item was selected in the table row dropdown.
 data StagingAction
   = ArchiveStaging
   | EditStaging
@@ -222,12 +222,12 @@ activeDeploymentWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -- ^ Event that carries clicked DOM element. This event is required by
+  -- ^ Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   -> Dynamic t (DeploymentFullInfo)
   -> m (Event t DeploymentFullInfo)
   -- ^ Returns event carrying editable staging that is required by
-  -- @edit staging@ sidebar.
+  -- \"edit staging\" sidebar.
 activeDeploymentWidget clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   editEvEv <- dyn $ ffor dDyn $ \d@DeploymentFullInfo{..} -> do
@@ -290,7 +290,7 @@ archivedDeploymentsWidget
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m )
   => Event t ClickedElement
-  -- ^ Event that carries clicked DOM element. This event is required by
+  -- ^ Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   -> Dynamic t [DeploymentFullInfo]
   -> m ()
@@ -355,7 +355,7 @@ archivedDeploymentWidget clickedEv dDyn' = do
     let route = DashboardRoute :/ Just dname
     setRoute $ route <$ domEvent Dblclick linkEl
 
--- | Sort stagings by passed condition.
+-- | Sort stagings by the supplied condition.
 sortDeployments
   :: [DeploymentFullInfo]
   -> SortDir
@@ -367,8 +367,7 @@ sortDeployments items s =  L.sortBy sortFunc items
       SortAsc get -> compare (a ^. get) (b ^. get)
       SortDesc get -> compare (b ^. get) (a ^. get)
 
--- | Each constructor contains getter that extracts field by which the sorting
--- is performed.
+-- | Each constructor contains a getter that extracts the field that is used for sorting.
 data SortDir where
   SortAsc  :: Ord a => Getter DeploymentFullInfo a -> SortDir
   SortDesc :: Ord a => Getter DeploymentFullInfo a -> SortDir
@@ -379,8 +378,8 @@ toggleSort = \case
   SortAsc x  -> SortDesc x
   SortDesc x -> SortAsc x
 
--- | Header for table with active and table with archived stagings. @Name@,
--- @created@ and @udpated@ columns support sorting.
+-- | Header for a stagings table.
+-- \"Name\",\"created\" and \"udpated\" columns support sorting.
 tableHeader :: MonadWidget t m => m (Dynamic t SortDir)
 tableHeader = do
   el "thead" $
@@ -398,7 +397,7 @@ tableHeader = do
       sortDyn <- holdDyn (SortAsc dfiName) sortEv
       pure sortDyn
 
--- | Special column header with sort button.
+-- | Special column header with a sort button.
 sortHeader
   :: (MonadWidget t m, Ord a)
   => Getter DeploymentFullInfo a
@@ -415,11 +414,11 @@ sortHeader f l = do
     sortBtnEv <- buttonDynClass classDyn (pure l)
     pure dateSortDyn'
 
--- | Wrapper with table header for table body.
+-- | A wrapper that adds a header to the table.
 tableWrapper
   :: MonadWidget t m
   => (Dynamic t SortDir -> m a)
-  -- ^ Sorting direction is obtained from table header.
+  -- ^ Sorting direction is obtained from the table header.
   -> m a
 tableWrapper ma =
   divClass "table table--stagings table--clickable table--double-click" $
@@ -427,27 +426,27 @@ tableWrapper ma =
       sDyn <- tableHeader
       el "tbody" $ ma sDyn
 
--- | Table wrapper for table with error or loading placeholders.
+-- | Table wrapper for a table with an \"error\" or a \"loading\ placeholder.
 initTableWrapper :: MonadWidget t m => m () -> m ()
 initTableWrapper ma = do
   divClass "data_primary" $
     tableWrapper $ const $
       emptyTableBody $ ma
 
--- | Widget with loading spinner.
+-- | Widget with a loading spinner.
 loadingDeploymentsWidget :: MonadWidget t m => m ()
 loadingDeploymentsWidget =
   deploymentsWidgetWrapper $ do
     void $ deploymentsHeadWidget False never
     dataWidgetWrapper $ initTableWrapper $ loadingCommonWidget
 
--- | Widget with error message.
+-- | Widget with an error message.
 errDeploymentsWidget :: MonadWidget t m => m ()
 errDeploymentsWidget = deploymentsWidgetWrapper $ dataWidgetWrapper $
   initTableWrapper $
     errorCommonWidget
 
--- | Widget for empty table with custom message.
+-- | Widget for an empty table with a custom message.
 noDeploymentsWidget'
   :: MonadWidget t m
   => m ()
@@ -458,7 +457,7 @@ noDeploymentsWidget' h =
     elClass "b" "null__heading" h
     divClass "null__message" blank
 
--- | Widget for empty table.
+-- | Widget for an empty table.
 noDeploymentsWidget :: MonadWidget t m => m ()
 noDeploymentsWidget = noDeploymentsWidget' (text "No stagings")
 
@@ -472,7 +471,7 @@ emptyTableBody msg =
 dataWidgetWrapper :: MonadWidget t m => m a -> m a
 dataWidgetWrapper ma = divClass "page__body" $ divClass "data" ma
 
--- | Button that controls visibility of archived stagings.
+-- | Button that controls visibility of the archived stagings.
 toggleButton :: MonadWidget t m => m (Dynamic t Bool)
 toggleButton = mdo
   showDyn <- toggle False $ domEvent Click archivedBtnEl

@@ -2,7 +2,7 @@
 Module      : Page.Popup.EditStaging
 Description : Edit staging sidebar.
 
-This module contains definition of classic popups with ok/cancel buttons.
+This module contains еру definition of classic popups with ok/cancel buttons.
 -}
 module Page.ClassicPopup where
 
@@ -10,12 +10,12 @@ import Reflex.Dom
 
 import Frontend.Utils
 
--- | The root function of popup.
+-- | The root function of a popup.
 classicPopup
   :: MonadWidget t m
-  => Event t ()                 -- ^ @Show@ event.
-  -> m (Event t (), Event t ()) -- ^ Body of popup returnung ok/cancel events.
-  -> m (Event t ())             -- Return @ok@ event.
+  => Event t ()                 -- ^ \"Show\" event.
+  -> m (Event t (), Event t ()) -- ^ Body of the popup returning ok/cancel events.
+  -> m (Event t ())             -- Returned \"ok\" event.
 classicPopup showEv m = mdo
   let
     closeEv = switchDyn $ snd <$> evsDyn
@@ -27,8 +27,8 @@ classicPopup showEv m = mdo
     , popupWidget m <$ showEv ]
   pure okEv
 
--- | Wrapper for popup widget that darkens background, makes background
--- unclickable and supports @close@ button.
+-- | Wrapper for popup widget that darkens the background, makes the background
+-- unclickable and supports a \"close\" button.
 popupWidget
   :: MonadWidget t m
   => m (Event t (), Event t ())
@@ -61,4 +61,3 @@ confirmDeletePopup showEv txt = do
             buttonClass "dialog__action button--secondary button" "Cancel"
           pure (okEv, cancelEv)
   classicPopup showEv body
-

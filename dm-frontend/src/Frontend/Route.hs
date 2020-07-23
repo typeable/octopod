@@ -2,9 +2,10 @@
 Module      : Frontend.Route
 Description : Router setup.
 
-This module contains the type-level routing scheme and the router encoder. Also
-there is an definition of 'Wrapped' instance for 'DeploymentName'. This helps to
-simplify router encoder. Routing is provided by package 'obelisk-router'.
+This module contains the type-level routing scheme and the router encoder.
+Also defines a 'Wrapped' instance for 'DeploymentName'. This helps
+simplify the router encoder.
+Routing is provided by the 'obelisk-router' package.
 -}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}

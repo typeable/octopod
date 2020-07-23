@@ -2,7 +2,7 @@
 Module      : Frontend.GHCJS
 Description : GHCJS functions.
 
-This module contains all the functions that require GHCJS imports.
+This module contains all functions that require GHCJS imports.
 -}
 
 module Frontend.GHCJS where
@@ -26,7 +26,7 @@ wsUrlKey = "ws"
 appAuthKey = "auth"
 -- ^ API auth token key in session storage.
 
--- | There is a project settings that contain a host for API requests,
+-- | There are project settings that contain the host for API requests,
 -- websocket host and API authentication token.
 data ProjectConfig = ProjectConfig
   { appUrl :: String  -- ^ API host.
@@ -42,8 +42,8 @@ data BadConfig = BadConfig
 
 instance Exception BadConfig
 
--- | Reads settings from config file and puts them into storage session. Throws
--- 'BadConfig' in case of the config file can't be parsed.
+-- | Reads settings from the config file and puts them into session storage.
+-- Throws 'BadConfig' if the config file can't be parsed.
 initConfig' :: JSM ()
 initConfig' = do
   w <- currentWindowUnchecked
@@ -59,12 +59,13 @@ initConfig' = do
       setItem stor appAuthKey $ appAuth cfg
     A.Error _ -> throwM BadConfig
 
--- | Reads settings from config file and puts them into storage session. If
--- config file can't be parsed returns 'False', else 'True'.
+-- | Reads settings from the config file and puts them into session storage. If
+-- the config file can't be parsed returns 'False', else 'True'.
 initConfig :: MonadJSM m => m Bool
 initConfig = liftJSM $ catchAll (initConfig' >> pure True) (const $ pure False)
 
--- | Gets value from session storage by key. Throws error if key doesn't exist.
+-- | Gets a value from session storage for the given key.
+-- Throws an error if key doesn't exist.
 getVar
   :: MonadJSM m
   => JSString -- ^ Key in session storage.
@@ -75,14 +76,14 @@ getVar k = do
   x <- getItemUnsafe stor k
   pure $ pack x
 
--- | Gets API host from session storage.
+-- | Gets the API host from session storage.
 getAppUrl :: MonadJSM m => m T.Text
 getAppUrl = getVar appUrlKey
 
--- | Gets API auth token from session storage.
+-- | Gets the API auth token from session storage.
 getAppAuth :: MonadJSM m => m T.Text
 getAppAuth = getVar appAuthKey
 
--- | Gets WS host from session storage.
+-- | Gets the WS host from session storage.
 getWsUrl :: MonadJSM m => m T.Text
 getWsUrl = getVar wsUrlKey

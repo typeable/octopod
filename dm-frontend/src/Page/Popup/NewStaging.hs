@@ -2,7 +2,7 @@
 Module      : Page.Popup.NewStaging
 Description : New staging sidebar.
 
-This module contains definition of @new staging@ sidebar.
+This module contains the definition of \"new staging\" sidebar.
 -}
 
 
@@ -26,11 +26,11 @@ import Frontend.Utils
 import Servant.Reflex
 
 
--- | The root function for @new staging@ sidebar.
+-- | The root function for \"new staging\" sidebar.
 newStagingPopup
   :: MonadWidget t m
-  => Event t ()     -- ^ @Show@ event.
-  -> Event t ()     -- ^ @Close@ event.
+  => Event t ()     -- ^ \"Show\" event.
+  -> Event t ()     -- ^ \"Close\" event.
   -> m ()
 newStagingPopup showEv hideEv = void $ sidebar showEv hideEv $ const $ mdo
   divClass "popup__body" $ mdo
@@ -47,7 +47,7 @@ newStagingPopup showEv hideEv = void $ sidebar showEv hideEv $ const $ mdo
       enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (never, closeEv)
 
--- | The header of sidebar contains control buttons: @Save@ and @Close@.
+-- | The header of sidebar contains control buttons: \"Save\" and \"Close\".
 newStagingPopupHeader
   :: MonadWidget t m
   => Dynamic t Bool
@@ -61,15 +61,15 @@ newStagingPopupHeader enabledDyn =
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
--- | The body of sidebar contains creation form. There are name field, tag field
--- and overrides fields. Name field is validated by next regexp:
+-- | The body of the sidebar contains the creation form. It contains: a name field,
+-- a tag field and overrides fields. The name field is validated with the regexp:
 -- @^[a-z][a-z0-9\\-]{1,16}$@.
 newStagingPopupBody
   :: MonadWidget t m
   => Event t (ReqResult tag CommandResponse)
   -- ^ Request failure event.
   -> m (Dynamic t Deployment, Dynamic t Bool)
-  -- ^ Returns new deployment and validation state.
+  -- ^ Returns new deployment and validation states.
 newStagingPopupBody errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
@@ -104,7 +104,7 @@ newStagingPopupBody errEv = divClass "popup__content" $
       badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
       in leftmost [tagErrEv, badNameEv]
 
--- | The error widget in case of request failure.
+-- | The widget used to display errors.
 errorHeader
   :: MonadWidget t m
   => Event t Text -- ^ Message text.
@@ -115,7 +115,7 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
--- | Widget with fields for overrides. This widget supports an adding and
+-- | Widget with override fields. This widget supports adding and
 -- a removing key-value pairs.
 envVarsInput
   :: MonadWidget t m
@@ -137,7 +137,7 @@ envVarsInput headerText = do
           "dash--disabled"
         pure $ elems <$> envsDyn
 
--- | Widget for variable key and value. It returns an event carrying an update
+-- | Widget for a key-value pair. It returns an event carrying an update
 -- of overrides list via 'EventWriter'.
 envVarInput
   :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
@@ -154,4 +154,3 @@ envVarInput ix _ = do
       deleteEv = Endo (M.delete ix) <$ closeEv
       updEv = Endo . flip update ix . const . Just <$> envEv
     tellEvent $ leftmost [deleteEv, updEv]
-

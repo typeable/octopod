@@ -2,7 +2,7 @@
 Module      : Page.Deployment
 Description : Staging page.
 
-This module contains definition of staging page.
+This module contains the definition of a staging page.
 -}
 
 module Page.Deployment (deploymentPage) where
@@ -24,9 +24,9 @@ import Frontend.Utils
 import Page.ClassicPopup
 import Page.Popup.EditStaging
 
--- | The root widget of staging page. It requests staging data. If request
--- failures it shows error page, else it calls 'deploymentWidget', passing there
--- a recieved data.
+-- | The root widget of a staging page. It requests the staging data. If the
+-- request fails it shows an error, otherwise it calls 'deploymentWidget', passing
+-- the received data.
 deploymentPage
   ::
     ( MonadWidget t m
@@ -44,8 +44,8 @@ deploymentPage updAllEv dname = do
     [ errorWidget dname <$ errEv
     , deploymentWidget updAllEv <$> okEv ]
 
--- | Staging page widget that takes initial staging data. It updates this data
--- every time when passed event fires. If update failures then a notification
+-- | Staging page widget that takes the initial staging data. It updates this data
+-- every time when the passed event fires. If an update fails, a notification
 -- widget appears at the top of the page.
 deploymentWidget
   ::
@@ -72,20 +72,20 @@ deploymentWidget updEv dfi = mdo
   sentEv <- editStagingPopup editEv never
   blank
 
--- | Header of staging page. It contains stating name and control buttons that
--- depends on staging status:
---  * @Archived@ status: @restore@ button.
---  * @Running@ status: @archive staging@ and @edit staging@ buttons.
--- If it's a pending status (Creating, Updating, etc) then all buttons are
--- inactive.
+-- | The header of a staging page. It contains the stating name and control
+-- buttons that depend on the status of the staging:
+--  * \"Archived\" status: a \"restore\" button.
+--  * \"Running\" status: \"archive staging\" and \"edit staging\" buttons.
+-- If the status is pending (\"Creating\", \"Updating\", etc) then all buttons
+-- are inactive.
 deploymentHead
   :: MonadWidget t m
   => Dynamic t DeploymentFullInfo
   -- ^ Staging data.
   -> Event t Bool
-  -- ^ Event with flag showing current state of request.
+  -- ^ Event with a flag showing the current state of the request.
   -> m (Event t DeploymentFullInfo)
-  -- ^ @Edit@ event.
+  -- ^ \"Edit\" event.
 deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
@@ -125,7 +125,7 @@ deploymentHead dfiDyn sentEv =
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a
 deploymentBodyWrapper m = divClass "page__body" $ divClass "staging" $ m
 
--- | Body of staging page.
+-- | Body of a staging page.
 deploymentBody
   :: MonadWidget t m
   => Event t ()
@@ -203,9 +203,10 @@ allEnvsWidget headerText envsDyn = do
             text ": "
           dynText valDyn
 
--- ^ Widget with table of actions perfomed on staging. It requests staging data.
--- If request failures it shows error message, else it calls 'actionsTableData',
--- passing a recieved data.
+-- ^ Widget with a table of actions that can be performed on a staging. It
+-- requests staging data.
+-- If a request fails it shows an error message, otherwise it calls 'actionsTableData',
+-- passing the received data.
 actionsTable
   :: MonadWidget t m
   => Event t ()
@@ -224,7 +225,7 @@ actionsTable updEv nameDyn = do
       [ actionsTableError <$ errEv
       , actionsTableData updEv nameDyn <$> okEv ]
 
--- | Header of actions table.
+-- | Header of the actions table.
 actionsTableHead :: MonadWidget t m => m ()
 actionsTableHead =
   el "thead" $
@@ -237,7 +238,7 @@ actionsTableHead =
       el "th" $ text "Created"
       el "th" $ text "Deployment duration"
 
--- | Widget with loading spinner for actions table.
+-- | Widget with a loading spinner for the actions table.
 actionsTableLoading :: MonadWidget t m => m ()
 actionsTableLoading = do
   el "tbody" $
@@ -246,7 +247,7 @@ actionsTableLoading = do
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
 
--- | Widget with error message for actions table.
+-- | Widget with an error message for the actions table.
 actionsTableError:: MonadWidget t m => m ()
 actionsTableError = do
   el "tbody" $
@@ -256,7 +257,7 @@ actionsTableError = do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload the page"
 
--- | Actions table body. It updates data every time when passed event fires.
+-- | Actions table body. It updates data every time when the supplied event fires.
 actionsTableData
   :: MonadWidget t m
   => Event t ()
@@ -274,7 +275,7 @@ actionsTableData updEv nameDyn initLogs = do
     void $ simpleList logsDyn $ \logDyn -> do
       dyn_ $ actinRow <$> logDyn
 
--- | Data row of actions table.
+-- | Data row of the actions table.
 actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog{..} = do
   el "tr" $ do
@@ -290,16 +291,16 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
--- | Convert action duration from milliseconds to human readable format.
+-- | Convert the duration of an action from milliseconds to a human readable format.
 formatDuration
-  :: Duration -- ^ Duration in miliseconds.
+  :: Duration -- ^ Duration in milliseconds.
   -> Text
 formatDuration (Duration d) = m <> "m " <> s <> "s"
   where
     m = showT $ d `div` (1000 * 60)
     s = showT $ d `div` (1000)
 
--- | Widget with button that returns to stagings list page.
+-- | Widget with a button that returns to stagings list page.
 backButton
   ::
     ( MonadWidget t m
@@ -313,7 +314,7 @@ backButton = do
     attrs = constDyn $ "class" =: "page__back dash dash--back dash--smaller"
   routeLinkDynAttr attrs backRoute $ text "All stagings"
 
--- | Widget with loading spinner for page.
+-- | Widget with a loading spinner.
 loadingWidget
   ::
     ( MonadWidget t m
@@ -329,7 +330,7 @@ loadingWidget dname = pageWrapper $ do
     divClass "no-staging" $
       loadingCommonWidget
 
--- | Widget with error placeholder for page.
+-- | Widget with an error placeholder.
 errorWidget
   ::
     ( MonadWidget t m

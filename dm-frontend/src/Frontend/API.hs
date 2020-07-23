@@ -1,9 +1,10 @@
 {-|
-Module      : Frontend.GHCJS
+Module      : Frontend.API
 Description : API requests.
 
 This module contains client functions that perform API requests (these functions
-are generated from servant API) and functions that work with requests results.
+are generated from the servant API) and functions that work with request
+results.
 -}
 
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -25,8 +26,8 @@ import Common.API
 import Common.Types
 import Frontend.GHCJS
 
--- | 'apiClients' generates API requests. Before each request API host and API
--- authentication token are read from session storage.
+-- | 'apiClients' generates API requests. Before each request the API host and
+-- API authentication token are read from session storage.
 apiClients
   :: forall t m. MonadWidget t m
   => SR.Client t m API ()
@@ -125,9 +126,9 @@ projectName
   :<|> cleanArchiveEndpoint
   :<|> projectName = apiClients
 
--- | Parser for kubectl command response.
+-- | Parser of kubectl command responses.
 commandResponse
-  :: ReqResult tag CommandResponse -- ^ Request result with command response.
+  :: ReqResult tag CommandResponse -- ^ Response of a kubectl request.
   -> Maybe CommandResponse
 commandResponse = \case
   ResponseSuccess _ a _   -> Just a
@@ -141,7 +142,7 @@ commandResponse = \case
       XhrResponseBody_ArrayBuffer x -> Just x
       _                             -> Nothing
 
--- | Gets path of websocket url.
+-- | Gets the websocket url path.
 wsPath :: Text
 wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)
 
@@ -149,7 +150,7 @@ wsPath = T.pack $ symbolVal (Proxy @ApiWSPath)
 processResp
   :: Reflex t
   => Event t (ReqResult tag a)
-  -- ^ Event with request result.
+  -- ^ Event with a request result.
   -> (Event t a, Event t ())
   -- ^ (Success event with obtained data, failure event).
 processResp respEv =

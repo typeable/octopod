@@ -2,7 +2,7 @@
 Module      : Page.Popup.EditStaging
 Description : Edit staging sidebar.
 
-This module contains definition of @edit staging@ sidebar.
+This module contains the definition of the "edit staging" sidebar.
 -}
 
 module Page.Popup.EditStaging (editStagingPopup) where
@@ -26,15 +26,15 @@ import Frontend.API
 import Frontend.Utils
 import Servant.Reflex
 
--- | The root function for @edit staging@ sidebar.
+-- | The root function for \"edit staging\" sidebar.
 editStagingPopup
   :: MonadWidget t m
   => Event t DeploymentFullInfo
-  -- ^ @Show@ event carrying editable sidebar.
+  -- ^ \"Show\" event carrying an editable sidebar.
   -> Event t ()
-  -- ^ @Close@ event.
+  -- ^ \"Close\" event.
   -> m (Event t Bool)
-  -- ^ Event with flag showing current state of request.
+  -- ^ Event with a flag showing the current state of the request.
 editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
@@ -52,13 +52,13 @@ editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
       enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (updated sentDyn, closeEv)
 
--- | The header of sidebar contains staging name and control buttons: @Save@ and
--- @Close@.
+-- | The header of the sidebar contains the staging name and control buttons:
+-- \"Save\" and \"Close\".
 editStagingPopupHeader
   :: MonadWidget t m
-  => DeploymentName             -- ^ Name of deployment.
+  => DeploymentName             -- ^ Name of the deployment.
   -> Dynamic t Bool             -- ^ Form validation state.
-  -> m (Event t (), Event t ()) -- ^ @Close@ event and @Save@ click event.
+  -> m (Event t (), Event t ()) -- ^ \"Close\" event and \"Save\" click event.
 editStagingPopupHeader dname validDyn =
   divClass "popup__head" $ do
     closeEv <- buttonClass "popup__close" "Close popup"
@@ -68,14 +68,14 @@ editStagingPopupHeader dname validDyn =
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
--- | The body of sidebar contains edit form. There are tag field and overrides
--- fields.
+-- | The body of the sidebar containing the edit form. Contains a tag field and
+-- an override field.
 editStagingPopupBody
   :: MonadWidget t m
   => DeploymentFullInfo
   -- ^ Full staging data.
   -> Event t (ReqResult tag CommandResponse)
-  -- ^ @Edit request@ failure event.
+  -- ^ \"Edit request\" failure event.
   -> m (Dynamic t DeploymentUpdate, Dynamic t Bool)
   -- ^ Returns deployment update and validation state.
 editStagingPopupBody dfi errEv = divClass "popup__content" $
@@ -115,7 +115,7 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
     getNewVars i u = deleteFirstsBy (==) u i
     cmpKey (Override k1 _ v1) (Override k2 _ v2) = k1 == k2 && v1 == v2
 
--- | The error widget in case of request failure.
+-- | The widget used to display errors.
 errorHeader
   :: MonadWidget t m
   => Event t Text -- ^ Message text.
@@ -126,7 +126,7 @@ errorHeader appErrEv = do
       el "b" $ text "App error: "
       text appErr
 
--- | Widget with fields for overrides. This widget supports adding and
+-- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.
 envVarsInput
   :: MonadWidget t m
@@ -150,7 +150,7 @@ envVarsInput overridesHeader evs = do
           "dash--disabled"
         pure $ elems <$> envsDyn
 
--- | Widget for variable key and value. It returns an event carrying an update
+-- | Widget for entering a key-value pair. It returns an event carrying an update
 -- of overrides list via 'EventWriter'.
 envVarInput
   :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
