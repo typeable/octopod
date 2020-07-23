@@ -23,7 +23,7 @@ import           Servant.Client.Core
   (ClientError(FailureResponse), ResponseF(..))
 import           System.Environment (lookupEnv)
 
-import           Common.API
+import           API
 import           Common.Utils (dfiName)
 import           DMC.Args
 import           TLS (makeClientManager)
@@ -40,27 +40,37 @@ runDMC = do
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      CreateC  tName tTag tSetApp tSetSt _ _                         -> do
-        setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
+      CreateC tName tTag tSetAp tSetSt tSetPAp tSetPSt _ _               -> do
+        setApp <- liftIO $ parseSetApplicationOverrides Public tSetAp
         setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
-        handleCreate $ Deployment (coerce tName) (coerce tTag) setApp setSt
-      ListC         _     _                                          ->
+        setPApp <- liftIO $ parseSetApplicationOverrides Private tSetPAp
+        setPSt <- liftIO $ parseSetStagingOverrides Private tSetPSt
+        let
+          appOvs = setApp ++ setPApp
+          stOvs  = setSt ++ setPSt
+        handleCreate $ Deployment (coerce tName) (coerce tTag) appOvs stOvs
+      ListC _ _                                                          ->
         handleList
-      DeleteC       tName _    _                                     ->
+      DeleteC tName _  _                                                 ->
         handleDelete . coerce $ tName
-      UpdateC       tName tTag tSetApp tUnsetApp tSetSt tUnsetSt _ _ -> do
-        setApp <- liftIO $ parseSetApplicationOverrides Public tSetApp
+      UpdateC tName tTag tSetAp tUnsAp tSetSt tUnsSt tSetPAp tSetPSt _ _ -> do
+        setApp <- liftIO $ parseSetApplicationOverrides Public tSetAp
         setSt <- liftIO $ parseSetStagingOverrides Public tSetSt
-        unsetApp <- liftIO $ parseUnsetApplicationOverrides Public tUnsetApp
-        unsetSt <- liftIO $ parseUnsetStagingOverrides Public tUnsetSt
-        handleUpdate (coerce tName) (coerce tTag) setApp unsetApp setSt unsetSt
-      InfoC         tName _    _                                     ->
+        unsetApp <- liftIO $ parseUnsetApplicationOverrides Public tUnsAp
+        unsetSt <- liftIO $ parseUnsetStagingOverrides Public tUnsSt
+        setPApp <- liftIO $ parseSetApplicationOverrides Private tSetPAp
+        setPSt <- liftIO $ parseSetStagingOverrides Private tSetPSt
+        let
+          appOvs = setApp ++ setPApp
+          stOvs  = setSt ++ setPSt
+        handleUpdate (coerce tName) (coerce tTag) appOvs unsetApp stOvs unsetSt
+      InfoC tName _ _                                                    ->
         handleInfo . coerce $ tName
-      CleanupC      tName _    _                                     ->
+      CleanupC tName _ _                                                 ->
         handleCleanup . coerce $ tName
-      RestoreC      tName _    _                                     ->
+      RestoreC tName _ _                                                 ->
         handleRestore . coerce $ tName
-      CleanArchiveC _     _                                          ->
+      CleanArchiveC _ _                                                  ->
         handleCleanArchive
 
 dmsHostName :: String
@@ -199,7 +209,7 @@ _projectName :: ClientM ProjectName
     :<|> _getActionInfoH
     :<|> _pingH
     :<|> cleanArchiveH
-    :<|> _projectName = client (Proxy @API)
+    :<|> _projectName = client (Proxy @PowerAPI)
 
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result)                    = f result
