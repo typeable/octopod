@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant DMC
+    participant DMS
+    participant PostgreSQL
+    participant UI
+    participant DMS/BgWorker
+    participant DMS/StatusUpdater
+    participant AppWrappers
+    participant KubeAPI
+    DMC->>DMS: restore(name)
+    DMS->>PostgreSQL: store config, status=CreatePending
+    alt name not found
+        PostgreSQL->>DMS: error: name not found
+        DMS->>DMC: error: name not found
+    else
+        alt tag not found
+            DMS->>DMC: error: tag not found
+        else
+            PostgreSQL->>DMS: ok
+            DMS->>UI: event FrontendPleaseUpdateEverything
+            UI->>DMS: get stagings info
+            DMS->>DMS/BgWorker: create
+            DMS->>DMC: done
+            DMS/BgWorker->>AppWrappers: create
+            AppWrappers->>KubeAPI: create staging using helm
+            KubeAPI->>AppWrappers: done
+            AppWrappers->>DMS/BgWorker: done
+            DMS/BgWorker->>PostgreSQL: write logs
+            DMS/BgWorker->>UI: event FrontendPleaseUpdateEverything
+            Note over DMS/StatusUpdater: wait 5 minutes
+            loop check staging status every 30 seconds
+                DMS/StatusUpdater->>PostgreSQL: status=Running/Failure
+                DMS/StatusUpdater->>UI: event FrontendPleaseUpdateEverything
+                UI->>DMS: get stagings info
+            end
+        end
+    end

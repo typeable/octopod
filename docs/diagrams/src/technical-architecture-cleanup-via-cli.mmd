@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant DMC
+    participant DMS
+    participant PostgreSQL
+    participant UI
+    participant DMS/BgWorker
+    participant DMS/StatusUpdater
+    participant AppWrappers
+    participant KubeAPI
+    DMC->>DMS: cleanup(name)
+    DMS->>DMS/BgWorker: cleanup
+    DMS->>DMC: done
+    DMS/BgWorker->>AppWrappers: cleanup
+    AppWrappers->>KubeAPI: cleanup staging resources using kubectl
+    KubeAPI->>AppWrappers: done
+    AppWrappers->>DMS/BgWorker: done
+    DMS->>PostgreSQL: delete config and logs
+    DMS/BgWorker->>UI: event FrontendPleaseUpdateEverything

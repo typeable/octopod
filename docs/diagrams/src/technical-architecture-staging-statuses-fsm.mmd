@@ -1,0 +1,16 @@
+stateDiagram-v2
+    [*] --> CreatePending: create
+    Running --> UpdatePending: update
+    Failure --> UpdatePending: update
+    Running --> DeletePending: delete
+    Failure --> DeletePending: delete
+    Archived --> CreatePending: restore
+    Archived --> [*]: cleanup
+    Running --> Failure: 30s passed and Kubedog said "nok"
+    Failure --> Running: 30s passed and Kubedog said "ok"
+    CreatePending --> Running: 5m passed and Kubedog said "ok"
+    CreatePending --> Failure: 5m passed and Kubedog said "nok"
+    UpdatePending --> Running: 5m passed and Kubedog said "ok"
+    UpdatePending --> Failure: 5m passed and Kubedog said "nok"
+    DeletePending --> Archived: 30s passed and Helm did not find the release
+    DeletePending --> DeletePending: 30s passed and Helm found the release
