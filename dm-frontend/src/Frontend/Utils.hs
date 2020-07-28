@@ -1,4 +1,12 @@
-module Page.Utils where
+{-|
+Module      : Frontend.Utils
+Description : Client utils and helpers.
+
+This module contains common types, functions and operators that are used by
+frontend modules.
+-}
+
+module Frontend.Utils where
 
 import Control.Lens
 import Control.Monad
@@ -17,28 +25,41 @@ import Reflex.Dom as R
 
 import Common.Types as CT
 
+-- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement =
   ClickedElement { unClickedElement :: Maybe DOM.Element }
 
+-- | Returns a click event bound to the current document.
+-- The event carries 'ClickedElement'.
 elementClick :: MonadWidget t m =>  m (Event t ClickedElement)
 elementClick = do
   doc <- currentDocumentUnchecked
   wrapDomEvent doc (`on` Events.click) $ ClickedElement <$> target
 
+-- | Dropdown widget which binds its own @document click@ event.
 dropdownWidget
   :: MonadWidget t m
   => m ()
+  -- ^ Button widget which opens the dropdown widget.
   -> m (Event t a)
+  -- ^ Widget with the dropdown list.
+  -- Returns an event carrying the user's selection.
   -> m (Event t a)
 dropdownWidget btn body = mdo
   clickedEl <- elementClick
   dropdownWidget' clickedEl btn body
 
+-- | Similar to 'dropdownWidget' but uses @document click@ event that may be
+-- shared between other widgets.
 dropdownWidget'
   :: MonadWidget t m
   => Event t ClickedElement
+  -- ^ Document click event that may be shared between other widgets.
   -> m ()
+  -- ^ Button widget which opens the dropdown widget.
   -> m (Event t a)
+  -- ^ Widget with the dropdown list.
+  -- Returns an event carrying the user's selection.
   -> m (Event t a)
 dropdownWidget' clickedEl btn body = mdo
   clickInsideEv <- performEvent $ ffor clickedEl $ \(ClickedElement clicked) ->
@@ -59,11 +80,15 @@ dropdownWidget' clickedEl btn body = mdo
 showT :: Show a => a -> Text
 showT = pack . show
 
+-- | Wrapper for a sidebar that provides opening and closing behavior.
 sidebar
   :: MonadWidget t m
   => Event t d
+  -- ^ Show event with data to be passed to sidebar.
   -> Event t ()
+  -- ^ Close event.
   -> (d -> m (Event t a, Event t ()))
+  -- ^ Sidebar body which returns data with first event and close event.
   -> m (Event t a)
 sidebar showEv closeEv m = mdo
   let
@@ -83,25 +108,31 @@ sidebar showEv closeEv m = mdo
       , blank' <$ deferDomClearEv ]
   pure $ switchDyn $ fst <$> resultEvDyn
 
+-- | Dark unclickable background for opened sidebar.
 popupOverlay :: DomBuilder t m => m ()
 popupOverlay =
   elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
 
-eventWriterWrapper :: (MonadWidget t m, Semigroup e) => (Event t e -> EventWriterT t e m ()) -> m (Event t e)
-eventWriterWrapper m = mdo
-  (_, ev) <- runEventWriterT (m ev)
-  pure ev
-
-buttonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
+-- | Button with customizable classes and label text.
+buttonClass
+  :: (DomBuilder t m, PostBuild t m)
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> m (Event t ())
 buttonClass cl lbl = do
   (bEl, _) <- elDynAttr' "button"
     (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
   return $ domEvent Click bEl
 
+-- | Advanced version of 'buttonClass' with dynamic arguments.
 buttonDynClass
   :: (DomBuilder t m, PostBuild t m)
   => Dynamic t Text
+  -- ^ Classes.
   -> Dynamic t Text
+  -- ^ Label text.
   -> m (Event t ())
 buttonDynClass clDyn lblDyn = do
   let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
@@ -109,9 +140,16 @@ buttonDynClass clDyn lblDyn = do
     dynText lblDyn
   return $ domEvent Click bEl
 
+-- | Advanced version of 'buttonClass' with a disabled state.
 buttonClassEnabled
   :: (DomBuilder t m, PostBuild t m)
-  => Text -> Text -> Dynamic t Bool -> m (Event t ())
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> Dynamic t Bool
+  -- ^ Enabled flag.
+  -> m (Event t ())
 buttonClassEnabled cl lbl dDyn = do
   let
     attrDyn = ffor dDyn $ \case
@@ -122,9 +160,19 @@ buttonClassEnabled cl lbl dDyn = do
     text lbl
   return $ domEvent Click bEl
 
+-- | Special version of 'buttonClassEnabled' that supports custom classes for
+-- the disabled state.
 buttonClassEnabled'
   :: (DomBuilder t m, PostBuild t m)
-  => Text -> Text -> Dynamic t Bool -> Text -> m (Event t ())
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> Dynamic t Bool
+  -- ^ Enabled flag.
+  -> Text
+  -- ^ Custom classes for disabled state.
+  -> m (Event t ())
 buttonClassEnabled' cl lbl dDyn disClass = do
   let
     attrDyn = ffor dDyn $ \case
@@ -135,16 +183,27 @@ buttonClassEnabled' cl lbl dDyn disClass = do
     text lbl
   return $ domEvent Click bEl
 
-aButtonClass :: (DomBuilder t m, PostBuild t m) => Text -> Text -> m (Event t ())
+-- | Version of 'buttonClass' for links that should look like buttons.
+aButtonClass
+  :: (DomBuilder t m, PostBuild t m)
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> m (Event t ())
 aButtonClass cl lbl = do
   (bEl, _) <- elDynAttr' "a"
     (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
   return $ domEvent Click bEl
 
+-- | Version of 'buttonDynClass' for links that should look like
+-- buttons.
 aButtonDynClass
   :: (DomBuilder t m, PostBuild t m)
   => Dynamic t Text
+  -- ^ Classes.
   -> Dynamic t Text
+  -- ^ Label text.
   -> m (Event t ())
 aButtonDynClass clDyn lblDyn = do
   let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
@@ -152,9 +211,17 @@ aButtonDynClass clDyn lblDyn = do
     dynText lblDyn
   return $ domEvent Click bEl
 
+-- | Version of 'buttonClassEnabled' for links that should look like
+-- buttons.
 aButtonClassEnabled
   :: (DomBuilder t m, PostBuild t m)
-  => Text -> Text -> Dynamic t Bool -> m (Event t ())
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> Dynamic t Bool
+  -- ^ Enabled flag.
+  -> m (Event t ())
 aButtonClassEnabled cl lbl dDyn = do
   let
     attrDyn = ffor dDyn $ \case
@@ -165,9 +232,13 @@ aButtonClassEnabled cl lbl dDyn = do
     text lbl
   return $ domEvent Click bEl
 
+-- | Converter from posix seconds to `UTCTime`.
 intToUTCTime :: Int -> UTCTime
 intToUTCTime = posixSecondsToUTCTime . realToFrac
 
+-- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
+--
+-- Like 'elDynAttr'' but configures "prevent default" on the given event.
 elDynAttrWithPreventDefaultEvent'
   :: forall a en m t. (DomBuilder t m, PostBuild t m)
   => EventName en              -- ^ Event on the element to configure with 'preventDefault'
@@ -179,6 +250,9 @@ elDynAttrWithPreventDefaultEvent' ev = elDynAttrWithModifyConfig'
   (\elCfg -> elCfg & elementConfig_eventSpec %~
     addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) ev (const preventDefault))
 
+-- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
+--
+-- Like 'elDynAttr'' but configures "stop propagation" on the given event.
 elDynAttrWithStopPropagationEvent'
   :: forall a en m t. (DomBuilder t m, PostBuild t m)
   => EventName en              -- ^ Event on the element to configure with 'preventDefault'
@@ -190,6 +264,11 @@ elDynAttrWithStopPropagationEvent' ev = elDynAttrWithModifyConfig'
   (\elCfg -> elCfg & elementConfig_eventSpec %~
     addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) ev (const stopPropagation))
 
+-- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
+--
+-- Like 'elDynAttr'' but allows you to modify the element configuration.
+--
+-- Special thanks to @luigy: <https://gist.github.com/luigy/b49ce04de8462e594c9c2b5b455ae5a5#file-foo-hs>
 elDynAttrWithModifyConfig'
   :: (DomBuilder t m, PostBuild t m)
   => (ElementConfig EventResult t (DomBuilderSpace m) -> ElementConfig EventResult t (DomBuilderSpace m))
@@ -205,28 +284,19 @@ elDynAttrWithModifyConfig' f elementTag attrs child = do
   notReadyUntil postBuild
   pure result
 
+-- | Formats posix seconds to date in iso8601.
 formatPosixToDate :: Int -> Text
 formatPosixToDate = pack
   . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
   . intToUTCTime
 
+-- | Formats posix seconds to date in iso8601 with time.
 formatPosixToDateTime :: Int -> Text
 formatPosixToDateTime = pack
   . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
   . intToUTCTime
 
-currentStatusWidget
-  :: MonadWidget t m
-  => Dynamic t (Maybe CurrentDeploymentStatus)
-  -> m ()
-currentStatusWidget stDyn = do
-  stDyn' <- holdUniqDyn stDyn
-  dyn_ $ stDyn' <&> \case
-    Nothing -> divClass "loading loading--status-alike" $ text "Loading"
-    Just (CurrentDeploymentStatus st) -> case st of
-      CT.Ok -> divClass "status status--success" $ text "Success"
-      CT.Error -> divClass "status status--failure" $ text "Failure"
-
+-- | Widget displaying the current deployment status.
 statusWidget :: MonadWidget t m => Dynamic t DeploymentStatus -> m ()
 statusWidget stDyn = do
   stDyn' <- holdUniqDyn stDyn
@@ -239,13 +309,19 @@ statusWidget stDyn = do
     UpdatePending -> pendingWidget $ text "Updating..."
     DeletePending -> pendingWidget $ text "Deleting..."
 
+-- | Text input field with label.
 dmTextInput
   :: MonadWidget t m
   => Text
+  -- ^ Input field classes.
   -> Text
+  -- ^ Label text.
   -> Text
+  -- ^ Placeholder for input field.
   -> Maybe Text
+  -- ^ Initial value.
   -> Event t Text
+  -- ^ Event carrying error message.
   -> m (Dynamic t Text, Dynamic t Bool)
 dmTextInput clss lbl placeholder val errEv =
   elClass "section" "staging__section" $ do
@@ -253,12 +329,18 @@ dmTextInput clss lbl placeholder val errEv =
     elClass "div" "staging__widget" $
       dmTextInput' clss placeholder val errEv
 
+-- | The only text input field that is used in project forms. This input
+-- provides automatic error message hiding after user starts typing.
 dmTextInput'
   :: MonadWidget t m
   => Text
+  -- ^ Input field classes.
   -> Text
+  -- ^ Placeholder for input field.
   -> Maybe Text
+  -- ^ Possible init value.
   -> Event t Text
+  -- ^ Event carrying the error message.
   -> m (Dynamic t Text, Dynamic t Bool)
 dmTextInput' clss placeholder val errEv = mdo
   let
@@ -283,12 +365,13 @@ dmTextInput' clss placeholder val errEv = mdo
     pure $ value inp
   pure (valDyn, isValid)
 
-
+-- | Widget with a loading spinner.
 loadingCommonWidget :: MonadWidget t m => m ()
 loadingCommonWidget =
   divClass "loading loading--enlarged loading--alternate" $
     text "Loading..."
 
+-- | Widget with an error message.
 errorCommonWidget :: MonadWidget t m => m ()
 errorCommonWidget =
   divClass "null null--data" $
@@ -296,7 +379,12 @@ errorCommonWidget =
       elClass "b" "null__heading" $ text "Cannot retrieve the data"
       divClass "null__message" $ text "Try to reload the page"
 
-overridesWidget :: MonadWidget t m => Overrides -> m ()
+-- | Widget that can show and hide overrides if there are more than 3. This
+-- widget is used in the stagings table and the staging action table.
+overridesWidget
+  :: MonadWidget t m
+  => Overrides -- ^ List of overrides.
+  -> m ()
 overridesWidget envs = divClass "listing listing--for-text" $ do
   let
     visible = take 3 envs
@@ -323,18 +411,32 @@ overridesWidget envs = divClass "listing listing--for-text" $ do
           el "b" $ text $ var <> ": "
           text val
 
-ifThenElseDyn :: Reflex t => Dynamic t Bool -> b -> b -> Dynamic t b
+-- | @if-then-else@ helper for cases when bool value is wrapped in 'Dynamic'.
+ifThenElseDyn
+  :: Reflex t
+  => Dynamic t Bool
+  -- ^ Condition wrapped in `Dynamic`.
+  -> b
+  -- ^ `then` branch.
+  -> b
+  -- ^ `else` branch.
+  -> Dynamic t b
 ifThenElseDyn bDyn t f = bDyn <&> \case
   True -> t
   False -> f
 
+-- | Type of notification at the top of pages.
 data DeploymentPageNotification
-  = DPMOk Text
-  | DPMError Text
-  | DPMClear
+  = DPMOk Text    -- ^ Message text for a \"success\" events.
+  | DPMError Text -- ^ Message text for an \"error\" events.
+  | DPMClear      -- ^ Clear notification widget.
 
+-- | Notification widget that can show success and failure messages.
 pageNotification
-  :: MonadWidget t m => Event t DeploymentPageNotification -> m ()
+  :: MonadWidget t m
+  => Event t DeploymentPageNotification
+  -- ^ Event carrying notifications.
+  -> m ()
 pageNotification notEv = mdo
   let
     messageWidget (DPMOk txt) = messageClassWidget txt "notification--success"
