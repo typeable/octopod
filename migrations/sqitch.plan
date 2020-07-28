@@ -8,3 +8,4 @@ archived_flag 2020-06-09T20:30:45Z Andrei Orlov <aaorlov1@gmail.com> # Add archi
 add_duration_and_stdout_and_stderr_to_deployment_logs 2020-06-26T09:30:35Z Andrei Orlov <aaorlov1@gmail.com> # Add 'duration', 'stdout' and 'stderr' fields to 'deployment_logs' table
 status_and_status_updated_at 2020-07-06T08:08:10Z Andrei Orlov <aaorlov1@gmail.com> # Add status, status_updated_at, checked_at to 'deployments' table
 add_deployment_overrides_and_deployment_log_overrides 2020-07-17T08:53:17Z Andrei Orlov <aaorlov1@gmail.com> # Add 'deployment_overrides' and 'deployment_log_overrides' tables
+add_archived_status 2020-07-28T11:40:30Z Andrei Orlov <aaorlov1@gmail.com> # Add 'Archived' to statuses
