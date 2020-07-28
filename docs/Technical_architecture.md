@@ -1,5 +1,37 @@
 # Technical architecture
 
+<details>
+  <summary>Table of contents</summary>
+
+- [Used tools](#used-tools)
+- [App architecture](#app-architecture)
+  - [UI](#ui)
+  - [DMS](#dms)
+  - [PostgreSQL](#postgresql)
+  - [DMC](#dmc)
+  - [Контейнер с утилитами (app wrappers)](#контейнер-с-утилитами-app-wrappers)
+  - [CronJob для удаления заархивированных стейджинов](#cronjob-для-удаления-заархивированных-стейджинов)
+  - [Kube API Server](#kube-api-server)
+- [DM Distribution model](#dm-distribution-model)
+- [App distribution model. **TODO: Deployment guide link.**](#app-distribution-model-todo-deployment-guide-link)
+- [Primary processes](#primary-processes)
+- [Synchronous and Asynchronous process diagrams](#synchronous-and-asynchronous-process-diagrams)
+  - [Create via CLI](#create-via-cli)
+  - [Create via UI](#create-via-ui)
+  - [Update via CLI](#update-via-cli)
+  - [Update via UI](#update-via-ui)
+  - [Delete via CLI](#delete-via-cli)
+  - [Delete via UI](#delete-via-ui)
+  - [Ceanup via CLI](#ceanup-via-cli)
+  - [Ceanup via UI](#ceanup-via-ui)
+  - [Restore via CLI](#restore-via-cli)
+  - [Restore via UI](#restore-via-ui)
+- [How we use it](#how-we-use-it)
+- [**TODO: Security model link**](#todo-security-model-link)
+- [Per staging statuses and status changes](#per-staging-statuses-and-status-changes)
+
+</details>
+
 ## Used tools
 
 _DM_ сам разворачивается в [_Kubernetes_](kube), а также разворачивает новые stagings в [_Kubernetes_](kube).
