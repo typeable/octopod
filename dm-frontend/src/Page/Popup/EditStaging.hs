@@ -150,8 +150,8 @@ envVarsInput overridesHeader evs = do
           "dash--disabled"
         pure $ elems <$> envsDyn
 
--- | Widget for entering a key-value pair. It returns an event carrying an update
--- of overrides list via 'EventWriter'.
+-- | Widget for entering a key-value pair. The updated overrides list is
+-- written to the 'EventWriter'.
 envVarInput
   :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
   => Int                -- ^ Index of variable in overrides list.
