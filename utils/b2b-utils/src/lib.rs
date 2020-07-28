@@ -389,6 +389,20 @@ pub fn delete_cert_atrs(namespace: &str, name: &str) -> Vec<String> {
     .collect::<Vec<_>>()
 }
 
+pub fn helm_app_release_status_atrs(name: &str) -> Vec<String> {
+    vec!["status", &release_name(APP_CHART_NAME, name)]
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+}
+
+pub fn helm_infra_release_status_atrs(name: &str) -> Vec<String> {
+    vec!["status", &release_name(INFRA_CHART_NAME, name)]
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+}
+
 pub fn check_list(namespace: &str, name: &str) -> String {
     json!({
         "Deployments": names_to_check_list(deployment_names(name), namespace),
