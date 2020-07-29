@@ -308,7 +308,7 @@ statusWidget stDyn = do
     CreatePending -> pendingWidget $ text "Creating..."
     UpdatePending -> pendingWidget $ text "Updating..."
     DeletePending -> pendingWidget $ text "Deleting..."
-    Archived -> divClass "status status--success" $ text "Archived"
+    Archived -> divClass "status status--archived" $ text "Archived"
 
 -- | Text input field with label.
 dmTextInput
