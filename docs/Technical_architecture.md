@@ -21,18 +21,22 @@
   - [archive_check](#archive_check)
 - [DM Distribution model](#dm-distribution-model)
 - [App distribution model. **TODO: Deployment guide link.**](#app-distribution-model-todo-deployment-guide-link)
-- [Primary processes](#primary-processes)
-- [Synchronous and Asynchronous process diagrams](#synchronous-and-asynchronous-process-diagrams)
-  - [Create via CLI](#create-via-cli)
-  - [Create via UI](#create-via-ui)
-  - [Update via CLI](#update-via-cli)
-  - [Update via UI](#update-via-ui)
-  - [Delete via CLI](#delete-via-cli)
-  - [Delete via UI](#delete-via-ui)
-  - [Ceanup via CLI](#ceanup-via-cli)
-  - [Ceanup via UI](#ceanup-via-ui)
-  - [Restore via CLI](#restore-via-cli)
-  - [Restore via UI](#restore-via-ui)
+- [Process view](#process-view)
+  - [Create](#create-1)
+    - [Create via CLI](#create-via-cli)
+    - [Create via UI](#create-via-ui)
+  - [Update](#update-1)
+    - [Update via CLI](#update-via-cli)
+    - [Update via UI](#update-via-ui)
+  - [Delete](#delete-1)
+    - [Delete via CLI](#delete-via-cli)
+    - [Delete via UI](#delete-via-ui)
+  - [Cleanup](#cleanup-1)
+    - [Ceanup via CLI](#ceanup-via-cli)
+    - [Ceanup via UI](#ceanup-via-ui)
+  - [Restore](#restore)
+    - [Restore via CLI](#restore-via-cli)
+    - [Restore via UI](#restore-via-ui)
 - [How we use it](#how-we-use-it)
 - [**TODO: Security model link**](#todo-security-model-link)
 - [Per staging statuses and status changes](#per-staging-statuses-and-status-changes)
@@ -179,53 +183,64 @@ Docker образ [_контейнера с утилитами (app wrappers)_](
 
 ## App distribution model. **TODO: Deployment guide link.**
 
-## Primary processes
+## Process view
 
-Команды управления стейджингами:
-* _create_ – создание нового стейджинга.
+### Create
+
+_create_ – создание нового стейджинга.
   В качестве аргументов принимаются `name`, `tag` и опциональные `overrides` (уровня App или Staging, открытие или секретные).
-* _update_ – обновление существующего стейджинга.
+
+#### Create via CLI
+![Create](diagrams/images/technical-architecture-create-via-cli.png)
+
+#### Create via UI
+![Create](diagrams/images/technical-architecture-create-via-ui.png)
+
+### Update
+
+_update_ – обновление существующего стейджинга.
   В качестве аргументов принимаются `name`, `tag` и опциональные `overrides` (уровня App или Staging, открытие или секретные).
-* _delete_ – архивирование существующего стейджига.
+
+#### Update via CLI
+![Update](diagrams/images/technical-architecture-update-via-cli.png)
+
+#### Update via UI
+![Update](diagrams/images/technical-architecture-update-via-ui.png)
+
+### Delete
+
+_delete_ – архивирование существующего стейджига.
   Производится удаление только подов, Persistent Volumes (диски) сохраняются. Отменить действие этой команды можно с помощью команды restore.
   В качестве аргументов принимаются `name`.
-* _cleanup_ – полная очистка стейджинга.
+
+#### Delete via CLI
+![Delete](diagrams/images/technical-architecture-delete-via-cli.png)
+
+#### Delete via UI
+![Delete](diagrams/images/technical-architecture-delete-via-ui.png)
+
+### Cleanup
+
+_cleanup_ – полная очистка стейджинга.
   Удаление сертификатов, Persistent Volume Claim и Persistent Volumes.
   В качестве аргументов принимаются `name`.
-* _restore_ – восстановление заархивированного стейджинга.
+
+#### Ceanup via CLI
+![Cleanup](diagrams/images/technical-architecture-cleanup-via-cli.png)
+
+#### Ceanup via UI
+![Cleanup](diagrams/images/technical-architecture-cleanup-via-ui.png)
+
+### Restore
+
+_restore_ – восстановление заархивированного стейджинга.
   Восстановление заархивированного стейджинга с последними настройками.
   В качестве аргументов принимаются `name`.
 
-## Synchronous and Asynchronous process diagrams
-
-### Create via CLI
-![Create](diagrams/images/technical-architecture-create-via-cli.png)
-
-### Create via UI
-![Create](diagrams/images/technical-architecture-create-via-ui.png)
-
-### Update via CLI
-![Update](diagrams/images/technical-architecture-update-via-cli.png)
-
-### Update via UI
-![Update](diagrams/images/technical-architecture-update-via-ui.png)
-
-### Delete via CLI
-![Delete](diagrams/images/technical-architecture-delete-via-cli.png)
-
-### Delete via UI
-![Delete](diagrams/images/technical-architecture-delete-via-ui.png)
-
-### Ceanup via CLI
-![Cleanup](diagrams/images/technical-architecture-cleanup-via-cli.png)
-
-### Ceanup via UI
-![Cleanup](diagrams/images/technical-architecture-cleanup-via-ui.png)
-
-### Restore via CLI
+#### Restore via CLI
 ![Restore](diagrams/images/technical-architecture-restore-via-cli.png)
 
-### Restore via UI
+#### Restore via UI
 ![Restore](diagrams/images/technical-architecture-restore-via-ui.png)
 
 ## How we use it
