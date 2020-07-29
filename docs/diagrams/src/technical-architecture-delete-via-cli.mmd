@@ -8,26 +8,30 @@ sequenceDiagram
     participant AppWrappers
     participant KubeAPI
     DMC->>DMS: delete(name)
-    DMS->>PostgreSQL: store config, status=DeletePending
+    DMS->>PostgreSQL: status=DeletePending
     alt name not found
-        PostgreSQL->>DMS: error: name not found
-        DMS->>DMC: error: name not found
+        PostgreSQL-->>DMS: error: name not found
+        DMS-->>DMC: error: name not found
     else
-        PostgreSQL->>DMS: ok
-        DMS->>UI: event FrontendPleaseUpdateEverything
+        PostgreSQL-->>DMS: ok
+        DMS-xUI: event FrontendPleaseUpdateEverything
         UI->>DMS: get stagings info
+        DMS-->>UI: stagings info
         DMS->>DMS/BgWorker: delete
-        DMS->>DMC: done
+        DMS-->>DMC: done
         DMS/BgWorker->>AppWrappers: delete
-        AppWrappers->>KubeAPI: delete staging using helm
-        KubeAPI->>AppWrappers: done
-        AppWrappers->>DMS/BgWorker: done
+        AppWrappers->>KubeAPI: delete staging
+        KubeAPI-->>AppWrappers: done
+        AppWrappers-->>DMS/BgWorker: done
         DMS/BgWorker->>PostgreSQL: write logs
-        DMS/BgWorker->>UI: event FrontendPleaseUpdateEverything
+        DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
+        UI->>DMS: get stagings info
+        DMS-->>UI: stagings info
         Note over DMS/StatusUpdater: wait 5 minutes
         loop check staging status every 30 seconds
             DMS/StatusUpdater->>PostgreSQL: status=Archived/DeletePending
-            DMS/StatusUpdater->>UI: event FrontendPleaseUpdateEverything
+            DMS/StatusUpdater-xUI: event FrontendPleaseUpdateEverything
             UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
         end
     end

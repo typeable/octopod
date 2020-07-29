@@ -11,27 +11,31 @@ sequenceDiagram
     DMS->>PostgreSQL: store config, status=CreatePending
     alt name already exists
         PostgreSQL->>DMS: error: staging already exists
-        DMS->>DMC: error: staging already exists
+        DMS-->>DMC: error: staging already exists
     else
         alt tag not found
-            DMS->>DMC: error: tag not found
+            DMS-->>DMC: error: tag not found
         else
-            PostgreSQL->>DMS: ok
-            DMS->>UI: event FrontendPleaseUpdateEverything
+            PostgreSQL-->>DMS: ok
+            DMS-xUI: event FrontendPleaseUpdateEverything
             UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
             DMS->>DMS/BgWorker: create
-            DMS->>DMC: done
+            DMS-->>DMC: done
             DMS/BgWorker->>AppWrappers: create
-            AppWrappers->>KubeAPI: create staging using helm
-            KubeAPI->>AppWrappers: done
-            AppWrappers->>DMS/BgWorker: done
+            AppWrappers->>KubeAPI: create staging
+            KubeAPI-->>AppWrappers: done
+            AppWrappers-->>DMS/BgWorker: done
             DMS/BgWorker->>PostgreSQL: write logs
-            DMS/BgWorker->>UI: event FrontendPleaseUpdateEverything
+            DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
+            UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
             Note over DMS/StatusUpdater: wait 5 minutes
             loop check staging status every 30 seconds
                 DMS/StatusUpdater->>PostgreSQL: status=Running/Failure
-                DMS/StatusUpdater->>UI: event FrontendPleaseUpdateEverything
+                DMS/StatusUpdater-xUI: event FrontendPleaseUpdateEverything
                 UI->>DMS: get stagings info
+                DMS-->>UI: stagings info
             end
         end
     end

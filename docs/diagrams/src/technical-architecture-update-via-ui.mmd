@@ -9,28 +9,32 @@ sequenceDiagram
     UI->>DMS: create(name, tag, [override])
     DMS->>PostgreSQL: store config, status=UpdatePending
     alt name not found
-        PostgreSQL->>DMS: error: name not found
-        DMS->>UI: error: name not found
+        PostgreSQL-->>DMS: error: name not found
+        DMS-->>UI: error: name not found
     else
         alt tag not found
-            DMS->>UI: error: tag not found
+            DMS-->>UI: error: tag not found
         else
-            PostgreSQL->>DMS: ok
-            DMS->>UI: event FrontendPleaseUpdateEverything
+            PostgreSQL-->>DMS: ok
+            DMS-xUI: event FrontendPleaseUpdateEverything
             UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
             DMS->>DMS/BgWorker: update
-            DMS->>UI: done
+            DMS-->>UI: done
             DMS/BgWorker->>AppWrappers: update
-            AppWrappers->>KubeAPI: upgrade staging using helm
-            KubeAPI->>AppWrappers: done
-            AppWrappers->>DMS/BgWorker: done
+            AppWrappers->>KubeAPI: upgrade staging
+            KubeAPI-->>AppWrappers: done
+            AppWrappers-->>DMS/BgWorker: done
             DMS/BgWorker->>PostgreSQL: write logs
-            DMS/BgWorker->>UI: event FrontendPleaseUpdateEverything
+            DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
+            UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
             Note over DMS/StatusUpdater: wait 5 minutes
             loop check staging status every 30 seconds
                 DMS/StatusUpdater->>PostgreSQL: status=Running/Failure
-                DMS/StatusUpdater->>UI: event FrontendPleaseUpdateEverything
+                DMS/StatusUpdater-xUI: event FrontendPleaseUpdateEverything
                 UI->>DMS: get stagings info
+                DMS-->>UI: stagings info
             end
         end
     end
