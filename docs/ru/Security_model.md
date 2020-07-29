@@ -4,12 +4,12 @@
   <summary>Table of contents</summary>
 
 - [DM roles](#dm-roles)
-- [K8S RBAC](#k8s-rbac)
+- [Kubernetes role-based access control](#kubernetes-role-based-access-control)
   - [Права на удаление сертификатов](#права-на-удаление-сертификатов)
   - [Права на удаление Persistent Volumes Claims](#права-на-удаление-persistent-volumes-claims)
-- [Users auth example with OAuth. **TODO: link to DM chart**](#user-auth-example-with-oauth)
-- [CLI client Auth. **TODO: поправить с учетом способа поставки DMC**](#cli-client-auth)
-- [UI Auth. **TODO: link to DM chart**](#ui-auth)
+- [Users auth example with OAuth. **TODO: link to DM chart**](#users-auth-example-with-oauth-todo-link-to-dm-chart)
+- [CLI client Auth. **TODO: поправить с учетом способа поставки DMC**](#cli-client-auth-todo-поправить-с-учетом-способа-поставки-dmc)
+- [UI Auth. **TODO: link to DM chart**](#ui-auth-todo-link-to-dm-chart)
 
 </details>
 
@@ -21,14 +21,14 @@
 
 | role | управление стеджингами (включая обновление секретных override) | просмотр секретных override | просмотр логов деплоя |
 | :---: | :---: | :---: | :---: |
-| user | + | - | - |
-| admin | + | + | + |
+| user | ✅ | ❌ | ❌ |
+| admin | ✅ | ✅ | ✅ |
 
 Пользователи _UI_ работают с правами _user_.
 
 Пользователи _DMC_ работают с правами _admin_.
 
-## K8S RBAC
+## Kubernetes role-based access control
 
 _DMS_ разворачивается в `dm` namespace. _DMS_ разворачивает стейджинги в `staging` namespace.
 _DMS_ использует `dm` [_Serivce Account_][kubernetes-service-account].
