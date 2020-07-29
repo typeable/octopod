@@ -4,7 +4,7 @@ sequenceDiagram
     participant PostgreSQL
     participant DMS/BgWorker
     participant DMS/StatusUpdater
-    participant AppWrappers
+    participant StagingControlScripts
     participant KubeAPI
     UI->>DMS: delete(name)
     DMS->>PostgreSQL: status=DeletePending
@@ -18,10 +18,10 @@ sequenceDiagram
         DMS-->>UI: stagings info
         DMS->>DMS/BgWorker: delete
         DMS-->>UI: done
-        DMS/BgWorker->>AppWrappers: delete
-        AppWrappers->>KubeAPI: delete staging
-        KubeAPI-->>AppWrappers: done
-        AppWrappers-->>DMS/BgWorker: done
+        DMS/BgWorker->>StagingControlScripts: delete
+        StagingControlScripts->>KubeAPI: delete staging
+        KubeAPI-->>StagingControlScripts: done
+        StagingControlScripts-->>DMS/BgWorker: done
         DMS/BgWorker->>PostgreSQL: write logs
         DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
         UI->>DMS: get stagings info

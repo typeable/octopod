@@ -5,7 +5,7 @@ sequenceDiagram
     participant UI
     participant DMS/BgWorker
     participant DMS/StatusUpdater
-    participant AppWrappers
+    participant StagingControlScripts
     participant KubeAPI
     DMC->>DMS: restore(name)
     DMS->>PostgreSQL: status=CreatePending
@@ -22,10 +22,10 @@ sequenceDiagram
             DMS-->>UI: stagings info
             DMS->>DMS/BgWorker: create
             DMS-->>DMC: done
-            DMS/BgWorker->>AppWrappers: create
-            AppWrappers->>KubeAPI: restore staging
-            KubeAPI-->>AppWrappers: done
-            AppWrappers-->>DMS/BgWorker: done
+            DMS/BgWorker->>StagingControlScripts: create
+            StagingControlScripts->>KubeAPI: restore staging
+            KubeAPI-->>StagingControlScripts: done
+            StagingControlScripts-->>DMS/BgWorker: done
             DMS/BgWorker->>PostgreSQL: write logs
             DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
             UI->>DMS: get stagings info

@@ -4,15 +4,15 @@ sequenceDiagram
     participant PostgreSQL
     participant DMS/BgWorker
     participant DMS/StatusUpdater
-    participant AppWrappers
+    participant StagingControlScripts
     participant KubeAPI
     UI->>DMS: cleanup(name)
     DMS->>DMS/BgWorker: cleanup
     DMS-->>UI: done
-    DMS/BgWorker->>AppWrappers: cleanup
-    AppWrappers->>KubeAPI: cleanup staging resources
-    KubeAPI-->>AppWrappers: done
-    AppWrappers-->>DMS/BgWorker: done
+    DMS/BgWorker->>StagingControlScripts: cleanup
+    StagingControlScripts->>KubeAPI: cleanup staging resources
+    KubeAPI-->>StagingControlScripts: done
+    StagingControlScripts-->>DMS/BgWorker: done
     DMS->>PostgreSQL: delete config and logs
     DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
     UI->>DMS: get stagings info
