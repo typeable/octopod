@@ -33,3 +33,7 @@ path = "src/bin/check.rs"
 [[bin]]
 name = "cleanup"
 path = "src/bin/cleanup.rs"
+
+[[bin]]
+name = "archive_check"
+path = "src/bin/archive_check.rs"

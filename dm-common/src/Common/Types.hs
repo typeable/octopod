@@ -78,6 +78,7 @@ data DeploymentStatus
   | CreatePending
   | UpdatePending
   | DeletePending
+  | Archived
   deriving (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 

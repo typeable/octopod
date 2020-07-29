@@ -69,7 +69,8 @@ data AppState = AppState
   , updateCommand                 :: Command
   , deletionCommand               :: Command
   , checkingCommand               :: Command
-  , cleanupCommand                :: Command }
+  , cleanupCommand                :: Command
+  , archiveCheckingCommand        :: Command }
 
 data DeploymentException
   = DeploymentFailed Int
@@ -112,6 +113,7 @@ runDMS = do
   deletionCmd <- coerce . pack <$> getEnvOrDie "DELETION_COMMAND"
   checkingCmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
   cleanupCmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
+  archiveCheckingCmd <- coerce . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
   pgPool <- initConnectionPool
     (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   channel <- liftIO . atomically $ newBroadcastTChan
@@ -133,6 +135,7 @@ runDMS = do
         deletionCmd
         checkingCmd
         cleanupCmd
+        archiveCheckingCmd
     app'         = app appSt
     powerApp'    = powerApp appSt
     wsApp'       = wsApp channel
@@ -753,7 +756,8 @@ restoreH dName = do
     (ec, out, err) <- createDeployment dep st
     let
       q =
-        "UPDATE deployments SET archived = 'f', archived_at = null \
+        "UPDATE deployments \
+        \SET archived = 'f', archived_at = null, status = 'CreatePending' \
         \WHERE name = ?"
     void $ withResource pgPool $ \conn -> execute conn q (Only dName)
     sendReloadEvent st
@@ -881,21 +885,22 @@ elapsedTime t1 t2 =
 runStatusUpdater :: AppState -> IO ()
 runStatusUpdater state = do
   let
-    pgPool          = pool state
-    checkingCmd     = checkingCommand state
-    ns              = namespace state
-    interval        = 30 :: Int
-    selectDeps      =
+    pgPool             = pool state
+    archiveCheckingCmd = archiveCheckingCommand state
+    checkingCmd        = checkingCommand state
+    ns                 = namespace state
+    interval           = 30 :: Int
+    selectDeps         =
       "SELECT name, status::text, \
       \extract(epoch from now())::int - \
         \extract(epoch from status_updated_at)::int \
       \FROM deployments \
-      \WHERE checked_at < now() - interval '?' second"
-    updateStatus    =
+      \WHERE checked_at < now() - interval '?' second AND status != 'Archived'"
+    updateStatus       =
       "UPDATE deployments \
       \SET status = ?, status_updated_at = now(), checked_at = now() \
       \WHERE name = ?"
-    updateCheckedAt =
+    updateCheckedAt    =
       "UPDATE deployments SET checked_at = now() WHERE name = ?"
 
   forever $ do
@@ -906,11 +911,12 @@ runStatusUpdater state = do
         (\(n, s, t) -> (n, read . unpack $ s, coerce t)) <$> rows
     checkResult <- for checkList $ \(dName, dStatus, ts) -> do
       let
-        args =
+        args              =
           [ "--namespace", unpack . coerce $ ns
           , "--name", unpack . coerce $ dName ]
-        cmd  = unpack . coerce $ checkingCmd
-      ec <- runCommandWithoutPipes cmd args
+        cmd DeletePending = unpack . coerce $ archiveCheckingCmd
+        cmd _             = unpack . coerce $ checkingCmd
+      ec <- runCommandWithoutPipes (cmd dStatus) args
       pure (dName, newStatus ec dStatus ts, ts)
     void $
       for (zip checkList checkResult) $ \((dName, oldSt, _), (_, newSt, _)) ->
@@ -927,11 +933,12 @@ updatePeriod :: Timestamp
 updatePeriod = Timestamp 600
 
 newStatus :: ExitCode -> DeploymentStatus -> Timestamp -> DeploymentStatus
+newStatus ExitSuccess     DeletePending _                      = Archived
 newStatus ExitSuccess     _             _                      = Running
 newStatus (ExitFailure _) Running       _                      = Failure
 newStatus (ExitFailure _) CreatePending ts | ts > updatePeriod = Failure
 newStatus (ExitFailure _) UpdatePending ts | ts > updatePeriod = Failure
-newStatus (ExitFailure _) DeletePending _                      = Failure
+newStatus (ExitFailure _) DeletePending _                      = DeletePending
 newStatus (ExitFailure _) oldStatus     _                      = oldStatus
 
 failIfGracefulShudownActivated :: AppM ()
