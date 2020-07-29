@@ -1,10 +1,17 @@
+{-|
+Module      : Page.Deployment
+Description : Staging page.
+
+This module contains the definition of a staging page.
+-}
+
 module Page.Deployment (deploymentPage) where
 
 import Control.Lens
 import Control.Monad
 import Data.Coerce
 import Data.Generics.Product (field)
-import Data.Text as T (Text, pack)
+import Data.Text as T (Text)
 import Obelisk.Route.Frontend
 import Reflex.Dom as R
 import Servant.Reflex
@@ -13,19 +20,22 @@ import Common.Types as CT
 import Common.Utils
 import Frontend.API
 import Frontend.Route
+import Frontend.Utils
 import Page.ClassicPopup
 import Page.Popup.EditStaging
-import Page.Utils
 
-
+-- | The root widget of a staging page. It requests the staging data. If the
+-- request fails it shows an error, otherwise it calls 'deploymentWidget', passing
+-- the received data.
 deploymentPage
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
     , Prerender js t m )
-  => Event t ()
-  -> DeploymentName -> m ()
+  => Event t ()     -- ^ Event notifying about the need to update data.
+  -> DeploymentName -- ^ Name of current deployment.
+  -> m ()
 deploymentPage updAllEv dname = do
   pb <- getPostBuild
   respEv <- fullInfoEndpoint (constDyn $ Right dname) pb
@@ -34,15 +44,17 @@ deploymentPage updAllEv dname = do
     [ errorWidget dname <$ errEv
     , deploymentWidget updAllEv <$> okEv ]
 
-
+-- | Staging page widget that takes the initial staging data. It updates this data
+-- every time when the passed event fires. If an update fails, a notification
+-- widget appears at the top of the page.
 deploymentWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
     , Prerender js t m)
-  => Event t ()
-  -> DeploymentFullInfo
+  => Event t ()         -- ^ Event notifying about the need to update data.
+  -> DeploymentFullInfo -- ^ Initial staging data.
   -> m ()
 deploymentWidget updEv dfi = mdo
   editEv <- pageWrapper $ mdo
@@ -60,11 +72,20 @@ deploymentWidget updEv dfi = mdo
   sentEv <- editStagingPopup editEv never
   blank
 
+-- | The header of a staging page. It contains the stating name and control
+-- buttons that depend on the status of the staging:
+--  * \"Archived\" status: a \"restore\" button.
+--  * \"Running\" status: \"archive staging\" and \"edit staging\" buttons.
+-- If the status is pending (\"Creating\", \"Updating\", etc) then all buttons
+-- are inactive.
 deploymentHead
   :: MonadWidget t m
   => Dynamic t DeploymentFullInfo
+  -- ^ Staging data.
   -> Event t Bool
+  -- ^ Event with a flag showing the current state of the request.
   -> m (Event t DeploymentFullInfo)
+  -- ^ \"Edit\" event.
 deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
@@ -100,13 +121,17 @@ deploymentHead dfiDyn sentEv =
         pure $ R.tag (current dfiDyn) editEv
     switchHold never editEvEv
 
+-- | Div wrappers.
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a
 deploymentBodyWrapper m = divClass "page__body" $ divClass "staging" $ m
 
+-- | Body of a staging page.
 deploymentBody
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentFullInfo
+  -- ^ Staging data.
   -> m ()
 deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   let nameDyn = dfiDyn <^.> dfiName
@@ -158,7 +183,12 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
       divClass "table table--actions" $
         actionsTable updEv nameDyn
 
-allEnvsWidget :: MonadWidget t m => Text -> Dynamic t Overrides -> m ()
+-- | Widget that shows overrides list. It does not depend on their type.
+allEnvsWidget
+  :: MonadWidget t m
+  => Text                -- ^ Widget header.
+  -> Dynamic t Overrides -- ^ Overrides list.
+  -> m ()
 allEnvsWidget headerText envsDyn = do
   elClass "h3" "staging__sub-heading" $ text headerText
   divClass "staging__widget" $
@@ -173,9 +203,14 @@ allEnvsWidget headerText envsDyn = do
             text ": "
           dynText valDyn
 
+-- ^ Widget with a table of actions that can be performed on a staging. It
+-- requests staging data.
+-- If a request fails it shows an error message, otherwise it calls 'actionsTableData',
+-- passing the received data.
 actionsTable
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentName
   -> m ()
 actionsTable updEv nameDyn = do
@@ -190,6 +225,7 @@ actionsTable updEv nameDyn = do
       [ actionsTableError <$ errEv
       , actionsTableData updEv nameDyn <$> okEv ]
 
+-- | Header of the actions table.
 actionsTableHead :: MonadWidget t m => m ()
 actionsTableHead =
   el "thead" $
@@ -202,7 +238,7 @@ actionsTableHead =
       el "th" $ text "Created"
       el "th" $ text "Deployment duration"
 
-
+-- | Widget with a loading spinner for the actions table.
 actionsTableLoading :: MonadWidget t m => m ()
 actionsTableLoading = do
   el "tbody" $
@@ -211,6 +247,7 @@ actionsTableLoading = do
         divClass "loading loading--enlarged loading--alternate" $
           text "Loading..."
 
+-- | Widget with an error message for the actions table.
 actionsTableError:: MonadWidget t m => m ()
 actionsTableError = do
   el "tbody" $
@@ -220,11 +257,14 @@ actionsTableError = do
           elClass "b" "null__heading" $ text "Cannot retrieve the data"
           divClass "null__message" $ text "Try to reload the page"
 
+-- | Actions table body. It updates data every time when the supplied event fires.
 actionsTableData
   :: MonadWidget t m
   => Event t ()
+  -- ^ Event notifying about the need to update data.
   -> Dynamic t DeploymentName
   -> [DeploymentLog]
+  -- ^ Initial logs.
   -> m ()
 actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
@@ -235,6 +275,7 @@ actionsTableData updEv nameDyn initLogs = do
     void $ simpleList logsDyn $ \logDyn -> do
       dyn_ $ actinRow <$> logDyn
 
+-- | Data row of the actions table.
 actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog{..} = do
   el "tr" $ do
@@ -250,12 +291,16 @@ actinRow DeploymentLog{..} = do
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
-formatDuration :: Duration -> Text
+-- | Convert the duration of an action from milliseconds to a human readable format.
+formatDuration
+  :: Duration -- ^ Duration in milliseconds.
+  -> Text
 formatDuration (Duration d) = m <> "m " <> s <> "s"
   where
-    m = pack . show $ d `div` (1000 * 60)
-    s = pack . show $ d `div` (1000)
+    m = showT $ d `div` (1000 * 60)
+    s = showT $ d `div` (1000)
 
+-- | Widget with a button that returns to stagings list page.
 backButton
   ::
     ( MonadWidget t m
@@ -269,6 +314,7 @@ backButton = do
     attrs = constDyn $ "class" =: "page__back dash dash--back dash--smaller"
   routeLinkDynAttr attrs backRoute $ text "All stagings"
 
+-- | Widget with a loading spinner.
 loadingWidget
   ::
     ( MonadWidget t m
@@ -284,6 +330,7 @@ loadingWidget dname = pageWrapper $ do
     divClass "no-staging" $
       loadingCommonWidget
 
+-- | Widget with an error placeholder.
 errorWidget
   ::
     ( MonadWidget t m
@@ -299,6 +346,7 @@ errorWidget dname = pageWrapper $ do
     divClass "no-staging" $
       errorCommonWidget
 
+-- | Div wrappers.
 pageWrapper
   ::
     ( MonadWidget t m

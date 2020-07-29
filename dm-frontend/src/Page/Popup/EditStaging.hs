@@ -1,4 +1,11 @@
-module Page.Popup.EditStaging where
+{-|
+Module      : Page.Popup.EditStaging
+Description : Edit staging sidebar.
+
+This module contains the definition of the "edit staging" sidebar.
+-}
+
+module Page.Popup.EditStaging (editStagingPopup) where
 
 import Control.Lens (preview, (^.), coerced, to, _2)
 import Control.Monad
@@ -16,15 +23,18 @@ import Reflex.Dom as R
 import Common.Types
 import Common.Utils
 import Frontend.API
-import Page.Utils
+import Frontend.Utils
 import Servant.Reflex
 
-
+-- | The root function for \"edit staging\" sidebar.
 editStagingPopup
   :: MonadWidget t m
   => Event t DeploymentFullInfo
+  -- ^ \"Show\" event carrying an editable sidebar.
   -> Event t ()
+  -- ^ \"Close\" event.
   -> m (Event t Bool)
+  -- ^ Event with a flag showing the current state of the request.
 editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
@@ -42,11 +52,13 @@ editStagingPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
       enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
     pure (updated sentDyn, closeEv)
 
+-- | The header of the sidebar contains the staging name and control buttons:
+-- \"Save\" and \"Close\".
 editStagingPopupHeader
   :: MonadWidget t m
-  => DeploymentName
-  -> Dynamic t Bool
-  -> m (Event t (), Event t ())
+  => DeploymentName             -- ^ Name of the deployment.
+  -> Dynamic t Bool             -- ^ Form validation state.
+  -> m (Event t (), Event t ()) -- ^ \"Close\" event and \"Save\" click event.
 editStagingPopupHeader dname validDyn =
   divClass "popup__head" $ do
     closeEv <- buttonClass "popup__close" "Close popup"
@@ -56,11 +68,16 @@ editStagingPopupHeader dname validDyn =
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
+-- | The body of the sidebar containing the edit form. Contains a tag field and
+-- an override field.
 editStagingPopupBody
   :: MonadWidget t m
   => DeploymentFullInfo
+  -- ^ Full staging data.
   -> Event t (ReqResult tag CommandResponse)
+  -- ^ \"Edit request\" failure event.
   -> m (Dynamic t DeploymentUpdate, Dynamic t Bool)
+  -- ^ Returns deployment update and validation state.
 editStagingPopupBody dfi errEv = divClass "popup__content" $
   divClass "staging" $ mdo
     let
@@ -98,18 +115,24 @@ editStagingPopupBody dfi errEv = divClass "popup__content" $
     getNewVars i u = deleteFirstsBy (==) u i
     cmpKey (Override k1 _ v1) (Override k2 _ v2) = k1 == k2 && v1 == v2
 
-errorHeader :: MonadWidget t m => Event t Text -> m ()
+-- | The widget used to display errors.
+errorHeader
+  :: MonadWidget t m
+  => Event t Text -- ^ Message text.
+  -> m ()
 errorHeader appErrEv = do
   widgetHold_ blank $ appErrEv <&> \appErr -> do
     divClass "staging__output notification notification--danger" $ do
       el "b" $ text "App error: "
       text appErr
 
+-- | Widget with override fields. This widget supports adding and
+-- removing key-value pairs.
 envVarsInput
   :: MonadWidget t m
-  => Text
-  -> Overrides
-  -> m (Dynamic t Overrides)
+  => Text                    -- ^ Overrides header.
+  -> Overrides               -- ^ Current staging overrides.
+  -> m (Dynamic t Overrides) -- ^ Updated staging overrides.
 envVarsInput overridesHeader evs = do
   elClass "section" "staging__section" $ do
     elClass "h3" "staging__sub-heading" $ text overridesHeader
@@ -127,10 +150,12 @@ envVarsInput overridesHeader evs = do
           "dash--disabled"
         pure $ elems <$> envsDyn
 
+-- | Widget for entering a key-value pair. The updated overrides list is
+-- written to the 'EventWriter'.
 envVarInput
   :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
-  => Int
-  -> Dynamic t Override
+  => Int                -- ^ Index of variable in overrides list.
+  -> Dynamic t Override -- ^ Current variable key and value.
   -> m ()
 envVarInput ix epDyn = do
   ep <- sample $ current epDyn
