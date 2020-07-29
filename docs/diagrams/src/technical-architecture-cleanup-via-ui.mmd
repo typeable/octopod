@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant UI
+    participant DMS
+    participant PostgreSQL
+    participant DMS/BgWorker
+    participant DMS/StatusUpdater
+    participant StagingControlScripts
+    participant KubeAPI
+    UI->>DMS: cleanup(name)
+    DMS->>DMS/BgWorker: cleanup
+    DMS-->>UI: done
+    DMS/BgWorker->>StagingControlScripts: cleanup
+    StagingControlScripts->>KubeAPI: cleanup staging resources
+    KubeAPI-->>StagingControlScripts: done
+    StagingControlScripts-->>DMS/BgWorker: done
+    DMS->>PostgreSQL: delete config and logs
+    DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
+    UI->>DMS: get stagings info
+    DMS-->>UI: stagings info

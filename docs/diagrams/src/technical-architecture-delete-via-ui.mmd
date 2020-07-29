@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant UI
+    participant DMS
+    participant PostgreSQL
+    participant DMS/BgWorker
+    participant DMS/StatusUpdater
+    participant StagingControlScripts
+    participant KubeAPI
+    UI->>DMS: delete(name)
+    DMS->>PostgreSQL: status=DeletePending
+    alt name not found
+        PostgreSQL-->>DMS: error: name not found
+        DMS-->>UI: error: name not found
+    else
+        PostgreSQL-->>DMS: ok
+        DMS-xUI: event FrontendPleaseUpdateEverything
+        UI->>DMS: get stagings info
+        DMS-->>UI: stagings info
+        DMS->>DMS/BgWorker: delete
+        DMS-->>UI: done
+        DMS/BgWorker->>StagingControlScripts: delete
+        StagingControlScripts->>KubeAPI: delete staging
+        KubeAPI-->>StagingControlScripts: done
+        StagingControlScripts-->>DMS/BgWorker: done
+        DMS/BgWorker->>PostgreSQL: write logs
+        DMS/BgWorker-xUI: event FrontendPleaseUpdateEverything
+        UI->>DMS: get stagings info
+        DMS-->>UI: stagings info
+        Note over DMS/StatusUpdater: wait 5 minutes
+        loop check staging status every 30 seconds
+            DMS/StatusUpdater->>PostgreSQL: status=Archived/DeletePending
+            DMS/StatusUpdater-xUI: event FrontendPleaseUpdateEverything
+            UI->>DMS: get stagings info
+            DMS-->>UI: stagings info
+        end
+    end
