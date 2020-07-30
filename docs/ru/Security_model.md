@@ -31,7 +31,7 @@
 ## Kubernetes role-based access control
 
 _DMS_ разворачивается в `dm` namespace. _DMS_ разворачивает стейджинги в `staging` namespace.
-_DMS_ использует `dm` [_Serivce Account_][kubernetes-service-account].
+_DMS_ использует `dm` [_Service Account_][kubernetes-service-account].
 
 Для очистки ресурсов _DMS_ / _Контейнеру с утилитами (staging control scripts)_ может потребоваться
 (зависит от настроект _Kubernetes_ и релизации _Контейнера с утилитами_)
