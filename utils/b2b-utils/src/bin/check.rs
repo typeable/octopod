@@ -10,6 +10,20 @@ fn main() -> std::io::Result<()> {
     let matches = App::new("create")
         .version("0.1")
         .arg(
+            Arg::with_name("project-name")
+                .long("project-name")
+                .short("p")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("base-domain")
+                .long("base-domain")
+                .short("d")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("namespace")
                 .long("namespace")
                 .short("s")
@@ -25,6 +39,12 @@ fn main() -> std::io::Result<()> {
         )
         .get_matches();
 
+    let project_name = matches
+        .value_of("project-name")
+        .expect("could not get project-name");
+    let base_domain = matches
+        .value_of("base-domain")
+        .expect("could not get base-domain");
     let namespace = matches
         .value_of("namespace")
         .expect("could not get namepace");
@@ -32,6 +52,8 @@ fn main() -> std::io::Result<()> {
 
     print_utils_version();
 
+    println!("project_name: {:?}", project_name);
+    println!("base_domain: {:?}", base_domain);
     println!("namespace: {:?}", namespace);
     println!("name: {:?}", name);
 

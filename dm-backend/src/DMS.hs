@@ -402,6 +402,7 @@ deleteH dName = do
     pgPool  = pool st
     args    =
       [ "--project-name", coerce $ projectName st
+      , "--base-domain", coerce $ baseDomain st
       , "--namespace", coerce $ namespace st
       , "--name", coerce dName
       ]
@@ -693,6 +694,7 @@ cleanupDeployment dName st = do
     pgPool  = pool st
     args    =
       [ "--project-name", coerce $ projectName st
+      , "--base-domain", coerce $ baseDomain st
       , "--namespace", coerce $ namespace st
       , "--name", coerce dName
       ]
@@ -886,9 +888,6 @@ runStatusUpdater :: AppState -> IO ()
 runStatusUpdater state = do
   let
     pgPool             = pool state
-    archiveCheckingCmd = archiveCheckingCommand state
-    checkingCmd        = checkingCommand state
-    ns                 = namespace state
     interval           = 30 :: Int
     selectDeps         =
       "SELECT name, status::text, \
@@ -912,10 +911,12 @@ runStatusUpdater state = do
     checkResult <- for checkList $ \(dName, dStatus, ts) -> do
       let
         args              =
-          [ "--namespace", unpack . coerce $ ns
+          [ "--project-name", unpack . coerce $ projectName state
+          , "--base-domain", unpack . coerce $ baseDomain state
+          , "--namespace", unpack . coerce $ namespace state
           , "--name", unpack . coerce $ dName ]
-        cmd DeletePending = unpack . coerce $ archiveCheckingCmd
-        cmd _             = unpack . coerce $ checkingCmd
+        cmd DeletePending = unpack . coerce $ archiveCheckingCommand state
+        cmd _             = unpack . coerce $ checkingCommand state
       ec <- runCommandWithoutPipes (cmd dStatus) args
       pure (dName, newStatus ec dStatus ts, ts)
     void $
