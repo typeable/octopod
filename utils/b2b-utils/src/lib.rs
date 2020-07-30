@@ -216,7 +216,7 @@ pub fn create_infra_atrs(domain: &str, namespace: &str, name: &str, checksum: &s
     let db = rn.replace("-", "_");
     let es = "elasticsearch";
 
-    vec![
+    [
         "upgrade",
         "--install",
         "--namespace",
@@ -347,21 +347,21 @@ pub fn create_app_atrs(
 }
 
 pub fn delete_infra_atrs(name: &str) -> Vec<String> {
-    vec!["delete", &release_name(INFRA_CHART_NAME, name), "--purge"]
+    ["delete", &release_name(INFRA_CHART_NAME, name), "--purge"]
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()
 }
 
 pub fn delete_app_atrs(name: &str) -> Vec<String> {
-    vec!["delete", &release_name(APP_CHART_NAME, name), "--purge"]
+    ["delete", &release_name(APP_CHART_NAME, name), "--purge"]
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()
 }
 
 pub fn delete_pvcs_atrs(namespace: &str, name: &str) -> Vec<String> {
-    vec![
+    [
         "delete",
         "pvc",
         "-n",
@@ -375,7 +375,7 @@ pub fn delete_pvcs_atrs(namespace: &str, name: &str) -> Vec<String> {
 }
 
 pub fn delete_cert_atrs(namespace: &str, name: &str) -> Vec<String> {
-    vec![
+    [
         "delete",
         "certificate",
         "-n",
@@ -389,15 +389,15 @@ pub fn delete_cert_atrs(namespace: &str, name: &str) -> Vec<String> {
     .collect::<Vec<_>>()
 }
 
-pub fn helm_app_release_status_atrs(name: &str) -> Vec<String> {
-    vec!["status", &release_name(APP_CHART_NAME, name)]
+pub fn app_release_status_atrs(name: &str) -> Vec<String> {
+    ["status", &release_name(APP_CHART_NAME, name)]
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()
 }
 
-pub fn helm_infra_release_status_atrs(name: &str) -> Vec<String> {
-    vec!["status", &release_name(INFRA_CHART_NAME, name)]
+pub fn infra_release_status_atrs(name: &str) -> Vec<String> {
+    ["status", &release_name(INFRA_CHART_NAME, name)]
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()
