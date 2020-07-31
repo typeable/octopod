@@ -4,7 +4,7 @@ use std::process::Command;
 use b2b_utils::*;
 
 fn main() -> std::io::Result<()> {
-    let matches = App::new("delete")
+    let matches = App::new("cleanup")
         .version("0.1")
         .arg(
             Arg::with_name("project-name")

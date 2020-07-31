@@ -6,3 +6,4 @@ ADD tmp/delete /utils/
 ADD tmp/check /utils/
 ADD tmp/cleanup /utils/
 ADD tmp/archive_check /utils/
+ADD tmp/tag_check /utils/
