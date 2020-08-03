@@ -9,6 +9,7 @@
 - [check](#check)
 - [cleanup](#cleanup)
 - [archive_check](#archive_check)
+- [tag_check](#tag_check)
 
 </details>
 
@@ -87,5 +88,18 @@
 * `--base-domain` – базовый домен
 * `--namespace` – namespace
 * `--name` – имя стейджинга
+
+Успешность операции определяется по exit code (`0` – успех).
+
+## tag_check
+
+Реализация проверки существования тега стейджинга.
+
+Получает на вход следующие аргументы:
+* `--project-name` – название проекта
+* `--base-domain` – базовый домен
+* `--namespace` – namespace
+* `--name` – имя стейджинга
+* `--tag` – тег стейджинга
 
 Успешность операции определяется по exit code (`0` – успех).

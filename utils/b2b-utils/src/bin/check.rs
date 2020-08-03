@@ -7,7 +7,7 @@ use b2b_utils::*;
 const KUBEDOG_TIMEOUT: usize = 3;
 
 fn main() -> std::io::Result<()> {
-    let matches = App::new("create")
+    let matches = App::new("check")
         .version("0.1")
         .arg(
             Arg::with_name("project-name")

@@ -43,7 +43,6 @@ import           API
 import           Common.API
 import           Common.Validation (isNameValid)
 import           DMS.Args
-import           DMS.AWS
 import           DMS.Logger
 import           DMS.Unix
 import           Orphans ()
@@ -70,7 +69,8 @@ data AppState = AppState
   , deletionCommand               :: Command
   , checkingCommand               :: Command
   , cleanupCommand                :: Command
-  , archiveCheckingCommand        :: Command }
+  , archiveCheckingCommand        :: Command
+  , tagCheckingCommand            :: Command }
 
 data DeploymentException
   = DeploymentFailed Int
@@ -114,6 +114,7 @@ runDMS = do
   checkingCmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
   cleanupCmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   archiveCheckingCmd <- coerce . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
+  tagCheckingCmd <- coerce . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
   pgPool <- initConnectionPool
     (unDBConnectionString $ dmsDB opts) (unDBPoolSize $ dmsDBPoolSize opts)
   channel <- liftIO . atomically $ newBroadcastTChan
@@ -136,6 +137,7 @@ runDMS = do
         checkingCmd
         cleanupCmd
         archiveCheckingCmd
+        tagCheckingCmd
     app'         = app appSt
     powerApp'    = powerApp appSt
     wsApp'       = wsApp channel
@@ -286,7 +288,7 @@ createH dep = do
     createDep p Deployment { name = n, tag = t } =
       withResource p $ \conn ->
         query conn q (n, t, show CreatePending)
-  failIfImageNotFound $ tag dep
+  failIfImageNotFound (name dep) (tag dep)
   res :: Either SqlError [Only Int] <- liftIO . try $ createDep pgPool dep
   dId <- case res of
     Right ((Only depId) : _)                                ->
@@ -448,7 +450,7 @@ updateH dName dUpdate = do
     log  = logInfo (logger st)
 
   dId <- selectDeploymentId pgPool dName
-  failIfImageNotFound dTag
+  failIfImageNotFound dName dTag
   liftIO . runBgWorker st $ do
     (appOvs, stOvs) <- withResource pgPool $ \conn ->
       withTransaction conn $ do
@@ -753,7 +755,7 @@ restoreH dName = do
   st <- ask
   let pgPool  = pool st
   dep <- selectDeployment pgPool dName ArchivedOnlyDeployments
-  failIfImageNotFound $ tag dep
+  failIfImageNotFound (name dep) (tag dep)
   liftIO . runBgWorker st $ do
     (ec, out, err) <- createDeployment dep st
     let
@@ -861,12 +863,27 @@ createDeploymentLog pgPool dep act ec arch dur out err = do
           oVis        = show . overrideVisibility . unStagingOverride $ o
         execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
 
-failIfImageNotFound :: DeploymentTag -> AppM ()
-failIfImageNotFound dTag = do
-  foundTag <- liftIO . findImageTag $ dTag
-  case foundTag of
-    Just _  -> pure ()
-    Nothing ->
+failIfImageNotFound :: DeploymentName -> DeploymentTag -> AppM ()
+failIfImageNotFound dName dTag = do
+  st <- ask
+  let
+    log :: Text -> IO ()
+    log  = logInfo (logger st)
+    args =
+      [ "--project-name", coerce $ projectName st
+      , "--base-domain", coerce $ baseDomain st
+      , "--namespace", coerce $ namespace st
+      , "--name", coerce $ dName
+      , "--tag", coerce $ dTag
+      ]
+    cmd  = coerce $ tagCheckingCommand st
+
+  ec <- liftIO $ do
+    log $ "call " <> unwords (cmd : args)
+    runCommandWithoutPipes (unpack cmd) (unpack <$> args)
+  case ec of
+    ExitSuccess   -> pure ()
+    ExitFailure _ ->
       throwError err400 { errBody = validationError [] ["Tag not found"] }
 
 appError :: Text -> BSL.ByteString

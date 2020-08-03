@@ -13,6 +13,9 @@ fs_extra = "1.1.0"
 walkdir = "2.3.1"
 sha2 = "0.9.1"
 hex = "0.4.2"
+rusoto_ecr = { version = "0.45.0", default_features = false, features = ["rustls"] }
+rusoto_signature = "0.45.0"
+tokio = "0.2.22"
 
 [[bin]]
 name = "create"
@@ -37,3 +40,7 @@ path = "src/bin/cleanup.rs"
 [[bin]]
 name = "archive_check"
 path = "src/bin/archive_check.rs"
+
+[[bin]]
+name = "tag_check"
+path = "src/bin/tag_check.rs"

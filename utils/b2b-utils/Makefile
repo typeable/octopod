@@ -1,8 +1,8 @@
-.PHONY: install-musl-target build-musl
+.PHONY: build
 
-build-musl:
+tag=1.45.0
+
+build:
 	git rev-parse HEAD > src/version
-	cargo build --release --target x86_64-unknown-linux-musl
-
-install-musl-target:
-	rustup target add x86_64-unknown-linux-musl
+	docker pull ekidd/rust-musl-builder:$(tag)
+	docker run --rm -it -v "$$PWD":/home/rust/src ekidd/rust-musl-builder:$(tag) cargo build --release
