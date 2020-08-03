@@ -16,10 +16,6 @@
   };
 
   overrides = hself: hsuper: {
-    amazonka = hsuper.callPackage nix/amazonka-1.6.1.nix {};
-    amazonka-core = hsuper.callPackage nix/amazonka-core-1.6.1.nix {};
-    amazonka-ecr = hsuper.callPackage nix/amazonka-ecr-1.6.1.nix {};
-    amazonka-test = hsuper.callPackage nix/amazonka-test-1.6.1.nix {};
     deriving-aeson = hsuper.callCabal2nix "deriving-aeson" sources.deriving-aeson { };
     servant-reflex = hsuper.callCabal2nix "servant-reflex" sources.servant-reflex { };
     tabulation = hsuper.callCabal2nix "tabulation" "${sources.obelisk}/lib/tabulation" { };
