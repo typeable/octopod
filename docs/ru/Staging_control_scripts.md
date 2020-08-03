@@ -9,6 +9,7 @@
 - [check](#check)
 - [cleanup](#cleanup)
 - [archive_check](#archive_check)
+- [tag_check](#tag_check)
 
 </details>
 
