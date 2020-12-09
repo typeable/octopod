@@ -13,6 +13,6 @@
       2. octopod-helm-example
    2. Create a new tag incrementing the integer version number of the tag:
       1. Pull the image (`docker pull`)
-      2. Tag it with the new `v<integer>` (`docker tag`)
+      2. Tag it with the new `<integer>` (`docker tag`)
       3. Push the new tag (`docker push`)
    3. Update docs where the tags are referenced.
