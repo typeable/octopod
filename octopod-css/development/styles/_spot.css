@@ -1,0 +1,25 @@
+.spot {
+    display: inline-block;
+    vertical-align: top;
+    border: none;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: 24px 24px;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    text-indent: 200%;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0.5;
+}
+
+.spot--cancel {
+    background-image: url("../vectors/spot.svg");
+}
+
+.spot--cancel:hover {
+    opacity: 1;
+}

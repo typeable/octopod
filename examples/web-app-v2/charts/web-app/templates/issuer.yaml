@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Release.Name }}-certs
+  namespace: {{ .Release.Namespace }}
+spec:
+  acme:
+    email: {{ .Values.acme_registration_email }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: {{ .Release.Name }}-letsencrypt
+    # ACME HTTP-01 provider configurations
+    solvers:
+    # An empty 'selector' means that this solver matches all domains
+    - selector: {}
+      http01:
+        ingress:
+          class: nginx

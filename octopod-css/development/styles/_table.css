@@ -1,0 +1,224 @@
+.table {
+    background-color: #FFFFFF;
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+}
+    .table table {
+        width: 100%;
+        vertical-align: top;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 14px;
+        line-height: 20px;
+        color: rgba(0, 0, 0, 0.87);
+    }
+        .table tr {
+
+        }
+
+        .table thead tr {
+            background-color: #EEEEEE;
+        }
+
+        .table tbody tr {
+            border-top: 1px solid #E0E0E0;
+        }
+            .table th {
+                vertical-align: middle;
+                height: 48px;
+                padding: 16px 12px;
+                font-weight: 500;
+                font-size: 14px;
+                line-height: 16px;
+                color: #000000;
+                text-align: left;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .table td {
+                vertical-align: top;
+                padding: 16px 12px;
+            }
+
+
+            /* Скругление углов всей таблицы */
+            /* stylelint-disable block-opening-brace-space-before, selector-descendant-combinator-no-non-space */
+            .table tr:first-child th:first-child { border-top-left-radius: 3px; }
+            .table tr:first-child th:last-child  { border-top-right-radius: 3px; }
+            .table tr:last-child  td:first-child { border-bottom-left-radius: 3px; }
+            .table tr:last-child  td:last-child  { border-bottom-right-radius: 3px; }
+            /* stylelint-enable */
+
+
+
+
+.table--clickable {
+
+}
+    .table--clickable tbody tr {
+        cursor: default;
+    }
+
+    .table--clickable tbody tr:hover {
+        background-color: #F8F8F8;
+    }
+
+
+.table--double-click {
+
+}
+    .table--double-click tbody tr {
+
+    }
+        .table--double-click tbody tr {
+            user-select: none; /* При двойном клике происходит выделение */
+        }
+
+
+
+
+.table--deployments {
+
+}
+    /* В случае table-layout: fixed; ширины колонкам задаются по ширинам в первой строке */
+    .table--deployments th:nth-child(1) { width: 16.1818%; } /* 178px */
+    .table--deployments th:nth-child(2) { width: 16.1818%; } /* 178px */
+    .table--deployments th:nth-child(3) { width: 8%; } /* 88px */
+    .table--deployments th:nth-child(4) { width: 20.3636%; } /* 224px */
+    .table--deployments th:nth-child(5) { width: 20.3636%; } /* 224px */
+    .table--deployments th:nth-child(6) { width: 9.4546%; } /* 104px */
+    .table--deployments th:nth-child(7) { width: 9.4546%; } /* 104px */
+    .table--deployments th:nth-child(8) { width: 52px; }
+
+    .table--deployments th:first-child,
+    .table--deployments td:first-child {
+        padding-left: 16px;
+    }
+
+    .table--deployments th:last-child,
+    .table--deployments td:last-child {
+        padding-right: 16px;
+    }
+
+
+    /* Name */
+    .table--deployments td:nth-child(1) {
+        font-weight: 500;
+        font-size: 16px;
+        line-height: 24px;
+    }
+        .table--deployments td:nth-child(1) .status,
+        .table--deployments td:nth-child(1) .loading {
+            margin-top: 8px;
+            display: block;
+        }
+
+    /* Links */
+    .table--deployments td:nth-child(2) {
+
+    }
+
+    /* Tag */
+    .table--deployments td:nth-child(3) {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* App overrides */
+    .table--deployments td:nth-child(4) {
+
+    }
+
+    /* Deployment overrides */
+    .table--deployments td:nth-child(5) {
+
+    }
+
+    /* Created */
+    .table--deployments td:nth-child(6) {
+        white-space: nowrap;
+    }
+
+    /* Changed */
+    .table--deployments td:nth-child(7) {
+        white-space: nowrap;
+    }
+
+    /* Dropdown */
+    .table--deployments td:nth-child(8) {
+
+    }
+        .table--deployments td:nth-child(8) .drop {
+            margin: -8px;
+        }
+
+
+
+
+.table--actions {
+
+}
+    .table--actions table {
+
+    }
+
+    /* В случае table-layout: fixed; ширины колонкам задаются по ширинам в первой строке */
+    .table--actions th:nth-child(1) { width: 8%; }
+    .table--actions th:nth-child(2) { width: 20%; }
+    .table--actions th:nth-child(3) { width: 21%; }
+    .table--actions th:nth-child(4) { width: 20%; }
+    .table--actions th:nth-child(5) { width: 7%; }
+    .table--actions th:nth-child(6) { width: 15%; }
+    .table--actions th:nth-child(7) { width: 9%; }
+
+    .table--actions th:first-child,
+    .table--actions td:first-child {
+        padding-left: 16px;
+    }
+
+    .table--actions th:last-child,
+    .table--actions td:last-child {
+        padding-right: 16px;
+    }
+
+    /* Action type */
+    .table--actions td:nth-child(1) {
+        font-weight: 500;
+        font-size: 16px;
+        line-height: 24px;
+    }
+        .table--actions td:nth-child(1) .status,
+        .table--actions td:nth-child(1) .loading {
+            margin-top: 8px;
+            display: block;
+        }
+
+    /* Image tag */
+    .table--actions td:nth-child(2) {
+        word-break: break-all;
+    }
+
+    /* Overrides */
+    .table--actions td:nth-child(3) {
+
+    }
+
+    /* Created */
+    .table--actions td:nth-child(4) {
+
+    }
+
+    /* Deployment duration */
+    .table--actions td:nth-child(5) {
+        white-space: nowrap;
+    }
+
+    /* Dropdown */
+    .table--actions td:nth-child(6) {
+
+    }
+        .table--actions td:nth-child(6) .drop {
+            margin: -8px;
+        }

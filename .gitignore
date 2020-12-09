@@ -1,0 +1,9 @@
+.stack-work/
+package.yaml
+result
+dms-docker
+*~
+dist-newstyle
+octopod-config.json
+frontend-result
+octopod-css/node_modules

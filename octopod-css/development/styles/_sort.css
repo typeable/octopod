@@ -1,0 +1,73 @@
+.sort {
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+    border: none;
+    background: none;
+    margin: -8px;
+    padding: 8px;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 16px;
+    text-decoration: underline;
+    color: #000000;
+    cursor: pointer;
+}
+    .sort::after {
+        position: absolute;
+        right: 12px;
+        top: 14px;
+        content: "";
+        display: block;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        opacity: 0;
+    }
+
+    .sort:hover {
+        color: var(--primary);
+    }
+
+    .sort:active {
+
+    }
+
+
+.sort--desc {
+    padding-right: 24px;
+}
+    .sort--desc::after {
+        border-top: 4px solid;
+    }
+
+.sort--active.sort--desc:hover {
+
+}
+    .sort--active.sort--desc:hover::after {
+
+    }
+
+
+.sort--asc {
+    padding-right: 24px;
+}
+    .sort--asc::after {
+        border-bottom: 4px solid;
+    }
+
+.sort--active.sort--asc:hover {
+
+}
+    .sort--active.sort--asc:hover::after {
+
+    }
+
+
+
+.sort--active {
+
+}
+    .sort--active::after {
+        opacity: 1;
+    }

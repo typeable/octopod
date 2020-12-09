@@ -1,0 +1,101 @@
+.button {
+    display: inline-block;
+    vertical-align: top;
+    height: 40px;
+    padding: 11px;
+    border: 1px solid transparent;
+    background-color: var(--primary);
+    border-radius: 4px;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 16px;
+    letter-spacing: 0.6px;
+    color: #FFFFFF;
+    text-align: center;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.button:hover {
+    background-color: var(--primary-hover);
+}
+
+.button:active {
+    background-color: var(--primary-active);
+}
+
+.button--disabled,
+.button--disabled:hover,
+.button--disabled:active {
+    background-color: var(--primary-disabled);
+    cursor: default;
+}
+
+
+.button--secondary {
+    background-color: #FFFFFF;
+    border-color: var(--dark-grey);
+    color: #000000;
+}
+
+.button--secondary:hover {
+    background-color: #EEEEEE;
+}
+
+.button--secondary:active {
+    background-color: #E2E2E2;
+}
+
+
+.button--secondary.button--disabled,
+.button--secondary.button--disabled:hover,
+.button--secondary.button--disabled:active {
+    background-color: transparent;
+    opacity: 0.5;
+    cursor: default;
+}
+
+
+
+.button--add {
+    padding-left: 40px;
+    background-image: url("../vectors/button-add.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}
+
+.button--edit {
+    padding-left: 40px;
+    background-image: url("../vectors/common-use-edit-white.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}
+
+.button--archive {
+    padding-left: 40px;
+    background-image: url("../vectors/common-use-archive.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}
+
+.button--restore {
+    padding-left: 40px;
+    background-image: url("../vectors/common-use-restore.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}
+
+.button--save {
+    padding-left: 40px;
+    background-image: url("../vectors/button-save.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}

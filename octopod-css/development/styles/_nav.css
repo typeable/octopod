@@ -1,0 +1,39 @@
+.nav {
+    display: inline-flex;
+    align-items: flex-start;
+}
+    .nav__link {
+        position: relative;
+        display: inline-block;
+        vertical-align: top;
+        background-color: transparent;
+        border: none;
+        padding: 21px 16px 19px;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 16px;
+        letter-spacing: 0.75px;
+        text-transform: uppercase;
+        cursor: pointer;
+    }
+
+    .nav__link:hover {
+        color: var(--primary-active);
+    }
+
+    .nav__link--current {
+        font-weight: 500;
+        color: var(--primary-active);
+    }
+        .nav__link--current::after {
+            content: "";
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 0;
+            display: block;
+            height: 4px;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+            background-color: var(--primary-active);
+        }

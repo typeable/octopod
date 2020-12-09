@@ -1,0 +1,19 @@
+.data {
+    flex-shrink: 0;
+}
+    .data__primary {
+
+    }
+
+    .data__show-archive {
+        margin-top: 18px;
+        align-self: flex-start;
+    }
+
+    .data__archive {
+        display: none;
+    }
+
+    .data__archive--open {
+        display: block;
+    }

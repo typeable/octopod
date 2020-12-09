@@ -1,0 +1,63 @@
+name: Octopod Docker Image
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  build:
+    name: build-docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repo: Aviora/dm
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v12
+
+      - name: Login to Cachix
+        uses: cachix/cachix-action@v8
+        with:
+          name: octopod
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+
+      - name: Build Docker Images
+        run: |
+          # enable required features (see https://github.com/cachix/install-nix-action/issues/19)
+          mkdir -p ~/.config/nix
+          echo "system-features = kvm" >> ~/.config/nix/nix.conf
+
+          # build docker images
+          ./build.sh build
+
+      - name: Login to DockerHub
+        id: login-docker-hub
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker Images to DockerHub
+        if: github.ref == 'refs/heads/master'
+        run: |
+          # push docker images to DockerHub
+          image_name=`cat octo-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octo:latest
+          docker push typeable/octo:latest
+
+          image_name=`cat octopod-server-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octopod:latest
+          docker push typeable/octopod:latest
+
+      - name: Clean up
+        if: always()
+        continue-on-error: true
+        run: |
+          docker logout ${{ steps.login-docker-hub.outputs.registry }}

@@ -1,0 +1,47 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-clean-archive-cronjob
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: "0 */1 * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: {{ .Release.Name }}
+          annotations:
+            checksum/config: "{{ .Values.global.deploy_checksum }}"
+        spec:
+          nodeSelector:
+            role: {{ .Values.nodeselector }}
+          containers:
+          - name: octo
+            image: {{ .Values.global.image_prefix }}/{{ .Values.global.octo_image }}:{{ .Values.global.image_tag }}
+            command:
+            - /app/octo
+            args:
+            - clean-archive
+            env:
+            - name: OCTOPOD_URL
+              value: https://{{ .Values.power_app_domain }}:443
+            volumeMounts:
+            - name: certs
+              mountPath: /cert.pem
+              subPath: client_cert.pem
+            - name: certs
+              mountPath: /key.pem
+              subPath: client_key.pem
+            resources:
+              requests:
+                cpu: 0.1
+                memory: 256Mi
+              limits:
+                cpu: 0.1
+                memory: 512Mi
+          restartPolicy: Never
+          volumes:
+          - name: certs
+            configMap:
+              name: octopod-certs

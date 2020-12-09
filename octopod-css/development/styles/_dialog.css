@@ -1,0 +1,47 @@
+.dialog {
+    width: 400px;
+    padding: 40px 24px;
+    background-color: #FFFFFF;
+    border-radius: 16px;
+}
+
+.dialog--archive::before {
+    content: "";
+    display: block;
+    width: 185px;
+    height: 120px;
+    margin-left: auto;
+    margin-right: auto;
+    background-image: url("../images/dialog-delete.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+@media (min-resolution: 2dppx) {
+
+    .dialog--archive::before {
+        background-image: url("../images/dialog-delete@2x.png");
+    }
+}
+    .dialog__content {
+        margin-top: 25px;
+        font-weight: bold;
+        font-size: 16px;
+        line-height: 20px;
+        text-align: center;
+    }
+
+    .dialog__footer {
+        margin-top: 16px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+    }
+        .dialog__action {
+            margin-left: 8px;
+        }
+
+        .dialog__action:first-child {
+            margin-left: 0;
+        }

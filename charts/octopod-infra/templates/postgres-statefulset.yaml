@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-postgres
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-postgres
+    spec:
+      nodeSelector:
+        role: {{ .Values.nodeselector }}
+      terminationGracePeriodSeconds: 120
+      containers:
+      - name: postgres
+        image: postgres:10
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name }}-postgres-config
+        resources:
+          requests:
+            cpu: {{ .Values.requests.cpu }}
+            memory: {{ .Values.requests.memory }}
+          limits:
+            cpu: {{ .Values.limits.cpu }}
+            memory: {{ .Values.limits.memory }}
+        ports:
+        - containerPort: 5432
+          name: postgredb
+        volumeMounts:
+        - name: postgredb
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+  volumeClaimTemplates:
+  - metadata:
+      name: postgredb
+      labels:
+        app: {{ .Release.Name }}-postgres
+    spec:
+      accessModes:
+        - "ReadWriteOnce"
+      storageClassName: {{ .Values.storage_class | default "default" }}
+      resources:
+        requests:
+          storage: {{ .Values.storage_size }}

@@ -1,0 +1,54 @@
+.notification {
+    position: relative;
+    padding: 15px 46px 15px 16px;
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 20px;
+}
+    .notification__close {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 46px;
+        padding: 0;
+        border: none;
+        background-color: transparent;
+        background-size: 24px 24px;
+        background-repeat: no-repeat;
+        background-position: center center;
+        text-indent: 200%;
+        white-space: nowrap;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+.notification--success {
+    background-color: rgba(15, 127, 18, 0.1);
+    color: var(--green);
+}
+    .notification--success .notification__close {
+        background-image: url("../vectors/notification-close-success.svg");
+    }
+    .notification--success:hover .notification__close {
+        background-image: url("../vectors/notification-close-success-hover.svg");
+    }
+    .notification--success:active .notification__close {
+        background-image: url("../vectors/notification-close-success-active.svg");
+    }
+
+.notification--danger {
+    background-color: rgba(212, 42, 42, 0.1);
+    color: var(--red);
+}
+    .notification--danger .notification__close {
+        background-image: url("../vectors/notification-close-danger.svg");
+    }
+    .notification--danger:hover .notification__close {
+        background-image: url("../vectors/notification-close-danger-hover.svg");
+    }
+    .notification--danger:active .notification__close {
+        background-image: url("../vectors/notification-close-danger-active.svg");
+    }
+

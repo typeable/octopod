@@ -1,0 +1,25 @@
+/* stylelint-disable declaration-colon-space-after */
+:root {
+    --primary: #3671E3;
+    --primary-hover: #3A6CCC;
+    --primary-active: #3964B8;
+    --primary-disabled: #99B7F3;
+
+    --grey: #EEEEEE;
+    --grey-hover: #E2E2E2;
+    --grey-active: #D6D6D6;
+
+    --dark-grey: #757575;
+    --dark-grey-50pct: #757575;
+
+    --orange: #FC5830;
+
+    --red: #D42A2A;
+    --green: #0F7F12;
+
+    --shadow_1: 0 2px 2px rgba(0, 0, 0, 0.24),
+                0 0 2px rgba(0, 0, 0, 0.12);
+
+    --transition-basic: 0.1s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+/* stylelint-enable declaration-colon-space-after */

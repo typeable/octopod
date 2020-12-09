@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>.input</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!--<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">-->
+        <link rel="stylesheet" href="../styles/style.css">
+    </head>
+
+    <body>
+
+
+
+        <div style="width: 600px; margin: 0 auto;">
+            <br>
+            <br>
+            <h1>.input</h1>
+
+            <div class="input">
+                <input class="input__widget" type="text" placeholder="Key">
+            </div>
+
+
+            <br>
+            <br>
+            <br>
+            <br>
+            <h2>Клеартайп</h2>
+            <p>
+                Здесь помимо самого клеартайпа еще нужно добавить модификатор
+                <b>.input--has-clear-type</b> -- он переиграет отступы и другие версточные штуки
+                (например выключит дефолтный ИЕшный клеартайп)
+            </p>
+
+            <div class="input input--has-clear-type">
+                <input class="input__widget" type="text" placeholder="Key">
+                <button class="input__clear-type spot spot--cancel">Delete</button>
+            </div>
+
+            <br>
+            <br>
+            <br>
+            <br>
+            <h2>.input--search</h2>
+            <p>
+                Просто иконка и паддинг
+            </p>
+
+            <div class="input input--search input--has-clear-type">
+                <input class="input__widget" type="text" placeholder="Key">
+                <button class="input__clear-type spot spot--cancel">Delete</button>
+            </div>
+
+
+            <br>
+            <br>
+            <br>
+            <br>
+            <h2>.input--error и .input__output</h2>
+            <p>
+                Первое -- модификатор, что делает сам инпут красным.
+                <br>Второе -- просто элемент для вывода ошибки.
+            </p>
+
+            <div class="input input--has-clear-type input--error">
+                <input class="input__widget" type="text" placeholder="Key" value="foobar$gmail.com">
+                <button class="input__clear-type spot spot--cancel">Delete</button>
+                <div class="input__output">Error message</div>
+                <div class="input__output">Another message</div>
+            </div>
+
+
+
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+        </div>
+
+
+
+
+        <!-- jQuery -->
+        <script src="../vendors/jquery/jquery-3.2.1.min.js"></script>
+
+        <!-- Outline.js -->
+        <script src="../vendors/outline/outline.js"></script>
+
+        <!-- Temp -->
+        <script src="../scripts/_expander.js"></script>
+        <script src="../scripts/_drop.js"></script>
+        <script src="../scripts/_sort.js"></script>
+        <script src="../scripts/_data.js"></script>
+        <script src="../scripts/_popup.js"></script>
+        <script src="../scripts/_classic-popup.js"></script>
+
+
+    </body>
+</html>

@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant UI
+    participant Octopod Server
+    participant PostgreSQL
+    participant Octopod Server/BgWorker
+    participant Octopod Server/StatusUpdater
+    participant ControlScripts
+    participant KubeAPI
+    UI->>Octopod Server: archive(name)
+    Octopod Server->>PostgreSQL: status=ArchivePending
+    alt name not found
+        PostgreSQL-->>Octopod Server: error: name not found
+        Octopod Server-->>UI: error: name not found
+    else
+        PostgreSQL-->>Octopod Server: ok
+        Octopod Server-xUI: event FrontendPleaseUpdateEverything
+        UI->>Octopod Server: get deployments info
+        Octopod Server-->>UI: deployments info
+        Octopod Server->>Octopod Server/BgWorker: archive
+        Octopod Server-->>UI: done
+        Octopod Server/BgWorker->>ControlScripts: archive
+        ControlScripts->>KubeAPI: archive deployment
+        KubeAPI-->>ControlScripts: done
+        ControlScripts-->>Octopod Server/BgWorker: done
+        Octopod Server/BgWorker->>PostgreSQL: write logs
+        Octopod Server/BgWorker-xUI: event FrontendPleaseUpdateEverything
+        UI->>Octopod Server: get deployments info
+        Octopod Server-->>UI: deployments info
+        Note over Octopod Server/StatusUpdater: wait 5 minutes
+        loop check deployment status every 30 seconds
+            Octopod Server/StatusUpdater->>PostgreSQL: status=Archived/ArchivePending
+            Octopod Server/StatusUpdater-xUI: event FrontendPleaseUpdateEverything
+            UI->>Octopod Server: get deployments info
+            Octopod Server-->>UI: deployments info
+        end
+    end

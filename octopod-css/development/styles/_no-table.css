@@ -1,0 +1,16 @@
+.no-table {
+    background-color: transparent !important;
+    cursor: auto !important;
+}
+    .no-table td {
+        vertical-align: middle;
+        text-align: center;
+        height: 352px;
+        padding-top: 50px;
+        padding-bottom: 50px;
+    }
+        .no-table .loading {
+            display: inline-block !important; /* конфликт со стилями лоадера */
+            vertical-align: top !important;   /* который вставляется в первый */
+            margin-top: 0 !important;         /* столбец всместо .status */
+        }

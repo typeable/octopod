@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>outline.js</title>
+	<script src="outline.js"></script>
+    <style>
+
+        .input {
+            outline: none;
+            border: 1px solid grey;
+        }
+
+        .input:focus {
+            border-color: blue;
+            box-shadow: 0 0 0 1px blue;
+        }
+
+        .checkbox {
+            position: relative;
+        }
+            .checkbox__widget {
+                position: absolute;
+                opacity: 0;
+            }
+
+            .checkbox__label::before {
+                content: "☐";
+            }
+
+            .checkbox__widget:checked ~ .checkbox__label::before {
+                content: "☑";
+            }
+
+            .checkbox__widget:focus ~ .checkbox__label {
+                outline: auto;
+            }
+
+    </style>
+</head>
+<body>
+	<h1>Fork of outline.js</h1>
+
+    <a href="#">Test link</a>
+
+    <br><br>
+
+	<button type="button">Test button</button>
+
+    <br><br>
+
+	<span tabindex="0">Test span</span>
+
+    <br><br>
+
+    <input class="input" type="text" placeholder="Test input">
+    <small><i>/must have it's own focus effect because otline is lost on click</i></small>
+
+    <br><br>
+
+    <label class="checkbox">
+        <input class="checkbox__widget" type="checkbox">
+        <span class="checkbox__label">Custom checbox</span>
+    </label>
+
+    <small><i>/need to make an outline for this thing using CSS and it should be possible to cancel it on click using this library</i></small>
+</body>
+</html>

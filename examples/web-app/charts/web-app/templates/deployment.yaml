@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      name: {{ .Release.Name }}
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      nodeSelector:
+        role: {{ .Values.nodeselector }}
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: main
+        image: {{ .Values.image_prefix }}/{{ .Values.image }}:{{ .Values.image_tag }}
+        env:
+          {{- range $key, $value := .Values.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value  | quote }}
+          {{- end }}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 64Mi
+          limits:
+            cpu: 0.1
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            port: 8080
+            path: /
+          periodSeconds: 20
+        livenessProbe:
+          httpGet:
+            port: 8080
+            path: /
+          initialDelaySeconds: 15
+          periodSeconds: 5

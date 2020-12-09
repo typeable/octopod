@@ -1,0 +1,16 @@
+@startuml
+
+top to bottom direction
+
+database "Redis" as OBR
+database "Postgres" as OBP
+boundary "nginx" as OBN
+
+rectangle "Server" as OBSer
+
+OBSer -down-> OBR
+OBSer -down-> OBP
+OBN -right-> OBSer
+
+
+@enduml

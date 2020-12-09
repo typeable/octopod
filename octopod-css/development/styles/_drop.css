@@ -1,0 +1,70 @@
+.drop {
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+}
+    .drop__handler {
+        border: none;
+        padding: 0;
+        background-color: transparent;
+        cursor: pointer;
+    }
+
+    .drop__dropdown {
+        position: absolute;
+        z-index: 500;
+        right: 0;
+        top: 100%;
+        min-width: 100%;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity var(--transition-basic),
+                    visibility var(--transition-basic);
+    }
+
+
+
+.drop--expanded {
+
+}
+    .drop--expanded .drop__dropdown {
+        opacity: 1;
+        visibility: visible;
+    }
+
+
+
+
+.drop--actions {
+
+}
+    .drop--actions .drop__handler {
+        width: 40px;
+        height: 40px;
+        background-image: url("../vectors/drop-actions.svg");
+        background-size: 24px 24px;
+        background-repeat: no-repeat;
+        background-position: center center;
+        text-indent: 200%;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .drop--actions .drop__handler:hover {
+        background-image: url("../vectors/drop-actions-hover.svg");
+    }
+
+    .drop--actions .drop__handler:active,
+    .drop--actions.drop--expanded .drop__handler {
+        background-image: url("../vectors/drop-actions-active.svg");
+    }
+
+    .drop--actions .drop__dropdown {
+        margin-top: 8px;
+        margin-right: -17px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        background-color: #FFFFFF;
+        box-shadow: var(--shadow_1);
+        border-radius: 2px;
+    }

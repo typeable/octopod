@@ -1,0 +1,26 @@
+.external {
+    padding-right: 24px;
+    background-image: url("../vectors/external.svg");
+    background-size: 12px 12px;
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.external:hover {
+    color: var(--primary);
+    background-color: #E2E2E2;
+    background-image: url("../vectors/external-hover-active.svg");
+}
+
+.external:active {
+    color: var(--primary);
+    background-color: #D6D6D6;
+    background-image: url("../vectors/external-hover-active.svg");
+}
+
+.external.bar--larger {
+    background-position: right 8px center;
+}

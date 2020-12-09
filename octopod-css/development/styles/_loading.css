@@ -1,0 +1,82 @@
+.loading {
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+    padding-left: 21px;
+    font-size: 14px;
+    line-height: 16px;
+    color: var(--dark-grey);
+}
+    @keyframes loading {
+        to { transform: rotate(360deg); }
+    }
+
+    .loading::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        right: auto;
+        margin: auto;
+        display: block;
+        width: 16px;
+        height: 16px;
+        background-image: url("../vectors/loading.svg");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+        animation: loading 2.2s linear infinite;
+    }
+
+.loading--status-alike {
+    font-weight: bold;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+
+.loading--alternate {
+
+}
+    .loading--alternate::before {
+        background-image: url("../vectors/loading-alternate.svg");
+    }
+
+
+.loading--enlarged {
+    padding-left: 0;
+    padding-top: 66px;
+    padding-bottom: 8px;
+    width: 62px;
+    text-align: center;
+}
+    .loading--enlarged::before {
+        left: 0;
+        top: 0;
+        bottom: auto;
+        right: 0;
+        width: 52px;
+        height: 52px;
+        background-image: url("../vectors/loading-enlarged.svg");
+    }
+
+    .loading--alternate.loading--enlarged::before {
+        background-image: url("../vectors/loading-enlarged-alternate.svg");
+    }
+
+
+.loading--indicator-only {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    text-indent: 200%;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.loading--indicator-only.loading--enlarged {
+    width: 52px;
+    height: 52px;
+}

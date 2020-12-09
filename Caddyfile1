@@ -1,0 +1,42 @@
+localhost:8000
+
+mime .css text/css
+
+rewrite /static/styles {
+  r (.*)
+  to /octopod-css/production/styles/{1}
+}
+
+mime .js 	application/javascript
+
+rewrite /static/vendors {
+  r (.*)
+  to /octopod-css/production/vendors/{1}
+}
+
+rewrite /static/scripts {
+  r (.*)
+  to /octopod-css/production/scripts/{1}
+}
+
+rewrite /static/images {
+  r (.*)
+  to /octopod-css/production/images/{1}
+}
+
+proxy /api localhost:3002 {
+  transparent
+}
+
+mime .json 	application/json
+rewrite /config.json /octopod-config.json
+
+rewrite /ghcjs /frontend-result/bin/frontend.jsexe/index.html
+
+proxy / localhost:3003 {
+  transparent
+  websocket
+  except /octopod-css/ /frontend-result/ /octopod-config.json
+}
+
+log / stdout

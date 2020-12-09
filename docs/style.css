@@ -1,0 +1,90 @@
+body {
+  background: white;
+}
+
+.actor {
+  stroke: #ccccff;
+  fill: #ececff;
+}
+
+text.actor {
+  fill: black;
+  stroke: none;
+  font-family: Helvetica, Helvetica;
+}
+
+.actor-line {
+  stroke: grey;
+}
+
+.messageLine0 {
+  stroke-width: 1.5;
+  stroke-dasharray: '2 2';
+  marker-end: 'url(#arrowhead)';
+  stroke: black;
+}
+
+.messageLine1 {
+  stroke-width: 1.5;
+  stroke-dasharray: '2 2';
+  stroke: black;
+}
+
+#arrowhead {
+  fill: black;
+}
+
+.messageText {
+  fill: black;
+  stroke: none;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+  font-size: 19px;
+}
+
+.labelBox {
+  stroke: #ccccff;
+  fill: #ececff;
+}
+
+.labelText {
+  fill: black;
+  stroke: none;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+  font-size: 19px;
+}
+
+.loopText {
+  fill: black;
+  stroke: none;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+}
+
+.loopLine {
+  stroke-width: 2;
+  stroke-dasharray: '2 2';
+  marker-end: 'url(#arrowhead)';
+  stroke: #ccccff;
+}
+
+.note {
+  stroke: #decc93;
+  fill: #fff5ad;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+  font-size: 19px;
+}
+
+.noteText {
+  font-size: 19px;
+  fill: black;
+  stroke: none;
+}
+
+.sectionTitle,
+.noteText,
+.taskText,
+.titleText,
+.taskTextOutsideRight {
+  font-size: 19px;
+  font-family: Helvetica, 'trebuchet ms', verdana, arial;
+}

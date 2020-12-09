@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+  - name: octopod-power-app
+    port: 443
+    targetPort: {{ .Values.port }}
+  - name: octopod-ui
+    port: 80
+    targetPort: 80
+  - name: octopod-app
+    port: 81
+    targetPort: {{ .Values.ui_port }}
+  - name: octopod-ws
+    port: 82
+    targetPort: {{ .Values.ws_port }}

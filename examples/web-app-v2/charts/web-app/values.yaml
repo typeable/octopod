@@ -1,0 +1,8 @@
+image_prefix:
+image: web-app-example
+image_tag:
+namespace: deployment
+domain:
+nodeselector: stand
+replicas: 1
+env:

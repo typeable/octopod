@@ -1,0 +1,66 @@
+.null {
+    display: inline-block;
+    vertical-align: top;
+}
+    .null::before {
+        content: "";
+        display: block;
+        margin: 0 auto 22px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+    }
+
+    .null__heading {
+        margin-top: 0;
+        margin-bottom: 0;
+        display: block;
+        font-weight: bold;
+        font-size: 16px;
+        line-height: 20px;
+        text-align: center;
+    }
+
+    .null__message {
+        margin-top: 14px;
+        font-size: 14px;
+        line-height: 16px;
+        color: var(--dark-grey);
+        text-align: center;
+    }
+
+
+.null--data {
+    padding-bottom: 8px;
+}
+    .null--data::before {
+        width: 174px;
+        height: 120px;
+        background-image: url("../images/null-data.png");
+    }
+
+    @media (min-resolution: 2dppx) {
+        .null--data::before {
+            background-image: url("../images/null-data@2x.png");
+        }
+    }
+
+
+.null--search {
+
+}
+    .null--search::before {
+        width: 120px;
+        height: 120px;
+        background-image: url("../images/null-search.png");
+    }
+
+    @media (min-resolution: 2dppx) {
+        .null--search::before {
+            background-image: url("../images/null-search@2x.png");
+        }
+    }
+
+    .null--search .null__message {
+        margin-top: 6px;
+    }

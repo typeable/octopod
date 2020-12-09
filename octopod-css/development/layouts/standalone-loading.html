@@ -1,0 +1,43 @@
+<style>
+    .loading {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        margin: auto;
+        box-sizing: border-box;
+        width: 62px;
+        height: 90px;
+        padding-top: 66px;
+        padding-bottom: 8px;
+        /* Здесь не используем Roboto намерено, чтобы не было скачка текста когда шрифты прогрузятся. */
+        font-family: -apple-system, "BlinkMacSystemFont", "Segoe UI", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+        font-size: 14px;
+        line-height: 16px;
+        color: #757575;
+    }
+        @keyframes loading {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading__indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: auto;
+            margin: auto;
+            display: block;
+            width: 52px;
+            height: 52px;
+            animation: loading 2.2s linear infinite;
+        }
+</style>
+
+<div class="loading">
+    <svg class="loading__indicator" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 26C2 39.2548 12.7452 50 26 50C39.2548 50 50 39.2548 50 26C50 12.7452 39.2548 2 26 2" stroke="#3671E3" stroke-width="4"/>
+    </svg>
+    Loading...
+</div>

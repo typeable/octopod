@@ -1,0 +1,10 @@
+.log {
+    margin-top: 0;
+    margin-bottom: 0;
+    display: block;
+    padding: 24px;
+    font-family: "Roboto Mono", monospace;
+    font-size: 12px;
+    line-height: 16px;
+    word-break: break-all;
+}

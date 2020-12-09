@@ -1,0 +1,90 @@
+.expander { /* дефолтная версия расчитана на использование с .bar */
+    position: relative;
+    border: none;
+    background-color: transparent;
+    padding: 0 17px 0 0;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+    /* Увеличиваем область кликабельности */
+    .expander::before {
+        content: "";
+        position: absolute;
+        left: -4px;
+        right: -4px;
+        top: -10px;
+        bottom: -10px;
+        display: block;
+    }
+
+    /* Стрелочка */
+    .expander::after {
+        position: absolute;
+        right: 0;
+        top: 0;
+        content: "";
+        display: block;
+        width: 16px;
+        height: 16px;
+        background-image: url("../vectors/expander.svg");
+        background-repeat: no-repeat;
+        background-position: center center;
+    }
+
+
+.expander:hover {
+    color: var(--primary-hover);
+}
+
+.expander:active {
+    color: var(--primary-active);
+}
+
+
+.expander--open {
+
+}
+    .expander--open::after {
+        transform: scaleY(-1);
+    }
+
+
+.expander--stand-alone {
+    padding: 9px 24px 9px 0;
+    background-color: transparent;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 16px;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+    .expander--stand-alone::after {
+        right: 0;
+        top: 7px;
+        width: 20px;
+        height: 20px;
+        background-image: url("../vectors/expander-larger.svg");
+        background-size: contain;
+    }
+
+.expander--stand-alone:hover {
+    background-color: transparent;
+    color: var(--primary-hover);
+}
+    .expander--stand-alone:hover::after {
+        background-image: url("../vectors/expander-larger-hover.svg");
+    }
+
+.expander--stand-alone:active {
+    background-color: transparent;
+    color: var(--primary-active);
+}
+    .expander--stand-alone:active::after {
+        background-image: url("../vectors/expander-larger-active.svg");
+    }

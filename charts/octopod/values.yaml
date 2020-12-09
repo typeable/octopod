@@ -1,0 +1,38 @@
+global:
+  image_prefix:
+  image: octopod
+  octo_image: octo
+  image_tag:
+  utils_image_prefix:
+  utils_image:
+  utils_image_tag:
+
+namespace: octopod
+target_namespace: deployment
+nodeselector: stand
+service_account: octopod
+port: 4443
+ui_port: 4000
+ws_port: 4020
+dbname: octopod
+seed: false
+migrations: true
+replicas: 1
+domain: octopod.stage.example.com
+app_domain: octopod-app.stage.example.com
+ws_domain: octopod-ws.stage.example.com
+power_app_domain: octopod-power-app.stage.example.com
+base_domain: stage.example.com
+project_name: Octopod
+status_update_timeout: 600
+acme_registration_email:
+basic_auth_token:
+connections:
+  pg_instance: octopod:octopod@octopod-infra-postgres-0.octopod-infra-postgres.octopod:5432
+pg_host: octopod-infra-postgres-0.octopod-infra-postgres.octopod
+requests:
+  cpu: 200m
+  memory: 256Mi
+limits:
+  cpu: 200m
+  memory: 512Mi

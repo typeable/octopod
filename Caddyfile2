@@ -1,0 +1,27 @@
+http://localhost:8000
+
+
+file_server
+
+@production {
+  path_regexp production /static/(.*)
+}
+
+rewrite @production /octopod-css/production/{http.regexp.production.1}
+
+reverse_proxy /api localhost:3002
+
+rewrite /config.json /octopod-config.json
+
+rewrite /ghcjs /frontend-result/bin/frontend.jsexe/index.html
+
+@3003 {
+  not path /octopod-css/* /frontend-result/* /octopod-config.json
+}
+
+reverse_proxy @3003 localhost:3003
+
+log {
+	output stdout
+	format single_field common_log
+}

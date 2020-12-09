@@ -1,0 +1,56 @@
+.listing {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+    .listing__item.bar {
+        margin-top: 2px;
+    }
+
+    .listing__item.bar--larger {
+        margin-top: 4px;
+    }
+
+    .listing__item.bar:first-child {
+        margin-top: 0;
+    }
+
+    .listing__more {
+        margin-top: 2px;
+    }
+
+
+/* пока что не встречалось: */
+.listing--larger {
+
+}
+
+
+.listing--for-text {
+    display: block;
+    font-size: 12px; /* поскольку тут нет .bar теперь размеры задаем вручную */
+    line-height: 16px;
+}
+    .listing--for-text .listing__item {
+        margin-top: 8px;
+        white-space: nowrap; /* поскольку тут нет .bar теперь обрезание текста задаем вручную */
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .listing--for-text .listing__item:first-child {
+        margin-top: 0;
+    }
+        .listing--for-text b {
+            font-weight: 500;
+        }
+
+    .listing--for-text .listing__more {
+        margin-top: 8px;
+    }
+
+
+.listing--for-text.listing--larger {
+    font-size: 16px;
+    line-height: 24px;
+}

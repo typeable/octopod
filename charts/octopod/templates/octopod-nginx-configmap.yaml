@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx-config
+  namespace: {{ .Values.namespace }}
+data:
+  app.conf: |
+    server {
+      listen 80 default_server;
+      server_name _;
+      root /www;
+      index index.html;
+      error_page 404 =200 /index.html;
+    }
+  config.json: |
+    {
+      "app_url": "https://{{ .Values.app_domain }}",
+      "ws_url": "wss://{{ .Values.ws_domain }}",
+      "app_auth": "Basic {{ .Values.basic_auth_token }}"
+    }

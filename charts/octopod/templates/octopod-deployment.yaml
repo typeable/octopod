@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      name: {{ .Release.Name }}
+      labels:
+        app: {{ .Release.Name }}
+      annotations:
+        checksum/config: "{{ .Values.global.deploy_checksum }}"
+    spec:
+      serviceAccountName: {{ .Values.service_account }}
+      nodeSelector:
+        role: {{ .Values.nodeselector }}
+      terminationGracePeriodSeconds: 600
+      initContainers:
+      - name: copy-utils
+        image: {{ .Values.global.utils_image_prefix }}/{{ .Values.global.utils_image }}:{{ .Values.global.utils_image_tag }}
+        command:
+        - sh
+        - -c
+        - 'cp /utils/* /copy/'
+        volumeMounts:
+        - name: utils
+          mountPath: /copy
+
+      - name: init
+        image: {{ .Values.global.image_prefix }}/{{ .Values.global.image }}:{{ .Values.global.image_tag }}
+        command:
+        - sh
+        - -c
+        - '/utils/init'
+        securityContext:
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+        - name: home
+          mountPath: /home/octopod
+        - name: utils
+          mountPath: /utils
+
+      - name: copy-www
+        image: {{ .Values.global.image_prefix }}/{{ .Values.global.image }}:{{ .Values.global.image_tag }}
+        command:
+        - sh
+        - -c
+        - 'cp -a /www/* /copy/'
+        volumeMounts:
+        - name: www
+          mountPath: /copy
+
+      containers:
+      - name: main
+        image: {{ .Values.global.image_prefix }}/{{ .Values.global.image }}:{{ .Values.global.image_tag }}
+        ports:
+        - containerPort: {{ .Values.port }}
+          protocol: TCP
+        - containerPort: {{ .Values.ui_port }}
+          protocol: TCP
+        args:
+        - "--port"
+        - "{{ .Values.port }}"
+        - "--ui-port"
+        - "{{ .Values.ui_port }}"
+        - "--ws-port"
+        - "{{ .Values.ws_port }}"
+        - "--db"
+        - "host='{{ .Values.pg_host }}' port=5432 user='octopod' password='octopod'"
+        - "--db-pool-size"
+        - "10"
+        - "--tls-cert-path"
+        - "/tls/server_cert.pem"
+        - "--tls-key-path"
+        - "/tls/server_key.pem"
+        - "--tls-store-path"
+        - "/tls_store"
+        envFrom:
+        - configMapRef:
+            name: {{ .Release.Name }}-config
+        securityContext:
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+        - name: home
+          mountPath: /home/octopod
+        - name: utils
+          mountPath: /utils
+        - name: certs
+          mountPath: /tls/server_cert.pem
+          subPath: server_cert.pem
+        - name: certs
+          mountPath: /tls/server_key.pem
+          subPath: server_key.pem
+        - name: certs
+          mountPath: /tls_store/server_cert.pem
+          subPath: server_cert.pem
+        resources:
+          requests:
+            cpu: 0.2
+            memory: 256Mi
+          limits:
+            cpu: 0.2
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            port: {{ .Values.ui_port }}
+            path: /api/v1/ping
+          periodSeconds: 20
+        livenessProbe:
+          httpGet:
+            port: {{ .Values.ui_port }}
+            path: /api/v1/ping
+          initialDelaySeconds: 15
+          periodSeconds: 5
+
+      - name: nginx
+        image: nginx:1.17.5
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/app.conf
+          subPath: app.conf
+        - name: nginx-config
+          mountPath: /www/config.json
+          subPath: config.json
+        - name: www
+          mountPath: /www
+        ports:
+        - containerPort: 80
+          protocol: TCP
+
+      volumes:
+      - name: home
+        emptyDir: {}
+      - name: utils
+        emptyDir: {}
+      - name: www
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: {{ .Release.Name }}-nginx-config
+      - name: certs
+        configMap:
+          name: octopod-certs

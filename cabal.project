@@ -1,0 +1,6 @@
+packages:
+  octo-cli/
+  octopod-api/
+  octopod-backend/
+  octopod-common/
+  octopod-frontend/

@@ -1,0 +1,14 @@
+resolver: lts-14.27
+
+packages:
+  - octo-cli
+  - octopod-api
+  - octopod-backend
+  - octopod-common
+
+extra-deps:
+  - deriving-aeson-0.2.2
+  - servant-websockets-2.0.0
+  - postgresql-error-codes-1.0.1
+  - table-layout-0.9.0.1
+  - data-default-instances-base-0.1.0.1

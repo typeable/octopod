@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  PROJECT_NAME: {{ .Values.project_name }}
+  BASE_DOMAIN: {{ .Values.base_domain }}
+  NAMESPACE: {{ .Values.target_namespace }}
+  STATUS_UPDATE_TIMEOUT: "{{ .Values.status_update_timeout }}"
+  ARCHIVE_RETENTION: "1209600"
+  CREATION_COMMAND: /utils/create
+  UPDATE_COMMAND: /utils/update
+  ARCHIVE_COMMAND: /utils/archive
+  CHECKING_COMMAND: /utils/check
+  CLEANUP_COMMAND: /utils/cleanup
+  ARCHIVE_CHECKING_COMMAND: /utils/archive_check
+  TAG_CHECKING_COMMAND: /utils/tag_check
+  INFO_COMMAND: /utils/info
