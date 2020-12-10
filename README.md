@@ -1,4 +1,4 @@
-# 🐙 Octopod ![Octopod Docker Image](https://github.com/typeable/octopod/workflows/Octopod%20Docker%20Image/badge.svg?branch=master) ![octo CLI](https://github.com/typeable/octopod/workflows/octo%20CLI/badge.svg?branch=master) ![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)
+# 🐙 Octopod [![Octopod Docker Image](https://github.com/typeable/octopod/workflows/Octopod%20Docker%20Image/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3A%22Octopod+Docker+Image%22+branch%3Amaster) [![octo CLI](https://github.com/typeable/octopod/workflows/octo%20CLI/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3A%22octo+CLI%22+branch%3Amaster) [![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster)
 
 _Octopod_ is a fully open-source self-hosted solution for managing multiple deployments in a _Kubernetes_ cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
@@ -44,10 +44,14 @@ Yes. If you can run arbitrary executables in your CI, then you will be able to i
 
 ### How come I can't see the deployment logs in Octopod web app?
 
-It's been excluded from the GUI because we don't have a good security story to accompany this feature yet. Some secret and credentials may leak to the project team using Octopod and, potentially, not everyone should have access to this data.
+It's been excluded from the GUI because we don't have a good security story to accompany this feature yet. Some secrets and credentials may leak to the project team using Octopod and, potentially, not everyone should have access to this data.
 
 ### Why Haskell and Rust?
 
 We believe that there is a lot to be gained in programming in general by being able to statically ensure invariants in your code. One of the most practical ways of ensuring invariants is a good static type system. Haskell and Rust are both languages that have very strong type systems. This allows us to move fast without breaking things in the process.
+
+## ❓ Still have questions?
+
+If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
 <p align="center"><a href="https://typeable.io"><img src="img/typeable.png" width="177px"></img></a></p>
