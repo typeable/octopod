@@ -1,3 +1,5 @@
-* linguist-vendored
-*.hs linguist-vendored=false
-*.rs linguist-vendored=false
+examples/**/*.rs -linguist-documentation
+*.tpl -linguist-detectable
+*.html -linguist-detectable
+*.css -linguist-detectable
+*.js -linguist-detectable
