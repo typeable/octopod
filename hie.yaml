@@ -1,13 +1,13 @@
 cradle:
-  stack:
+  cabal:
     - path: "octo-cli/src"
       component: "octo-cli:exe:octo"
 
     - path: "octopod-api/src"
-      component: "octopod-api:lib"
+      component: "lib:octopod-api"
 
     - path: "octopod-backend/src"
-      component: "octopod-backend:lib"
+      component: "lib:octopod-backend"
 
     - path: "octopod-backend/app"
       component: "octopod-backend:exe:octopod-exe"
@@ -16,4 +16,7 @@ cradle:
       component: "octopod-backend:test:octopod-test"
 
     - path: "octopod-common/src"
-      component: "octopod-common:lib"
+      component: "lib:octopod-common"
+
+    - path: "octopod-frontend/src"
+      component: "octopod-frontend:exe:frontend"

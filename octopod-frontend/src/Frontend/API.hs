@@ -21,6 +21,7 @@ import           GHC.TypeLits
 import           Reflex.Dom as R
 import           Servant.API as S
 import           Servant.Reflex as SR
+import           Servant.Reflex.Extra ()
 
 import           Common.Types
 import           Frontend.GHCJS
