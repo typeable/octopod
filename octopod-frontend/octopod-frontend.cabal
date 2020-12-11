@@ -32,6 +32,7 @@ executable frontend
                      , Page.Deployments
                      , Page.Popup.EditDeployment
                      , Page.Popup.NewDeployment
+                     , Servant.Reflex.Extra
   ghc-options:         -Wall
                        -Werror
                        -Wno-missing-home-modules
@@ -57,6 +58,10 @@ executable frontend
                      , RankNTypes
                      , RecordWildCards
                      , RecursiveDo
+                     , FlexibleInstances
+                     , MultiParamTypeClasses
+                     , TypeFamilies
+                     , UndecidableInstances
   -- other-extensions:
   build-depends:       aeson
                      , base >=4.12 && <4.13

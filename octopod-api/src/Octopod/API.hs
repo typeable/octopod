@@ -30,8 +30,7 @@ type StatusEndpoint c = c :> "status" :> Get '[JSON] CurrentDeploymentStatus
 type RestoreEndpoint c =
   c :> "restore" :> Patch '[JSON] CommandResponse
 
-type PingEndpoint =
-  "ping" :> GetNoContent '[PlainText] NoContent
+type PingEndpoint = "ping" :> GetNoContent
 type ProjectNameEndpoint =
   "project_name" :> Get '[JSON] ProjectName
 
