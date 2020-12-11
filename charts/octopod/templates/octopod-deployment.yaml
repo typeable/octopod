@@ -51,7 +51,10 @@ spec:
         command:
         - sh
         - -c
-        - 'cp -a /www/* /copy/'
+        - |
+          set -ex
+          cp -a /www/* /copy/
+          find /www -type f -exec touch {} +
         volumeMounts:
         - name: www
           mountPath: /copy
