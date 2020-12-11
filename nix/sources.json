@@ -1,4 +1,40 @@
 {
+    "brittany": {
+        "branch": "c59655f10d5ad295c2481537fc8abf0a297d9d1c",
+        "description": "haskell source code formatter",
+        "homepage": "",
+        "owner": "bubba",
+        "repo": "brittany",
+        "rev": "c59655f10d5ad295c2481537fc8abf0a297d9d1c",
+        "sha256": "1rkk09f8750qykrmkqfqbh44dbx1p8aq1caznxxlw8zqfvx39cxl",
+        "type": "tarball",
+        "url": "https://github.com/bubba/brittany/archive/c59655f10d5ad295c2481537fc8abf0a297d9d1c.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "ghcide": {
+        "branch": "9b8aaf9b06846571cc0b5d46680e686e4f9153a3",
+        "description": "A library for building Haskell IDE tooling",
+        "homepage": "",
+        "owner": "haskell",
+        "repo": "ghcide",
+        "rev": "9b8aaf9b06846571cc0b5d46680e686e4f9153a3",
+        "sha256": "0clwg8fgnsgwzl6rbni7p6xifl117f6h5hjsdyy0swnbjkxkqpaa",
+        "type": "tarball",
+        "url": "https://github.com/haskell/ghcide/archive/9b8aaf9b06846571cc0b5d46680e686e4f9153a3.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "haskell-language-server": {
+        "branch": "master",
+        "description": "Integration point for ghcide and haskell-ide-engine. One IDE to rule them all.",
+        "homepage": "",
+        "owner": "haskell",
+        "repo": "haskell-language-server",
+        "rev": "b649b15b2d67a97d6a262eb65fee0002629b6dcb",
+        "sha256": "1gxwkn3mqv20f061f9pg1y13k4ymsq6ji9gf475wdiikiql82z6a",
+        "type": "tarball",
+        "url": "https://github.com/haskell/haskell-language-server/archive/b649b15b2d67a97d6a262eb65fee0002629b6dcb.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "hspec-webdriver-clone": {
         "branch": "master",
         "description": "Clone of hspec-webdriver, as the original source is inaccesible",
@@ -57,18 +93,6 @@
         "sha256": "06fy5b0mk5k2ps1h78yihf4j76cb855r86y9p4jv5d91nfyl2dck",
         "type": "tarball",
         "url": "https://github.com/reflex-frp/reflex-platform/archive/8d421e9e06b0477cbc065346aaf596c9db6cc387.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "servant-reflex": {
-        "branch": "master",
-        "description": "Generate reflex client functions for querying a servant API",
-        "homepage": null,
-        "owner": "imalsogreg",
-        "repo": "servant-reflex",
-        "rev": "1109043c8437a375fc00bb48792e8dc377a84494",
-        "sha256": "0issnp95rnji3v9qifr0brypxsvmjkzanfq5lscj68lynnjv37g0",
-        "type": "tarball",
-        "url": "https://github.com/imalsogreg/servant-reflex/archive/1109043c8437a375fc00bb48792e8dc377a84494.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "static-haskell-nix": {
