@@ -111,7 +111,7 @@ deploymentsHeadWidget enabledSearch okUpdEv =
       (deleteEl, _) <- elClass' "button" "input__clear-type spot spot--cancel" $
         text "Delete"
       pure termDyn'
-    (nsEl, _) <- elClass' "a"
+    (nsEl, _) <- elClass' "button"
       "page__action button button--add popup-handler" $ text "New deployment"
     pure $ (domEvent Click nsEl, value termDyn)
 

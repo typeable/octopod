@@ -228,7 +228,7 @@ aButtonClassEnabled cl lbl dDyn = do
       True -> "class" =: cl <> "type" =: "button"
       False ->  "class" =: (cl <> " button--disabled")
         <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttr' "a" attrDyn $
+  (bEl, _) <- elDynAttr' "button" attrDyn $
     text lbl
   return $ domEvent Click bEl
 
