@@ -29,6 +29,7 @@ with {
           gnugrep
           cacert'
           shadow
+          findutils
         ];
 
         runAsRoot = ''
