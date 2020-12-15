@@ -39,7 +39,7 @@
 4. Скачивание исходного кода проекта
 
    ```bash
-   git clone https://github.com/typeable/octopod.git /tmp/octopod
+   git clone --branch master https://github.com/typeable/octopod.git /tmp/octopod
    ```
 
 5. Создание namespace `deployment` и `octopod`
