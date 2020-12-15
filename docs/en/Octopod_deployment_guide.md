@@ -79,7 +79,7 @@ To function properly _Octopod_ needs to generate three TLS certificates for the 
 To download the source code required to install _Octopod Sever_ you will need to clone the git repository:
 
 ```bash
-git clone https://github.com/typeable/octopod.git /tmp/octopod
+git clone --branch master https://github.com/typeable/octopod.git /tmp/octopod
 ```
 
 ## Creating required namespaces
