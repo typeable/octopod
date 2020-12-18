@@ -310,6 +310,7 @@ language_extensions:
   - UndecidableInstances
   - ViewPatterns
   - OverloadedLabels
+  - FlexibleContexts
 
 # Attempt to find the cabal file in ancestors of the current directory, and
 # parse options (currently only language extensions) from that.
