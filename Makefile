@@ -33,7 +33,7 @@ ghcid-cli:
 	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl octo-cli"'
 
 ghcid-frontend:
-	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl octopod-frontend -fdevelopment" --test 'Main.main''
+	nix-shell . -A shells.ghc --run 'ghcid -c "cabal new-repl octopod-frontend -fdevelopment --ghc-options=-Wwarn" --warnings --test 'Main.main''
 
 push-octopod:
 	./build.sh build-and-push latest

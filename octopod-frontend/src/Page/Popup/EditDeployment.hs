@@ -14,14 +14,16 @@ import           Data.Functor
 import           Data.Generics.Product
 import           Data.Generics.Sum
 import           Data.List (deleteFirstsBy)
+import qualified Data.List as L
 import           Data.Map as M
 import           Data.Monoid
-import           Data.Text as T (Text, intercalate)
+import qualified Data.Text as T
 import           Prelude as P
 import           Reflex.Dom as R
 
 import           Common.Types
 import           Common.Utils
+import           Data.Text (Text)
 import           Frontend.API
 import           Frontend.Utils
 import           Servant.Reflex
@@ -139,21 +141,21 @@ envVarsInput overridesHeader evs = do
     elClass "div" "deployment__widget" $
       elClass "div" "overrides" $ mdo
         let
-          initEnvs = fromList $ zip [0..] evs
+          initEnvs = L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap evs
           emptyVar = Override "" "" Public
-          addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
+          addEv = clickEv $> Endo (fst . insertUniq emptyVar)
         envsDyn <- foldDyn appEndo initEnvs $ leftmost [ addEv, updEv ]
-        (_, updEv)  <- runEventWriterT $ listWithKey envsDyn envVarInput
-        let addDisabledDyn = all ( (/= "") . overrideKey ) . M.elems <$> envsDyn
+        (_, updEv)  <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
+        let addingIsEnabled = all ( (not . T.null) . overrideKey ) . elemsUniq <$> envsDyn
         clickEv <- buttonClassEnabled'
-          "overrides__add dash dash--add" "Add an override" addDisabledDyn
+          "overrides__add dash dash--add" "Add an override" addingIsEnabled
           "dash--disabled"
-        pure $ elems <$> envsDyn
+        pure $ elemsUniq <$> envsDyn
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput
-  :: (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m)
+  :: (EventWriter t (Endo (UniqKeyMap Override)) m, MonadWidget t m)
   => Int                -- ^ Index of variable in overrides list.
   -> Dynamic t Override -- ^ Current variable key and value.
   -> m ()
@@ -167,6 +169,26 @@ envVarInput ix epDyn = do
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let
       envEv = updated $ zipDynWith (\k v -> Override k v Public) keyDyn valDyn
-      deleteEv = Endo (M.delete ix) <$ closeEv
-      updEv = Endo . flip update ix . const . Just <$> envEv
+      deleteEv = Endo (deleteUniq ix) <$ closeEv
+      updEv = Endo . updateUniq ix . const <$> envEv
     tellEvent $ leftmost [deleteEv, updEv]
+
+data UniqKeyMap v = UniqKeyMap (Map Int v) (Int)
+
+uniqMap :: UniqKeyMap v -> Map Int v
+uniqMap (UniqKeyMap m _) = m
+
+insertUniq :: v -> UniqKeyMap v -> (UniqKeyMap v, Int)
+insertUniq v (UniqKeyMap m x) = (UniqKeyMap (M.insert x v m) (x + 1), x)
+
+deleteUniq :: Int -> UniqKeyMap v -> UniqKeyMap v
+deleteUniq k (UniqKeyMap m x) = UniqKeyMap (M.delete k m) x
+
+updateUniq :: Int -> (v -> v) -> UniqKeyMap v -> UniqKeyMap v
+updateUniq k f (UniqKeyMap m x) = UniqKeyMap (M.adjust f k m) x
+
+elemsUniq :: UniqKeyMap v -> [v]
+elemsUniq (UniqKeyMap m _) = M.elems m
+
+emptyUniqKeyMap :: UniqKeyMap v
+emptyUniqKeyMap = UniqKeyMap mempty 0
