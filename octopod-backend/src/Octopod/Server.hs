@@ -41,6 +41,7 @@ import           System.Process.Typed
 
 import           Common.Utils
 import           Common.Validation (isNameValid)
+import           Database.PostgreSQL.Simple.Transaction
 import           Octopod.API
 import           Octopod.PowerAPI
 import           Octopod.Server.Args
@@ -385,8 +386,7 @@ updateDeploymentInfo dName st = do
     case ec of
       ExitSuccess -> do
         dMeta <- parseDeploymentMetadata (lines . unStdout $ out)
-        forM_ dMeta $ \meta ->
-          upsertDeploymentMetadata (pool st) dName meta
+        upsertDeploymentMetadata (pool st) dName dMeta
       ExitFailure _ ->
         log $
           "could not get deployment info, exit code: " <> (pack . show $ ec)
@@ -1045,7 +1045,8 @@ selectDeploymentMetadata conn dName = do
   let
     q =
       "SELECT key, value FROM deployment_metadata \
-      \WHERE deployment_id = (SELECT id FROM deployments WHERE name = ?)"
+      \WHERE deployment_id = (SELECT id FROM deployments WHERE name = ?) \
+      \ORDER BY ord ASC"
   rows <- query conn q (Only dName)
   for rows $ \(k, v) -> pure $ DeploymentMetadata k v
 
@@ -1065,21 +1066,23 @@ deleteDeploymentMetadata pgPool dName = do
 upsertDeploymentMetadata
   :: PgPool
   -> DeploymentName
-  -> DeploymentMetadata
+  -> [DeploymentMetadata]
   -> IO ()
-upsertDeploymentMetadata pgPool dName dMetadata = do
+upsertDeploymentMetadata pgPool dName dMetadatas = do
   let
-    q     =
-      "INSERT INTO deployment_metadata \
-      \(deployment_id, key, value, created_at, updated_at) \
-      \(SELECT id, ?, ?, now(), now() FROM deployments WHERE name = ?) \
-      \ON CONFLICT (deployment_id, key) \
-      \DO \
-        \UPDATE SET key = ?, value = ?, updated_at = now()"
-    key   = deploymentMetadataKey dMetadata
-    value = deploymentMetadataValue dMetadata
-  void $ withResource pgPool $ \conn ->
-    execute conn q (key, value, dName, key, value)
+  withResource pgPool $ \conn -> withTransactionSerializable conn $ do
+    void $ execute
+      conn
+      "DELETE FROM deployment_metadata \
+      \WHERE deployment_id = (SELECT id FROM deployments WHERE name = ?)"
+      (Only dName)
+    forM_ (zip [1..] dMetadatas) $ \(ord :: Int, dMeta) ->
+      execute
+        conn
+        "INSERT INTO deployment_metadata \
+        \(deployment_id, key, value, created_at, updated_at, ord) \
+        \(SELECT id, ?, ?, now(), now(), ? FROM deployments WHERE name = ?)"
+        (deploymentMetadataKey dMeta, deploymentMetadataValue dMeta, ord, dName)
 
 -- | Checks the existence of a deployment tag.
 -- Returns 404 'Tag not found' response if the deployment tag doesn't exist.
