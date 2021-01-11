@@ -96,13 +96,6 @@
       ver = "1.6.2";
       sha256 = "1s7cahx8cf85kwz9l8cm6x6kvjwsv0spwv78pybsspb1ap5q287p";
     } { };
-  optparse-applicative =
-    hsuper.callHackageDirect
-      {
-        pkg = "optparse-applicative";
-        ver = "0.15.1.0";
-        sha256 = "1mii408cscjvids2xqdcy2p18dvanb0qc0q1bi7234r23wz60ajk";
-      } { };
   reflex = lib.dontCheck (lib.doJailbreak hsuper.reflex);
   reflex-dom-core = lib.dontCheck hsuper.reflex-dom-core;
   chronos = lib.doJailbreak hsuper.chronos;
