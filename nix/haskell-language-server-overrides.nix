@@ -125,14 +125,14 @@
         ver = "8.10.0.16";
         sha256 = "0dp8plj708ss3im6rmp41kpj0df71kjzpw1kqkpn0dhms9yr1g0x";
       } { };
-  retrie = lib.dontCheck (
+  retrie = lib.doJailbreak (lib.dontCheck (
     hsuper.callHackageDirect
       {
         pkg = "retrie";
         ver = "0.1.1.1";
         sha256 = "0gnp6j35jnk1gcglrymvvn13sawir0610vh0z8ya6599kyddmw7l";
       } { }
-  );
+  ));
   ghc-lib =
     hsuper.callHackageDirect
       {
@@ -218,13 +218,13 @@
         ver = "0.3.22";
         sha256 = "05mam3x4x7c881bqbq8lcbclmz914yziqh6s04icxzp12zq7c7ks";
       } { };
-  apply-refact =
-    hsuper.callHackageDirect
-      {
-        pkg = "apply-refact";
-        ver = "0.8.2.1";
-        sha256 = "0nnprv5lbk7c8w1pa4kywk0cny6prjaml4vnw70s8v6c1r1dx2rx";
-      } { };
+  apply-refact = lib.doJailbreak (hsuper.callHackageDirect
+    {
+      pkg = "apply-refact";
+      ver = "0.8.2.1";
+      sha256 = "0nnprv5lbk7c8w1pa4kywk0cny6prjaml4vnw70s8v6c1r1dx2rx";
+    } { }
+  );
   hlint =
     hsuper.callHackageDirect
       {
