@@ -1,0 +1,5 @@
+{
+  "app_url": "http://localhost:8000",
+  "ws_url": "ws://localhost:4020",
+  "app_auth": ""
+}
