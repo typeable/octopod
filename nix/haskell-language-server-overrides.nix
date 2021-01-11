@@ -6,8 +6,21 @@
   hls-retrie-plugin = hsuper.callCabal2nix "hls-retrie-plugin" (sources.haskell-language-server + "/plugins/hls-retrie-plugin") { };
   hls-plugin-api = hsuper.callCabal2nix "hls-plugin-api" (sources.haskell-language-server + "/hls-plugin-api") { };
   hls-tactics-plugin = hsuper.callCabal2nix "hls-tactics-plugin" (sources.haskell-language-server + "/plugins/tactics") { };
-  ghcide = lib.dontCheck (hsuper.callCabal2nix "ghcide" sources.ghcide { });
-  hie-compat = hsuper.callCabal2nix "hie-compat" (sources.ghcide + "/hie-compat") { };
+  hls-class-plugin = hsuper.callCabal2nix "hls-class-plugin" (sources.haskell-language-server + "/plugins/hls-class-plugin") { };
+  hls-eval-plugin = hsuper.callCabal2nix "hls-eval-plugin" (sources.haskell-language-server + "/plugins/hls-eval-plugin") { };
+  hls-haddock-comments-plugin = hsuper.callCabal2nix "hls-haddock-comments-plugin" (sources.haskell-language-server + "/plugins/hls-haddock-comments-plugin") { };
+  hls-splice-plugin = hsuper.callCabal2nix "hls-splice-plugin" (sources.haskell-language-server + "/plugins/hls-splice-plugin") { };
+  shake-bench = hsuper.callCabal2nix "shake-bench" (sources.haskell-language-server + "/shake-bench") { };
+  ghcide = lib.dontCheck (hsuper.callCabal2nix "ghcide" (sources.haskell-language-server + "/ghcide") { });
+  hie-compat = hsuper.callCabal2nix "hie-compat" (sources.haskell-language-server + "/hie-compat") { };
+  hls-exactprint-utils = hsuper.callCabal2nix "hls-exactprint-utils" (sources.haskell-language-server + "/hls-exactprint-utils") { };
+  with-utf8 = (hsuper.callHackageDirect
+    {
+      pkg = "with-utf8";
+      ver = "1.0.2.1";
+      sha256 = "1hpqc0ljk1c1vl4671zb290hbvdcjpg66bcxmf1cz8h0vb382xp7";
+    } { }
+  );
   fourmolu = lib.doJailbreak (hsuper.callHackageDirect
     {
       pkg = "fourmolu";
@@ -15,6 +28,37 @@
       sha256 = "sha256-SFBwhkXfDArITiBSxGSp2qf8gl+yBpWHglBB5aKeaBU=";
     } { }
   );
+  heapsize = lib.doJailbreak (hsuper.callHackageDirect
+    {
+      pkg = "heapsize";
+      ver = "0.3.0.1";
+      sha256 = "0c8lqndpbx9ahjrqyfxjkj0z4yhm1zlcn8al0ir4ldlahql2xv3r";
+    } { }
+  );
+  opentelemetry = hsuper.callHackageDirect
+    {
+      pkg = "opentelemetry";
+      ver = "0.6.1";
+      sha256 = "08k71z7bns0i6r89nmxqsl00kyksicq619rqy6pf5m7hq1r4zs9m";
+    } { };
+  ghc-trace-events = hsuper.callHackageDirect
+    {
+      pkg = "ghc-trace-events";
+      ver = "0.1.2.1";
+      sha256 = "10vrm7hmg97fn8xf0r79d9vfph0j2s105lsgm0hgqay1qz1x7sp7";
+    } { };
+  haskell-lsp = hsuper.callHackageDirect
+    {
+      pkg = "haskell-lsp";
+      ver = "0.23.0.0";
+      sha256 = "0d9bk1cqkk41frm81j683h2vd1hghl4hlvj8g17690d2qk5pq3c0";
+    } { };
+  haskell-lsp-types = hsuper.callHackageDirect
+    {
+      pkg = "haskell-lsp-types";
+      ver = "0.23.0.0";
+      sha256 = "17mfc2zxkbwipxiy0g3qwqnyp8ds4mrg0z1v7jchcm89hnf8mmmq";
+    } { };
   ormolu =
     hsuper.callHackageDirect
       {
@@ -43,13 +87,12 @@
         ver = "0.1.2.5";
         sha256 = "1l0rz4r4hamvmqlb68a7y4s3n73y6xx76zyprksd0pscd9axznnv";
       } { };
-  lsp-test = lib.dontCheck (
-    hsuper.callHackageDirect
-      {
-        pkg = "lsp-test";
-        ver = "0.11.0.6";
-        sha256 = "19mbbkjpgpmkna26i4y1jvp305srv3kwa5b62x30rlb3rqf2vy5v";
-      } { }
+  lsp-test = lib.dontCheck (hsuper.callHackageDirect
+    {
+      pkg = "lsp-test";
+      ver = "0.11.0.7";
+      sha256 = "sha256-buHcgRbLIn2zr5GK4gHrKuUiyYJK7Nzqc1y+WosaHJg=";
+    } { }
   );
   floskell = lib.dontCheck (
     hsuper.callHackageDirect
@@ -104,26 +147,12 @@
         ver = "8.10.2.20200916";
         sha256 = "1apm9zn484sm6b8flbh6a2kqnv1wjan4l58b81cic5fc1jsqnyjk";
       } { };
-  haskell-lsp =
-    hsuper.callHackageDirect
-      {
-        pkg = "haskell-lsp";
-        ver = "0.22.0.0";
-        sha256 = "1q3w46qcvzraxgmw75s7bl0qvb2fvff242r5vfx95sqska566b4m";
-      } { };
   parser-combinators =
     hsuper.callHackageDirect
       {
         pkg = "parser-combinators";
         ver = "1.2.1";
         sha256 = "1990d6c1zm2wq4w9521bx7l3arg4ly02hq1ass9n19gs273bxx5h";
-      } { };
-  haskell-lsp-types =
-    hsuper.callHackageDirect
-      {
-        pkg = "haskell-lsp-types";
-        ver = "0.22.0.0";
-        sha256 = "1apjclphi2v6ggrdnbc0azxbb1gkfj3x1vkwpc8qd6lsrbyaf0n8";
       } { };
   regex-tdfa =
     hsuper.callHackageDirect
@@ -159,13 +188,6 @@
         pkg = "stylish-haskell";
         ver = "0.12.2.0";
         sha256 = "1ck8i550rvzbvzrm7dvgir73slai8zmvfppg3n5v4igi7y3jy0mr";
-      } { };
-  optparse-applicative =
-    hsuper.callHackageDirect
-      {
-        pkg = "optparse-applicative";
-        ver = "0.15.1.0";
-        sha256 = "1mii408cscjvids2xqdcy2p18dvanb0qc0q1bi7234r23wz60ajk";
       } { };
   shake = lib.dontCheck (
     hsuper.callHackageDirect
@@ -236,5 +258,10 @@
   test-framework = lib.doJailbreak hsuper.test-framework;
   aeson = lib.dontCheck hsuper.aeson;
   tree-diff = lib.doJailbreak hsuper.tree-diff;
-  brittany = hsuper.callCabal2nix "brittany" sources.brittany { };
+  brittany = hsuper.callHackageDirect
+    {
+      pkg = "brittany";
+      ver = "0.13.1.0";
+      sha256 = "172mg0ch2awfzhz8vzvjrfdjylfzawrbgfr5z82l1qzjh6g9z295";
+    } { };
 }
