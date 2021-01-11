@@ -1,6 +1,6 @@
 #!/bin/bash
 
-(cd migrations && sqitch deploy)
+(cd migrations && sqitch deploy -t postgresql://octopod:octopod@localhost:5432/octopod)
 
 export MOUNT_DIR=./dev
 

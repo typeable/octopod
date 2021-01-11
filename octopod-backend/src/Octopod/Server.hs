@@ -1046,7 +1046,7 @@ selectDeploymentMetadata conn dName = do
     q =
       "SELECT key, value FROM deployment_metadata \
       \WHERE deployment_id = (SELECT id FROM deployments WHERE name = ?) \
-      \ORDER BY ord ASC"
+      \ORDER BY id ASC"
   rows <- query conn q (Only dName)
   for rows $ \(k, v) -> pure $ DeploymentMetadata k v
 
@@ -1076,13 +1076,13 @@ upsertDeploymentMetadata pgPool dName dMetadatas = do
       "DELETE FROM deployment_metadata \
       \WHERE deployment_id = (SELECT id FROM deployments WHERE name = ?)"
       (Only dName)
-    forM_ (zip [1..] dMetadatas) $ \(ord :: Int, dMeta) ->
+    forM_ dMetadatas $ \dMeta ->
       execute
         conn
         "INSERT INTO deployment_metadata \
-        \(deployment_id, key, value, created_at, updated_at, ord) \
-        \(SELECT id, ?, ?, now(), now(), ? FROM deployments WHERE name = ?)"
-        (deploymentMetadataKey dMeta, deploymentMetadataValue dMeta, ord, dName)
+        \(deployment_id, key, value, created_at, updated_at) \
+        \(SELECT id, ?, ?, now(), now() FROM deployments WHERE name = ?)"
+        (deploymentMetadataKey dMeta, deploymentMetadataValue dMeta, dName)
 
 -- | Checks the existence of a deployment tag.
 -- Returns 404 'Tag not found' response if the deployment tag doesn't exist.

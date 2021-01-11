@@ -76,14 +76,16 @@ We have two commands to run the backend and frontend in the `Makefile`:
 
    1. You need to have a [Postgres](https://www.postgresql.org) database running on `localhost:5432` (the default port).
 
-   2. You also need to have an `octopod:octopod` user set up as it will be used by the server to access the database.
+   2. You need to create an empty `octopod` database.
+
+   3. You also need to have an `octopod:octopod` user set up as it will be used by the server to access the database.
 
       The easiest way to do this is by running the following command after you have _Postgres running_:
       ```bash
       psql -c "CREATE ROLE IF NOT EXISTS octopod WITH PASSWORD 'octopod' SUPERUSER LOGIN;"
       ```
 
-   3. You will need [sqitch](https://sqitch.org) installed on your system as it will be used to run migrations on the database.
+   4. You will need [sqitch](https://sqitch.org) installed on your system as it will be used to run migrations on the database.
 
 - `run-frontend-dev`
 
