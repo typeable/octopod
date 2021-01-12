@@ -26,8 +26,10 @@ import           Servant.Reflex
 import           Common.Types as CT
 import           Common.Utils
 import           Control.Monad.Reader
+import           Data.Align
 import           Data.Functor
 import qualified Data.Semigroup as S
+import           Data.These
 import           Frontend.API
 import           Frontend.Route
 import           Frontend.Utils
@@ -35,6 +37,7 @@ import           Page.ClassicPopup
 import           Page.Elements.Links
 import           Page.Popup.EditDeployment
 import           Page.Popup.NewDeployment
+import           Reflex.MultiEventWriter.Class
 
 
 -- | The root widget of the deployments list page.
@@ -389,13 +392,13 @@ tableHeader :: (MonadWidget t m, SortableTableGroup t m) => m ()
 tableHeader = do
   el "thead" $
     el "tr" $ do
-      sortHeader dfiName "Name"
+      sortHeader dfiName "Name" SortAsc
       el "th" $ text "Links"
       el "th" $ text "Tag"
       el "th" $ text "App overrides"
       el "th" $ text "Deployment overrides"
-      sortHeader (field @"createdAt") "Created"
-      sortHeader (field @"updatedAt") "Changed"
+      sortHeader (field @"createdAt") "Created" SortDesc
+      sortHeaderInitially (field @"updatedAt") "Changed" SortDesc
       el "th" $
         elClass "span" "visuallyhidden" $ text "Menu"
 
@@ -404,36 +407,73 @@ data SortingChanged = SortingChanged
 
 type SortableTableGroup t m =
   ( MonadReader (Event t SortingChanged) m
-  , EventWriter t SortDir m
+  , MultiEventWriter t SortDir m
+  , MultiEventWriter t SortingChanged m
   )
 
+-- | Group all sortable headers ('sortHeader', 'sortHeaderInitially').
+-- Makes sure that only one can be active at a time.
 runSortableTableGroup
   :: (Reflex t, MonadFix m)
-  => ReaderT (Event t SortingChanged) (EventWriterT t SortDir m) x
+  => ReaderT
+     (Event t SortingChanged)
+     (EventWriterT t SortDir (EventWriterT t SortingChanged m))
+     x
   -> m (x, Event t SortDir)
 runSortableTableGroup m = mdo
-  (a, sDyn') <- runEventWriterT . flip runReaderT (sDyn' $> SortingChanged) $ m
-  return (a, sDyn')
+  ((x, sDyn), changed) <-
+    runEventWriterT . runEventWriterT . flip runReaderT changed $ m
+  return (x, sDyn)
+
+type SortingDirection a = Getter DeploymentFullInfo a -> SortDir
 
 -- | Special column header with a sort button.
 sortHeader
-  :: (MonadWidget t m, Ord a, SortableTableGroup t m)
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
   => Getter DeploymentFullInfo a
   -> Text
+  -> SortingDirection a -- ^ The direction to sort when clicked
   -> m ()
-sortHeader f l = do
+sortHeader f l defaultSorting =
+  sortHeaderWithInitial f l defaultSorting (Nothing @(SortingDirection a))
+
+-- | Special column header with a sort button.
+sortHeaderInitially
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
+  => Getter DeploymentFullInfo a
+  -> Text
+  -> SortingDirection a -- ^ The direction to sort when clicked and when the page loads
+  -> m ()
+sortHeaderInitially f l defaultSorting =
+  sortHeaderWithInitial f l defaultSorting (Just @(SortingDirection a) defaultSorting)
+
+-- | Special column header with a sort button.
+sortHeaderWithInitial
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
+  => Getter DeploymentFullInfo a
+  -> Text
+  -> SortingDirection a -- ^ The direction to sort when clicked
+  -> Maybe (SortingDirection a) -- ^ The direction to sort when the page loads
+  -> m ()
+sortHeaderWithInitial f l defaultSorting initSortingM = do
+  let initSorting = case initSortingM of
+        Nothing -> Nothing
+        Just x -> Just $ x f
   el "th" $ mdo
-    sortDyn' <- foldDyn ($) (SortDesc f) $ toggleSort <$ sortBtnEv
-    tellEvent $ updated sortDyn'
     sortingChanged <- ask
-    let sortEv = leftmost [Just <$> updated sortDyn', sortingChanged $> Nothing]
-    sortDyn <- holdDyn Nothing sortEv
+    sortDyn <- foldDyn ($) initSorting $ alignWith (curry $ \case
+      (That SortingChanged, _) -> Nothing -- Some other column has started sorting
+      (_, Nothing) -> Just $ defaultSorting f -- This column started sorting
+      (_, Just x) -> Just $ toggleSort x -- This column was sorting and was clicked
+      ) sortBtnEv sortingChanged
+    tellMultiEvent . fmapMaybe id $ updated sortDyn
     let
       classDyn = fmap ("sort " <>) $ sortDyn <&> \case
         Just (SortDesc _) -> "sort--active sort--desc"
         Just (SortAsc _) -> "sort--active sort--asc"
         Nothing -> ""
     sortBtnEv <- buttonDynClass classDyn (pure l)
+    tellMultiEvent $ sortBtnEv $> SortingChanged
     pure ()
 
 -- | A wrapper that adds a header to the table.

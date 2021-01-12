@@ -34,6 +34,7 @@ executable frontend
                      , Page.Popup.NewDeployment
                      , Servant.Reflex.Extra
                      , Page.Elements.Links
+                     , Reflex.MultiEventWriter.Class
   ghc-options:         -Wall
                        -Werror
                        -Wno-missing-home-modules
@@ -63,6 +64,8 @@ executable frontend
                      , MultiParamTypeClasses
                      , TypeFamilies
                      , UndecidableInstances
+                     , FunctionalDependencies
+                     , AllowAmbiguousTypes
   -- other-extensions:
   build-depends:       aeson
                      , base >=4.12 && <4.13
@@ -85,5 +88,7 @@ executable frontend
                      , time
                      , transformers
                      , mtl
+                     , semialign
+                     , these
   hs-source-dirs:      src
   default-language:    Haskell2010
