@@ -5,8 +5,8 @@
 export MOUNT_DIR=./dev
 
 export PROJECT_NAME="Example Project"
-export BASE_DOMAIN=stage.example.com
-export NAMESPACE=staging
+export BASE_DOMAIN=octopod.example.com
+export NAMESPACE=deployment
 export ARCHIVE_RETENTION=60
 export STATUS_UPDATE_TIMEOUT=600
 export CREATION_COMMAND=$MOUNT_DIR/echo.sh
