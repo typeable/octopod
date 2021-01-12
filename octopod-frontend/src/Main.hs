@@ -40,7 +40,6 @@ initConfigWidget = do
   widgetHold_ loadingWidget $ leftmost
     [ (headerWidget >> routeWidget) <$ ffilter id x
     , errorWidget <$ ffilter not x ]
-  -- projectNameEv <- projectName (x $> ())
   return ()
 
 -- | Sets up websockets. WS url is obtained from session storage.
