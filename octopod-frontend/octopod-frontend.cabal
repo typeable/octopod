@@ -33,6 +33,7 @@ executable frontend
                      , Page.Popup.EditDeployment
                      , Page.Popup.NewDeployment
                      , Servant.Reflex.Extra
+                     , Page.Elements.Links
   ghc-options:         -Wall
                        -Werror
                        -Wno-missing-home-modules

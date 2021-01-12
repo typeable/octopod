@@ -117,8 +117,8 @@ data DeploymentLog = DeploymentLog
   deriving (FromJSON, ToJSON) via Snake DeploymentLog
 
 data DeploymentMetadata = DeploymentMetadata
-  { deploymentMetadataKey :: Text
-  , deploymentMetadataValue :: Text
+  { deploymentMetadataKey :: Text -- ^ The name of the link
+  , deploymentMetadataValue :: Text -- ^ The URL
   }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentMetadata

@@ -29,6 +29,7 @@ import           Frontend.API
 import           Frontend.Route
 import           Frontend.Utils
 import           Page.ClassicPopup
+import           Page.Elements.Links
 import           Page.Popup.EditDeployment
 import           Page.Popup.NewDeployment
 
@@ -239,15 +240,7 @@ activeDeploymentWidget clickedEv dDyn' = do
       el "td" $ do
         text $ coerce dname
         statusWidget $ constDyn status
-      el "td" $ do
-        divClass "listing" $
-          forM_ metadata $ \meta -> do
-            let
-              url = deploymentMetadataValue meta
-            void $ elAttr' "a"
-              (  "class" =: "listing__item external bar"
-              <> "href" =: url
-              <> "target" =: "_blank") $ text url
+      el "td" $ divClass "listing" $ forM_ metadata (renderMetadataLink . pure)
       el "td" $
         text $ coerce $ deployment ^. field @"tag"
       el "td" $
