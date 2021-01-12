@@ -64,9 +64,36 @@ For development, we have set up `ghcid` commands that rebuild the project every 
 - `ghcid-cli`
 - `ghcid-frontend`
 
-### Frontend proxy
+### Running the project locally
 
-The frontend should be accessed through a proxy. We have set up [caddy](https://caddyserver.com) configs to ease development. You will need place an `octopod-config.json` file at the root of the repository containing a [config](../../charts/octopod/templates/octopod-nginx-configmap.yaml#L15-L20). `app_auth` can be an arbitrary string – it will not affect anything when running locally.
+We have two commands to run the backend and frontend in the `Makefile`:
+
+- `run-backend-dev`
+
+   Builds a production version of the backend server, runs database migrations and starts the server with mock control scripts. You can see the used config in [`dev/dev_backend.sh`](./dev/dev_backend.sh).
+
+   ### NOTE:
+
+   1. You need to have a [Postgres](https://www.postgresql.org) database running on `localhost:5432` (the default port).
+
+   2. You need to create an empty `octopod` database.
+
+   3. You also need to have an `octopod:octopod` user set up as it will be used by the server to access the database.
+
+      The easiest way to do this is by running the following command after you have _Postgres running_:
+      ```bash
+      psql -c "CREATE ROLE IF NOT EXISTS octopod WITH PASSWORD 'octopod' SUPERUSER LOGIN;"
+      ```
+
+   4. You will need [sqitch](https://sqitch.org) installed on your system as it will be used to run migrations on the database.
+
+- `run-frontend-dev`
+
+   Build a production version of the frontend and runs it locally, pointing it to the locally running backend server.
+
+   ### NOTE:
+
+   You need to have [_Caddy 2_](https://caddyserver.com/v2) installed on your system as it is automatically used as a proxy.
 
 ### Stack
 

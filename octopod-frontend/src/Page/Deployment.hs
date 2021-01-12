@@ -22,6 +22,7 @@ import           Frontend.API
 import           Frontend.Route
 import           Frontend.Utils
 import           Page.ClassicPopup
+import           Page.Elements.Links
 import           Page.Popup.EditDeployment
 
 -- | The root widget of a deployment page. It requests the deployment data.
@@ -68,7 +69,7 @@ deploymentWidget updEv dfi = mdo
       [ DPMError "Couldn't update status of deployment" <$ errEv
       , DPMClear <$ okEv ]
     deploymentBody updEv dfiDyn
-    pure (editEv')
+    pure editEv'
   sentEv <- editDeploymentPopup editEv never
   blank
 
@@ -161,14 +162,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
     elClass "h3" "deployment__sub-heading" $ text "Links"
     divClass "deployment__widget" $
       divClass "listing" $
-        void $ simpleList urlsDyn $ \urlDyn' -> do
-          let
-            urlDyn = deploymentMetadataValue <$> urlDyn'
-            attrDyn = urlDyn <&> \url ->
-              (  "class" =: "listing__item external bar bar--larger"
-              <> "href" =: url
-              <> "target" =: "_blank" )
-          elDynAttr "a" attrDyn $ dynText urlDyn
+        void $ simpleList urlsDyn renderMetadataLink
   elClass "section" "deployment__section" $ do
     let
       envsDyn = dfiDyn <^.> field @"deployment"

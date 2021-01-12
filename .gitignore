@@ -7,3 +7,4 @@ dist-newstyle
 octopod-config.json
 frontend-result
 octopod-css/node_modules
+dev/certs/*
