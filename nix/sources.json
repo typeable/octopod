@@ -1,38 +1,14 @@
 {
-    "brittany": {
-        "branch": "c59655f10d5ad295c2481537fc8abf0a297d9d1c",
-        "description": "haskell source code formatter",
-        "homepage": "",
-        "owner": "bubba",
-        "repo": "brittany",
-        "rev": "c59655f10d5ad295c2481537fc8abf0a297d9d1c",
-        "sha256": "1rkk09f8750qykrmkqfqbh44dbx1p8aq1caznxxlw8zqfvx39cxl",
-        "type": "tarball",
-        "url": "https://github.com/bubba/brittany/archive/c59655f10d5ad295c2481537fc8abf0a297d9d1c.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "ghcide": {
-        "branch": "9b8aaf9b06846571cc0b5d46680e686e4f9153a3",
-        "description": "A library for building Haskell IDE tooling",
-        "homepage": "",
-        "owner": "haskell",
-        "repo": "ghcide",
-        "rev": "9b8aaf9b06846571cc0b5d46680e686e4f9153a3",
-        "sha256": "0clwg8fgnsgwzl6rbni7p6xifl117f6h5hjsdyy0swnbjkxkqpaa",
-        "type": "tarball",
-        "url": "https://github.com/haskell/ghcide/archive/9b8aaf9b06846571cc0b5d46680e686e4f9153a3.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "haskell-language-server": {
         "branch": "master",
         "description": "Integration point for ghcide and haskell-ide-engine. One IDE to rule them all.",
         "homepage": "",
         "owner": "haskell",
         "repo": "haskell-language-server",
-        "rev": "b649b15b2d67a97d6a262eb65fee0002629b6dcb",
-        "sha256": "1gxwkn3mqv20f061f9pg1y13k4ymsq6ji9gf475wdiikiql82z6a",
+        "rev": "fde10fa5e4cb74ca4b64c43250297b36a9bbbd7e",
+        "sha256": "03frszid12dcmqg0m6wkc1nf561kdap3y3yqrp1x13gvbkvb9xwn",
         "type": "tarball",
-        "url": "https://github.com/haskell/haskell-language-server/archive/b649b15b2d67a97d6a262eb65fee0002629b6dcb.tar.gz",
+        "url": "https://github.com/haskell/haskell-language-server/archive/fde10fa5e4cb74ca4b64c43250297b36a9bbbd7e.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "hspec-webdriver-clone": {
