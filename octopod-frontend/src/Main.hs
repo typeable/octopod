@@ -13,34 +13,41 @@ import           Reflex.Dom
 import           Servant.Reflex
 
 import           Common.Types as CT
+import           Data.Monoid
 import           Frontend.API
 import           Frontend.GHCJS
 import           Frontend.Route
-import           Frontend.Utils
+import           Frontend.Utils (errorCommonWidget, loadingCommonWidget)
 import           Page.Deployment
 import           Page.Deployments
 
 
 main :: IO ()
-main = mainWidgetWithHead headWidget $ do
-  initConfigWidget
+main = mdo
+  mainWidgetWithHead' (headWidget, \() -> do
+      ((), projectNameEv) <- runEventWriterT initConfigWidget
+      return $ fmapMaybe getLast projectNameEv
+    )
 
 -- | Receives the config file.
 -- If request fails then an error message is displayed.
-initConfigWidget :: (MonadWidget t m, Prerender js t m) => m ()
+initConfigWidget
+  :: (MonadWidget t m, Prerender js t m, EventWriter t (Last ProjectName) m)
+  => m ()
 initConfigWidget = do
   pb <- getPostBuild
   x <- performEvent (initConfig <$ pb)
   widgetHold_ loadingWidget $ leftmost
     [ (headerWidget >> routeWidget) <$ ffilter id x
     , errorWidget <$ ffilter not x ]
+  return ()
 
 -- | Sets up websockets. WS url is obtained from session storage.
 wsUpdate :: forall t m . MonadWidget t m => m (Event t ())
 wsUpdate = do
   let
     wsConfig = WebSocketConfig
-      { _webSocketConfig_send = (never :: Event t [ByteString])
+      { _webSocketConfig_send = never :: Event t [ByteString]
       , _webSocketConfig_close = never
       , _webSocketConfig_reconnect = True
       , _webSocketConfig_protocols = []
@@ -71,8 +78,10 @@ routeWidget = do
     blank
 
 -- | Content of the @head@ DOM element.
-headWidget :: DomBuilder t m => m ()
-headWidget = do
+headWidget
+  :: (DomBuilder t m, MonadHold t m, PostBuild t m)
+  => Event t ProjectName -> m ()
+headWidget projectNameEv = do
   elAttr "meta" ( "charset" =: "urf8 ") blank
   elAttr "meta"
     (  "http-equiv" =: "x-ua-compatible"
@@ -88,9 +97,11 @@ headWidget = do
     <> "rel" =: "stylesheet") blank
   elAttr "script"
     (  "src" =: "/static/vendors/outline/outline.js" ) blank
+  projectNameDyn <- holdDyn "Octopod" $ ("Octopod – " <>) . uProjectName <$> projectNameEv
+  el "title" $ dynText projectNameDyn
 
 -- | Common headers of all pages. Displays the project name.
-headerWidget :: MonadWidget t m => m ()
+headerWidget :: (MonadWidget t m, EventWriter t (Last ProjectName) m) => m ()
 headerWidget =
   elClass "header" "header" $
     divClass "header__wrap container" $ do
@@ -98,8 +109,9 @@ headerWidget =
         text "Octopod"
       elClass "div" "header__project" $ do
         pb <- getPostBuild
-        respEv <- projectName pb
-        nameDyn <- holdDyn "" $ uProjectName <$> fmapMaybe reqSuccess respEv
+        respEv <- fmapMaybe reqSuccess <$> projectName pb
+        tellEvent $ Last . Just <$> respEv
+        nameDyn <- holdDyn "" $ uProjectName <$> respEv
         dynText nameDyn
 
 -- | Widget with a loading spinner.
