@@ -13,7 +13,7 @@ import           Reflex.Dom
 import           Servant.Reflex
 
 import           Common.Types as CT
-import           Data.Monoid
+import qualified Data.Semigroup as S
 import           Frontend.API
 import           Frontend.GHCJS
 import           Frontend.Route
@@ -26,13 +26,13 @@ main :: IO ()
 main = mdo
   mainWidgetWithHead' (headWidget, \() -> do
       ((), projectNameEv) <- runEventWriterT initConfigWidget
-      return $ fmapMaybe getLast projectNameEv
+      return $ fmap S.getLast projectNameEv
     )
 
 -- | Receives the config file.
 -- If request fails then an error message is displayed.
 initConfigWidget
-  :: (MonadWidget t m, Prerender js t m, EventWriter t (Last ProjectName) m)
+  :: (MonadWidget t m, Prerender js t m, EventWriter t (S.Last ProjectName) m)
   => m ()
 initConfigWidget = do
   pb <- getPostBuild
@@ -172,7 +172,7 @@ headWidget projectNameEv = do
     <> "name" =: "theme-color") blank
 
 -- | Common headers of all pages. Displays the project name.
-headerWidget :: (MonadWidget t m, EventWriter t (Last ProjectName) m) => m ()
+headerWidget :: (MonadWidget t m, EventWriter t (S.Last ProjectName) m) => m ()
 headerWidget =
   elClass "header" "header" $
     divClass "header__wrap container" $ do
@@ -181,7 +181,7 @@ headerWidget =
       elClass "div" "header__project" $ do
         pb <- getPostBuild
         respEv <- fmapMaybe reqSuccess <$> projectName pb
-        tellEvent $ Last . Just <$> respEv
+        tellEvent $ S.Last <$> respEv
         nameDyn <- holdDyn "" $ uProjectName <$> respEv
         dynText nameDyn
 

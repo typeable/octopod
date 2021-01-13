@@ -25,6 +25,11 @@ import           Servant.Reflex
 
 import           Common.Types as CT
 import           Common.Utils
+import           Control.Monad.Reader
+import           Data.Align
+import           Data.Functor
+import qualified Data.Semigroup as S
+import           Data.These
 import           Frontend.API
 import           Frontend.Route
 import           Frontend.Utils
@@ -32,6 +37,7 @@ import           Page.ClassicPopup
 import           Page.Elements.Links
 import           Page.Popup.EditDeployment
 import           Page.Popup.NewDeployment
+import           Reflex.MultiEventWriter.Class
 
 
 -- | The root widget of the deployments list page.
@@ -357,20 +363,22 @@ archivedDeploymentWidget clickedEv dDyn' = do
 -- | Sort deployments by the supplied condition.
 sortDeployments
   :: [DeploymentFullInfo]
-  -> SortDir
+  -> Maybe SortDir
   -- ^ Sorting condition.
   -> [DeploymentFullInfo]
 sortDeployments items s =  L.sortBy sortFunc items
   where
     sortFunc a b = case s of
-      SortAsc get -> compare (a ^. get) (b ^. get)
-      SortDesc get -> compare (b ^. get) (a ^. get)
+      Just (SortAsc get) -> compare (a ^. get) (b ^. get)
+      Just (SortDesc get) -> compare (b ^. get) (a ^. get)
+      Nothing -> EQ
 
 -- | Each constructor contains a getter
 -- that extracts the field that is used for sorting.
 data SortDir where
   SortAsc  :: Ord a => Getter DeploymentFullInfo a -> SortDir
   SortDesc :: Ord a => Getter DeploymentFullInfo a -> SortDir
+  deriving Semigroup via (S.Last SortDir)
 
 -- | Sorting toggler.
 toggleSort :: SortDir -> SortDir
@@ -380,52 +388,105 @@ toggleSort = \case
 
 -- | Header for a deployments table.
 -- \"Name\",\"created\" and \"udpated\" columns support sorting.
-tableHeader :: MonadWidget t m => m (Dynamic t SortDir)
+tableHeader :: (MonadWidget t m, SortableTableGroup t m) => m ()
 tableHeader = do
   el "thead" $
     el "tr" $ do
-      nameSortDyn <- sortHeader dfiName "Name"
+      sortHeader dfiName "Name" SortAsc
       el "th" $ text "Links"
       el "th" $ text "Tag"
       el "th" $ text "App overrides"
       el "th" $ text "Deployment overrides"
-      createSortDyn <- sortHeader (field @"createdAt") "Created"
-      updateSortDyn <- sortHeader (field @"updatedAt") "Changed"
+      sortHeader (field @"createdAt") "Created" SortDesc
+      sortHeaderInitially (field @"updatedAt") "Changed" SortDesc
       el "th" $
         elClass "span" "visuallyhidden" $ text "Menu"
-      let
-        sortEv =
-          leftmost $ fmap updated [nameSortDyn, createSortDyn, updateSortDyn]
-      sortDyn <- holdDyn (SortAsc dfiName) sortEv
-      pure sortDyn
+
+data SortingChanged = SortingChanged
+  deriving Semigroup via (S.Last SortingChanged)
+
+type SortableTableGroup t m =
+  ( MonadReader (Event t SortingChanged) m
+  , MultiEventWriter t SortDir m
+  , MultiEventWriter t SortingChanged m
+  )
+
+-- | Group all sortable headers ('sortHeader', 'sortHeaderInitially').
+-- Makes sure that only one can be active at a time.
+runSortableTableGroup
+  :: (Reflex t, MonadFix m)
+  => ReaderT
+     (Event t SortingChanged)
+     (EventWriterT t SortDir (EventWriterT t SortingChanged m))
+     x
+  -> m (x, Event t SortDir)
+runSortableTableGroup m = mdo
+  ((x, sDyn), changed) <-
+    runEventWriterT . runEventWriterT . flip runReaderT changed $ m
+  return (x, sDyn)
+
+type SortingDirection a = Getter DeploymentFullInfo a -> SortDir
 
 -- | Special column header with a sort button.
 sortHeader
-  :: (MonadWidget t m, Ord a)
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
   => Getter DeploymentFullInfo a
   -> Text
-  -> m (Dynamic t SortDir)
-sortHeader f l = do
+  -> SortingDirection a -- ^ The direction to sort when clicked
+  -> m ()
+sortHeader f l defaultSorting =
+  sortHeaderWithInitial f l defaultSorting (Nothing @(SortingDirection a))
+
+-- | Special column header with a sort button.
+sortHeaderInitially
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
+  => Getter DeploymentFullInfo a
+  -> Text
+  -> SortingDirection a -- ^ The direction to sort when clicked and when the page loads
+  -> m ()
+sortHeaderInitially f l defaultSorting =
+  sortHeaderWithInitial f l defaultSorting (Just @(SortingDirection a) defaultSorting)
+
+-- | Special column header with a sort button.
+sortHeaderWithInitial
+  :: forall t m a. (MonadWidget t m, Ord a, SortableTableGroup t m)
+  => Getter DeploymentFullInfo a
+  -> Text
+  -> SortingDirection a -- ^ The direction to sort when clicked
+  -> Maybe (SortingDirection a) -- ^ The direction to sort when the page loads
+  -> m ()
+sortHeaderWithInitial f l defaultSorting initSortingM = do
+  let initSorting = case initSortingM of
+        Nothing -> Nothing
+        Just x -> Just $ x f
   el "th" $ mdo
-    dateSortDyn' <- foldDyn ($) (SortDesc f)
-      $ toggleSort <$ sortBtnEv
+    sortingChanged <- ask
+    sortDyn <- foldDyn ($) initSorting $ alignWith (curry $ \case
+      (That SortingChanged, _) -> Nothing -- Some other column has started sorting
+      (_, Nothing) -> Just $ defaultSorting f -- This column started sorting
+      (_, Just x) -> Just $ toggleSort x -- This column was sorting and was clicked
+      ) sortBtnEv sortingChanged
+    tellMultiEvent . fmapMaybe id $ updated sortDyn
     let
-      classDyn = dateSortDyn' <&> \case
-        SortDesc _ -> "sort sort--active sort--desc"
-        SortAsc _ -> "sort sort--active sort--asc"
+      classDyn = fmap ("sort " <>) $ sortDyn <&> \case
+        Just (SortDesc _) -> "sort--active sort--desc"
+        Just (SortAsc _) -> "sort--active sort--asc"
+        Nothing -> ""
     sortBtnEv <- buttonDynClass classDyn (pure l)
-    pure dateSortDyn'
+    tellMultiEvent $ sortBtnEv $> SortingChanged
+    pure ()
 
 -- | A wrapper that adds a header to the table.
 tableWrapper
-  :: MonadWidget t m
-  => (Dynamic t SortDir -> m a)
+  :: (MonadWidget t m)
+  => (Dynamic t (Maybe SortDir) -> m a)
   -- ^ Sorting direction is obtained from the table header.
   -> m a
 tableWrapper ma =
   divClass "table table--deployments table--clickable table--double-click" $
-    el "table" $ do
-      sDyn <- tableHeader
+    el "table" $ mdo
+      ((), sDyn') <- runSortableTableGroup tableHeader
+      sDyn <- holdDyn Nothing $ Just <$> sDyn'
       el "tbody" $ ma sDyn
 
 -- | Table wrapper for a table with an \"error\" or a \"loading\ placeholder.
