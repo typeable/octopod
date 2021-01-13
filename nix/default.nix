@@ -53,6 +53,7 @@ with {
           cp -av ${octopod-css}/production/images/* /www/static/images/
           cp -av ${octopod-css}/production/styles/* /www/static/styles/
           cp -av ${octopod-css}/production/vendors/outline/* /www/static/vendors/outline/
+          cp -av ${octopod-css}/favicons/* /www/
         '';
 
         config = {
