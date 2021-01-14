@@ -12,7 +12,7 @@ We created _Octopod_ because we believe that everything we release should be rig
 
 ### 🔭 High-level notes
 - [🐙 Overview](docs/en/Overview.md)
-- [🧑‍🔬 Project managment case study](docs/en/PM_case_study.md)
+- [🧑‍🔬 Project management case study](docs/en/PM_case_study.md)
 - [🧑‍💻 Technical case study](docs/en/Tech_case_study.md)
 
 ### 🛠️ Technical documentation
