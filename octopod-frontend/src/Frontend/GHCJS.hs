@@ -29,22 +29,18 @@ appAuthKey = "auth"
 -- | There are project settings that contain the host for API requests,
 -- websocket host and API authentication token.
 data ProjectConfig = ProjectConfig
-  { appUrl :: String  -- ^ API host.
-  , wsUrl :: String   -- ^ WS host.
-  , appAuth :: String -- ^ API authentication token.
+  { appUrl :: T.Text  -- ^ API host.
+  , wsUrl :: T.Text   -- ^ WS host.
+  , appAuth :: T.Text -- ^ API authentication token.
+  , kubernetesDashboardUrlTemplate :: Maybe T.Text
+  -- ^ A k8s dashboard url template to which the name of the deployment is appended.
   }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake ProjectConfig
 
--- | The type for error handling.
-data BadConfig = BadConfig
-  deriving (Show)
-
-instance Exception BadConfig
-
 -- | Reads settings from the config file and puts them into session storage.
 -- Throws 'BadConfig' if the config file can't be parsed.
-initConfig' :: JSM ()
+initConfig' :: JSM (Maybe ProjectConfig)
 initConfig' = do
   w <- currentWindowUnchecked
   resp <- fetch w ("/config.json" :: JSString) Nothing
@@ -57,12 +53,13 @@ initConfig' = do
       setItem stor appUrlKey $ appUrl cfg
       setItem stor wsUrlKey $ wsUrl cfg
       setItem stor appAuthKey $ appAuth cfg
-    A.Error _ -> throwM BadConfig
+      return $ Just cfg
+    A.Error _ -> return Nothing
 
 -- | Reads settings from the config file and puts them into session storage. If
 -- the config file can't be parsed returns 'False', else 'True'.
-initConfig :: MonadJSM m => m Bool
-initConfig = liftJSM $ catchAll (initConfig' >> pure True) (const $ pure False)
+initConfig :: MonadJSM m => m (Maybe ProjectConfig)
+initConfig = liftJSM $ catchAll initConfig' (const $ pure Nothing)
 
 -- | Gets a value from session storage for the given key.
 -- Throws an error if key doesn't exist.

@@ -99,3 +99,11 @@
     background-position: 11px center;
     background-repeat: no-repeat;
 }
+
+.button--logs {
+    padding-left: 40px;
+    background-image: url("../vectors/common-use-logs.svg");
+    background-size: 24px 24px;
+    background-position: 11px center;
+    background-repeat: no-repeat;
+}

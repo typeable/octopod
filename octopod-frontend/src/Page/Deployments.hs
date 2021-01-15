@@ -31,6 +31,7 @@ import           Data.Functor
 import qualified Data.Semigroup as S
 import           Data.These
 import           Frontend.API
+import           Frontend.GHCJS
 import           Frontend.Route
 import           Frontend.Utils
 import           Page.ClassicPopup
@@ -48,7 +49,9 @@ deploymentsPage
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
+    , SetRoute t (R Routes) m
+    , MonadReader ProjectConfig m
+    )
   => Event t () -- ^ Event notifying about the need to update data.
   -> m ()
 deploymentsPage updAllEv = do
@@ -66,7 +69,9 @@ deploymentsWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
+    , SetRoute t (R Routes) m
+    , MonadReader ProjectConfig m
+    )
   => Event t ()           -- ^ Event notifying about the need to update data.
   -> [DeploymentFullInfo] -- ^ Initial deployment data.
   -> m ()
@@ -153,7 +158,9 @@ deploymentsListWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
+    , SetRoute t (R Routes) m
+    , MonadReader ProjectConfig m
+    )
   => Event t ()
   -> Dynamic t Text
   -> [DeploymentFullInfo] -- ^ Initial deployment data
@@ -194,7 +201,9 @@ activeDeploymentsWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
+    , SetRoute t (R Routes) m
+    , MonadReader ProjectConfig m
+    )
   => Event t ClickedElement
   -- ^ Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
@@ -230,7 +239,9 @@ activeDeploymentWidget
   ::
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
-    , SetRoute t (R Routes) m )
+    , SetRoute t (R Routes) m
+    , MonadReader ProjectConfig m
+    )
   => Event t ClickedElement
   -- ^ Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
@@ -271,6 +282,11 @@ activeDeploymentWidget clickedEv dDyn' = do
           body = do
             btnEditEv <- buttonClass "action action--edit" "Edit"
             btnArcEv <- buttonClass "action action--archive" "Move to archive"
+            url' <- kubeDashboardUrl dDyn
+            void . dyn $ url' <&> maybe blank (\url ->
+              void $ aButtonClass' "action action--logs" "View logs"
+                    (pure $ "href" =: url)
+              )
             pure $
               leftmost
                 [ ArchiveDeployment <$ btnArcEv, EditDeployment <$ btnEditEv ]

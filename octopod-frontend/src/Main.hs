@@ -14,6 +14,8 @@ import           Servant.Reflex
 
 import           Common.Types as CT
 import qualified Data.Semigroup as S
+import           Control.Monad.Reader
+import           Data.Maybe
 import           Frontend.API
 import           Frontend.GHCJS
 import           Frontend.Route
@@ -38,8 +40,8 @@ initConfigWidget = do
   pb <- getPostBuild
   x <- performEvent (initConfig <$ pb)
   widgetHold_ loadingWidget $ leftmost
-    [ (headerWidget >> routeWidget) <$ ffilter id x
-    , errorWidget <$ ffilter not x ]
+    [ (\cfg -> headerWidget >> routeWidget cfg) <$> fmapMaybe id x
+    , errorWidget <$ ffilter isNothing x ]
   return ()
 
 -- | Sets up websockets. WS url is obtained from session storage.
@@ -63,8 +65,9 @@ routeWidget
   ::
     ( MonadWidget t m
     , Prerender js t m )
-  => m ()
-routeWidget = do
+  => ProjectConfig
+  -> m ()
+routeWidget cfg = do
   let Right encoder = checkEncoder routeEncoder
   pb <- getPostBuild
   updAllEv <- wsUpdate
@@ -72,7 +75,7 @@ routeWidget = do
     subRoute_ $ \case
       DashboardRoute -> do
         r <- askRoute
-        dyn_ $ ffor r $ \case
+        flip runReaderT cfg $ dyn_ $ ffor r $ \case
           Nothing -> deploymentsPage updAllEv
           Just dn -> deploymentPage updAllEv dn
     blank

@@ -66,6 +66,7 @@ executable frontend
                      , UndecidableInstances
                      , FunctionalDependencies
                      , AllowAmbiguousTypes
+                     , OverloadedLabels
   -- other-extensions:
   build-depends:       aeson
                      , base >=4.12 && <4.13

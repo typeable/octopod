@@ -10,6 +10,7 @@ module Frontend.Utils where
 
 import           Control.Lens
 import           Control.Monad
+import           Data.Generics.Labels ()
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe)
 import           Data.Proxy (Proxy(..))
@@ -24,6 +25,8 @@ import           GHCJS.DOM.Node as DOM
 import           Reflex.Dom as R
 
 import           Common.Types as CT
+import           Control.Monad.Reader
+import           Frontend.GHCJS
 
 -- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement =
@@ -193,7 +196,22 @@ aButtonClass
   -> m (Event t ())
 aButtonClass cl lbl = do
   (bEl, _) <- elDynAttr' "a"
-    (constDyn $ "class" =: cl <> "type" =: "button") $ text lbl
+    (constDyn $ "class" =: cl) $ text lbl
+  return $ domEvent Click bEl
+
+-- | Version of 'buttonClass' for links that should look like buttons.
+aButtonClass'
+  :: (DomBuilder t m, PostBuild t m)
+  => Text
+  -- ^ Classes.
+  -> Text
+  -- ^ Label text.
+  -> Dynamic t (Map Text Text)
+  -- ^ Extra attributes
+  -> m (Event t ())
+aButtonClass' cl lbl eAttrs = do
+  (bEl, _) <- elDynAttr' "a"
+    (fmap (<> ("class" =: cl)) eAttrs) $ text lbl
   return $ domEvent Click bEl
 
 -- | Version of 'buttonDynClass' for links that should look like
@@ -206,7 +224,27 @@ aButtonDynClass
   -- ^ Label text.
   -> m (Event t ())
 aButtonDynClass clDyn lblDyn = do
-  let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
+  let attrDyn = ffor clDyn $ \cl -> "class" =: cl
+  (bEl, _) <- elDynAttr' "a" attrDyn $
+    dynText lblDyn
+  return $ domEvent Click bEl
+
+
+-- | Version of 'buttonDynClass' for links that should look like
+-- buttons.
+aButtonDynClass'
+  :: (DomBuilder t m, PostBuild t m)
+  => Dynamic t Text
+  -- ^ Classes.
+  -> Dynamic t Text
+  -- ^ Label text.
+  -> Dynamic t (Map Text Text)
+  -- ^ Extra attributes
+  -> m (Event t ())
+aButtonDynClass' clDyn lblDyn eAttrs = do
+  let
+    attrDyn' = ffor clDyn $ \cl -> "class" =: cl
+    attrDyn = (<>) <$> eAttrs <*> attrDyn'
   (bEl, _) <- elDynAttr' "a" attrDyn $
     dynText lblDyn
   return $ domEvent Click bEl
@@ -225,10 +263,10 @@ aButtonClassEnabled
 aButtonClassEnabled cl lbl dDyn = do
   let
     attrDyn = ffor dDyn $ \case
-      True -> "class" =: cl <> "type" =: "button"
+      True -> "class" =: cl
       False ->  "class" =: (cl <> " button--disabled")
-        <> "type" =: "button" <> "disabled" =: ""
-  (bEl, _) <- elDynAttr' "button" attrDyn $
+        <> "disabled" =: ""
+  (bEl, _) <- elDynAttr' "a" attrDyn $
     text lbl
   return $ domEvent Click bEl
 
@@ -468,3 +506,11 @@ pageNotification notEv = mdo
     [ messageWidget <$> notEv
     , pure never <$ closeEv ]
   blank
+
+kubeDashboardUrl
+  :: (MonadReader ProjectConfig m, MonadWidget t m)
+  => Dynamic t DeploymentFullInfo -> m (Dynamic t (Maybe Text))
+kubeDashboardUrl deploymentInfo = do
+  template <- asks kubernetesDashboardUrlTemplate
+  let name = unDeploymentName . view (#deployment . #name) <$> deploymentInfo
+  return $ name <&> (\n -> (<> n) <$> template)
