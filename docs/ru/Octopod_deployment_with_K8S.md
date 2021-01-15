@@ -160,6 +160,12 @@
        helm install --name octopod-kubedog-access ./kubedog-access
        ```
 
+    5. Eсли вы планируете из [_Control scripts_](Control_scripts.md) удалять [_Jobs_][kubernetes-job], то для этого необходимо выдать права [_Service Account_][kubernetes-service-account] `octopod`:
+       ```bash
+       cd /tmp/octopod/charts
+       helm install --name octopod-job-control ./job-control
+       ```
+
 13. Установка сервера Octopod
 
     ```bash
@@ -270,6 +276,7 @@
 [kubernetes-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account
 [kubernetes-pvc]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
 [kubernetes-storage-classes]: https://kubernetes.io/docs/concepts/storage/storage-classes
+[kubernetes-job]: https://kubernetes.io/docs/concepts/workloads/controllers/job
 [minikube]: https://kubernetes.io/ru/docs/tasks/tools/install-minikube
 [tiller]: https://v2.helm.sh/docs/install
 [kubedog]: https://github.com/werf/kubedog
