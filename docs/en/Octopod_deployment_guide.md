@@ -353,7 +353,7 @@ password="password"
 # to view the cluster, in which the Octopod will create deployments.
 #
 # Example URL to supply:
-#   https://dashboard.stage.thebestagent.pro
+#   https://dashboard.example.com
 #
 # If you supply a url, then there will be a "View logs" button for
 # every deployment which opens a filtered page of your k8s dashboard.
