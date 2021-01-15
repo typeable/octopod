@@ -135,6 +135,13 @@ kubectl create -n octopod serviceaccount octopod
    helm install --name octopod-kubedog-access ./kubedog-access
    ```
 
+5. If you are planning to delete [_Jobs_][kubernetes-job] in your [_Control scripts_](Control_scripts.md), you will need to give appropriate permissions to the `octopod` _Service Account_:
+
+   ```bash
+   cd /tmp/octopod/charts
+   helm install --name octopod-job-control ./job-control
+   ```
+
 ## Web UI authentication secrets
 
 [Authentication](Security_model.md#web-ui-authentication) between _Octopod Server_ and the _Web UI_ is done through _Basic Auth_. This implies that there needs to be a username and password associated with it.
@@ -392,6 +399,7 @@ helm upgrade --install octopod ./octopod \
 [kubernetes-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account
 [kubernetes-pvc]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
 [kubernetes-storage-classes]: https://kubernetes.io/docs/concepts/storage/storage-classes
+[kubernetes-job]: https://kubernetes.io/docs/concepts/workloads/controllers/job
 [minikube]: https://kubernetes.io/ru/docs/tasks/tools/install-minikube/
 [tiller]: https://v2.helm.sh/docs/install/
 [kubedog]: https://github.com/werf/kubedog
