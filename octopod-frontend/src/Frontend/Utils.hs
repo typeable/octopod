@@ -317,7 +317,7 @@ statusWidget :: MonadWidget t m => Dynamic t DeploymentStatus -> m ()
 statusWidget stDyn = do
   stDyn' <- holdUniqDyn stDyn
   let
-    pendingWidget = divClass "status status--pending"
+    pendingWidget = divClass "loading loading--status-alike"
   dyn_ $ stDyn' <&> \case
     Running -> divClass "status status--success" $ text "Running"
     Failure -> divClass "status status--failure" $ text "Failure"
