@@ -345,6 +345,22 @@ base_domain="octo.example.com"
 username="octopod"
 password="password"
 
+#################################################
+# Kubernetes Dashboard Setup
+#################################################
+
+# You can supply a base url for your k8s dashboard you have set up
+# to view the cluster, in which the Octopod will create deployments.
+#
+# Example URL to supply:
+#   https://dashboard.stage.thebestagent.pro
+#
+# If you supply a url, then there will be a "View logs" button for
+# every deployment which opens a filtered page of your k8s dashboard.
+#
+# If you leave this blank, the "View logs" button will not be displayed in the
+# Web UI.
+kubernetes_dashboard_url=""
 
 #################################################
 # Other Setup
@@ -382,6 +398,7 @@ helm upgrade --install octopod ./octopod \
     --set "power_app_domain=$power_app_domain" \
     --set "base_domain=$base_domain" \
     --set "status_update_timeout=$status_update_timeout" \
+    --set "kubernetes_dashboard_url=$kubernetes_dashboard_url" \
     --wait --timeout 600 --debug
  ```
 
