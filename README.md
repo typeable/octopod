@@ -55,7 +55,7 @@ There are several places where things can go wrong:
    To fix this the DevOps engineer can use the [_octo CLI_][octo] to see detailed logs collected during the deployment process and diagnose the issue.
 2. You could have one of the steps of your deployment failing (for example, a failing database migration).
 
-   If you have supplied a [_Kubernetes Dashboard_](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) URL to _Octopod_ during deployment, then you will have a "View logs" button in the _Web UI_. You can click that button to get a filtered view of the _Kubernetes Dashboard_ where you can see what could have gone wrong and diagnose the issue.
+   If you have supplied a [_Kubernetes Dashboard_](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) URL to _Octopod_ during deployment, then you will have a "Details" button in the _Web UI_. You can click that button to get a filtered view of the _Kubernetes Dashboard_ where you can see what could have gone wrong and diagnose the issue.
 
 ### Why Haskell and Rust?
 

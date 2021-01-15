@@ -355,10 +355,10 @@ password="password"
 # Example URL to supply:
 #   https://dashboard.example.com
 #
-# If you supply a url, then there will be a "View logs" button for
+# If you supply a url, then there will be a "Details" button for
 # every deployment which opens a filtered page of your k8s dashboard.
 #
-# If you leave this blank, the "View logs" button will not be displayed in the
+# If you leave this blank, the "Details" button will not be displayed in the
 # Web UI.
 kubernetes_dashboard_url=""
 

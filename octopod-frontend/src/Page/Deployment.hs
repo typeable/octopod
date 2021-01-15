@@ -128,7 +128,7 @@ deploymentHead dfiDyn sentEv =
     void . dyn $ url' <&> maybe blank (\url ->
       void $ aButtonDynClass'
             "page__action button button--secondary button--logs"
-            "View logs"
+            "Details"
             (pure $ "href" =: url)
       )
     delEv <- confirmArchivePopup archEv $ do

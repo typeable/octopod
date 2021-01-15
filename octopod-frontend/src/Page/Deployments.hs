@@ -284,7 +284,7 @@ activeDeploymentWidget clickedEv dDyn' = do
             btnArcEv <- buttonClass "action action--archive" "Move to archive"
             url' <- kubeDashboardUrl dDyn
             void . dyn $ url' <&> maybe blank (\url ->
-              void $ aButtonClass' "action action--logs" "View logs"
+              void $ aButtonClass' "action action--logs" "Details"
                     (pure $ "href" =: url)
               )
             pure $
