@@ -113,6 +113,7 @@ deploymentsHeadWidget enabledSearch okUpdEv =
           (  "type" =: "text"
           <> "class" =: "input__widget"
           <> "placeholder" =: "Search for deployments"
+          <> "style" =: "width: 264px;"
           <> enabledSearchAttr)
         & inputElementConfig_setValue .~ ("" <$ domEvent Click deleteEl)
       (deleteEl, _) <- elClass' "button" "input__clear-type spot spot--cancel" $
