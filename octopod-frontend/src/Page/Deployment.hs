@@ -18,7 +18,11 @@ import           Servant.Reflex
 
 import           Common.Types as CT
 import           Common.Utils
+import           Control.Monad.Reader
+import           Data.Align
+import           Data.Generics.Labels ()
 import           Frontend.API
+import           Frontend.GHCJS
 import           Frontend.Route
 import           Frontend.Utils
 import           Page.ClassicPopup
@@ -33,7 +37,9 @@ deploymentPage
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
-    , Prerender js t m )
+    , Prerender js t m
+    , MonadReader ProjectConfig m
+    )
   => Event t ()     -- ^ Event notifying about the need to update data.
   -> DeploymentName -- ^ Name of current deployment.
   -> m ()
@@ -53,7 +59,9 @@ deploymentWidget
     ( MonadWidget t m
     , RouteToUrl (R Routes) m
     , SetRoute t (R Routes) m
-    , Prerender js t m)
+    , Prerender js t m
+    , MonadReader ProjectConfig m
+    )
   => Event t ()         -- ^ Event notifying about the need to update data.
   -> DeploymentFullInfo -- ^ Initial deployment data.
   -> m ()
@@ -81,7 +89,7 @@ deploymentWidget updEv dfi = mdo
 -- If the status is pending (\"Creating\", \"Updating\", etc)
 -- then all buttons are inactive.
 deploymentHead
-  :: MonadWidget t m
+  :: (MonadWidget t m, MonadReader ProjectConfig m)
   => Dynamic t DeploymentFullInfo
   -- ^ Deployment data.
   -> Event t Bool
@@ -92,7 +100,7 @@ deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
     elClass "h1" "page__heading title" $ dynText dname
-    editEvEv <- dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
+    (editEv, archEv) <- hold2 . dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
       True -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ leftmost [ False <$ btnEv, sentEv ]
@@ -102,7 +110,7 @@ deploymentHead dfiDyn sentEv =
           "Recover from archive"
           btnEnabledDyn
         void $ restoreEndpoint (Right . coerce <$> dname) btnEv
-        pure never
+        pure (never, never)
       False -> mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
@@ -115,14 +123,27 @@ deploymentHead dfiDyn sentEv =
           \classic-popup-handler"
           "Move to archive"
           btnEnabledDyn
-        delEv <- confirmArchivePopup archEv $ do
-          text "Are you sure you want to archive the"
-          el "br" blank
-          dynText dname
-          text " deployment?"
-        void $ archiveEndpoint (Right . coerce <$> dname) delEv
-        pure $ R.tag (current dfiDyn) editEv
-    switchHold never editEvEv
+        pure (R.tag (current dfiDyn) editEv, archEv)
+    url' <- kubeDashboardUrl dfiDyn
+    void . dyn $ url' <&> maybe blank (\url ->
+      void $ aButtonDynClass'
+            "page__action button button--secondary button--logs"
+            "Details"
+            (pure $ "href" =: url)
+      )
+    delEv <- confirmArchivePopup archEv $ do
+      text "Are you sure you want to archive the"
+      el "br" blank
+      dynText dname
+      text " deployment?"
+    void $ archiveEndpoint (Right . coerce <$> dname) delEv
+    return editEv
+
+hold2
+  :: (MonadHold t m, Reflex t)
+  =>  m (Event t (Event t a, Event t b))
+  -> m (Event t a, Event t b)
+hold2 = (>>= fmap fanThese . switchHold never . fmap (uncurry align))
 
 -- | Div wrappers.
 deploymentBodyWrapper :: MonadWidget t m => m a -> m a

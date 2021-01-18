@@ -8,7 +8,7 @@ import           Data.Type.Equality
 import           Reflex.Dom
 
 
--- | Same as 'EventWriter' but without a fundep and can only have a concrete implementation by EventWriterT.
+-- | Same as 'EventWriter' but without a fundep.
 class (Monad m, Semigroup w) => MultiEventWriter t w m | m -> t where
   tellMultiEvent :: Event t w -> m ()
 
