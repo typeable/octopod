@@ -35,6 +35,7 @@ executable frontend
                      , Servant.Reflex.Extra
                      , Page.Elements.Links
                      , Reflex.MultiEventWriter.Class
+                     , Data.Text.Search
   ghc-options:         -Wall
                        -Werror
                        -Wno-missing-home-modules
