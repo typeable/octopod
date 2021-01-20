@@ -61,6 +61,10 @@ There are several places where things can go wrong:
 
 We believe that there is a lot to be gained in programming in general by being able to statically ensure invariants in your code. One of the most practical ways of ensuring invariants is a good static type system. Haskell and Rust are both languages that have very strong type systems. This allows us to move fast without breaking things in the process.
 
+## Quotations
+
+`Typeable team envisioned an insightful approach to CI/CD, which managed to help us cut the delivery time for new features and projects with Octopod` (C) Wes Iwanski - VP Technology, Downtown Travel
+
 ## ❓ Still have questions?
 
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
