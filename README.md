@@ -63,8 +63,9 @@ We believe that there is a lot to be gained in programming in general by being a
 
 ## Quotations
 
-```Typeable team envisioned an insightful approach to CI/CD, which managed to help us cut the delivery time for new features and projects with Octopod```
-(C) Wes Iwanski - VP Technology, Downtown Travel
+> Typeable team envisioned an insightful approach to CI/CD, which managed to help us cut the delivery time for new features and projects with Octopod
+
+— Wes Iwanski – VP Technology, Downtown Travel
 
 ## ❓ Still have questions?
 
