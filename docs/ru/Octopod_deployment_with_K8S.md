@@ -178,7 +178,7 @@
     registry="typeable"
 
     # tag Octopod Server
-    tag="1.0"
+    tag="1.1"
 
     # название docker образа Octopod Server
     image="octopod"
