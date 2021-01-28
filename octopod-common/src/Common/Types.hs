@@ -101,6 +101,12 @@ data FailureType
   deriving (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake FailureType
 
+archivedStatuses :: [DeploymentStatus]
+archivedStatuses = [ArchivePending, Archived]
+
+isArchivedStatus :: DeploymentStatus -> Bool
+isArchivedStatus = (`elem` archivedStatuses)
+
 data Deployment = Deployment
   { name :: DeploymentName
   , tag :: DeploymentTag
