@@ -281,7 +281,7 @@ powerFullInfoH dName = do
 -- | Hides private overrides in 'full_info' response.
 hidePrivateOverridesInFullInfos :: [DeploymentFullInfo] -> [DeploymentFullInfo]
 hidePrivateOverridesInFullInfos dFullInfos =  do
-  dFullInfos <&> \(DeploymentFullInfo dep s a ct ut u) ->
+  dFullInfos <&> \(DeploymentFullInfo dep s ct ut u) ->
     let
       hidePrivate (Deployment n t appOvs depOvs) =
         Deployment n t (hideP appOvs) (hideP depOvs)
@@ -292,7 +292,7 @@ hidePrivateOverridesInFullInfos dFullInfos =  do
               Private -> "*"
               Public -> v
           in coerce $ Override k v' vis
-    in DeploymentFullInfo (hidePrivate dep) s a ct ut u
+    in DeploymentFullInfo (hidePrivate dep) s ct ut u
 
 getFullInfo
   :: (MonadReader AppState m, MonadBaseControl IO m)
@@ -313,22 +313,22 @@ getFullInfo' conn listType = do
   deployments <- liftBase $ do
     rows <- case listType of
       FullInfoForAll -> query_ conn qAll
-      FullInfoOnlyForOne (dName) -> query conn qOne (Only dName)
-    for rows $ \(n, t, a, ct, ut, st) -> do
+      FullInfoOnlyForOne dName -> query conn qOne (Only dName)
+    for rows $ \(n, t, ct, ut, st) -> do
       (appOvs, depOvs) <- selectOverrides conn n
       dMeta <- selectDeploymentMetadata conn n
       pure $ do
-        let dep = (Deployment n t appOvs depOvs)
-        DeploymentFullInfo dep st a dMeta ct ut
+        let dep = Deployment n t appOvs depOvs
+        DeploymentFullInfo dep (read st) dMeta ct ut
   liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
     qAll                 =
-      "SELECT name, tag, archived, extract(epoch from created_at)::int, \
+      "SELECT name, tag, extract(epoch from created_at)::int, \
         \extract(epoch from updated_at)::int, status::text \
       \FROM deployments ORDER BY name"
     qOne                 =
-      "SELECT name, tag, archived, extract(epoch from created_at)::int, \
+      "SELECT name, tag, extract(epoch from created_at)::int, \
         \extract(epoch from updated_at)::int, status::text \
       \FROM deployments \
       \WHERE name = ?"
@@ -944,9 +944,9 @@ cleanArchiveH = do
     archRetention = unArchiveRetention . archiveRetention $ st
     q =
       "SELECT name FROM deployments \
-      \WHERE archived = 't' AND archived_at + interval '?' second < now()"
+      \WHERE status in ? AND archived_at + interval '?' second < now()"
   retrieved :: [Only DeploymentName] <- liftIO $
-    withResource pgPool $ \conn -> query conn q (Only archRetention)
+    withResource pgPool $ \conn -> query conn q (In (show <$> archivedStatuses), archRetention)
   runBgWorker . void . liftBase $
     for retrieved $ \(Only dName) -> cleanupDeployment dName st
 

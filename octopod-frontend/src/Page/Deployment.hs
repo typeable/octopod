@@ -100,8 +100,8 @@ deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
     elClass "h1" "page__heading title" $ dynText dname
-    (editEv, archEv) <- hold2 . dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
-      True -> mdo
+    (editEv, archEv) <- hold2 . dyn $ dfiDyn <&> \dfi -> if isDeploymentArchived dfi
+      then mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ leftmost [ False <$ btnEv, sentEv ]
         btnEv <- aButtonClassEnabled
@@ -111,7 +111,7 @@ deploymentHead dfiDyn sentEv =
           btnEnabledDyn
         void $ restoreEndpoint (Right . coerce <$> dname) btnEv
         pure (never, never)
-      False -> mdo
+      else mdo
         let btnState = not $ isPending $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
         editEv <- aButtonClassEnabled

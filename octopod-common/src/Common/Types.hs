@@ -16,6 +16,7 @@ import           Data.Text as T
 import           Data.Traversable
 import           Deriving.Aeson.Stock
 import           Web.HttpApiData
+import GHC.Records
 
 -- | Deployment override.
 data Override = Override
@@ -147,13 +148,15 @@ data DeploymentInfo = DeploymentInfo
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
   , status :: DeploymentStatus
-  , archived :: Bool
   , metadata :: [DeploymentMetadata]
   , createdAt :: Int
   , updatedAt :: Int
   }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
+isDeploymentArchived :: DeploymentFullInfo -> Bool
+isDeploymentArchived = isArchivedStatus . getField @"status"
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag

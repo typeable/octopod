@@ -177,7 +177,7 @@ deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
     errUpdEv = fmapMaybe reqFailure updRespEv
   dsDyn <- holdDyn ds okUpdEv
   let
-    isArchived = view (field @"deployment" . field @"archived")
+    isArchived = isDeploymentArchived . view #deployment
     filteredDyn = ffor2 termDyn dsDyn $ \term ds' ->
       mapMaybe (searchDeployments . T.filter (not . isSpace) $ term) ds'
     (archivedDsDyn, activeDsDyn) = splitDynPure $ L.partition isArchived
