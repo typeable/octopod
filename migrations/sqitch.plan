@@ -13,3 +13,4 @@ create_deployment_metadata 2020-08-14T12:11:42Z Typeable LLC <octopod@typeable.i
 rename_elements_of_scope_enum 2020-08-19T09:38:40Z Typeable LLC <octopod@typeable.io> # Rename elements of 'scope' enum
 rename-delete-to-archive 2020-11-23T10:53:10Z Ilya <octopod@typeable.io> # Renamed delete to archive
 rename_delete_to_archive_2 2020-11-26T08:28:58Z Typeable LLC <octopod@typeable.io> # Renamed delete to archive
+remove_archived_column 2021-01-28T18:44:54Z Typeable LLC <octopod@typeable.io> # Removed 'archived' column
