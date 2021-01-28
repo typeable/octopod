@@ -35,6 +35,12 @@ library
                      , StandaloneDeriving
                      , TypeApplications
                      , TypeOperators
+                     , OverloadedLabels
+                     , UndecidableInstances
+                     , MultiParamTypeClasses
+                     , FunctionalDependencies
+                     , RankNTypes
+                     , TypeFamilies
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args
@@ -91,6 +97,8 @@ library
     , x509
     , x509-store
     , x509-validation
+    , monad-control
+    , lifted-base
   default-language: Haskell2010
 
 executable octopod-exe
