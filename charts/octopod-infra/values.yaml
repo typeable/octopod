@@ -5,9 +5,6 @@ global:
 
 namespace: octopod
 nodeselector: stand
-
-nodeselector: stand
-namespace: octopod
 postgres_db: octopod
 postgres_user: octopod
 postgres_password: octopod
