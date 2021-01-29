@@ -41,6 +41,7 @@ library
                      , FunctionalDependencies
                      , RankNTypes
                      , TypeFamilies
+                     , QuantifiedConstraints
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args
@@ -50,6 +51,7 @@ library
       Orphans
       TLS
       Types
+      Control.Octopod.DeploymentLock
   hs-source-dirs:
       src
   build-depends:
@@ -99,6 +101,7 @@ library
     , x509-validation
     , monad-control
     , lifted-base
+    , containers
   default-language: Haskell2010
 
 executable octopod-exe

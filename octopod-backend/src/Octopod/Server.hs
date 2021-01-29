@@ -44,6 +44,7 @@ import           System.Process.Typed
 import           Common.Validation (isNameValid)
 import           Control.Monad.Base
 import           Control.Monad.Trans.Control
+import           Control.Octopod.DeploymentLock
 import qualified Data.ByteString.Lazy.Char8 as BSLC
 import           Data.Generics.Labels ()
 import qualified Data.Text.Encoding as T
@@ -100,7 +101,10 @@ data AppState = AppState
   , tagCheckingCommand :: Command
   -- ^ tag checking command path
   , infoCommand :: Command
-  }
+  , lockedDeployments :: LockedDeployments
+  -- ^ Deployments currently being processed which has not yet been
+  -- recorded in the database.
+  } deriving Generic
 
 -- | Deployment exception definition.
 data DeploymentException
@@ -155,6 +159,7 @@ runOctopodServer = do
     (unDBConnectionString $ octopodDB opts)
     (unDBPoolSize $ octopodDBPoolSize opts)
   channel <- liftIO . atomically $ newBroadcastTChan
+  lockedDs <- initLockedDeployments
   let
     appSt        =
       AppState
@@ -177,6 +182,7 @@ runOctopodServer = do
         archiveCheckingCmd
         tagCheckingCmd
         infoCmd
+        lockedDs
     app'         = app appSt
     powerApp'    = powerApp appSt
     wsApp'       = wsApp channel
@@ -308,16 +314,19 @@ getFullInfo'
   -> m [DeploymentFullInfo]
 getFullInfo' conn listType = do
   AppState {logger = l} <- ask
-  deployments <- liftBase $ do
+  deployments <- do
     rows <- case listType of
-      FullInfoForAll -> query_ conn qAll
-      FullInfoOnlyForOne dName -> query conn qOne (Only dName)
+      FullInfoForAll -> liftBase $ query_ conn qAll
+      FullInfoOnlyForOne dName -> liftBase $  query conn qOne (Only dName)
     for rows $ \(n, t, ct, ut, st) -> do
-      (appOvs, depOvs) <- selectOverrides conn n
-      dMeta <- selectDeploymentMetadata conn n
+      (appOvs, depOvs) <- liftBase $  selectOverrides conn n
+      dMeta <- liftBase $  selectDeploymentMetadata conn n
+      st' <- isDeploymentLocked n <&> \case
+        True -> DeploymentPending $ read st
+        False -> DeploymentNotPending $ read st
       pure $ do
         let dep = Deployment n t appOvs depOvs
-        DeploymentFullInfo dep (read st) dMeta ct ut
+        DeploymentFullInfo dep st' dMeta ct ut
   liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
@@ -344,43 +353,43 @@ createH dep = do
       { errBody = validationError [badNameText] [] }
   t1 <- liftIO $ now
   st <- ask
-  let
-    q                                            =
-      "INSERT INTO deployments (name, tag, status) \
-      \VALUES (?, ?, ?) RETURNING id"
-    pgPool                                       = pool st
-    createDep :: PgPool -> Deployment -> IO [Only Int]
-    createDep p Deployment { name = n, tag = t } =
-      withResource p $ \conn ->
-        query conn q (n, t, show CreatePending)
   failIfImageNotFound (name dep) (tag dep)
   failIfGracefulShutdownActivated
-  res :: Either SqlError [Only Int] <- liftIO . try $ createDep pgPool dep
-  dId <- case res of
-    Right ((Only depId) : _) ->
-      pure . DeploymentId $ depId
-    Right [] ->
-      throwError err404
-        { errBody = validationError ["Name not found"] [] }
-    Left (SqlError code _ _ _ _) | code == unique_violation ->
-      throwError err400
-        { errBody = validationError ["Deployment already exists"] [] }
-    Left (SqlError _ _ _ _ _) ->
-      throwError err409 { errBody = appError "Some database error" }
-  liftIO . withResource pgPool $ \conn ->
-    upsertNewOverrides conn dId (appOverrides dep) (deploymentOverrides dep)
-  runBgWorker $ liftBase $ do
-    sendReloadEvent st
-    updateDeploymentInfo (name dep) st
-    (ec, out, err) <- createDeployment dep st
-    t2 <- now
+  runDeploymentBgWorker (name dep) $ do
+    let
+      q                                            =
+        "INSERT INTO deployments (name, tag, status) \
+        \VALUES (?, ?, ?) RETURNING id"
+      pgPool                                       = pool st
+      createDep :: PgPool -> Deployment -> IO [Only Int]
+      createDep p Deployment { name = n, tag = t } =
+        withResource p $ \conn ->
+          query conn q (n, t, show CreatePending)
+    res :: Either SqlError [Only Int] <- liftIO . try $ createDep pgPool dep
+    dId <- case res of
+      Right ((Only depId) : _) ->
+        pure . DeploymentId $ depId
+      Right [] ->
+        throwError err404
+          { errBody = validationError ["Name not found"] [] }
+      Left (SqlError code _ _ _ _) | code == unique_violation ->
+        throwError err400
+          { errBody = validationError ["Deployment already exists"] [] }
+      Left (SqlError _ _ _ _ _) ->
+        throwError err409 { errBody = appError "Some database error" }
+    liftIO . withResource pgPool $ \conn ->
+      upsertNewOverrides conn dId (appOverrides dep) (deploymentOverrides dep)
+    liftBase $ sendReloadEvent st
+    liftBase $ updateDeploymentInfo (name dep) st
+    (ec, out, err) <- liftBase $ createDeployment dep st
+    t2 <- liftBase $ now
     let
       elTime = elapsedTime t2 t1
     liftIO . withResource pgPool $ \conn ->
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog conn dep "create" ec elTime out err
-    sendReloadEvent st
-    handleExitCode ec
+    liftBase $ sendReloadEvent st
+    liftBase $ handleExitCode ec
   pure Success
 
 -- | Updates deployment info.
@@ -546,7 +555,7 @@ transitionToStatus dName s = do
     dep <- lift (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
       [x] -> return x
       _ -> throwError $ DeploymentNotFound dName
-    assertStatusTransitionPossible (dep ^. #status) newS
+    assertStatusTransitionPossible (recordedStatus $ dep ^. #status) newS
     log $ "Transitioning deployment " <> (show' . unDeploymentName) dName <> " " <> show' s
     let
       q =
@@ -602,7 +611,7 @@ archiveH dName = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ archiveCommand st
-  runBgWorker $ do
+  runDeploymentBgWorker dName $ do
     log $ "call " <> unwords (cmd : args)
     (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     t2 <- liftBase now
@@ -635,11 +644,12 @@ updateH dName dUpdate = do
   dId <- selectDeploymentId pgPool dName
   failIfImageNotFound dName dTag
   failIfGracefulShutdownActivated
-  runBgWorker $ do
+  runDeploymentBgWorker dName $ do
     (appOvs, depOvs) <- liftBase . withResource pgPool $ \conn ->
       withTransaction conn $ do
         deleteOldOverrides conn dId oldAppOvs oldDepOvs
         upsertNewOverrides conn dId newAppOvs newDepOvs
+        updateTag conn dId dTag
         selectOverrides conn dName
     liftBase $ updateDeploymentInfo dName st
     liftBase $ sendReloadEvent st
@@ -786,6 +796,16 @@ upsertNewOverrides conn dId appOvs depOvs = do
       oVis   = show . overrideVisibility . unDeploymentOverride $ o
     execute conn q (oKey, oValue, dId', oScope, oVis, oValue, oVis)
 
+updateTag
+  :: Connection
+  -> DeploymentId
+  -> DeploymentTag
+  -> IO ()
+updateTag conn (DeploymentId dId) (DeploymentTag dTag) = do
+  let
+    q   = "UPDATE deployments SET tag=? WHERE id=?;"
+  void $ execute conn q (dTag, dId)
+
 -- | Handles the 'info' request of the Web UI API.
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
@@ -869,7 +889,7 @@ cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
   failIfGracefulShutdownActivated
   st <- ask
-  runBgWorker $ liftBase $ cleanupDeployment dName st
+  runDeploymentBgWorker dName $ liftBase $ cleanupDeployment dName st
   pure Success
 
 -- | Helper to cleanup deployment.
@@ -942,8 +962,9 @@ cleanArchiveH = do
       \WHERE status in ? AND archived_at + interval '?' second < now()"
   retrieved :: [Only DeploymentName] <- liftIO $
     withResource pgPool $ \conn -> query conn q (In (show <$> archivedStatuses), archRetention)
-  runBgWorker . void . liftBase $
-    for retrieved $ \(Only dName) -> cleanupDeployment dName st
+  runBgWorker . void $
+    for retrieved $ \(Only dName) ->
+      runDeploymentBgWorker dName $ liftBase $ cleanupDeployment dName st
 
   pure Success
 
@@ -956,9 +977,10 @@ restoreH dName = do
   dep <- selectDeployment dName
   failIfImageNotFound (name dep) (tag dep)
   failIfGracefulShutdownActivated
-  runBgWorker $ do
+  runDeploymentBgWorker dName $ do
+    dep' <- selectDeployment dName
     liftBase $ updateDeploymentInfo dName st
-    (ec, out, err) <- liftBase $ createDeployment dep st
+    (ec, out, err) <- liftBase $ createDeployment dep' st
     t2 <- liftBase now
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $ TransitionCreatePending StatusTransitionProcessOutput
@@ -1263,3 +1285,18 @@ runBgWorker act = void $ L.forkFinally act' cleanup
         if gracefulShutdown && c == 0
           then putMVar (shutdownSem state) ()
           else pure ()
+
+-- | Same as 'runBgWorker' but also locks the specified deployment.
+runDeploymentBgWorker
+  :: (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m)
+  => DeploymentName -> m () -> m ()
+runDeploymentBgWorker dName m = do
+  st <- ask
+  (err :: MVar (Either ServerError ())) <- L.newEmptyMVar
+  runBgWorker $ withLockedDeployment
+    dName
+    (L.putMVar err $ Left err409 {errBody = "The deployment is currently being processed."})
+    (L.putMVar err (Right ()) >> liftBase (sendReloadEvent st) >> m)
+  L.readMVar err >>= \case
+    Left e -> throwError e
+    Right () -> return ()

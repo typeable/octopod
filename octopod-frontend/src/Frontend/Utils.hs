@@ -351,18 +351,19 @@ formatPosixToDateTime = pack
   . intToUTCTime
 
 -- | Widget displaying the current deployment status.
-statusWidget :: MonadWidget t m => Dynamic t DeploymentStatus -> m ()
+statusWidget :: MonadWidget t m => Dynamic t PreciseDeploymentStatus -> m ()
 statusWidget stDyn = do
   stDyn' <- holdUniqDyn stDyn
   let
-    pendingWidget = divClass "loading loading--status-alike"
+    loadingWidget = divClass "loading loading--status-alike"
   dyn_ $ stDyn' <&> \case
-    Running -> divClass "status status--success" $ text "Running"
-    Failure -> divClass "status status--failure" $ text "Failure"
-    CreatePending -> pendingWidget $ text "Creating..."
-    UpdatePending -> pendingWidget $ text "Updating..."
-    ArchivePending -> pendingWidget $ text "Archiving..."
-    Archived -> divClass "status status--archived" $ text "Archived"
+    DeploymentPending _ -> divClass "status status--pending" $ text "Pending..."
+    DeploymentNotPending Running -> divClass "status status--success" $ text "Running"
+    DeploymentNotPending Failure -> divClass "status status--failure" $ text "Failure"
+    DeploymentNotPending CreatePending -> loadingWidget $ text "Creating..."
+    DeploymentNotPending UpdatePending -> loadingWidget $ text "Updating..."
+    DeploymentNotPending ArchivePending -> loadingWidget $ text "Archiving..."
+    DeploymentNotPending Archived -> divClass "status status--archived" $ text "Archived"
 
 -- | Text input field with label.
 octopodTextInput

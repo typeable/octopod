@@ -42,6 +42,7 @@ import           Page.Elements.Links
 import           Page.Popup.EditDeployment
 import           Page.Popup.NewDeployment
 import           Reflex.MultiEventWriter.Class
+import           Servant.Reflex.Extra
 
 
 -- | The root widget of the deployments list page.
@@ -174,7 +175,7 @@ deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
   updRespEv <- listEndpoint $ leftmost [updAllEv, () <$ retryEv]
   let
     okUpdEv = fmapMaybe reqSuccess updRespEv
-    errUpdEv = fmapMaybe reqFailure updRespEv
+    errUpdEv = fmapMaybe reqErrorBody updRespEv
   dsDyn <- holdDyn ds okUpdEv
   let
     isArchived = isDeploymentArchived . view #deployment
@@ -295,7 +296,7 @@ activeDeploymentWidget clickedEv dDyn' = do
         text $ formatPosixToDate updatedAt
       el "td" $ do
         let
-          disabledAttr = if isPending status
+          disabledAttr = if isPending . recordedStatus $ status
             then "disabled" =: ""
             else mempty
           elId = "deployment_row_" <> unDeploymentName dName

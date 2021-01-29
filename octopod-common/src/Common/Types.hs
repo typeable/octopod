@@ -95,6 +95,13 @@ data DeploymentStatus
   deriving (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 
+data PreciseDeploymentStatus
+  = DeploymentPending { recordedStatus :: DeploymentStatus }
+  -- ^ The deployment is currently being processed by the server
+  | DeploymentNotPending { recordedStatus :: DeploymentStatus }
+  deriving (Generic, Read, Show, Eq)
+  deriving (FromJSON, ToJSON) via Snake PreciseDeploymentStatus
+
 archivedStatuses :: [DeploymentStatus]
 archivedStatuses = [ArchivePending, Archived]
 
@@ -140,7 +147,7 @@ data DeploymentInfo = DeploymentInfo
 
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
-  , status :: DeploymentStatus
+  , status :: PreciseDeploymentStatus
   , metadata :: [DeploymentMetadata]
   , createdAt :: Int
   , updatedAt :: Int
@@ -149,7 +156,7 @@ data DeploymentFullInfo = DeploymentFullInfo
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
 isDeploymentArchived :: DeploymentFullInfo -> Bool
-isDeploymentArchived = isArchivedStatus . getField @"status"
+isDeploymentArchived = isArchivedStatus . recordedStatus . getField @"status"
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag

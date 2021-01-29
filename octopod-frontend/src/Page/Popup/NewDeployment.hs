@@ -24,6 +24,7 @@ import           Common.Validation (isNameValid)
 import           Frontend.API
 import           Frontend.Utils
 import           Servant.Reflex
+import           Servant.Reflex.Extra
 
 
 -- | The root function for \"new deployment\" sidebar.
@@ -74,7 +75,7 @@ newDeploymentPopupBody errEv = divClass "popup__content" $
   divClass "deployment" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv
-      appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
+      appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
       nameErrEv = getNameError commandResponseEv nameDyn
       tagErrEv = getTagError commandResponseEv tagDyn
     errorHeader appErrEv
