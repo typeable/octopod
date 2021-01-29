@@ -355,7 +355,7 @@ createH dep = do
   st <- ask
   failIfImageNotFound (name dep) (tag dep)
   failIfGracefulShutdownActivated
-  runDeploymentBgWorker (name dep) $ do
+  runDeploymentBgWorker Nothing (name dep) $ do
     let
       q                                            =
         "INSERT INTO deployments (name, tag, status) \
@@ -527,15 +527,19 @@ processOutput TransitionFailure = Nothing
 transitionToStatusS
   :: (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m)
   => DeploymentName -> DeploymentStatusTransition -> m ()
-transitionToStatusS dName tran = runExceptT (transitionToStatus dName tran) >>= \case
+transitionToStatusS dName tran =
+  runExceptT (transitionToStatus dName tran) >>= transitionErrorToServerError
+
+transitionErrorToServerError :: MonadError ServerError m => Either StatusTransitionError a -> m a
+transitionErrorToServerError = \case
   Right x -> return x
-  Left (InvalidStatusTransition a b) -> throwError err409
+  Left (InvalidStatusTransition dName a b) -> throwError err409
     { errBody
       = "Unable to transition deployment "
       <> (BSL.fromStrict . T.encodeUtf8 . unDeploymentName) dName
       <> " from " <> show'' a <> " to " <> show'' b <> "."
     }
-  Left (DeploymentNotFound _) -> throwError err404
+  Left (DeploymentNotFound dName) -> throwError err404
     { errBody
       = "Couldn't find deployment "
       <> (BSL.fromStrict . T.encodeUtf8 . unDeploymentName) dName <> "."
@@ -555,7 +559,7 @@ transitionToStatus dName s = do
     dep <- lift (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
       [x] -> return x
       _ -> throwError $ DeploymentNotFound dName
-    assertStatusTransitionPossible (recordedStatus $ dep ^. #status) newS
+    assertStatusTransitionPossible dName (recordedStatus $ dep ^. #status) newS
     log $ "Transitioning deployment " <> (show' . unDeploymentName) dName <> " " <> show' s
     let
       q =
@@ -577,14 +581,36 @@ transitionToStatus dName s = do
 
 assertStatusTransitionPossible
   :: MonadError StatusTransitionError m
-  => DeploymentStatus
+  => DeploymentName
+  -> DeploymentStatus
   -> DeploymentStatus
   -> m ()
-assertStatusTransitionPossible old new =
-  unless (new `elem` possibleTransitions old) (throwError $ InvalidStatusTransition old new)
+assertStatusTransitionPossible dName old new =
+  unless
+    (new `elem` possibleTransitions old)
+    (throwError $ InvalidStatusTransition dName old new)
 
+assertDeploymentTransitionPossible
+  :: (MonadError StatusTransitionError m, MonadReader AppState m, MonadBaseControl IO m)
+  => DeploymentName
+  -> DeploymentStatus
+  -> m ()
+assertDeploymentTransitionPossible dName new = do
+  p <- asks pool
+  dep <- withResource p $ \conn -> (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
+    [x] -> return x
+    _ -> throwError $ DeploymentNotFound dName
+  assertStatusTransitionPossible dName (recordedStatus $ dep ^. #status) new
+
+assertDeploymentTransitionPossibleS
+  :: (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m)
+  => DeploymentName
+  -> DeploymentStatus
+  -> m ()
+assertDeploymentTransitionPossibleS dName new =
+  runExceptT (assertDeploymentTransitionPossible dName new) >>= transitionErrorToServerError
 data StatusTransitionError
-  = InvalidStatusTransition DeploymentStatus DeploymentStatus
+  = InvalidStatusTransition DeploymentName DeploymentStatus DeploymentStatus
   | DeploymentNotFound DeploymentName
   deriving Show
 
@@ -611,7 +637,7 @@ archiveH dName = do
       , "--name", coerce dName
       ]
     cmd     = coerce $ archiveCommand st
-  runDeploymentBgWorker dName $ do
+  runDeploymentBgWorker (Just ArchivePending) dName $ do
     log $ "call " <> unwords (cmd : args)
     (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
     t2 <- liftBase now
@@ -644,7 +670,7 @@ updateH dName dUpdate = do
   dId <- selectDeploymentId pgPool dName
   failIfImageNotFound dName dTag
   failIfGracefulShutdownActivated
-  runDeploymentBgWorker dName $ do
+  runDeploymentBgWorker (Just UpdatePending) dName $ do
     (appOvs, depOvs) <- liftBase . withResource pgPool $ \conn ->
       withTransaction conn $ do
         deleteOldOverrides conn dId oldAppOvs oldDepOvs
@@ -889,7 +915,7 @@ cleanupH :: DeploymentName -> AppM CommandResponse
 cleanupH dName = do
   failIfGracefulShutdownActivated
   st <- ask
-  runDeploymentBgWorker dName $ liftBase $ cleanupDeployment dName st
+  runDeploymentBgWorker Nothing dName $ liftBase $ cleanupDeployment dName st
   pure Success
 
 -- | Helper to cleanup deployment.
@@ -964,7 +990,7 @@ cleanArchiveH = do
     withResource pgPool $ \conn -> query conn q (In (show <$> archivedStatuses), archRetention)
   runBgWorker . void $
     for retrieved $ \(Only dName) ->
-      runDeploymentBgWorker dName $ liftBase $ cleanupDeployment dName st
+      runDeploymentBgWorker Nothing dName $ liftBase $ cleanupDeployment dName st
 
   pure Success
 
@@ -977,7 +1003,7 @@ restoreH dName = do
   dep <- selectDeployment dName
   failIfImageNotFound (name dep) (tag dep)
   failIfGracefulShutdownActivated
-  runDeploymentBgWorker dName $ do
+  runDeploymentBgWorker (Just CreatePending) dName $ do
     dep' <- selectDeployment dName
     liftBase $ updateDeploymentInfo dName st
     (ec, out, err) <- liftBase $ createDeployment dep' st
@@ -1289,14 +1315,26 @@ runBgWorker act = void $ L.forkFinally act' cleanup
 -- | Same as 'runBgWorker' but also locks the specified deployment.
 runDeploymentBgWorker
   :: (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m)
-  => DeploymentName -> m () -> m ()
-runDeploymentBgWorker dName m = do
+  => (Maybe DeploymentStatus) -> DeploymentName -> m () -> m ()
+runDeploymentBgWorker newS dName m = do
   st <- ask
   (err :: MVar (Either ServerError ())) <- L.newEmptyMVar
   runBgWorker $ withLockedDeployment
     dName
     (L.putMVar err $ Left err409 {errBody = "The deployment is currently being processed."})
-    (L.putMVar err (Right ()) >> liftBase (sendReloadEvent st) >> m)
+    ( do
+        let
+          ok = do
+            L.putMVar err $ Right ()
+            liftBase (sendReloadEvent st)
+            m
+        case newS of
+          Just newS' ->
+            runExceptT (assertDeploymentTransitionPossibleS dName newS') >>= \case
+              Left e -> L.putMVar err $ Left e
+              Right () -> ok
+          Nothing -> ok
+    )
   L.readMVar err >>= \case
     Left e -> throwError e
     Right () -> return ()
