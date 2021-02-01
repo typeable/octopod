@@ -18,7 +18,7 @@ data:
       "ws_url": "wss://{{ .Values.ws_domain }}",
       "app_auth": "Basic {{ .Values.basic_auth_token }}",
       {{ if .Values.kubernetes_dashboard_url }}
-      "kubernetes_dashboard_url_template": "{{ .Values.kubernetes_dashboard_url }}/#/search?namespace={{ .Values.namespace }}&q="
+      "kubernetes_dashboard_url_template": "{{ .Values.kubernetes_dashboard_url }}/#/search?namespace={{ .Values.target_namespace }}&q="
       {{ else }}
       "kubernetes_dashboard_url_template": null
       {{ end }}
