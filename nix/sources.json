@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "haskell",
         "repo": "haskell-language-server",
-        "rev": "fde10fa5e4cb74ca4b64c43250297b36a9bbbd7e",
-        "sha256": "03frszid12dcmqg0m6wkc1nf561kdap3y3yqrp1x13gvbkvb9xwn",
+        "rev": "9c40dcff1b989b14e05b5aebe96f3da78c6ea25c",
+        "sha256": "0i17ssfmcgh6z1b8q7cy3x46xi81x5z82ngik86h8d5cb6w98lsn",
         "type": "tarball",
-        "url": "https://github.com/haskell/haskell-language-server/archive/fde10fa5e4cb74ca4b64c43250297b36a9bbbd7e.tar.gz",
+        "url": "https://github.com/haskell/haskell-language-server/archive/9c40dcff1b989b14e05b5aebe96f3da78c6ea25c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "hspec-webdriver-clone": {

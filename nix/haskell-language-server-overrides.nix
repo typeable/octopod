@@ -5,7 +5,7 @@
   hls-explicit-imports-plugin = hsuper.callCabal2nix "hls-explicit-imports-plugin" (sources.haskell-language-server + "/plugins/hls-explicit-imports-plugin") { };
   hls-retrie-plugin = hsuper.callCabal2nix "hls-retrie-plugin" (sources.haskell-language-server + "/plugins/hls-retrie-plugin") { };
   hls-plugin-api = hsuper.callCabal2nix "hls-plugin-api" (sources.haskell-language-server + "/hls-plugin-api") { };
-  hls-tactics-plugin = hsuper.callCabal2nix "hls-tactics-plugin" (sources.haskell-language-server + "/plugins/tactics") { };
+  hls-tactics-plugin = hsuper.callCabal2nix "hls-tactics-plugin" (sources.haskell-language-server + "/plugins/hls-tactics-plugin") { };
   hls-class-plugin = hsuper.callCabal2nix "hls-class-plugin" (sources.haskell-language-server + "/plugins/hls-class-plugin") { };
   hls-eval-plugin = hsuper.callCabal2nix "hls-eval-plugin" (sources.haskell-language-server + "/plugins/hls-eval-plugin") { };
   hls-haddock-comments-plugin = hsuper.callCabal2nix "hls-haddock-comments-plugin" (sources.haskell-language-server + "/plugins/hls-haddock-comments-plugin") { };
@@ -19,6 +19,27 @@
       pkg = "with-utf8";
       ver = "1.0.2.1";
       sha256 = "1hpqc0ljk1c1vl4671zb290hbvdcjpg66bcxmf1cz8h0vb382xp7";
+    } { }
+  );
+  hiedb = lib.dontCheck (hsuper.callHackageDirect
+    {
+      pkg = "hiedb";
+      ver = "0.3.0.1";
+      sha256 = "0n6m13lybnb6vl0lh69i2v6xykcd0bl5svkk18964k4wza8a5b12";
+    } { }
+  );
+  algebraic-graphs = (hsuper.callHackageDirect
+    {
+      pkg = "algebraic-graphs";
+      ver = "0.5";
+      sha256 = "0z8mgzdis72a9zd9x9f185phqr4bx8s06piggis4rlih1rly61nr";
+    } { }
+  );
+  inspection-testing = (hsuper.callHackageDirect
+    {
+      pkg = "inspection-testing";
+      ver = "0.4.2.4";
+      sha256 = "01mgxxjayv41cdmdm8dxmap3c7i289jw72sfa1gmi6v1bd8mbzh8";
     } { }
   );
   fourmolu = lib.doJailbreak (hsuper.callHackageDirect
@@ -90,8 +111,8 @@
   lsp-test = lib.dontCheck (hsuper.callHackageDirect
     {
       pkg = "lsp-test";
-      ver = "0.11.0.7";
-      sha256 = "sha256-buHcgRbLIn2zr5GK4gHrKuUiyYJK7Nzqc1y+WosaHJg=";
+      ver = "0.12.0.0";
+      sha256 = "1v6zg2pvjw31645129sbj2qss0zf1npk7m25dv0iiiq3gw0wqls4";
     } { }
   );
   floskell = lib.dontCheck (
@@ -204,13 +225,6 @@
         ver = "0.94.0.0";
         sha256 = "0x2ip8kn3sv599r7yc9dmdx7hgh5x632m45ga99ib5rnbn6kvn8x";
       } { };
-  extra =
-    hsuper.callHackageDirect
-      {
-        pkg = "extra";
-        ver = "1.7.3";
-        sha256 = "08j4gg2n5cl7ycr943hmyfimgby0xhf5vp8nwrwflg6lrn1s388c";
-      } { };
   quickcheck-instances =
     hsuper.callHackageDirect
       {
@@ -221,16 +235,16 @@
   apply-refact = lib.doJailbreak (hsuper.callHackageDirect
     {
       pkg = "apply-refact";
-      ver = "0.8.2.1";
-      sha256 = "0nnprv5lbk7c8w1pa4kywk0cny6prjaml4vnw70s8v6c1r1dx2rx";
+      ver = "0.9.0.0";
+      sha256 = "1vxxzfajg248lk4s6lh1jjkn1rym8x6zs5985i5kpz989k6cpyx5";
     } { }
   );
   hlint =
     hsuper.callHackageDirect
       {
         pkg = "hlint";
-        ver = "3.2";
-        sha256 = "0y2agj9y4nwhypv9ss97n26mc28pcynfynwilcyj2lwfabhr9pzc";
+        ver = "3.2.3";
+        sha256 = "1ka150d227ssyzg7ahj0q69svdsviszh65jv8yg6yybwz0in8kgi";
       } { };
   Diff =
     hsuper.callHackageDirect
@@ -255,6 +269,13 @@
         sha256 = "137f1dy0fmlrzngwcmgnxghcih7f2rfq5bdnizbwy9534dn4dr42";
       } { }
   );
+  megaparsec =
+    hsuper.callHackageDirect
+      {
+        pkg = "megaparsec";
+        ver = "9.0.1";
+        sha256 = "1279c0snq1w13scikiakdm25ybpnvbpm7khjq4wyy0gj1vvh8r6z";
+      } { };
   test-framework = lib.doJailbreak hsuper.test-framework;
   aeson = lib.dontCheck hsuper.aeson;
   tree-diff = lib.doJailbreak hsuper.tree-diff;

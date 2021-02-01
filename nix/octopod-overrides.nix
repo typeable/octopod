@@ -96,6 +96,13 @@
       ver = "1.6.2";
       sha256 = "1s7cahx8cf85kwz9l8cm6x6kvjwsv0spwv78pybsspb1ap5q287p";
     } { };
+  extra =
+    hsuper.callHackageDirect
+      {
+        pkg = "extra";
+        ver = "1.7.9";
+        sha256 = "0q64x7qiw0zsi8dv958nrqidjlgv9w20wva1y73affq8470m28vh";
+      } { };
   reflex = lib.dontCheck (lib.doJailbreak hsuper.reflex);
   reflex-dom-core = lib.dontCheck hsuper.reflex-dom-core;
   chronos = lib.doJailbreak hsuper.chronos;
