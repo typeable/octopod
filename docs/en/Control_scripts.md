@@ -264,7 +264,7 @@ tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --names
 
 #### Description
 
-This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture.md#-deployment-state-transitions).
+This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture.md#️-deployment-state-transitions).
 
 It is optional and can be omitted altogether.
 
@@ -280,3 +280,5 @@ The script might be called something like this:
 ```bash
 notification --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --old-status "UpdatePending" --new-status "Running"
 ```
+
+[configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/
