@@ -264,7 +264,7 @@ tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --names
 
 #### Description
 
-This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture️.md#-deployment-state-transitions).
+This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture.md#-deployment-state-transitions).
 
 It is optional and can be omitted altogether.
 
