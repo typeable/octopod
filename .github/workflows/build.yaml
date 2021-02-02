@@ -14,7 +14,7 @@ jobs:
     name: macOS octo CLI Release (Stack)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Cache stack dependencies
         uses: actions/cache@v2
         with:
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 600
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v12
       - uses: cachix/cachix-action@v8
         with:
@@ -52,8 +52,6 @@ jobs:
     timeout-minutes: 600
     steps:
       - uses: actions/checkout@v2
-        with:
-          repo: Aviora/dm
 
       - name: Install Nix
         uses: cachix/install-nix-action@v12
