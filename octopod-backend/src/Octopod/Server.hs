@@ -25,7 +25,6 @@ import           Data.IORef
 import           Data.Maybe
 import           Data.Pool
 import           Data.Text (lines, pack, unpack, unwords)
-import           Data.Text.IO (hGetContents)
 import           Data.Traversable
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.Instances ()
@@ -39,7 +38,6 @@ import           System.Environment (lookupEnv)
 import           System.Exit
 import           System.Log.FastLogger
 import           System.Posix.Signals (sigTERM)
-import           System.Process.Typed
 
 
 import           Common.Validation (isNameValid)
@@ -103,6 +101,7 @@ data AppState = AppState
   , tagCheckingCommand :: Command
   -- ^ tag checking command path
   , infoCommand :: Command
+  , notificationCommand :: Maybe Command
   , lockedDeployments :: LockedDeployments
   -- ^ Deployments currently being processed which has not yet been
   -- recorded in the database.
@@ -157,6 +156,10 @@ runOctopodServer = do
   archiveCheckingCmd <- coerce . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
   tagCheckingCmd <- coerce . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
   infoCmd <- coerce . pack <$> getEnvOrDie "INFO_COMMAND"
+  notificationCmd <- (fmap . fmap) (Command . pack)
+    $ lookupEnv "NOTIFICATION_COMMAND" <&> \case
+      Just "" -> Nothing
+      x -> x
   pgPool <- initConnectionPool
     (unDBConnectionString $ octopodDB opts)
     (unDBPoolSize $ octopodDBPoolSize opts)
@@ -184,6 +187,7 @@ runOctopodServer = do
         archiveCheckingCmd
         tagCheckingCmd
         infoCmd
+        notificationCmd
         lockedDs
     app'         = app appSt
     powerApp'    = powerApp appSt
@@ -556,12 +560,14 @@ transitionToStatus dName s = do
   p <- asks pool
   st <- ask
   let log = liftBase . logInfo (logger st)
-  () <- withResource p $ \conn -> liftBaseOp_ (withTransaction conn) . void $ do
-    let newS = transitionStatus s
+  (oldS, newS) <- withResource p $ \conn -> liftBaseOp_ (withTransaction conn) $ do
     dep <- lift (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
       [x] -> return x
       _ -> throwError $ DeploymentNotFound dName
-    assertStatusTransitionPossible dName (recordedStatus $ dep ^. #status) newS
+    let
+      oldS = recordedStatus $ dep ^. #status
+      newS = transitionStatus s
+    assertStatusTransitionPossible dName oldS newS
     log $ "Transitioning deployment " <> (show' . unDeploymentName) dName <> " " <> show' s
     let
       q =
@@ -579,6 +585,10 @@ transitionToStatus dName s = do
         (output ^. #duration)
         (output ^. #stdout)
         (output ^. #stderr)
+    return (oldS, newS)
+  notificationCmd <- asks notificationCommand
+  forM_ notificationCmd $ \nCmd ->
+    runBgWorker . void $ runCommandArgs' nCmd =<< notificationCommandArgs dName oldS newS
   liftBase $ sendReloadEvent st
 
 assertStatusTransitionPossible
@@ -1038,23 +1048,6 @@ getActionInfoH aId = do
     _ ->
       throwError err400 { errBody = appError "Action not found" }
 
--- | Helper to run command with pipes.
-runCommand :: MonadBase IO m => FilePath -> [String] -> m (ExitCode, Stdout, Stderr)
-runCommand cmd args = do
-  let proc' c a = setStdout createPipe . setStderr createPipe $ proc c a
-  liftBase $ withProcessWait (proc' cmd args) $ \p -> do
-    out <- hGetContents . getStdout $ p
-    err <- hGetContents . getStderr $ p
-    ec <- waitExitCode p
-    pure (ec, Stdout out, Stderr err)
-
--- | Helper to run command without pipes.
-runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
-runCommandWithoutPipes cmd args = do
-  withProcessWait (proc cmd args) $ \p -> do
-    ec <- waitExitCode p
-    pure ec
-
 -- | Helper to handle exit code.
 handleExitCode :: MonadBaseControl IO m => ExitCode -> m ()
 handleExitCode ExitSuccess = return ()
@@ -1324,7 +1317,7 @@ runBgWorker act = void $ L.forkFinally act' cleanup
 -- | Same as 'runBgWorker' but also locks the specified deployment.
 runDeploymentBgWorker
   :: (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m)
-  => (Maybe DeploymentStatus) -> DeploymentName -> m () -> m ()
+  => Maybe DeploymentStatus -> DeploymentName -> m () -> m ()
 runDeploymentBgWorker newS dName m = do
   st <- ask
   (err :: MVar (Either ServerError ())) <- L.newEmptyMVar

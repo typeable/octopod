@@ -35,10 +35,9 @@
   - [🐋✅ tag_check](#-tag_check)
     - [Description](#description-7)
     - [Execution example](#execution-example-6)
-  - [👀 info](#-info)
+  - [🔔 notifications](#-notifications)
     - [Description](#description-8)
     - [Execution example](#execution-example-7)
-    - [Sample implementation](#sample-implementation-7)
 
 </details>
 
@@ -266,34 +265,25 @@ The script might be called something like this:
 tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a"
 ```
 
-### 👀 info
+### 🔔 notifications
 
 #### Description
 
-This script returns user-facing metadata about a deployment. Currently, the metadata consists of URLs that are relevant for the deployment. Things like the deployment URL, the URL to view logs, and the database URL.
+This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture.md#️-deployment-state-transitions).
 
-The script should return the metadata as a two-column CSV table:
+It is optional and can be omitted altogether.
 
-```
-app,https://foo.example.com
-api,https://api.foo.example.com
-```
-
-This script receives only [the default command-line arguments](#general-behavior) as input.
+This script receives the following additional command-line arguments as input:
+* `--tag` – The _Docker Image tag_ that should be deployed. (In practice you can use some other string that identifies a version of your system to deploy – you will need to process it accordingly in the script.)
+- `--old-status` – The previous status the deployment was in.
+- `--new-status` – The new status the deployment transitioned to.
 
 #### Execution example
 
 The script might be called something like this:
 
 ```bash
-info --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button"
-```
-
-#### Sample implementation
-
-```bash
-echo "app,https://${name}.example.com"
-echo "api,https://api.${name}.example.com"
+notification --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --old-status "UpdatePending" --new-status "Running"
 ```
 
 [configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/
