@@ -98,12 +98,14 @@ jobs:
           mv octo-docker octo-cli-image.tar.gz
           mv octopod-server-docker octopod-server-image.tar.gz
 
-      - uses: actions/upload-artifact@v2
+      - name: Upload octo CLI Image
+        uses: actions/upload-artifact@v2
         with:
           name: octo-cli-image
           path: octo-cli-image.tar.gz
 
-      - uses: actions/upload-artifact@v2
+      - name: Upload Octopod Server Image
+        uses: actions/upload-artifact@v2
         with:
           name: octopod-server-image
           path: octopod-server-image.tar.gz
