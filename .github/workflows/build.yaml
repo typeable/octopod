@@ -1,0 +1,138 @@
+name: Build
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  octo-macOS:
+    name: macOS octo CLI Release (Stack)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Cache stack dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.stack
+          key: octo-cli-stack-${{ runner.os }}
+      # TODO: Remove this step once https://github.com/actions/cache/issues/445 is resolved.
+      - name: Fix macOS cache bug
+        run: rm -rf ~/.stack/setup-exe-cache
+      - name: Build
+        run: stack build octo-cli --local-bin-path out --copy-bins
+      - uses: actions/upload-artifact@v2
+        with:
+          name: octo-cli-macos
+          path: out/octo
+  octo-linux:
+    name: Linux octo CLI Release (Nix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v12
+      - uses: cachix/cachix-action@v8
+        with:
+          name: octopod
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+      - name: Build
+        run: nix-build nix/octo.nix
+      - uses: actions/upload-artifact@v2
+        with:
+          name: octo-cli-linux
+          path: result/bin/octo
+  docker-images:
+    name: Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repo: Aviora/dm
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v12
+
+      - name: Login to Cachix
+        uses: cachix/cachix-action@v8
+        with:
+          name: octopod
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+
+      - name: Build Docker Images
+        run: |
+          # enable required features (see https://github.com/cachix/install-nix-action/issues/19)
+          mkdir -p ~/.config/nix
+          echo "system-features = kvm" >> ~/.config/nix/nix.conf
+
+          # build docker images
+          ./build.sh build
+
+      - name: Login to DockerHub
+        id: login-docker-hub
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker Images to DockerHub
+        if: github.ref == 'refs/heads/master'
+        run: |
+          # push docker images to DockerHub
+          image_name=`cat octo-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octo:latest
+          docker push typeable/octo:latest
+
+          image_name=`cat octopod-server-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octopod:latest
+          docker push typeable/octopod:latest
+
+      - name: Rename Docker image archives
+        run: |
+          mv octo-docker octo-cli-image.tar.gz
+          mv octopod-server-docker octopod-server-image.tar.gz
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: octo-cli-image
+          path: octo-cli-image.tar.gz
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: octopod-server-image
+          path: octopod-server-image.tar.gz
+
+      - name: Clean up
+        if: always()
+        continue-on-error: true
+        run: |
+          docker logout ${{ steps.login-docker-hub.outputs.registry }}
+
+  release:
+    name: "Release"
+    if: github.ref == 'refs/heads/master'
+    runs-on: "ubuntu-latest"
+    needs: [octo-macOS, octo-linux, docker-images]
+    steps:
+      - uses: actions/download-artifact@v2
+      - name: Zip
+        run: |
+          chmod +x octo-cli-macos/octo
+          zip octo-cli-macos octo-cli-macos/octo
+          chmod +x octo-cli-linux/octo
+          zip octo-cli-linux octo-cli-linux/octo
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Pre-Release"
+          files: |
+            *.zip
+            *.tar.gz
