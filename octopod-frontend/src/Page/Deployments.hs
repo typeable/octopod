@@ -295,18 +295,15 @@ activeDeploymentWidget clickedEv dDyn' = do
         text $ formatPosixToDate updatedAt
       el "td" $ do
         let
-          disabledAttr = if isPending status
-            then "disabled" =: ""
-            else mempty
+          enabled = not $ isPending status
           elId = "deployment_row_" <> unDeploymentName dName
           btn = elAttr "button"
             (  "class" =: "drop__handler"
             <> "type" =: "button"
-            <> "id" =: elId
-            <> disabledAttr) $ text "Actions"
+            <> "id" =: elId ) $ text "Actions"
           body = do
-            btnEditEv <- buttonClass "action action--edit" "Edit"
-            btnArcEv <- buttonClass "action action--archive" "Move to archive"
+            btnEditEv <- buttonClassEnabled' "action action--edit" "Edit" (pure enabled) "action--disabled"
+            btnArcEv <- buttonClassEnabled' "action action--archive" "Move to archive" (pure enabled) "action--disabled"
             url' <- kubeDashboardUrl (view #deployment <$> dDyn)
             void . dyn $ url' <&> maybe blank (\url ->
               void $ aButtonClass' "action action--logs" "Details"
