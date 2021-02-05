@@ -28,6 +28,7 @@ import           Frontend.Utils
 import           Page.ClassicPopup
 import           Page.Elements.Links
 import           Page.Popup.EditDeployment
+import           Servant.Reflex.Extra
 
 -- | The root widget of a deployment page. It requests the deployment data.
 -- If the request fails it shows an error,
@@ -100,9 +101,9 @@ deploymentHead dfiDyn sentEv =
   divClass "page__head" $ do
     let dname = dfiDyn <^.> dfiName . coerced
     elClass "h1" "page__heading title" $ dynText dname
-    (editEv, archEv) <- hold2 . dyn $ dfiDyn <&> \dfi -> case dfi ^. field @"archived" of
-      True -> mdo
-        let btnState = not $ isPending $ dfi ^. field @"status"
+    (editEv, archEv) <- hold2 . dyn $ dfiDyn <&> \dfi -> if isDeploymentArchived dfi
+      then mdo
+        let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ leftmost [ False <$ btnEv, sentEv ]
         btnEv <- aButtonClassEnabled
           "page__action button button--secondary button--restore \
@@ -111,8 +112,8 @@ deploymentHead dfiDyn sentEv =
           btnEnabledDyn
         void $ restoreEndpoint (Right . coerce <$> dname) btnEv
         pure (never, never)
-      False -> mdo
-        let btnState = not $ isPending $ dfi ^. field @"status"
+      else mdo
+        let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
         editEv <- aButtonClassEnabled
           "page__action button button--edit popup-handler"
@@ -235,7 +236,7 @@ actionsTable updEv nameDyn = do
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let
     okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
-    errEv = fmapMaybe reqFailure respEv
+    errEv = fmapMaybe reqErrorBody respEv
   el "table" $ do
     actionsTableHead
     widgetHold_ actionsTableLoading $ leftmost

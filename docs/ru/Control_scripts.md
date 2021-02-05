@@ -12,6 +12,7 @@
 - [tag_check](#tag_check)
 - [init](#init)
 - [info](#info)
+- [notifications](#notifications)
 
 </details>
 
@@ -212,3 +213,18 @@ echo "api,https://api.${name}.example.com"
 ```
 
 [kubedog]: https://github.com/werf/kubedog
+
+## notifications
+
+Этот скрипт вызывается каждый раз, когда развертывание меняет свой статус. (При создании и удалении не вызывается.)
+
+Полный список статусов и их переходов можно найти в документе по [технической архитектуре](Technical_architecture.md#deployment-state-transitions).
+
+Получает на вход следующие аргументы:
+* `--project-name` – название проекта
+* `--base-domain` – базовый домен
+* `--namespace` – namespace
+* `--name` – имя стейджинга
+* `--tag` – тег развертывания
+- `--old-status` – предыдущий статус
+- `--new-status` – новый статус

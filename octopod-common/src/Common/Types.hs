@@ -15,6 +15,7 @@ import           Data.String
 import           Data.Text as T
 import           Data.Traversable
 import           Deriving.Aeson.Stock
+import           GHC.Records
 import           Web.HttpApiData
 
 -- | Deployment override.
@@ -101,6 +102,19 @@ data FailureType
   deriving (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake FailureType
 
+data PreciseDeploymentStatus
+  = DeploymentPending { recordedStatus :: DeploymentStatus }
+  -- ^ The deployment is currently being processed by the server
+  | DeploymentNotPending { recordedStatus :: DeploymentStatus }
+  deriving (Generic, Read, Show, Eq)
+  deriving (FromJSON, ToJSON) via Snake PreciseDeploymentStatus
+
+archivedStatuses :: [DeploymentStatus]
+archivedStatuses = [ArchivePending, Archived]
+
+isArchivedStatus :: DeploymentStatus -> Bool
+isArchivedStatus = (`elem` archivedStatuses)
+
 data Deployment = Deployment
   { name :: DeploymentName
   , tag :: DeploymentTag
@@ -140,14 +154,16 @@ data DeploymentInfo = DeploymentInfo
 
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
-  , status :: DeploymentStatus
-  , archived :: Bool
+  , status :: PreciseDeploymentStatus
   , metadata :: [DeploymentMetadata]
   , createdAt :: Int
   , updatedAt :: Int
   }
   deriving (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
+isDeploymentArchived :: DeploymentFullInfo -> Bool
+isDeploymentArchived = isArchivedStatus . recordedStatus . getField @"status"
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag
