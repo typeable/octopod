@@ -312,6 +312,16 @@ This script receives the following additional command-line arguments as input:
 - `--old-status` – The previous status the deployment was in.
 - `--new-status` – The new status the deployment transitioned to.
 
+The last two arguments can have one of the following values:
+- `Running`
+- `GenericFailure`
+- `TagMismatch`
+- `PartialAvailability`
+- `CreatePending`
+- `UpdatePending`
+- `ArchivePending`
+- `Archived`
+
 #### Execution example
 
 The script might be called something like this:

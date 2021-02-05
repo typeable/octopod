@@ -228,3 +228,13 @@ echo "api,https://api.${name}.example.com"
 * `--tag` – тег развертывания
 - `--old-status` – предыдущий статус
 - `--new-status` – новый статус
+
+Последние два аргумент могут иметь одно из следующих значений:
+- `Running`
+- `GenericFailure`
+- `TagMismatch`
+- `PartialAvailability`
+- `CreatePending`
+- `UpdatePending`
+- `ArchivePending`
+- `Archived`
