@@ -26,6 +26,7 @@ import           Data.Text (lines, pack, unpack, unwords)
 import           Data.Text.IO (hGetContents)
 import           Data.Traversable
 import           Database.PostgreSQL.Simple
+import           Database.PostgreSQL.Simple.Instances ()
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 import           Options.Generic
@@ -309,7 +310,7 @@ getFullInfo listType = do
       dMeta <- selectDeploymentMetadata conn n
       pure $ do
         let dep = (Deployment n t appOvs depOvs)
-        DeploymentFullInfo dep (read st) a dMeta ct ut
+        DeploymentFullInfo dep st a dMeta ct ut
   liftIO . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
   where
@@ -344,7 +345,7 @@ createH dep = do
     createDep :: PgPool -> Deployment -> IO [Only Int]
     createDep p Deployment { name = n, tag = t } =
       withResource p $ \conn ->
-        query conn q (n, t, show CreatePending)
+        query conn q (n, t, CreatePending)
   failIfImageNotFound (name dep) (tag dep)
   failIfGracefulShutdownActivated
   res :: Either SqlError [Only Int] <- liftIO . try $ createDep pgPool dep
@@ -554,7 +555,7 @@ archiveDeployment p dName = withResource p $ \conn -> do
       \SET archived = 't', archived_at = now(), \
         \status = ?, status_updated_at = now() \
       \WHERE name = ?"
-  execute conn q (show ArchivePending, dName)
+  execute conn q (ArchivePending, dName)
 
 -- | Handles the 'update' request.
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
@@ -743,7 +744,7 @@ updateDeployment conn dName dTag = do
       \SET tag = ?, updated_at = now(), \
         \status = ?, status_updated_at = now() \
       \WHERE name = ?"
-  execute conn q (dTag, show UpdatePending, dName)
+  execute conn q (dTag, UpdatePending, dName)
 
 -- | Handles the 'info' request of the Web UI API.
 infoH :: DeploymentName -> AppM [DeploymentInfo]
@@ -1069,7 +1070,6 @@ upsertDeploymentMetadata
   -> [DeploymentMetadata]
   -> IO ()
 upsertDeploymentMetadata pgPool dName dMetadatas = do
-  let
   withResource pgPool $ \conn -> withTransactionSerializable conn $ do
     void $ execute
       conn
@@ -1148,11 +1148,11 @@ runStatusUpdater state = do
       "UPDATE deployments SET checked_at = now() WHERE name = ? and status = ?"
 
   forever $ do
-    rows :: [(DeploymentName, Text, Int)] <- liftIO $
+    rows :: [(DeploymentName, DeploymentStatus, Int)] <- liftIO $
       withResource pgPool $ \conn -> query conn selectDeps (Only interval)
     let
       checkList :: [(DeploymentName, DeploymentStatus, Timestamp)] =
-        (\(n, s, t) -> (n, read . unpack $ s, coerce t)) <$> rows
+        (\(n, s, t) -> (n, s, coerce t)) <$> rows
     checkResult <- for checkList $ \(dName, dStatus, ts) -> do
       let
         args              =
@@ -1169,8 +1169,8 @@ runStatusUpdater state = do
       for (zip checkList checkResult) $ \((dName, oldSt, _), (_, newSt, _)) ->
         withResource pgPool $ \conn ->
           if oldSt == newSt
-            then execute conn updateCheckedAt (dName, show oldSt)
-            else execute conn updateStatus (show newSt, dName, show oldSt)
+            then execute conn updateCheckedAt (dName, oldSt)
+            else execute conn updateStatus (newSt, dName, oldSt)
     if checkList == checkResult
       then pure ()
       else sendReloadEvent state
@@ -1185,13 +1185,18 @@ newStatus
   -> DeploymentStatus
 newStatus ExitSuccess     ArchivePending _ _ = Archived
 newStatus ExitSuccess     _             _ _ = Running
-newStatus (ExitFailure _) Running       _ _ = Failure
-newStatus (ExitFailure _) CreatePending ts timeout | ts > coerce timeout =
-  Failure
-newStatus (ExitFailure _) UpdatePending ts timeout | ts > coerce timeout =
-  Failure
+newStatus (ExitFailure n) Running       _ _ = Failure $ failureStatusType n
+newStatus (ExitFailure n) CreatePending ts timeout | ts > coerce timeout =
+  Failure $ failureStatusType n
+newStatus (ExitFailure n) UpdatePending ts timeout | ts > coerce timeout =
+  Failure $ failureStatusType n
 newStatus (ExitFailure _) ArchivePending _ _ = ArchivePending
 newStatus (ExitFailure _) oldStatus     _ _ = oldStatus
+
+failureStatusType :: Int -> FailureType
+failureStatusType 2 = PartialAvailability
+failureStatusType 3 = TagMismatch
+failureStatusType _ = GenericFailure
 
 -- | Checks if graceful shutdown has been activated activated.
 -- Returns 405 'Graceful shutdown activated' response
