@@ -22,4 +22,10 @@ instance (SupportsServantReflex t m)
 reqErrorBody :: ReqResult tag a -> Maybe Text
 reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_responseText = Just b})
   = Just b
+reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_response = Just (XhrResponseBody_Default t)}) =
+  Just t
+reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_response = Just (XhrResponseBody_Text t)}) =
+  Just t
+reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_response = Just (XhrResponseBody_ArrayBuffer t)}) =
+  Just . E.decodeUtf8 $ t
 reqErrorBody x = reqFailure x
