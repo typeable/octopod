@@ -553,6 +553,13 @@ transitionErrorToServerError = \case
   where
     show'' = BSLC.pack . show
 
+getDeploymentS
+  :: (MonadReader AppState m, MonadBase IO m, MonadError ServerError m)
+  => Connection -> DeploymentName -> m DeploymentFullInfo
+getDeploymentS conn dName = (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
+  [x] -> return x
+  _ -> throwError err404 {errBody = "Deployment not found."}
+
 transitionToStatus
   :: (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m)
   => DeploymentName -> DeploymentStatusTransition -> ExceptT StatusTransitionError m ()
@@ -560,10 +567,8 @@ transitionToStatus dName s = do
   p <- asks pool
   st <- ask
   let log = liftBase . logInfo (logger st)
-  (oldS, newS) <- withResource p $ \conn -> liftBaseOp_ (withTransaction conn) $ do
-    dep <- lift (getFullInfo' conn (FullInfoOnlyForOne dName)) >>= \case
-      [x] -> return x
-      _ -> throwError $ DeploymentNotFound dName
+  (oldS, newS, dep :: DeploymentFullInfo) <- withResource p $ \conn -> liftBaseOp_ (withTransaction conn) $ do
+    dep <- lift $ getDeploymentS conn dName
     let
       oldS = recordedStatus $ dep ^. #status
       newS = transitionStatus s
@@ -585,10 +590,11 @@ transitionToStatus dName s = do
         (output ^. #duration)
         (output ^. #stdout)
         (output ^. #stderr)
-    return (oldS, newS)
+    return (oldS, newS, dep)
   notificationCmd <- asks notificationCommand
   forM_ notificationCmd $ \nCmd ->
-    runBgWorker . void $ runCommandArgs' nCmd =<< notificationCommandArgs dName oldS newS
+    runBgWorker . void $ runCommandArgs' nCmd
+      =<< notificationCommandArgs dName (dep ^. #deployment . #tag) oldS newS
   liftBase $ sendReloadEvent st
 
 assertStatusTransitionPossible
@@ -911,15 +917,9 @@ projectNameH = projectName <$> ask
 -- | Handles the 'status' request.
 statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
-  st <- ask
-  let
-    log    = logInfo (logger st)
-    cmd    = checkingCommand st
-    args   =
-      [ "--namespace", coerce $ namespace st
-      , "--name", coerce $ dName ]
-  liftIO $ log $ "call " <> unwords (coerce cmd : args)
-  ec <- liftIO $ runCommandWithoutPipes (unpack $ coerce cmd) (unpack <$> args)
+  pgPool <- asks pool
+  dep <- withResource pgPool $ \conn -> getDeploymentS conn dName
+  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs dName (dep ^. #deployment . #tag)
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -1206,6 +1206,7 @@ runStatusUpdater state = do
       "SELECT name, status::text, \
       \extract(epoch from now())::int - \
         \extract(epoch from status_updated_at)::int \
+      \, tag \
       \FROM deployments \
       \WHERE checked_at < now() - interval '?' second AND status != 'Archived'"
     updateCheckedAt    =
@@ -1214,18 +1215,20 @@ runStatusUpdater state = do
     logErr  = logWarning (logger state)
 
   forever $ do
-    rows :: [(DeploymentName, DeploymentStatus, Int)] <- liftIO $
+    rows :: [(DeploymentName, DeploymentStatus, Int, DeploymentTag)] <- liftIO $
       withResource pgPool $ \conn -> query conn selectDeps (Only interval)
     let
-      checkList :: [(DeploymentName, DeploymentStatus, Timestamp)] =
-        (\(n, s, t) -> (n, s, coerce t)) <$> rows
-    checkResult <- for checkList $ \(dName, dStatus, ts) -> do
+      checkList :: [(DeploymentName, DeploymentStatus, Timestamp, DeploymentTag)] =
+        (\(n, s, t, dTag) -> (n, s, coerce t, dTag)) <$> rows
+    checkResult <- for checkList $ \(dName, dStatus, ts, dTag) -> do
       let
         args              =
           [ "--project-name", unpack . coerce $ projectName state
           , "--base-domain", unpack . coerce $ baseDomain state
           , "--namespace", unpack . coerce $ namespace state
-          , "--name", unpack . coerce $ dName ]
+          , "--name", unpack . coerce $ dName
+          , "--tag", unpack . unDeploymentTag $ dTag
+          ]
         cmd ArchivePending = unpack . coerce $ archiveCheckingCommand state
         cmd _ = unpack . coerce $ checkingCommand state
         timeout = statusUpdateTimeout state

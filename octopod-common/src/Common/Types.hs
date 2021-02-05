@@ -85,6 +85,16 @@ newtype Timestamp = Timestamp { unTimestamp :: Int }
 newtype ProjectName = ProjectName { uProjectName :: Text }
   deriving (Show, FromJSON, ToJSON)
 
+deploymentStatusText :: DeploymentStatus -> Text
+deploymentStatusText Running = "Running"
+deploymentStatusText (Failure GenericFailure) = "GenericFailure"
+deploymentStatusText (Failure TagMismatch) = "TagMismatch"
+deploymentStatusText (Failure PartialAvailability) = "PartialAvailability"
+deploymentStatusText CreatePending = "CreatePending"
+deploymentStatusText UpdatePending = "UpdatePending"
+deploymentStatusText ArchivePending = "ArchivePending"
+deploymentStatusText Archived = "Archived"
+
 data DeploymentStatus
   = Running
   | Failure FailureType

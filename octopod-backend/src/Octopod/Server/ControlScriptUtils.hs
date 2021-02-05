@@ -13,6 +13,7 @@ module Octopod.Server.ControlScriptUtils
   , runCommandWithoutPipes
   , runCommandArgs
   , runCommandArgs'
+  , checkCommandArgs
   ) where
 
 
@@ -52,12 +53,13 @@ notificationCommandArgs
     , HasType Domain r
     )
   => DeploymentName
+  -> DeploymentTag
   -> DeploymentStatus
   -- ^ Previous status
   -> DeploymentStatus
   -- ^ New status
   -> m ControlScriptArgs
-notificationCommandArgs dName old new = do
+notificationCommandArgs dName dTag old new = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -66,9 +68,25 @@ notificationCommandArgs dName old new = do
     , "--base-domain", T.unpack domain
     , "--namespace", T.unpack namespace
     , "--name", T.unpack . coerce $ dName
-    , "--tag", T.unpack . coerce $ dName
-    , "--old-status", show old
-    , "--new-status", show new
+    , "--tag", T.unpack . coerce $ dTag
+    , "--old-status", T.unpack $ deploymentStatusText old
+    , "--new-status", T.unpack $ deploymentStatusText new
+    ]
+
+checkCommandArgs
+  ::
+    ( MonadReader r m
+    , HasType Namespace r
+    )
+  => DeploymentName
+  -> DeploymentTag
+  -> m ControlScriptArgs
+checkCommandArgs dName dTag  = do
+  (Namespace namespace) <- asks getTyped
+  return $ ControlScriptArgs
+    [ "--namespace", T.unpack namespace
+    , "--name", T.unpack . coerce $ dName
+    , "--tag", T.unpack . unDeploymentTag $ dTag
     ]
 
 runCommandArgs
