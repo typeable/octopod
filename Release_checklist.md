@@ -10,9 +10,12 @@
       2. Tag it with the new `<integer>` (`docker tag`)
       3. Push the new tag (`docker push`)
    3. Update docs where the tags are referenced.
-3. Merge the `develop` branch into `master`.
-4. CI will automatically create a new release in GitHub with _octo CLI_ and update the `latest` tag for both `octo` and `octopod`. Wait for CI to complete.
-5. Edit the created release in GitHub to match the version you are releasing.
+3. Merge the `develop` branch into the `staging` branch.
+4. CI will automatically update the `latest` tag for both `octo` and `octopod`. Wait for CI to complete.
+5. Deploy everything in our private cluser and make sure everything works.
+6. Merge the `staging` branch into `master` using **Rebase and Merge**.
+7. CI will automatically create a new release in GitHub with _octo CLI_ and update the `latest` tag for both `octo` and `octopod`. Wait for CI to complete.
+8. Edit the created release in GitHub to match the version you are releasing.
    1. Change the release name to the version being released.
    2. Uncheck "This is a pre-release"
-6. Push the new release of `octo` and `octopod`. To do this run `./release.sh <version>`.
+9. Push the new release of `octo` and `octopod`. To do this run `./release.sh <version>`.
