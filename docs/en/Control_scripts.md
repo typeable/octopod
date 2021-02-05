@@ -39,6 +39,9 @@
     - [Description](#description-8)
     - [Execution example](#execution-example-7)
     - [Sample implementation](#sample-implementation-7)
+  - [🔔 notifications](#-notifications)
+    - [Description](#description-9)
+    - [Execution example](#execution-example-8)
 
 </details>
 
@@ -294,6 +297,27 @@ info --project-name "Cactus store" --base-domain "cactus-store.com" --namespace 
 ```bash
 echo "app,https://${name}.example.com"
 echo "api,https://api.${name}.example.com"
+```
+
+### 🔔 notifications
+
+#### Description
+
+This script gets called every time a deployment changes its status (apart from creation and deletion). It might be useful if you want to send notifications about certain deployment status transitions. The complete list of statuses and their transitions can be found in the [technical architecture document](Technical_architecture.md#️-deployment-state-transitions).
+
+It is optional and can be omitted altogether.
+
+This script receives the following additional command-line arguments as input:
+* `--tag` – The _Docker Image tag_ that should be deployed. (In practice you can use some other string that identifies a version of your system to deploy – you will need to process it accordingly in the script.)
+- `--old-status` – The previous status the deployment was in.
+- `--new-status` – The new status the deployment transitioned to.
+
+#### Execution example
+
+The script might be called something like this:
+
+```bash
+notification --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --old-status "UpdatePending" --new-status "Running"
 ```
 
 [configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/

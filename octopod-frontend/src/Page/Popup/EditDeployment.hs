@@ -27,6 +27,7 @@ import           Data.Text (Text)
 import           Frontend.API
 import           Frontend.Utils
 import           Servant.Reflex
+import           Servant.Reflex.Extra
 
 -- | The root function for \"edit deployment\" sidebar.
 editDeploymentPopup
@@ -84,7 +85,7 @@ editDeploymentPopupBody dfi errEv = divClass "popup__content" $
   divClass "deployment" $ mdo
     let
       commandResponseEv = fmapMaybe commandResponse errEv
-      appErrEv = R.difference (fmapMaybe reqFailure errEv) commandResponseEv
+      appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
       dfiTag = dfi ^. field @"deployment" . field @"tag" . coerced . to Just
       dfiAppVars = dfi ^. field @"deployment" . field @"appOverrides" . coerced
       dfiDeploymentVars =

@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import           Data.Text (Text)
 import           Database.PostgreSQL.Simple.FromField
 import           Database.PostgreSQL.Simple.ToField
+import qualified Data.Text.Encoding as T
 
 deploymentStatusText :: DeploymentStatus -> Text
 deploymentStatusText Running = "Running"
@@ -26,7 +27,8 @@ instance ToField DeploymentStatus where
   toField = toField @Text . deploymentStatusText
 
 instance FromField DeploymentStatus where
-  fromField f b = fromField f b >>= maybe empty return . flip M.lookup m
+  fromField _ (Just b) =
+    (either (const empty) pure . T.decodeUtf8' $ b) >>= maybe empty return . flip M.lookup m
     where
       m = M.fromList . fmap (deploymentStatusText &&& id) $
         [ Running
@@ -38,3 +40,4 @@ instance FromField DeploymentStatus where
         , ArchivePending
         , Archived
         ]
+  fromField _ Nothing = empty
