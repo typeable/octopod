@@ -35,9 +35,13 @@
   - [🐋✅ tag_check](#-tag_check)
     - [Description](#description-7)
     - [Execution example](#execution-example-6)
-  - [🔔 notifications](#-notifications)
+  - [👀 info](#-info)
     - [Description](#description-8)
     - [Execution example](#execution-example-7)
+    - [Sample implementation](#sample-implementation-7)
+  - [🔔 notifications](#-notifications)
+    - [Description](#description-9)
+    - [Execution example](#execution-example-8)
 
 </details>
 
@@ -263,6 +267,36 @@ The script might be called something like this:
 
 ```bash
 tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a"
+```
+
+### 👀 info
+
+#### Description
+
+This script returns user-facing metadata about a deployment. Currently, the metadata consists of URLs that are relevant for the deployment. Things like the deployment URL, the URL to view logs, and the database URL.
+
+The script should return the metadata as a two-column CSV table:
+
+```
+app,https://foo.example.com
+api,https://api.foo.example.com
+```
+
+This script receives only [the default command-line arguments](#general-behavior) as input.
+
+#### Execution example
+
+The script might be called something like this:
+
+```bash
+info --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button"
+```
+
+#### Sample implementation
+
+```bash
+echo "app,https://${name}.example.com"
+echo "api,https://api.${name}.example.com"
 ```
 
 ### 🔔 notifications
