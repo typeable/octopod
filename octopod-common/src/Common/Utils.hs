@@ -34,7 +34,7 @@ dfiName = field @"deployment" . field @"name"
 isPending :: DeploymentStatus -> Bool
 isPending = \case
   Running -> False
-  Failure -> False
+  Failure _ -> False
   Archived -> False
   CreatePending -> True
   UpdatePending -> True

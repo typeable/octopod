@@ -358,7 +358,7 @@ statusWidget stDyn = do
     pendingWidget = divClass "loading loading--status-alike"
   dyn_ $ stDyn' <&> \case
     Running -> divClass "status status--success" $ text "Running"
-    Failure -> divClass "status status--failure" $ text "Failure"
+    Failure _ -> divClass "status status--failure" $ text "Failure"
     CreatePending -> pendingWidget $ text "Creating..."
     UpdatePending -> pendingWidget $ text "Updating..."
     ArchivePending -> pendingWidget $ text "Archiving..."

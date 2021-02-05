@@ -86,13 +86,20 @@ newtype ProjectName = ProjectName { uProjectName :: Text }
 
 data DeploymentStatus
   = Running
-  | Failure
+  | Failure FailureType
   | CreatePending
   | UpdatePending
   | ArchivePending
   | Archived
   deriving (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
+
+data FailureType
+  = GenericFailure
+  | TagMismatch
+  | PartialAvailability
+  deriving (Generic, Read, Show, Eq)
+  deriving (FromJSON, ToJSON) via Snake FailureType
 
 data Deployment = Deployment
   { name :: DeploymentName
