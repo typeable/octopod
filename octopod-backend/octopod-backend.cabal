@@ -44,6 +44,7 @@ library
       Orphans
       TLS
       Types
+      Database.PostgreSQL.Simple.Instances
   hs-source-dirs:
       src
   build-depends:
@@ -91,6 +92,7 @@ library
     , x509
     , x509-store
     , x509-validation
+    , containers
   default-language: Haskell2010
 
 executable octopod-exe
