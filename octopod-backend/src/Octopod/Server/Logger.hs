@@ -8,6 +8,7 @@ module Octopod.Server.Logger where
 
 import           Data.ByteString
 import           Data.Text
+import qualified Data.Text as T
 import           System.Log.FastLogger
 
 -- | Creates new logger.
@@ -32,3 +33,6 @@ logWithSeverity l severity msg = l $ \ft -> metadata ft <> message
     metadata :: ByteString -> LogStr
     metadata ft = foldMap toLogStr ["[", ft, " ", severity, "] "]
     message     = toLogStr msg <> toLogStr ("\n" :: ByteString)
+
+show' :: Show a => a -> Text
+show' = T.pack . show

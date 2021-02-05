@@ -35,6 +35,13 @@ library
                      , StandaloneDeriving
                      , TypeApplications
                      , TypeOperators
+                     , OverloadedLabels
+                     , UndecidableInstances
+                     , MultiParamTypeClasses
+                     , FunctionalDependencies
+                     , RankNTypes
+                     , TypeFamilies
+                     , QuantifiedConstraints
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args
@@ -45,6 +52,7 @@ library
       TLS
       Types
       Database.PostgreSQL.Simple.Instances
+      Control.Octopod.DeploymentLock
   hs-source-dirs:
       src
   build-depends:
@@ -92,6 +100,9 @@ library
     , x509
     , x509-store
     , x509-validation
+    , containers
+    , monad-control
+    , lifted-base
     , containers
   default-language: Haskell2010
 
