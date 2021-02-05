@@ -15,8 +15,8 @@ import           Data.String
 import           Data.Text as T
 import           Data.Traversable
 import           Deriving.Aeson.Stock
+import           GHC.Records
 import           Web.HttpApiData
-import GHC.Records
 
 -- | Deployment override.
 data Override = Override

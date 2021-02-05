@@ -328,8 +328,8 @@ getFullInfo' conn listType = do
       (appOvs, depOvs) <- liftBase $  selectOverrides conn n
       dMeta <- liftBase $  selectDeploymentMetadata conn n
       st' <- isDeploymentLocked n <&> \case
-        True -> DeploymentPending $ read st
-        False -> DeploymentNotPending $ read st
+        True -> DeploymentPending st
+        False -> DeploymentNotPending st
       pure $ do
         let dep = Deployment n t appOvs depOvs
         DeploymentFullInfo dep st' dMeta ct ut
@@ -338,11 +338,11 @@ getFullInfo' conn listType = do
   where
     qAll                 =
       "SELECT name, tag, extract(epoch from created_at)::int, \
-        \extract(epoch from updated_at)::int, status::text \
+        \extract(epoch from updated_at)::int, status \
       \FROM deployments ORDER BY name"
     qOne                 =
       "SELECT name, tag, extract(epoch from created_at)::int, \
-        \extract(epoch from updated_at)::int, status::text \
+        \extract(epoch from updated_at)::int, status \
       \FROM deployments \
       \WHERE name = ?"
 
@@ -575,7 +575,7 @@ transitionToStatus dName s = do
         \SET status = ?, status_updated_at = now() "
         <> (if newS == ArchivePending then ", archived_at = now()" else mempty)
         <> " WHERE name = ?"
-    void . liftBase $ execute conn q (show newS, dName)
+    void . liftBase $ execute conn q (newS, dName)
     liftBase $ forM_ (processOutput s) $ \(output, act) ->
       createDeploymentLog
         conn
@@ -1002,7 +1002,7 @@ cleanArchiveH = do
       "SELECT name FROM deployments \
       \WHERE status in ? AND archived_at + interval '?' second < now()"
   retrieved :: [Only DeploymentName] <- liftIO $
-    withResource pgPool $ \conn -> query conn q (In (show <$> archivedStatuses), archRetention)
+    withResource pgPool $ \conn -> query conn q (In archivedStatuses, archRetention)
   runBgWorker . void $
     for retrieved $ \(Only dName) ->
       runDeploymentBgWorker Nothing dName $ liftBase $ cleanupDeployment dName st
@@ -1209,7 +1209,7 @@ runStatusUpdater state = do
       \FROM deployments \
       \WHERE checked_at < now() - interval '?' second AND status != 'Archived'"
     updateCheckedAt    =
-      "UPDATE deployments SET checked_at = now() WHERE name = ?"
+      "UPDATE deployments SET checked_at = now() WHERE name = ? AND status = ?"
     logErr :: Text -> IO ()
     logErr  = logWarning (logger state)
 
@@ -1230,15 +1230,15 @@ runStatusUpdater state = do
         cmd _ = unpack . coerce $ checkingCommand state
         timeout = statusUpdateTimeout state
       ec <- runCommandWithoutPipes (cmd dStatus) args
-      pure (dName, statusTransition ec dStatus ts timeout, ts)
+      pure (dName, statusTransition ec dStatus ts timeout, dStatus)
     updated <-
-      for checkResult $ \(dName, transitionM, _) ->
+      for checkResult $ \(dName, transitionM, dStatus) ->
         withResource pgPool $ \conn ->
           case transitionM of
-            Nothing -> execute conn updateCheckedAt (Only dName) $> False
+            Nothing -> execute conn updateCheckedAt (dName, dStatus) $> False
             Just transition ->
               ($> True) $ (flip runReaderT state . runExceptT . runExceptT) (transitionToStatus dName transition) >>= \case
-                Right (Right ()) -> void $ execute conn updateCheckedAt (Only dName)
+                Right (Right ()) -> void $ execute conn updateCheckedAt (dName, transitionStatus transition)
                 Left e -> logErr $ show' e
                 Right (Left e) -> logErr $ show' e
     when (or updated) $ sendReloadEvent state

@@ -20,7 +20,7 @@ instance (SupportsServantReflex t m)
       where method = E.decodeUtf8 $ reflectMethod (Proxy :: Proxy 'GET)
 
 reqErrorBody :: ReqResult tag a -> Maybe Text
-reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_responseText = Just b})
+reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_responseText = Just b}) 
   = Just b
 reqErrorBody (ResponseFailure _ _ XhrResponse {_xhrResponse_response = Just (XhrResponseBody_Default t)}) =
   Just t

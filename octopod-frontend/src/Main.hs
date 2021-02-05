@@ -13,9 +13,9 @@ import           Reflex.Dom
 import           Servant.Reflex
 
 import           Common.Types as CT
-import qualified Data.Semigroup as S
 import           Control.Monad.Reader
 import           Data.Maybe
+import qualified Data.Semigroup as S
 import           Frontend.API
 import           Frontend.GHCJS
 import           Frontend.Route
