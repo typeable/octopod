@@ -115,15 +115,17 @@ deploymentHead dfiDyn sentEv =
       else mdo
         let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
         btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
-        editEv <- aButtonClassEnabled
+        editEv <- buttonClassEnabled'
           "page__action button button--edit popup-handler"
           "Edit deployment"
           btnEnabledDyn
-        archEv <- aButtonClassEnabled
+          "button--disabled"
+        archEv <- buttonClassEnabled'
           "page__action button button--secondary button--archive \
           \classic-popup-handler"
           "Move to archive"
           btnEnabledDyn
+          "button--disabled"
         pure (R.tag (current dfiDyn) editEv, archEv)
     url' <- kubeDashboardUrl dfiDyn
     void . dyn $ url' <&> maybe blank (\url ->
