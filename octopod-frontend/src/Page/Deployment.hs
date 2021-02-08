@@ -132,7 +132,7 @@ deploymentHead dfiDyn sentEv =
       void $ aButtonDynClass'
             "page__action button button--secondary button--logs"
             "Details"
-            (pure $ "href" =: url)
+            (pure $ "href" =: url <> "target" =: "_blank")
       )
     delEv <- confirmArchivePopup archEv $ do
       text "Are you sure you want to archive the"
