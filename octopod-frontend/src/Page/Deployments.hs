@@ -308,7 +308,7 @@ activeDeploymentWidget clickedEv dDyn' = do
             url' <- kubeDashboardUrl (view #deployment <$> dDyn)
             void . dyn $ url' <&> maybe blank (\url ->
               void $ aButtonClass' "action action--logs" "Details"
-                    (pure $ "href" =: url)
+                (pure $ "href" =: url <> "target" =: "_blank")
               )
             pure $
               leftmost
