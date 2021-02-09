@@ -13,16 +13,6 @@ import           Database.PostgreSQL.Simple.FromField
 import           Database.PostgreSQL.Simple.ToField
 import qualified Data.Text.Encoding as T
 
-deploymentStatusText :: DeploymentStatus -> Text
-deploymentStatusText Running = "Running"
-deploymentStatusText (Failure GenericFailure) = "GenericFailure"
-deploymentStatusText (Failure TagMismatch) = "TagMismatch"
-deploymentStatusText (Failure PartialAvailability) = "PartialAvailability"
-deploymentStatusText CreatePending = "CreatePending"
-deploymentStatusText UpdatePending = "UpdatePending"
-deploymentStatusText ArchivePending = "ArchivePending"
-deploymentStatusText Archived = "Archived"
-
 instance ToField DeploymentStatus where
   toField = toField @Text . deploymentStatusText
 
