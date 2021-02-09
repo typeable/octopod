@@ -264,7 +264,7 @@ cd /tmp/octopod/charts
 #################################################
 
 registry="typeable"
-tag="1.1"
+tag="1.2"
 image="octopod"
 octo_image="octo"
 
