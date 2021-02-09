@@ -1223,7 +1223,7 @@ runStatusUpdater state = do
     checkResult <- for checkList $ \(dName, dStatus, ts, dTag) -> do
       let timeout = statusUpdateTimeout state
       (ec, _, _) <- flip runReaderT state case dStatus of
-        ArchivePending -> runCommandArgs archiveCheckingCommand =<< checkArchiveArgs dName
+        ArchivePending -> runCommandArgs archiveCheckingCommand =<< archiveCheckArgs dName
         _ -> runCommandArgs checkingCommand =<< checkCommandArgs dName dTag
       pure (dName, statusTransition ec dStatus ts timeout, dStatus)
     updated <-

@@ -14,7 +14,7 @@ module Octopod.Server.ControlScriptUtils
   , runCommandArgs
   , runCommandArgs'
   , checkCommandArgs
-  , checkArchiveArgs
+  , archiveCheckArgs
   ) where
 
 
@@ -96,7 +96,7 @@ checkCommandArgs dName dTag = do
     , "--base-domain", T.unpack domain
     ]
 
-checkArchiveArgs
+archiveCheckArgs
   ::
     ( MonadReader r m
     , HasType Namespace r
@@ -105,7 +105,7 @@ checkArchiveArgs
     )
   => DeploymentName
   -> m ControlScriptArgs
-checkArchiveArgs dName = do
+archiveCheckArgs dName = do
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
   (Namespace namespace) <- asks getTyped
