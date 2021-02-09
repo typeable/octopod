@@ -1221,18 +1221,10 @@ runStatusUpdater state = do
       checkList :: [(DeploymentName, DeploymentStatus, Timestamp, DeploymentTag)] =
         (\(n, s, t, dTag) -> (n, s, coerce t, dTag)) <$> rows
     checkResult <- for checkList $ \(dName, dStatus, ts, dTag) -> do
-      let
-        args              =
-          [ "--project-name", unpack . coerce $ projectName state
-          , "--base-domain", unpack . coerce $ baseDomain state
-          , "--namespace", unpack . coerce $ namespace state
-          , "--name", unpack . coerce $ dName
-          , "--tag", unpack . unDeploymentTag $ dTag
-          ]
-        cmd ArchivePending = unpack . coerce $ archiveCheckingCommand state
-        cmd _ = unpack . coerce $ checkingCommand state
-        timeout = statusUpdateTimeout state
-      ec <- runCommandWithoutPipes (cmd dStatus) args
+      let timeout = statusUpdateTimeout state
+      (ec, _, _) <- flip runReaderT state case dStatus of
+        ArchivePending -> runCommandArgs archiveCheckingCommand =<< checkArchiveArgs dName
+        _ -> runCommandArgs checkingCommand =<< checkCommandArgs dName dTag
       pure (dName, statusTransition ec dStatus ts timeout, dStatus)
     updated <-
       for checkResult $ \(dName, transitionM, dStatus) ->

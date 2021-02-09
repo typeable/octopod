@@ -14,6 +14,7 @@ module Octopod.Server.ControlScriptUtils
   , runCommandArgs
   , runCommandArgs'
   , checkCommandArgs
+  , checkArchiveArgs
   ) where
 
 
@@ -93,6 +94,26 @@ checkCommandArgs dName dTag = do
     , "--tag", T.unpack . unDeploymentTag $ dTag
     , "--project-name", T.unpack projectName
     , "--base-domain", T.unpack domain
+    ]
+
+checkArchiveArgs
+  ::
+    ( MonadReader r m
+    , HasType Namespace r
+    , HasType ProjectName r
+    , HasType Domain r
+    )
+  => DeploymentName
+  -> m ControlScriptArgs
+checkArchiveArgs dName = do
+  (ProjectName projectName) <- asks getTyped
+  (Domain domain) <- asks getTyped
+  (Namespace namespace) <- asks getTyped
+  return $ ControlScriptArgs
+    [ "--project-name", T.unpack projectName
+    , "--base-domain", T.unpack domain
+    , "--namespace", T.unpack namespace
+    , "--name", T.unpack . coerce $ dName
     ]
 
 runCommandArgs
