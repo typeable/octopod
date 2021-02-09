@@ -77,16 +77,22 @@ checkCommandArgs
   ::
     ( MonadReader r m
     , HasType Namespace r
+    , HasType ProjectName r
+    , HasType Domain r
     )
   => DeploymentName
   -> DeploymentTag
   -> m ControlScriptArgs
-checkCommandArgs dName dTag  = do
+checkCommandArgs dName dTag = do
+  (ProjectName projectName) <- asks getTyped
+  (Domain domain) <- asks getTyped
   (Namespace namespace) <- asks getTyped
   return $ ControlScriptArgs
     [ "--namespace", T.unpack namespace
     , "--name", T.unpack . coerce $ dName
     , "--tag", T.unpack . unDeploymentTag $ dTag
+    , "--project-name", T.unpack projectName
+    , "--base-domain", T.unpack domain
     ]
 
 runCommandArgs
