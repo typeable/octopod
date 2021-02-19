@@ -1,4 +1,11 @@
-# 🐙 Octopod [![Octopod Docker Image](https://github.com/typeable/octopod/workflows/Octopod%20Docker%20Image/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3A%22Octopod+Docker+Image%22+branch%3Amaster) [![octo CLI](https://github.com/typeable/octopod/workflows/octo%20CLI/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3A%22octo+CLI%22+branch%3Amaster) [![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster)
+<p align="center">
+   <a href="#"><img src="img/logo.svg" width="400"></img></a>
+</p>
+
+<p align="center">
+   <a href="https://github.com/typeable/octopod/actions?query=workflow%3ABuild"><img src="https://github.com/typeable/octopod/workflows/Build/badge.svg?branch=master" alt="Build"></a>
+   <a href="https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster"><img src="https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master" alt="Documentation"></a>
+</p>
 
 _Octopod_ is a fully open-source self-hosted solution for managing multiple deployments in a _Kubernetes_ cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
