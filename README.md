@@ -1,6 +1,9 @@
-<p align="center"><img src="img/logo.svg" width="350"></img></p>
+<p align="center">
+   <img src="img/logo.svg" width="350"></img>
 
-[![Build](https://github.com/typeable/octopod/workflows/Build/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ABuild+branch%3Amaster) [![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster)
+   [![Build](https://github.com/typeable/octopod/workflows/Build/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ABuild+branch%3Amaster) [![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster)
+
+</p>
 
 _Octopod_ is a fully open-source self-hosted solution for managing multiple deployments in a _Kubernetes_ cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
