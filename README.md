@@ -1,4 +1,4 @@
-<p align="center"><img src="img/logo.svg" width="250"></img></p>
+<p align="center"><img src="img/logo.svg" width="350"></img></p>
 
 [![Build](https://github.com/typeable/octopod/workflows/Build/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ABuild+branch%3Amaster) [![Documentation](https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master)](https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster)
 
