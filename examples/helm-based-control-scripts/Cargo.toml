@@ -6,12 +6,12 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33.3"
-rand = "0.7.3"
-serde = "1.0.117"
-serde_derive = "1.0.117"
-serde_json = "1.0.60"
-tokio = { version = "0.2.22", default_features = false, features = ["full"] }
-reqwest = { version = "0.10.9", default_features = false, features = ["json", "rustls-tls"] }
+rand = "0.8.3"
+serde = "1.0.123"
+serde_derive = "1.0.123"
+serde_json = "1.0.62"
+tokio = { version = "1", default_features = false, features = ["full"] }
+reqwest = { version = "0.11.1", default_features = false, features = ["json", "rustls-tls"] }
 
 [[bin]]
 name = "create"
