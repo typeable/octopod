@@ -44,3 +44,7 @@ path = "src/bin/init.rs"
 [[bin]]
 name = "info"
 path = "src/bin/info.rs"
+
+[[bin]]
+name = "notifications"
+path = "src/bin/notifications.rs"
