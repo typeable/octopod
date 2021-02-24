@@ -36,6 +36,13 @@ fn main() -> std::io::Result<()> {
                 .required(true)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("tag")
+                .long("tag")
+                .short("t")
+                .required(true)
+                .takes_value(true),
+        )
         .get_matches();
 
     let _project_name = matches
@@ -48,6 +55,7 @@ fn main() -> std::io::Result<()> {
         .value_of("namespace")
         .expect("could not get namepace");
     let name = matches.value_of("name").expect("could not get name");
+    let _tag = matches.value_of("tag").expect("could not get tag");
 
     let kubedog_stdin = json!({
         "Deployments": [{"ResourceName": format!("app-{}", name), "Namespace": namespace}]
