@@ -75,7 +75,7 @@ utils_registry="typeable"
 utils_image="octopod-helm-example"
 
 # The tag of the image to use
-utils_image_tag="1.0"
+utils_image_tag="1.1"
 ```
 
 ## Testing out the deployment

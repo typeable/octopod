@@ -22,7 +22,7 @@ helm upgrade octopod ./octopod \
 	--set "global.image_tag=1.0" \
 	--set "global.utils_image_prefix=typeable" \
 	--set "global.utils_image=octopod-helm-example" \
-	--set "global.utils_image_tag=1.0" \
+	--set "global.utils_image_tag=1.1" \
 	--set "global.acme_registration_email=certbot@example.com" \
 	--set "global.auth_url=https://oauth.exmaple.com/oauth2/auth" \
 	--set "global.auth_signin=https://oauth.exmaple.com/oauth2/start?rd=/redirect/$http_host$request_uri" \

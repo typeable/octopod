@@ -23,6 +23,7 @@ COPY --from=builder /app/helm-based-control-scripts/target/x86_64-unknown-linux-
 COPY --from=builder /app/helm-based-control-scripts/target/x86_64-unknown-linux-musl/release/tag_check /utils/tag_check
 COPY --from=builder /app/helm-based-control-scripts/target/x86_64-unknown-linux-musl/release/init /utils/init
 COPY --from=builder /app/helm-based-control-scripts/target/x86_64-unknown-linux-musl/release/info /utils/info
+COPY --from=builder /app/helm-based-control-scripts/target/x86_64-unknown-linux-musl/release/notifications /utils/notifications
 
 COPY --from=base-utils /utils/kubectl /utils/kubectl
 COPY --from=base-utils /utils/helm2 /utils/helm

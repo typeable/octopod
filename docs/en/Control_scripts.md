@@ -179,14 +179,15 @@ helm delete "$name" --purge
 
 This script checks the status of the deployment.
 
+This script receives the following additional command-line arguments as input:
+* `--tag` – The _Docker Image tag_ that should be checked.
+
 If the script exits with `0`, it means that the deployment is healthy and up. If the script exits with a non-zero exit code, it means that the deployment is not healthy or down.
 
 You can specify exactly what error occured using exit codes:
 - `1` – a generic failure.
 - `2` – the deployment is partially down (some containers are unhealthy).
 - `3` – tag mismatch, the deployment has not been updated to the expected version.
-
-This script receives only [the default command-line arguments](#general-behavior) as input.
 
 #### Execution example
 
