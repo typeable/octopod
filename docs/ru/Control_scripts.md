@@ -99,6 +99,7 @@ helm delete "$name" --purge
 * `--base-domain` – базовый домен
 * `--namespace` – namespace
 * `--name` – имя развертывания
+* `--tag` – тег развертывания
 
 Успешность операции определяется по exit code (`0` – успех).
 

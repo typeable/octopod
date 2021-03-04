@@ -169,7 +169,11 @@ fn tmp_dir() -> String {
     const LENGTH: usize = 10;
 
     let rng = thread_rng();
-    let random_string: String = Alphanumeric.sample_iter(rng).take(LENGTH).collect();
+    let random_string: String = Alphanumeric
+        .sample_iter(rng)
+        .take(LENGTH)
+        .map(char::from)
+        .collect();
     format!("octopod-{}", random_string)
 }
 
@@ -216,12 +220,7 @@ fn command_args(
 
     let mut app_args = app_env_overrides
         .into_iter()
-        .map(|e| {
-            vec![
-                "--set".to_string(),
-                format!("env.{}", e.to_string()),
-            ]
-        })
+        .map(|e| vec!["--set".to_string(), format!("env.{}", e.to_string())])
         .flatten()
         .collect::<Vec<_>>();
     args.append(&mut app_args);
