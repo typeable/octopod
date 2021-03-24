@@ -19,7 +19,7 @@ spec:
       terminationGracePeriodSeconds: 120
       containers:
       - name: postgres
-        image: postgres:10
+        image: postgres:12
         envFrom:
           - configMapRef:
               name: {{ .Release.Name }}-postgres-config
