@@ -173,7 +173,10 @@ data DeploymentFullInfo = DeploymentFullInfo
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
 
 isDeploymentArchived :: DeploymentFullInfo -> Bool
-isDeploymentArchived = isArchivedStatus . recordedStatus . getField @"status"
+isDeploymentArchived (DeploymentNotPending s) = isArchivedStatus s
+-- if the deployment is currently undergoing some process,
+-- then it is not considered archived
+isDeploymentArchived (DeploymentPending _) = False
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag
