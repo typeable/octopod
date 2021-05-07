@@ -1,0 +1,30 @@
+{{- if and .Values.rbac.create (eq .Values.serviceAccount.create true) -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "octopod.fullname" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "octopod.fullname" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: {{ include "octopod.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "octopod.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end -}}

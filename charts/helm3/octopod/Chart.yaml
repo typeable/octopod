@@ -1,0 +1,15 @@
+apiVersion: v2
+name: octopod
+description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+type: application
+version: 0.0.1
+appVersion: 1.1
+keywords:
+- kubernetes
+- octopod
+home: https://octopod.site
+sources:
+- https://github.com/typeable/octopod
+maintainers:
+- name: Alex Sizov
+  email: a.sizov@typeable.io

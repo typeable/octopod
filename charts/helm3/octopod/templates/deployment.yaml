@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "octopod.fullname" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "octopod.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "octopod.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "octopod.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: copy-control-scripts
+          image: "{{ .Values.controlScripts.image.repository }}:{{ .Values.controlScripts.image.tag }}"
+          imagePullPolicy: {{ .Values.controlScripts.image.pullPolicy }}
+          command:
+          - sh
+          - -c
+          - 'cp /utils/* /copy/'
+          volumeMounts:
+          - name: control-scripts
+            mountPath: /copy
+  
+        - name: run-init
+          image: typeable/octopod:1.1
+          command:
+          - sh
+          - -c
+          - '/utils/init'
+          volumeMounts:
+          - name: home
+            mountPath: /home/octopod
+          - name: control-scripts
+            mountPath: {{ include "controlScriptsPath" . }}
+        - name: copy-www
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command:
+          - sh
+          - -c
+          - |
+            set -ex
+            cp -a /www/* /copy/
+            find /www -type f -exec touch {} +
+          volumeMounts:
+          - name: www
+            mountPath: /copy
+      containers:
+        - name: octopod
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+          - containerPort: 4443
+            protocol: TCP
+          - containerPort: 4000
+            protocol: TCP
+          args:
+          - "--port"
+          - {{ .Values.service.ports.powerApp | quote }}
+          - "--ui-port"
+          - {{ .Values.service.ports.app | quote }}
+          - "--ws-port"
+          - {{ .Values.service.ports.ws | quote }}
+          - "--db"
+          - "host='postgres-postgresql' port=5432 user='octopod' password='octopod'"
+          - "--db-pool-size"
+          - "10"
+          - "--tls-cert-path"
+          - "/tls/server_cert.pem"
+          - "--tls-key-path"
+          - "/tls/server_key.pem"
+          - "--tls-store-path"
+          - "/tls_store"
+          envFrom:
+          - configMapRef:
+              name: {{ include "octopod.fullname" . }}
+          volumeMounts:
+          - name: home
+            mountPath: /home/octopod
+          - name: control-scripts
+            mountPath: {{ include "controlScriptsPath" . }}
+          - name: certs
+            mountPath: /tls/server_cert.pem
+            subPath: server_cert.pem
+          - name: certs
+            mountPath: /tls/server_key.pem
+            subPath: server_key.pem
+          - name: certs
+            mountPath: /tls_store/server_cert.pem
+            subPath: server_cert.pem
+          readinessProbe:
+            httpGet:
+              port: {{ .Values.service.ports.app }}
+              path: /api/v1/ping
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              port: {{ .Values.service.ports.app }}
+              path: /api/v1/ping
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: nginx
+          image: nginx:1.17.5
+          volumeMounts:
+          - name: nginx-config
+            mountPath: /etc/nginx/conf.d/app.conf
+            subPath: app.conf
+          - name: nginx-config
+            mountPath: /www/config.json
+            subPath: config.json
+          - name: www
+            mountPath: /www
+          ports:
+          - containerPort: {{ .Values.service.ports.ui }}
+            protocol: TCP
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: home
+        emptyDir: {}
+      - name: control-scripts
+        emptyDir: {}
+      - name: www
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+#TODO Need proper name reference
+          name: octopod-nginx-config
+      - name: certs
+        configMap:
+          name: {{ .Values.octopod.certsConfigMapName }}

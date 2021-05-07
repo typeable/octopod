@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "octopod.fullname" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+data:
+  app.conf: |
+    server {
+      listen 80 default_server;
+      server_name _;
+      root /www;
+      index index.html;
+      error_page 404 =200 /index.html;
+    }
+#TODO generate normal urls here
+  config.json: |
+    {
+      "app_url": "http://octopod-app.sizov-test.thebestagent.pro",
+      "ws_url": "ws://octopod-ws.sizov-test.thebestagent.pro",
+      "app_auth": "Basic ",
+      
+      "kubernetes_dashboard_url_template": null
+      
+    }
