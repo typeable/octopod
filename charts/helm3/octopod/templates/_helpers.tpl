@@ -64,3 +64,15 @@ Create the name of the service account to use
 {{- define "controlScriptsPath" -}}
 /utils
 {{- end }}
+
+{{- define "octopodAppAuthSecret" -}}
+{{- printf "%s-app-auth-secret" (include "octopod.fullname" .) }}
+{{- end }}
+
+{{- define "httpScheme" -}}
+{{- if .Values.ingress.tls -}}
+https
+{{- else -}}
+http
+{{- end }}
+{{- end }}
