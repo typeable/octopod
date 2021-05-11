@@ -65,8 +65,12 @@ Create the name of the service account to use
 /utils
 {{- end }}
 
-{{- define "octopodAppAuthSecret" -}}
+{{- define "octopodAppAuthSecretName" -}}
 {{- printf "%s-app-auth-secret" (include "octopod.fullname" .) }}
+{{- end }}
+
+{{- define "octopodAppAuthPassword" -}}
+{{- randAlphaNum 32 }}
 {{- end }}
 
 {{- define "httpScheme" -}}
@@ -76,3 +80,12 @@ https
 http
 {{- end }}
 {{- end }}
+
+{{- define "wsScheme" -}}
+{{- if .Values.ingress.tls -}}
+wss
+{{- else -}}
+ws
+{{- end }}
+{{- end }}
+

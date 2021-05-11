@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "octopod.fullname" . }}
+  name: {{ include "octopod.fullname" . }}-nginx-config
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
 data:
@@ -13,12 +13,11 @@ data:
       index index.html;
       error_page 404 =200 /index.html;
     }
-#TODO generate normal urls here
   config.json: |
     {
-      "app_url": "http://octopod-app.sizov-test.thebestagent.pro",
-      "ws_url": "ws://octopod-ws.sizov-test.thebestagent.pro",
-      "app_auth": "Basic ",
+      "app_url": "{{ printf "%s://%s" (include "httpScheme" .) .Values.ingress.app.host}}",
+      "ws_url": "{{ printf "%s://%s" (include "wsScheme" .) .Values.ingress.ws.host}}",
+      "app_auth": "Basic {{ printf "octopod:%s" (include "octopodAppAuthPassword" .) | b64enc }}",
       
       "kubernetes_dashboard_url_template": null
       

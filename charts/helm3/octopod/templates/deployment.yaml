@@ -171,8 +171,7 @@ spec:
         emptyDir: {}
       - name: nginx-config
         configMap:
-#TODO Need proper name reference
-          name: octopod-nginx-config
+          name: {{ include "octopod.fullname" . }}-nginx-config
       - name: certs
         configMap:
           name: {{ .Values.octopod.certsConfigMapName }}
