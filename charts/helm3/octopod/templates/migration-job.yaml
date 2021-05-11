@@ -59,11 +59,6 @@ spec:
             set -e
             echo 'run migrations...'
             cd /migrations && /usr/local/bin/sqitch deploy octopod
-{{- if .Values.octopod.migrations.seed }}
-            echo 'seed'
-            DB_CONN="psql postgresql://{{ .Values.postgresql.postgresqlUsername }}:$(PG_PASS)@{{ include "postgresqlHost" . }}/{{ .Values.postgresql.postgresqlDatabase }}"
-            cd /migrations && $DB_CONN -1 -f seeds.sql || echo 'ok'
-{{- end }}
           env:
             - name: PG_PASS
               valueFrom:

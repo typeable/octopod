@@ -88,7 +88,6 @@ octopod:
   archiveRetention: 1209600
   migrations:
     enabled: true
-    seed: true
 controlScripts:
   image:
     repository: typeable/octopod-helm-example
