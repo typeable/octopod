@@ -86,11 +86,19 @@ octopod:
   baseDomain: ""
   statusUpdateTimeout: 600
   archiveRetention: 1209600
+  migrations:
+    enabled: true
+    seed: true
 controlScripts:
   image:
     repository: typeable/octopod-helm-example
     pullPolicy: IfNotPresent
     tag: 1.1
+sqitch:
+  image:
+    repository: typeable/sqitch
+    pullPolicy: IfNotPresent
+    tag: v2.0.0
 postgresql:
   enabled: true
   postgresqlUsername: octopod
