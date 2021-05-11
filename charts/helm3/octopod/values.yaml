@@ -50,7 +50,7 @@ ingress:
   enabled: true
   ingressClass: nginx
   tls:
-    enabled: true
+    enabled: false
     clusterIssuer: letsencrypt
   powerApp:
     host: octopod-powerapp.example.com
@@ -93,3 +93,5 @@ controlScripts:
     tag: 1.1
 postgresql:
   enabled: true
+  postgresqlUsername: octopod
+  postgresqlDatabase: octopod

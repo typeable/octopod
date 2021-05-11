@@ -74,7 +74,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "httpScheme" -}}
-{{- if .Values.ingress.tls -}}
+{{- if .Values.ingress.tls.enabled -}}
 https
 {{- else -}}
 http
@@ -82,10 +82,17 @@ http
 {{- end }}
 
 {{- define "wsScheme" -}}
-{{- if .Values.ingress.tls -}}
+{{- if .Values.ingress.tls.enabled -}}
 wss
 {{- else -}}
 ws
 {{- end }}
 {{- end }}
 
+{{- define "postgresqlHost" -}}
+{{ .Release.Name }}-postgresql
+{{- end }}
+
+{{- define "postgresqlSecretName" -}}
+{{ .Release.Name }}-postgresql
+{{- end }}

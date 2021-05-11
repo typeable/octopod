@@ -5,11 +5,16 @@ type: application
 version: 0.0.1
 appVersion: 1.1
 keywords:
-- kubernetes
-- octopod
+  - kubernetes
+  - octopod
 home: https://octopod.site
 sources:
-- https://github.com/typeable/octopod
+  - https://github.com/typeable/octopod
 maintainers:
-- name: Alex Sizov
-  email: a.sizov@typeable.io
+  - name: Alex Sizov
+    email: a.sizov@typeable.io
+dependencies:
+  - name: postgresql
+    version: 10.4.2
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

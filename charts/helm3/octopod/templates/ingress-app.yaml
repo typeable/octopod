@@ -11,9 +11,9 @@ metadata:
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
   annotations:
-    {{- if .Values.ingress.tls }}
+    {{- if .Values.ingress.tls.enabled }}
     kubernetes.io/tls-acme: "true"
-    cert-manager.io/issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
     {{- end }}
     kubernetes.io/ingress.class: {{ .Values.ingress.ingressClass | quote }}
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
@@ -30,7 +30,7 @@ metadata:
       {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  {{- if .Values.ingress.tls }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
         - {{ .Values.ingress.app.host }}

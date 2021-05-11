@@ -70,25 +70,31 @@ spec:
           - containerPort: 4000
             protocol: TCP
           args:
-          - "--port"
+          - --port
           - {{ .Values.service.ports.powerApp | quote }}
-          - "--ui-port"
+          - --ui-port
           - {{ .Values.service.ports.app | quote }}
-          - "--ws-port"
+          - --ws-port
           - {{ .Values.service.ports.ws | quote }}
-          - "--db"
-          - "host='postgres-postgresql' port=5432 user='octopod' password='octopod'"
-          - "--db-pool-size"
+          - --db
+          - host='{{ include "postgresqlHost" . }}' port=5432 user='{{ .Values.postgresql.postgresqlUsername }}' password=$(PG_PASS)
+          - --db-pool-size
           - "10"
-          - "--tls-cert-path"
-          - "/tls/server_cert.pem"
-          - "--tls-key-path"
-          - "/tls/server_key.pem"
-          - "--tls-store-path"
-          - "/tls_store"
+          - --tls-cert-path
+          - /tls/server_cert.pem
+          - --tls-key-path
+          - /tls/server_key.pem
+          - --tls-store-path
+          - /tls_store
           envFrom:
-          - configMapRef:
-              name: {{ include "octopod.fullname" . }}
+            - configMapRef:
+                name: {{ include "octopod.fullname" . }}
+          env:
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresqlSecretName" . }}
+                  key: postgresql-password
           volumeMounts:
           - name: home
             mountPath: /home/octopod
@@ -130,26 +136,6 @@ spec:
           ports:
           - containerPort: {{ .Values.service.ports.ui }}
             protocol: TCP
-      containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
