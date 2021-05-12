@@ -424,4 +424,4 @@ helm upgrade --install octopod ./octopod \
 [lets-encrypt-rate-limits]: https://letsencrypt.org/docs/rate-limits
 
 ## Helm 3 chart
-You can use a [Helm 3](charts/helm3/octopod) chart (beta!) to install octopod.
+You can use a [Helm 3](../../charts/helm3/octopod) chart (beta!) to install octopod.
