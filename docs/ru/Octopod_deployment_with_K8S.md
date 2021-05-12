@@ -280,3 +280,6 @@
 [minikube]: https://kubernetes.io/ru/docs/tasks/tools/install-minikube
 [tiller]: https://v2.helm.sh/docs/install
 [kubedog]: https://github.com/werf/kubedog
+
+## Helm 3
+Для установки Octopod вы также можете использовать чарт [Helm 3](charts/helm3/octopod) (бета версия!).

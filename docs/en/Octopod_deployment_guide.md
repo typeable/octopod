@@ -422,3 +422,6 @@ helm upgrade --install octopod ./octopod \
 [kubedog]: https://github.com/werf/kubedog
 [lets-encrypt]: https://letsencrypt.org
 [lets-encrypt-rate-limits]: https://letsencrypt.org/docs/rate-limits
+
+## Helm 3 chart
+You can use a [Helm 3](charts/helm3/octopod) chart (beta!) to install octopod.
