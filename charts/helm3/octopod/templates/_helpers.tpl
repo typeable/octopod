@@ -69,10 +69,6 @@ Create the name of the service account to use
 {{- printf "%s-app-auth-secret" (include "octopod.fullname" .) }}
 {{- end }}
 
-{{- define "octopodAppAuthPassword" -}}
-{{- randAlphaNum 32 }}
-{{- end }}
-
 {{- define "httpScheme" -}}
 {{- if .Values.ingress.tls.enabled -}}
 https
