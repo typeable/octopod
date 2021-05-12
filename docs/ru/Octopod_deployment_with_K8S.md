@@ -282,4 +282,4 @@
 [kubedog]: https://github.com/werf/kubedog
 
 ## Helm 3
-Для установки Octopod вы также можете использовать чарт [Helm 3](charts/helm3/octopod) (бета версия!).
+Для установки Octopod вы также можете использовать чарт [Helm 3](../../charts/helm3/octopod) (бета версия!).
