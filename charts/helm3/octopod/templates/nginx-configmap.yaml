@@ -1,3 +1,4 @@
+{{- $octopodAppAuthPassword := randAlphaNum 32 -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,8 +18,18 @@ data:
     {
       "app_url": "{{ printf "%s://%s" (include "httpScheme" .) .Values.ingress.app.host}}",
       "ws_url": "{{ printf "%s://%s" (include "wsScheme" .) .Values.ingress.ws.host}}",
-      "app_auth": "Basic {{ printf "octopod:%s" (include "octopodAppAuthPassword" .) | b64enc }}",
+      "app_auth": "Basic {{ printf "octopod:%s" $octopodAppAuthPassword | b64enc }}",
       
       "kubernetes_dashboard_url_template": null
       
     }
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ include "octopodAppAuthSecretName" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+data:
+  auth: {{ htpasswd "octopod" $octopodAppAuthPassword | b64enc }}
