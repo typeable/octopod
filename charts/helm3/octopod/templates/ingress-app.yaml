@@ -1,0 +1,47 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "octopod.fullname" . -}}
+{{- if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-app
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.ingressClass | quote }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "http_502 error timeout"
+    nginx.ingress.kubernetes.io/auth-secret: {{ include "octopodAppAuthSecretName" . }}
+    nginx.ingress.kubernetes.io/auth-secret-type: auth-file
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: {{ printf "%s://%s" (include "httpScheme" .) .Values.ingress.ui.host | quote }}
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    {{- with .Values.ingress.app.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.app.host }}
+      secretName: {{ $fullName }}-app-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.app.host | quote }}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: {{ $fullName }}
+              servicePort: {{ .Values.service.ports.app }}
+{{- end }}
