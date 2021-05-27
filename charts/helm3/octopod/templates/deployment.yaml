@@ -48,6 +48,8 @@ spec:
             mountPath: /home/octopod
           - name: control-scripts
             mountPath: {{ include "controlScriptsPath" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
         - name: copy-www
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           command:
@@ -122,6 +124,8 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
         - name: nginx
           image: nginx:1.17.5
           volumeMounts:
