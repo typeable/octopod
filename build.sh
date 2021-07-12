@@ -3,11 +3,11 @@
 set -e
 
 build_octo_cli_docker_image() {
-    nix build ./nix -A octo-cli-container -o "$1"
+    nix-build ./nix -A octo-cli-container -o "$1"
 }
 
 build_octopod_server_docker_image() {
-    nix build ./nix -A octopod-server-container --arg migrations "$1" -o "$2"
+    nix-build ./nix -A octopod-server-container --arg migrations "$1" -o "$2"
 }
 
 push_docker_images() {
