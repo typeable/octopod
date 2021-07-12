@@ -9,7 +9,7 @@ let
 
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
-  octopod-frontend = hsPkgs.octopod-frontend.components.exes.frontend;
+  octopod-frontend = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
 
   cacert' = pkgs.cacert.overrideAttrs (o: {
     fixupPhase = ''
