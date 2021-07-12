@@ -7,7 +7,7 @@ build-octo-cli:
 	nix-build . -A octo-cli.components.exes.octo -j auto
 
 build-frontend:
-	nix-build . -A projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend -o frontend-result -j auto
+	nix-build . -A octopod-frontend-pretty -o frontend-result -j auto
 
 backend-docs:
 	nix-build . -A octopod-backend.components.library.doc -j auto
@@ -31,7 +31,7 @@ push-octopod:
 	./build.sh build-and-push latest
 
 run-backend-dev: dev/certs/server_cert.pem dev/certs/server_key.pem
-	./dev/dev_backend.sh `nix-build . -A ghc.octopod-backend`
+	./dev/dev_backend.sh `nix-build -A octopod-backend.components.exes.octopod-exe -j auto`
 
 run-frontend-dev: build-frontend
 	caddy run

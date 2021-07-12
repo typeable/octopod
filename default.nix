@@ -13,4 +13,12 @@ let
     compiler-nix-name = "ghc8105";
   };
 in
-hsPkgs
+hsPkgs // {
+  octopod-frontend-pretty =
+    pkgs.runCommand "octopod-frontend-pretty"
+      { } ''
+      mkdir $out
+      cp ${./octopod-frontend/index.html} $out/index.html
+      cp ${hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend}/bin/frontend.jsexe/all.js $out/all.js
+    '';
+}
