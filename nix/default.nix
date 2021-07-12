@@ -9,7 +9,22 @@ let
 
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
-  octopod-frontend = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
+  octopod-frontend-pretty = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
+
+  terser = (import sources.nixpkgs { }).nodePackages.terser;
+
+  octopod-frontend-ugly = pkgs.runCommand "octopod-frontend-ugly"
+    { } ''
+    cp -r ${octopod-frontend-pretty} $out
+    chmod 775 -R $out/bin/frontend.jsexe
+    for f in $out/bin/frontend.jsexe/*.js
+    do
+      echo "Uglifying: $f"
+      # mv $f file.js
+      ${terser}/bin/terser $f -o $f -mangle -c
+      # rm file.js
+    done
+  '';
 
   cacert' = pkgs.cacert.overrideAttrs (o: {
     fixupPhase = ''
@@ -21,7 +36,7 @@ let
     name = "octopod-server-container-slim";
     contents = with pkgs; [
       octopod-backend
-      octopod-frontend
+      octopod-frontend-ugly
       git
       coreutils
       bash
@@ -49,7 +64,7 @@ let
       mkdir /tls /tls_store
 
       mkdir -p /www/static/{images,styles,vendors/outline}
-      cp -av ${octopod-frontend}/bin/frontend.jsexe/* /www/
+      cp -av ${octopod-frontend-ugly}/bin/frontend.jsexe/* /www/
       cp -av ${octopod-css}/production/images/* /www/static/images/
       cp -av ${octopod-css}/production/styles/* /www/static/styles/
       cp -av ${octopod-css}/production/vendors/outline/* /www/static/vendors/outline/
