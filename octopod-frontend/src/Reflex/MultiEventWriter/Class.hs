@@ -3,7 +3,6 @@ module Reflex.MultiEventWriter.Class
   ) where
 
 import           Control.Monad.Reader (ReaderT, lift)
-import           Data.Semigroup (Semigroup)
 import           Data.Type.Equality
 import           Reflex.Dom
 

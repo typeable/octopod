@@ -1,26 +1,14 @@
 {
-    "haskell-language-server": {
+    "haskellNix": {
         "branch": "master",
-        "description": "Integration point for ghcide and haskell-ide-engine. One IDE to rule them all.",
-        "homepage": "",
-        "owner": "haskell",
-        "repo": "haskell-language-server",
-        "rev": "9c40dcff1b989b14e05b5aebe96f3da78c6ea25c",
-        "sha256": "0i17ssfmcgh6z1b8q7cy3x46xi81x5z82ngik86h8d5cb6w98lsn",
+        "description": "Alternative Haskell Infrastructure for Nixpkgs",
+        "homepage": "https://input-output-hk.github.io/haskell.nix",
+        "owner": "input-output-hk",
+        "repo": "haskell.nix",
+        "rev": "920ac43ee13d95f56d7539bece1f5ee41b10c8a9",
+        "sha256": "0px60yvag24ayj9zl82cbnpixm41slj2wqw4p2vgbwnbz125hgsx",
         "type": "tarball",
-        "url": "https://github.com/haskell/haskell-language-server/archive/9c40dcff1b989b14e05b5aebe96f3da78c6ea25c.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "hspec-webdriver-clone": {
-        "branch": "master",
-        "description": "Clone of hspec-webdriver, as the original source is inaccesible",
-        "homepage": null,
-        "owner": "dfordivam",
-        "repo": "hspec-webdriver-clone",
-        "rev": "0d748b7bb7cd74dce0a55a1ec86b01dbb8a71cd8",
-        "sha256": "1criynifhvmnqwhrshmzylikqkvlgq98xf72w9cdd2zpjw539qf0",
-        "type": "tarball",
-        "url": "https://github.com/dfordivam/hspec-webdriver-clone/archive/0d748b7bb7cd74dce0a55a1ec86b01dbb8a71cd8.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/920ac43ee13d95f56d7539bece1f5ee41b10c8a9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
@@ -33,54 +21,6 @@
         "sha256": "1kpsvc53x821cmjg1khvp1nz7906gczq8mp83664cr15h94sh8i4",
         "type": "tarball",
         "url": "https://github.com/nmattia/niv/archive/ba57d5a29b4e0f2085917010380ef3ddc3cf380f.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "nixpkgs": {
-        "branch": "63ad5ab28ee380a4c6a974c9f70639f81a15f6ad",
-        "description": "A read-only mirror of NixOS/nixpkgs tracking the released channels. Send issues and PRs to",
-        "homepage": "https://github.com/NixOS/nixpkgs",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "63ad5ab28ee380a4c6a974c9f70639f81a15f6ad",
-        "sha256": "1lppx6rsr52hdd1bp25ni4d6c8b76ip6lvr0iphfv0d1jjdf9r4h",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/63ad5ab28ee380a4c6a974c9f70639f81a15f6ad.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "obelisk": {
-        "branch": "master",
-        "description": "Functional reactive web and mobile applications, with batteries included.",
-        "homepage": "https://reflex-frp.org",
-        "owner": "obsidiansystems",
-        "repo": "obelisk",
-        "rev": "11beb6e8cd2419b2429925b76a98f24035e40985",
-        "sha256": "0b4m33b7yyzsbkvfz2kwg4v9hlnvbjlmjikbvwd7pg52vy84and0",
-        "type": "tarball",
-        "url": "https://github.com/obsidiansystems/obelisk/archive/11beb6e8cd2419b2429925b76a98f24035e40985.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "reflex-platform": {
-        "branch": "rc/0.6.0.0",
-        "description": "A curated package set and set of tools that let you build Haskell packages so they can run on a variety of platforms. reflex-platform is built on top of the nix package manager.",
-        "homepage": "https://reflex-frp.org",
-        "owner": "reflex-frp",
-        "repo": "reflex-platform",
-        "rev": "8d421e9e06b0477cbc065346aaf596c9db6cc387",
-        "sha256": "06fy5b0mk5k2ps1h78yihf4j76cb855r86y9p4jv5d91nfyl2dck",
-        "type": "tarball",
-        "url": "https://github.com/reflex-frp/reflex-platform/archive/8d421e9e06b0477cbc065346aaf596c9db6cc387.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "static-haskell-nix": {
-        "branch": "master",
-        "description": "easily build most Haskell programs into fully static Linux executables",
-        "homepage": "",
-        "owner": "nh2",
-        "repo": "static-haskell-nix",
-        "rev": "382150290ba43b6eb41981c1ab3b32aa31798140",
-        "sha256": "0zsyplzf1k235rl26irm27y5ljd8ciayw80q575msxa69a9y2nvd",
-        "type": "tarball",
-        "url": "https://github.com/nh2/static-haskell-nix/archive/382150290ba43b6eb41981c1ab3b32aa31798140.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
