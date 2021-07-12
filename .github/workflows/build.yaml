@@ -68,6 +68,8 @@ jobs:
 
           free -h      - uses: actions/checkout@v2
 
+      - uses: actions/checkout@v2
+
       - name: Install Nix
         uses: cachix/install-nix-action@v12
         with:
