@@ -3,7 +3,7 @@
 , migrations ? "please use '--arg migration <value>'"
 }:
 let
-  hsPkgs = import ./..;
+  hsPkgs = import ./.. { };
 
   pkgs = hsPkgs.pkgs;
 
