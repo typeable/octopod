@@ -1,38 +1,23 @@
 { sources ? import ./nix/sources.nix
-, reflex-platform ? sources.reflex-platform
-, hls ? false
+, haskellNix ? import sources.haskellNix { }
+, pkgs ? import haskellNix.sources.nixpkgs-2105 haskellNix.nixpkgsArgs
 }:
-(import reflex-platform { }).project ({ pkgs, ... }:
-  let foldOs = pkgs.lib.foldl' pkgs.lib.composeExtensions (self: super: { });
-  in
-  {
-    useWarp = true;
-
-    packages = {
-      octopod-common = ./octopod-common;
-      octopod-frontend = ./octopod-frontend;
-      octopod-backend = ./octopod-backend;
-      octo-cli = ./octo-cli;
-      octopod-api = ./octopod-api;
+let
+  hsPkgs = pkgs.haskell-nix.cabalProject {
+    src = pkgs.haskell-nix.haskellLib.cleanGit {
+      name = "octopod";
+      src = ./.;
     };
-
-    overrides = foldOs [
-      (import ./nix/haskell-language-server-overrides.nix {
-        inherit (pkgs.haskell) lib;
-        inherit sources;
-      }
-      )
-      (import ./nix/octopod-overrides.nix {
-        inherit (pkgs.haskell) lib;
-        inherit sources;
-      }
-      )
-    ];
-    shellToolOverrides = ghc: super:
-      if hls then { inherit (ghc) haskell-language-server; }
-      else { };
-    shells = {
-      ghc = [ "octopod-common" "octopod-backend" "octopod-frontend" "octopod-api" "octo-cli" ];
-      ghcjs = [ "octopod-common" "octopod-frontend" ];
-    };
-  })
+    index-state = "2021-07-02T00:00:00Z";
+    compiler-nix-name = "ghc8105";
+  };
+in
+hsPkgs // {
+  octopod-frontend-pretty =
+    pkgs.runCommand "octopod-frontend-pretty"
+      { } ''
+      mkdir $out
+      cp ${./octopod-frontend/index.html} $out/index.html
+      cp ${hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend}/bin/frontend.jsexe/all.js $out/all.js
+    '';
+}

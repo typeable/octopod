@@ -3,16 +3,11 @@
 set -e
 
 build_octo_cli_docker_image() {
-    nix build nixpkgs.octo-cli-container \
-        -I nixpkgs=nix \
-        -o "$1"
+    nix-build ./nix -A octo-cli-container -o "$1"
 }
 
 build_octopod_server_docker_image() {
-    nix build nixpkgs.octopod-server-container \
-        --arg migrations "$1" \
-        -I nixpkgs=nix \
-        -o "$2"
+    nix-build ./nix -A octopod-server-container --arg migrations "$1" -o "$2"
 }
 
 push_docker_images() {
@@ -41,26 +36,25 @@ export octo_cli_docker="octo-docker"
 export octopod_server_docker="octopod-server-docker"
 
 case "$1" in
-    build-and-push)
-        echo "$1 mode"
+build-and-push)
+    echo "$1 mode"
 
-        if test -z "$2"
-        then
-            echo "Please provide a tag to upload to"
-            exit 1
-        fi
-
-        build_docker_images
-        push_docker_images $2
-        ;;
-    build)
-        echo "$1 mode"
-        build_docker_images
-        ;;
-    *)
-        echo "usage:"
-        echo "  $0 build                    Builds the docker images."
-        echo "  $0 build-and-push <tag>     Builds the docker images and uploads it to Docker Hub under the tag <tag>."
+    if test -z "$2"; then
+        echo "Please provide a tag to upload to"
         exit 1
-        ;;
+    fi
+
+    build_docker_images
+    push_docker_images $2
+    ;;
+build)
+    echo "$1 mode"
+    build_docker_images
+    ;;
+*)
+    echo "usage:"
+    echo "  $0 build                    Builds the docker images."
+    echo "  $0 build-and-push <tag>     Builds the docker images and uploads it to Docker Hub under the tag <tag>."
+    exit 1
+    ;;
 esac

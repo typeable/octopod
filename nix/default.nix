@@ -1,122 +1,112 @@
 { sources ? import ./sources.nix
-
 , octopod-css ? ../octopod-css
-
 , migrations ? "please use '--arg migration <value>'"
 }:
-with {
-  overlay = _: pkgs:
-    with pkgs; rec {
-      octo-cli = haskellPackages.octo-cli-static;
-      octopod-backend = haskellPackages.octopod-server-static;
-      octopod-frontend = haskellPackages.octopod-frontend-static;
+let
+  hsPkgs = import ./.. { };
 
-      cacert' = cacert.overrideAttrs (o: {
-        fixupPhase = ''
-          cat $out/etc/ssl/certs/* > $out/etc/ssl/certs/ca-certificates.crt
-        '';
-      });
+  pkgs = hsPkgs.pkgs;
 
-      octopod-server-container = dockerTools.buildImage {
-        name = "octopod-server-container-slim";
-        contents = [
-          octopod-backend
-          octopod-frontend
-          git
-          coreutils
-          bash
-          openssh
-          gnugrep
-          cacert'
-          shadow
-          findutils
-        ];
+  octo-cli = hsPkgs.octo-cli.components.exes.octo;
+  octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
 
-        runAsRoot = ''
-          mkdir /tmp
-          chmod 777 /tmp
+  terser = (import sources.nixpkgs { }).nodePackages.terser;
 
-          mkdir -p /home/octopod
-          useradd octopod -d /home/octopod
-          chown octopod.octopod /home/octopod
+  octopod-frontend-ugly = pkgs.runCommand "octopod-frontend-ugly"
+    { } ''
+    mkdir $out
+    cp ${hsPkgs.octopod-frontend-pretty}/index.html $out/index.html
 
-          mkdir /app
-          cp -av ${octopod-backend}/bin/octopod-exe /app/octopod-exe
+    ${terser}/bin/terser ${hsPkgs.octopod-frontend-pretty}/all.js -o $out/all.js -mangle -c
+  '';
 
-          mkdir -p /migrations/{deploy,revert,verify}
-          cp -av ${migrations}/* /migrations/
+  cacert' = pkgs.cacert.overrideAttrs (o: {
+    fixupPhase = ''
+      cat $out/etc/ssl/certs/* > $out/etc/ssl/certs/ca-certificates.crt
+    '';
+  });
 
-          mkdir /tls /tls_store
+  octopod-server-container = pkgs.dockerTools.buildImage {
+    name = "octopod-server-container-slim";
+    contents = with pkgs; [
+      octopod-backend
+      octopod-frontend-ugly
+      git
+      coreutils
+      bash
+      openssh
+      gnugrep
+      cacert'
+      shadow
+      findutils
+    ];
 
-          mkdir -p /www/static/{images,styles,vendors/outline}
-          cp -av ${octopod-frontend}/bin/frontend.jsexe/* /www/
-          cp -av ${octopod-css}/production/images/* /www/static/images/
-          cp -av ${octopod-css}/production/styles/* /www/static/styles/
-          cp -av ${octopod-css}/production/vendors/outline/* /www/static/vendors/outline/
-          cp -av ${octopod-css}/favicons/* /www/
-        '';
+    runAsRoot = ''
+      mkdir /tmp
+      chmod 777 /tmp
 
-        config = {
-          Entrypoint = [ "/app/octopod-exe" ];
-          Cmd = [
-            "--port"
-            "4443"
-            "--ui-port"
-            "4000"
-            "--ws-port"
-            "4020"
-            "--db"
-            "host='127.0.0.1' port=5432 user='octopod' password='octopod'"
-            "--db-pool-size"
-            "10"
-            "--tls-cert-path"
-            "/tls/server_cert.pem"
-            "--tls-key-path"
-            "/tls/server_key.pem"
-            "--tls-store-path"
-            "/tls_store"
-          ];
-          Env = [
-            "PATH=/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-            "USER=octopod"
-          ];
-        };
-      };
+      mkdir -p /home/octopod
+      useradd octopod -d /home/octopod
+      chown octopod.octopod /home/octopod
 
-      octo-cli-container = dockerTools.buildImage {
-        name = "octo-cli-container-slim";
-        contents = [ octo-cli coreutils bash ];
+      mkdir /app
+      cp -av ${octopod-backend}/bin/octopod-exe /app/octopod-exe
 
-        runAsRoot = ''
-          mkdir /app
-          cp -av ${octo-cli}/bin/octo /app/octo
-        '';
+      mkdir -p /migrations/{deploy,revert,verify}
+      cp -av ${migrations}/* /migrations/
 
-        config = {
-          Entrypoint = [ "/app/octo" ];
-          Env = [ "EDITOR=${vim}/bin/vim" ];
-        };
-      };
+      mkdir /tls /tls_store
 
-      niv = import sources.niv { };
+      mkdir -p /www/static/{images,styles,vendors/outline}
+      cp -av ${octopod-frontend-ugly}/* /www/
+      cp -av ${octopod-css}/production/images/* /www/static/images/
+      cp -av ${octopod-css}/production/styles/* /www/static/styles/
+      cp -av ${octopod-css}/production/vendors/outline/* /www/static/vendors/outline/
+      cp -av ${octopod-css}/favicons/* /www/
+    '';
 
-      haskellPackages = pkgs.haskellPackages.override {
-        overrides = hself: hsuper: {
-          octo-cli-static = haskell.lib.justStaticExecutables
-            (hsuper.callPackage ../default.nix { }).ghc.octo-cli;
-
-          octopod-server-static = haskell.lib.justStaticExecutables
-            (hsuper.callPackage ../default.nix { }).ghc.octopod-backend;
-
-          octopod-frontend-static = haskell.lib.justStaticExecutables
-            (hsuper.callPackage ../default.nix { }).ghcjs.octopod-frontend;
-        };
-      };
+    config = {
+      Entrypoint = [ "/app/octopod-exe" ];
+      Cmd = [
+        "--port"
+        "4443"
+        "--ui-port"
+        "4000"
+        "--ws-port"
+        "4020"
+        "--db"
+        "host='127.0.0.1' port=5432 user='octopod' password='octopod'"
+        "--db-pool-size"
+        "10"
+        "--tls-cert-path"
+        "/tls/server_cert.pem"
+        "--tls-key-path"
+        "/tls/server_key.pem"
+        "--tls-store-path"
+        "/tls_store"
+      ];
+      Env = [
+        "PATH=/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        "USER=octopod"
+      ];
     };
-};
-import
-  sources.nixpkgs # and use them again!
+  };
+
+  octo-cli-container = pkgs.dockerTools.buildImage {
+    name = "octo-cli-container-slim";
+    contents = with pkgs; [ octo-cli coreutils bash ];
+
+    runAsRoot = ''
+      mkdir /app
+      cp -av ${octo-cli}/bin/octo /app/octo
+    '';
+
+    config = {
+      Entrypoint = [ "/app/octo" ];
+      Env = [ "EDITOR=${pkgs.vim}/bin/vim" ];
+    };
+  };
+in
 {
-  overlays = [ overlay ];
-  config = { };
+  inherit octo-cli-container octopod-server-container octopod-frontend-ugly;
 }
