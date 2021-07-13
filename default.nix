@@ -1,7 +1,6 @@
 { sources ? import ./nix/sources.nix
 , haskellNix ? import sources.haskellNix { }
 , pkgs ? import haskellNix.sources.nixpkgs-2105 haskellNix.nixpkgsArgs
-, useWarp ? true
 }:
 let
   hsPkgs = pkgs.haskell-nix.cabalProject {
