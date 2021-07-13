@@ -34,7 +34,7 @@ library
                      , ScopedTypeVariables
                      , TypeApplications
                      , TypeOperators
-  build-depends:       base >=4.12 && <4.13
+  build-depends:       base
                      , aeson
                      , bytestring
                      , deriving-aeson
