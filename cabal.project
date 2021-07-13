@@ -6,9 +6,9 @@ packages:
   octopod-frontend/
 
 allow-newer:
-  servant-reflex:servant
-  , servant-reflex:servant-auth
-  , servant-reflex:reflex
+  servant-reflex:servant,
+  servant-reflex:servant-auth,
+  servant-reflex:reflex
 
 source-repository-package
     type: git
