@@ -15,6 +15,7 @@ extra-source-files:  CHANGELOG.md
 cabal-version:       >=1.10
 
 
+
 flag development
   default: False
   description: mock host
@@ -40,6 +41,7 @@ executable frontend
                        -Werror
                        -Wno-missing-home-modules
                        -Wno-error=missing-home-modules
+                       -threaded
   default-extensions:  BlockArguments
                      , ConstraintKinds
                      , DataKinds
@@ -70,7 +72,7 @@ executable frontend
                      , OverloadedLabels
   -- other-extensions:
   build-depends:       aeson
-                     , base >=4.12 && <4.13
+                     , base
                      , bytestring
                      , containers
                      , deriving-aeson
