@@ -1,0 +1,29 @@
+apiVersion: v1
+entries:
+  octopod:
+  - apiVersion: v2
+    appVersion: "1.1"
+    created: "2021-07-15T19:07:11.13946474+03:00"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 10.4.2
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
+    digest: 10f1c09c6be241deb580e98a6db064877a8ee5f920a7c4ca7668ba3987ec9e44
+    home: https://octopod.site
+    keywords:
+    - kubernetes
+    - octopod
+    maintainers:
+    - email: a.sizov@typeable.io
+      name: Alex Sizov
+    name: octopod
+    sources:
+    - https://github.com/typeable/octopod
+    type: application
+    urls:
+    - octopod-0.2.0.tgz
+    version: 0.2.0
+generated: "2021-07-15T19:07:11.136238359+03:00"
