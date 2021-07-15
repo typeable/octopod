@@ -4,6 +4,8 @@ metadata:
   name: {{ include "octopod.fullname" . }}
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -11,10 +13,27 @@ spec:
       {{- include "octopod.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-    {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.vault.enabled }}
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-init-first: 'true'
+        vault.hashicorp.com/auth-path: 'auth/{{ .Values.vault.clusterName }}'
+        vault.hashicorp.com/role: {{ .Values.vault.clusterName | quote}}
+        {{- range $kv_store, $secret := .Values.octopod.vaultEnv }}
+        {{- range $secret_name, $secret_values := $secret }}
+        vault.hashicorp.com/agent-inject-secret-{{ $secret_name }}: '{{ $kv_store }}/{{ $secret_name }}'
+        vault.hashicorp.com/agent-inject-template-{{ $secret_name }}: |
+          {{ "{{" }} with secret "{{ $kv_store }}/{{ $secret_name }}" {{ "-}}" }}
+            {{- range $secret_values }}
+            export {{ .name }}="{{ "{{" }} .Data.data.{{ .key }} {{ "}}" }}"
+            {{- end }}
+          {{ "{{-" }} end {{ "}}" }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
       labels:
         {{- include "octopod.selectorLabels" . | nindent 8 }}
     spec:
@@ -38,16 +57,25 @@ spec:
             mountPath: /copy
   
         - name: run-init
-          image: typeable/octopod:1.1
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           command:
           - sh
           - -c
-          - '/utils/init'
+          - |
+            {{- if .Values.vault.enabled }}
+            for i in /vault/secrets/*;do source $i;done
+            {{- end }}
+            /utils/init
+          envFrom:
+            - configMapRef:
+                name: {{ include "octopod.fullname" . }}
           volumeMounts:
           - name: home
             mountPath: /home/octopod
           - name: control-scripts
             mountPath: {{ include "controlScriptsPath" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
         - name: copy-www
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           command:
@@ -69,6 +97,22 @@ spec:
             protocol: TCP
           - containerPort: 4000
             protocol: TCP
+          {{- if .Values.vault.enabled }}
+          command:
+          - "sh"
+          - "-ec"
+          - |
+            for i in /vault/secrets/*;do source $i;done
+            exec /app/octopod-exe \
+            --port {{ .Values.service.ports.powerApp | quote }} \
+            --ui-port {{ .Values.service.ports.app | quote }} \
+            --ws-port {{ .Values.service.ports.ws | quote }} \
+            --db host="'{{ include "postgresqlHost" . }}' port=5432 user='{{ .Values.postgresql.postgresqlUsername }}' password=$(PG_PASS)" \
+            --db-pool-size "10" \
+            --tls-cert-path /tls/server_cert.pem \
+            --tls-key-path /tls/server_key.pem \
+            --tls-store-path /tls_store \
+          {{- else }}
           args:
           - --port
           - {{ .Values.service.ports.powerApp | quote }}
@@ -86,6 +130,7 @@ spec:
           - /tls/server_key.pem
           - --tls-store-path
           - /tls_store
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "octopod.fullname" . }}
@@ -122,6 +167,8 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
         - name: nginx
           image: nginx:1.17.5
           volumeMounts:

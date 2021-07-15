@@ -18,3 +18,6 @@ data:
   ARCHIVE_CHECKING_COMMAND: {{ printf "%s/archive_check" (include "controlScriptsPath" .)  | quote }}
   TAG_CHECKING_COMMAND: {{ printf "%s/tag_check" (include "controlScriptsPath" .)  | quote }}
   INFO_COMMAND: {{ printf "%s/info" (include "controlScriptsPath" .)  | quote }}
+  {{- range $name, $value := .Values.octopod.env }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}

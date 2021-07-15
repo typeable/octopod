@@ -6,12 +6,12 @@ metadata:
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
 rules:
-  - apiGroups: [""]
-    resources: ["pods/portforward"]
-    verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["list", "get"]
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
