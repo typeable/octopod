@@ -6,7 +6,6 @@ Description : octo CLI arguments parser utils.
 module Octopod.CLI.Args where
 
 import           Common.Types
-import           Data.Semigroup ((<>))
 import           Data.Text
 import           Options.Applicative
 

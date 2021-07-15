@@ -12,7 +12,7 @@ reverse_proxy /api/* localhost:3002
 rewrite @production /octopod-css/production/{http.regexp.production.1}
 
 rewrite /config.json /dev/config.json
-rewrite * /frontend-result/bin/frontend.jsexe/{path}
+rewrite * /frontend-result/{path}
 
 
 @3003 {
