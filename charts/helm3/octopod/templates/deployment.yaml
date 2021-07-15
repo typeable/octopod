@@ -4,6 +4,8 @@ metadata:
   name: {{ include "octopod.fullname" . }}
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
