@@ -1,3 +1,0 @@
-namespace: deployment
-octopod_namespace: octopod
-serviceaccount: octopod

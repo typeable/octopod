@@ -3,7 +3,7 @@ entries:
   octopod:
   - apiVersion: v2
     appVersion: "1.1"
-    created: "2021-07-15T19:07:11.13946474+03:00"
+    created: "2021-07-15T19:13:21.726161967+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -26,4 +26,4 @@ entries:
     urls:
     - octopod-0.2.0.tgz
     version: 0.2.0
-generated: "2021-07-15T19:07:11.136238359+03:00"
+generated: "2021-07-15T19:13:21.723161946+03:00"
