@@ -88,6 +88,8 @@ octopod:
   archiveRetention: 1209600
   migrations:
     enabled: true
+  env: {}
+  vaultEnv: {}
 controlScripts:
   image:
     repository: typeable/octopod-helm-example
@@ -102,3 +104,9 @@ postgresql:
   enabled: true
   postgresqlUsername: octopod
   postgresqlDatabase: octopod
+vault:
+  enabled: false
+  clusterName: ""
+kubernetesDashboard:
+  enabled: false
+  url: ""
