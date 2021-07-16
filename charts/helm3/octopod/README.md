@@ -5,9 +5,11 @@
 [Octopod](https://octopod.site/) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
 ## TL;DR
+```console
 helm repo add typeable https://typeable.github.io/octopod/
 kubectl create ns octopod-deployment
 helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
+```
 
 ## Introduction
 
