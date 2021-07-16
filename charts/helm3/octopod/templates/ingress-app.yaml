@@ -33,11 +33,11 @@ spec:
   {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - {{ .Values.ingress.app.host }}
+        - {{ include "appIngressHost" . }}
       secretName: {{ $fullName }}-app-tls
   {{- end }}
   rules:
-    - host: {{ .Values.ingress.app.host | quote }}
+    - host: {{ include "appIngressHost" . }}
       http:
         paths:
           - path: /

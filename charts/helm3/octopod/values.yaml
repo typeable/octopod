@@ -53,16 +53,12 @@ ingress:
     enabled: true
     clusterIssuer: letsencrypt
   powerApp:
-    host: octopod-powerapp.example.com
     annotations: {}
   ui:
-    host: octopod.example.com
     annotations: {}
   app:
-    host: octopod-app.example.com
     annotations: {}
   ws:
-    host: octopod-ws.example.com
     annotations: {}
 
 resources: 
