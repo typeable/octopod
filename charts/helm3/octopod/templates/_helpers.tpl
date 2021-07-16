@@ -92,3 +92,35 @@ ws
 {{- define "postgresqlSecretName" -}}
 {{ .Release.Name }}-postgresql
 {{- end }}
+
+{{- define "wsIngressHost" -}}
+{{- if .Values.ingress.ws.host -}}
+{{ .Values.ingress.ws.host }}
+{{- else -}}
+octopod-ws.{{ .Values.octopod.baseDomain }}
+{{- end }}
+{{- end }}
+
+{{- define "uiIngressHost" -}}
+{{- if .Values.ingress.ui.host -}}
+{{ .Values.ingress.ui.host }}
+{{- else -}}
+octopod.{{ .Values.octopod.baseDomain }}
+{{- end }}
+{{- end }}
+
+{{- define "powerAppIngressHost" -}}
+{{- if .Values.ingress.powerApp.host -}}
+{{ .Values.ingress.powerApp.host }}
+{{- else -}}
+octopod-powerapp.{{ .Values.octopod.baseDomain }}
+{{- end }}
+{{- end }}
+
+{{- define "appIngressHost" -}}
+{{- if .Values.ingress.app.host -}}
+{{ .Values.ingress.app.host }}
+{{- else -}}
+octopod-app.{{ .Values.octopod.baseDomain }}
+{{- end }}
+{{- end }}
