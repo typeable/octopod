@@ -5,7 +5,11 @@
 [Octopod](https://octopod.site/) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
 ## TL;DR
-TBD (install chart from typeable's chart repository)
+```console
+helm repo add typeable https://typeable.github.io/octopod/
+kubectl create ns octopod-deployment
+helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
+```
 
 ## Introduction
 
@@ -48,8 +52,8 @@ Name for configmap is cofigured in octopod.certsConfigMapName
 To install the chart with the release name `my-release` from current directory execute:
 
 ```console
-$ helm dependency build
-$ helm -n octopod install my-release .
+$ helm repo add typeable https://typeable.github.io/octopod/
+# helm -n octopod install my-release typeable/octopod 
 ```
 
 The command deploys Octopod on the Kubernetes cluster in the default configuration inside octopod namespace. The [Parameters](#parameters) section lists the parameters that can be configured during installation.
@@ -80,26 +84,30 @@ The following tables lists the configurable parameters of the Octopod chart and 
 | image.tag | string | `""` | Octopod image tag (default values is taken from chart metadata) |
 | imagePullSecrets | list | `[]` | Pull secrets if you want to use private registry  |
 | ingress.app.annotations | object | `{}` | Additional ingress annotations for app service |
-| ingress.app.host | string | `"octopod-app.example.com"` | Hostname for app service |
+| ingress.app.host | string | `null` | Hostname override for app service by default it will be generated using your baseDomain |
 | ingress.enabled | bool | `true` | Create ingress objects or not |
 | ingress.ingressClass | string | `"nginx"` | Ingress class |
 | ingress.powerApp.annotations | object | `{}` | Additional ingress annotations for power-app service  |
-| ingress.powerApp.host | string | `"octopod-powerapp.example.com"` | Hostname for power-app |
+| ingress.powerApp.host | string | `null` | Hostname override for powerapp by default it will be generated using your baseDomain |
 | ingress.tls.clusterIssuer | string | `"letsencrypt"` | Name of cluster issuer you want to use |
 | ingress.tls.enabled | bool | `true` | Use https for all services |
 | ingress.ui.annotations | object | `{}` | Additional ingress annotations for ui service |
-| ingress.ui.host | string | `"octopod.example.com"` | Hostname for main UI |
+| ingress.ui.host | string | `null` | Hostname override for main UI by default it will be generated using your baseDomain |
 | ingress.ws.annotations | object | `{}` | Additional ingress annotations for ws service |
-| ingress.ws.host | string | `"octopod-ws.example.com"` | Hostname for websockets ingress |
+| ingress.ws.host | string | `null` | Hostname override for websockets ingress by default it will be generated using your baseDomain |
+| kubernetesDashboard.enabled | bool | `false` | Set this if you are using kubernetes dashboard and want to enable Details featire of octopod |
+| kubernetesDashboard.url | bool | `""` | URL to your kubernetes dashboard |
 | nameOverride | string | `""` | Name ovveride (default is Release.Name) |
 | nodeSelector | object | `{}` | Node selector if you want octopod to use specific nodes onn your cluster |
 | octopod.archiveRetention | int | `1209600` |  |
-| octopod.baseDomain | string | `""` | Domain that will be used as a ase for Octopod deploymets |
+| octopod.baseDomain | string | `""` | Domain that will be used as a ase for Octopod deploymets and ingress hosts|
 | octopod.certsConfigMapName | string | `"octopod-certs"` | Config map with self-signed certificates |
 | octopod.deploymentNamespace | string | `"octopod-deployment"` | Name of a namespace which will be used for all Octopod deployments (you need to create it yourself) |
+| octopod.env | object | `{}` | key value map for supplying additional environment variables for octopod or your control scripts |
 | octopod.migrations.enabled | bool | `true` | Enable or not automatic DB schema migrations |
 | octopod.projectName | string | `"Octopod"` | Project name |
 | octopod.statusUpdateTimeout | int | `600` | Time to wait before deployment is marked as failed |
+| octopod.vaultEnv | object | `{}` | key value map for reference kv secrets stored in Hashicorp's Vault |
 | podAnnotations | object | `{}` | Additional pod annotations |
 | podSecurityContext | object | `{}` | Additional security context |
 | postgresql.enabled | bool | `true` | Use bitnami postgres chart |
@@ -125,6 +133,8 @@ The following tables lists the configurable parameters of the Octopod chart and 
 | sqitch.image.repository | string | `"typeable/sqitch"` | squitch image repository |
 | sqitch.image.tag | string | `"v2.0.0"` | squitch image tag |
 | tolerations | list | `[]` | Octpod deploymet tolerations |
+| vault.enabled | bool | `false` | Set to true if you want to add Vault agent annotations (vaultEnv must contain at least one reference) |
+| vault.clusterName | string | `""` | Name of your cluster authentication method in Vault |
 
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,

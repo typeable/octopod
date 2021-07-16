@@ -53,16 +53,12 @@ ingress:
     enabled: true
     clusterIssuer: letsencrypt
   powerApp:
-    host: octopod-powerapp.example.com
     annotations: {}
   ui:
-    host: octopod.example.com
     annotations: {}
   app:
-    host: octopod-app.example.com
     annotations: {}
   ws:
-    host: octopod-ws.example.com
     annotations: {}
 
 resources: 
@@ -88,6 +84,8 @@ octopod:
   archiveRetention: 1209600
   migrations:
     enabled: true
+  env: {}
+  vaultEnv: {}
 controlScripts:
   image:
     repository: typeable/octopod-helm-example
@@ -102,3 +100,9 @@ postgresql:
   enabled: true
   postgresqlUsername: octopod
   postgresqlDatabase: octopod
+vault:
+  enabled: false
+  clusterName: ""
+kubernetesDashboard:
+  enabled: false
+  url: ""
