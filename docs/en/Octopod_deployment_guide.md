@@ -264,7 +264,7 @@ cd /tmp/octopod/charts
 #################################################
 
 registry="typeable"
-tag="1.2"
+tag="1.2.1"
 image="octopod"
 octo_image="octo"
 
@@ -425,4 +425,3 @@ helm upgrade --install octopod ./octopod \
 
 ## Helm 3 chart
 You can use a [Helm 3](../../charts/helm3/octopod) chart (beta!) to install octopod.
-
