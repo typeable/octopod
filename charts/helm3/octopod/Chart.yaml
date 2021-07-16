@@ -2,7 +2,7 @@ apiVersion: v2
 name: octopod
 description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
 type: application
-version: 0.3.0
+version: 0.3.1
 appVersion: 1.2
 keywords:
   - kubernetes
@@ -15,6 +15,6 @@ maintainers:
     email: a.sizov@typeable.io
 dependencies:
   - name: postgresql
-    version: 10.4.2
+    version: 10.5.3
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
