@@ -100,6 +100,8 @@ postgresql:
   enabled: true
   postgresqlUsername: octopod
   postgresqlDatabase: octopod
+  image:
+    tag: 12.7.0-debian-10-r51
 vault:
   enabled: false
   clusterName: ""
