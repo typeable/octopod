@@ -13,6 +13,7 @@ data:
       root /www;
       index index.html;
       error_page 404 =200 /index.html;
+      charset utf-8;
       gzip on;
       gzip_disable msie6;
       gzip_buffers 32 4k;
@@ -21,8 +22,8 @@ data:
     }
   config.json: |
     {
-      "app_url": "{{ printf "%s://%s" (include "httpScheme" .) .Values.ingress.app.host}}",
-      "ws_url": "{{ printf "%s://%s" (include "wsScheme" .) .Values.ingress.ws.host}}",
+      "app_url": "{{ printf "%s://%s" (include "httpScheme" .) (include "appIngressHost" . )}}",
+      "ws_url": "{{ printf "%s://%s" (include "wsScheme" .) (include "wsIngressHost" .) }}",
       "app_auth": "Basic {{ printf "octopod:%s" $octopodAppAuthPassword | b64enc }}",
       {{- if .Values.kubernetesDashboard.enabled }}
       "kubernetes_dashboard_url_template": "{{ .Values.kubernetesDashboard.url }}/#/search?namespace={{ .Values.octopod.deploymentNamespace }}&q="
