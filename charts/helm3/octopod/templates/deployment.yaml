@@ -140,20 +140,18 @@ spec:
                 secretKeyRef:
                   name: {{ include "postgresqlSecretName" . }}
                   key: postgresql-password
+          {{- if not .Values.vault.enabled }}
+            - name: POWER_AUTHORIZATION_HEADER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "octopodCliAuthSecretName" . }}
+                  key: cli-secret
+          {{- end }}
           volumeMounts:
           - name: home
             mountPath: /home/octopod
           - name: control-scripts
             mountPath: {{ include "controlScriptsPath" . }}
-          - name: certs
-            mountPath: /tls/server_cert.pem
-            subPath: server_cert.pem
-          - name: certs
-            mountPath: /tls/server_key.pem
-            subPath: server_key.pem
-          - name: certs
-            mountPath: /tls_store/server_cert.pem
-            subPath: server_cert.pem
           readinessProbe:
             httpGet:
               port: {{ .Values.service.ports.app }}
@@ -205,6 +203,3 @@ spec:
       - name: nginx-config
         configMap:
           name: {{ include "octopod.fullname" . }}-nginx-config
-      - name: certs
-        configMap:
-          name: {{ .Values.octopod.certsConfigMapName }}
