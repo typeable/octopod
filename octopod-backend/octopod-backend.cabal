@@ -42,6 +42,7 @@ library
                      , RankNTypes
                      , TypeFamilies
                      , QuantifiedConstraints
+                     , DeriveAnyClass
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args
@@ -53,6 +54,7 @@ library
       Types
       Database.PostgreSQL.Simple.Instances
       Control.Octopod.DeploymentLock
+      Octopod.PowerAPI.Auth.Server
   hs-source-dirs:
       src
   build-depends:
@@ -104,6 +106,9 @@ library
     , monad-control
     , lifted-base
     , containers
+    , servant-auth-server
+    , wai
+    , jose
   default-language: Haskell2010
 
 executable octopod-exe

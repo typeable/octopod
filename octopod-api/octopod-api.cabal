@@ -35,6 +35,7 @@ library
     base,
     servant,
     octopod-common,
+    servant-auth,
   if !impl(ghcjs)
     build-depends:
       servant-websockets,
