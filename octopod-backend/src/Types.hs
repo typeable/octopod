@@ -9,7 +9,6 @@ module Types
     ServerPort (..),
     DBPoolSize (..),
     DBConnectionString (..),
-    TLSStorePath (..),
     ProjectName (..),
     Domain (..),
     Namespace (..),
@@ -51,10 +50,6 @@ newtype DBPoolSize = DBPoolSize {unDBPoolSize :: Int}
 -- | Database connection string.
 newtype DBConnectionString = DbConnectionString
   {unDBConnectionString :: ByteString}
-  deriving stock (Show)
-
--- | TLS store path.
-newtype TLSStorePath = TLSStore {unTLSStorePath :: ByteString}
   deriving stock (Show)
 
 newtype Domain = Domain {unDomain :: Text}

@@ -54,7 +54,7 @@ runOcto = do
       >>= maybe (die "OCTO_AUTHORIZATION_HEADER is not set") pure
   args <- parseArgs
   env <- getBaseUrl
-  manager <- newTlsManagerWith tlsManagerSettings
+  manager <- newTlsManager
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
@@ -141,11 +141,11 @@ handleUpdate auth dName dTag dNewAppOvs dOldAppOvs dNewDepOvs dOldDepOvs = do
   liftIO $ do
     let dUpdate =
           DeploymentUpdate
-            { newTag = dTag,
-              newAppOverrides = dNewAppOvs,
-              oldAppOverrides = dOldAppOvs,
-              newDeploymentOverrides = dNewDepOvs,
-              oldDeploymentOverrides = dOldDepOvs
+            { newTag = dTag
+            , newAppOverrides = dNewAppOvs
+            , oldAppOverrides = dOldAppOvs
+            , newDeploymentOverrides = dNewDepOvs
+            , oldDeploymentOverrides = dOldDepOvs
             }
     response <- runClientM (updateH auth dName dUpdate) clientEnv
     handleResponse (const $ pure ()) response
@@ -281,23 +281,23 @@ ppDeploymentLogs :: [DeploymentLog] -> IO ()
 ppDeploymentLogs ds =
   putStrLn
     . tableString
-      [ column expand right noAlign def,
-        column expand center noAlign def,
-        column expand center noAlign def,
-        column expand center noAlign def,
-        column expand left (charAlign '=') def,
-        column expand left (charAlign '=') def,
-        column expand center noAlign def
+      [ column expand right noAlign def
+      , column expand center noAlign def
+      , column expand center noAlign def
+      , column expand center noAlign def
+      , column expand left (charAlign '=') def
+      , column expand left (charAlign '=') def
+      , column expand center noAlign def
       ]
       unicodeBoldHeaderS
       ( titlesH
-          [ "Created at",
-            "Action id",
-            "Action",
-            "Tag",
-            "App overrides",
-            "Deployment overrides",
-            "Exit code"
+          [ "Created at"
+          , "Action id"
+          , "Action"
+          , "Tag"
+          , "App overrides"
+          , "Deployment overrides"
+          , "Exit code"
           ]
       )
     $ ppDeploymentLogRow <$> ds
@@ -307,21 +307,22 @@ ppDeploymentLogRow :: DeploymentLog -> RowGroup Text
 ppDeploymentLogRow dLog =
   colsAllG
     top
-    [ [ encode_YmdHMS
+    [
+      [ encode_YmdHMS
           SubsecondPrecisionAuto
           w3c
           ( timeToDatetime . Time . fromIntegral $
               dLog ^. field @"createdAt" * 10 ^ (9 :: Int)
           )
-      ],
-      [dLog ^. field @"actionId" . to unActionId . re _Show . packed],
-      [dLog ^. field @"action" . coerced],
-      [dLog ^. field @"deploymentTag" . coerced],
-      dLog
+      ]
+    , [dLog ^. field @"actionId" . to unActionId . re _Show . packed]
+    , [dLog ^. field @"action" . coerced]
+    , [dLog ^. field @"deploymentTag" . coerced]
+    , dLog
         ^. field @"deploymentAppOverrides"
-          . to (fmap $ formatOverride . coerce),
-      dLog
+          . to (fmap $ formatOverride . coerce)
+    , dLog
         ^. field @"deploymentDepOverrides"
-          . to (fmap $ formatOverride . coerce),
-      [dLog ^. field @"exitCode" . re _Show . packed]
+          . to (fmap $ formatOverride . coerce)
+    , [dLog ^. field @"exitCode" . re _Show . packed]
     ]

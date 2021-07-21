@@ -26,12 +26,6 @@ data Args = Args
     db :: ByteString
   , -- | database pool size
     dbPoolSize :: Int
-  , -- | TLS certificate file path
-    tlsCertPath :: ByteString
-  , -- | TLS key file path
-    tlsKeyPath :: ByteString
-  , -- | TLS store path
-    tlsStorePath :: ByteString
   }
   deriving stock (Generic, Show)
 
@@ -50,12 +44,6 @@ data OctopodOpts = OctopodOpts
     octopodDB :: DBConnectionString
   , -- | database pool size
     octopodDBPoolSize :: DBPoolSize
-  , -- | TLS certificate file path
-    octopodTLSCertPath :: TLSCertPath
-  , -- | TLS key file path
-    octopodTLSKeyPath :: TLSKeyPath
-  , -- | TLS store path
-    octopodTLSStorePath :: TLSStorePath
   }
   deriving stock (Show)
 
@@ -70,6 +58,3 @@ parseArgs = do
       (coerce $ wsPort args)
       (coerce $ db args)
       (coerce $ dbPoolSize args)
-      (coerce $ tlsCertPath args)
-      (coerce $ tlsKeyPath args)
-      (coerce $ tlsStorePath args)

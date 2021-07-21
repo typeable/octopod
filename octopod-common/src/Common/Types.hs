@@ -8,7 +8,6 @@
 module Common.Types where
 
 import Data.Bifunctor
-import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.String
 import Data.Text as T
@@ -231,14 +230,6 @@ data ActionInfo = ActionInfo
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake ActionInfo
-
--- | TLS certificate path.
-newtype TLSCertPath = TLSCertPath {unTLSCertPath :: ByteString}
-  deriving stock (Show)
-
--- | TLS key path.
-newtype TLSKeyPath = TLSKeyPath {unTLSKeyPath :: ByteString}
-  deriving stock (Show)
 
 -- | Parses setting application-level overrides.
 parseSetApplicationOverrides ::
