@@ -1,18 +1,22 @@
-{-|
-Module      : Common.Utils
-Description : Common utils for backend and frontend.
+-- |
+--Module      : Common.Utils
+--Description : Common utils for backend and frontend.
+--
+--This module contains common utils between the backend and the frontend.
+module Common.Utils
+  ( (<^.>),
+    (<^?>),
+    (<^..>),
+    dfiName,
+    isPending,
+  )
+where
 
-This module contains common utils between the backend and the frontend.
--}
+import Control.Lens
+import Data.Generics.Product
+import Data.Monoid
 
-
-module Common.Utils where
-
-import           Control.Lens
-import           Data.Generics.Product
-import           Data.Monoid
-
-import           Common.Types
+import Common.Types
 
 -- Lens convenience helpers
 (<^.>) :: Functor f => f a -> Getting b a b -> f b
@@ -27,7 +31,11 @@ import           Common.Types
 infixl 8 <^.>, <^..>, <^?>
 
 -- | Gets name from deployment full info.
-dfiName :: Getter DeploymentFullInfo DeploymentName
+dfiName ::
+  Functor f =>
+  (DeploymentName -> f DeploymentName) ->
+  DeploymentFullInfo ->
+  f DeploymentFullInfo
 dfiName = field @"deployment" . field @"name"
 
 -- | Checks that deployment status is pending.

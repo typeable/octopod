@@ -1,15 +1,19 @@
-{-|
-Module      : Octopod.Server.Logger
-Description : Octopod Server logger.
--}
+-- |
+--Module      : Octopod.Server.Logger
+--Description : Octopod Server logger.
+module Octopod.Server.Logger
+  ( newLogger,
+    logInfo,
+    logWarning,
+    logWithSeverity,
+    show',
+  )
+where
 
-
-module Octopod.Server.Logger where
-
-import           Data.ByteString
-import           Data.Text
+import Data.ByteString
+import Data.Text
 import qualified Data.Text as T
-import           System.Log.FastLogger
+import System.Log.FastLogger
 
 -- | Creates new logger.
 newLogger :: IO TimedFastLogger
@@ -32,7 +36,7 @@ logWithSeverity l severity msg = l $ \ft -> metadata ft <> message
   where
     metadata :: ByteString -> LogStr
     metadata ft = foldMap toLogStr ["[", ft, " ", severity, "] "]
-    message     = toLogStr msg <> toLogStr ("\n" :: ByteString)
+    message = toLogStr msg <> toLogStr ("\n" :: ByteString)
 
 show' :: Show a => a -> Text
 show' = T.pack . show

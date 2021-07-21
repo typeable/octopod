@@ -37,11 +37,20 @@ executable frontend
                      , Page.Elements.Links
                      , Reflex.MultiEventWriter.Class
                      , Data.Text.Search
-  ghc-options:         -Wall
-                       -Werror
-                       -Wno-missing-home-modules
-                       -Wno-error=missing-home-modules
-                       -threaded
+  ghc-options:
+    -Weverything
+    -Wno-implicit-prelude
+    -Wno-missing-safe-haskell-mode
+    -Wno-safe
+    -Wno-prepositive-qualified-module
+    -Wno-missing-import-lists
+    -Wno-all-missed-specialisations
+    -Wno-missing-local-signatures
+    -Wno-partial-fields
+    -Wno-unsafe
+    -Wno-monomorphism-restriction
+    -Wno-missed-specialisations
+    -threaded
   default-extensions:  BlockArguments
                      , ConstraintKinds
                      , DataKinds
@@ -70,7 +79,6 @@ executable frontend
                      , FunctionalDependencies
                      , AllowAmbiguousTypes
                      , OverloadedLabels
-  -- other-extensions:
   build-depends:       aeson
                      , base
                      , bytestring
@@ -81,7 +89,6 @@ executable frontend
                      , octopod-api
                      , exceptions
                      , generic-lens
-                     , ghcjs-dom
                      , jsaddle
                      , lens
                      , obelisk-route

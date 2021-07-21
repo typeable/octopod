@@ -66,54 +66,54 @@ type AppM = ReaderT AppState Handler
 -- | Octopod Server state definition.
 data AppState = AppState
   { -- | postgres pool
-    pool :: PgPool,
-    -- | logger
-    logger :: TimedFastLogger,
-    -- | channel for WS events for the frontend
-    eventSink :: TChan WSEvent,
-    -- | background workers counter
-    bgWorkersCounter :: IORef Int,
-    -- | flag of activating graceful shutdown
-    gracefulShutdownActivated :: IORef Bool,
-    -- | semaphore for graceful shutdown
-    shutdownSem :: MVar (),
-    -- | project name
-    projectName :: ProjectName,
-    -- | base domain
-    baseDomain :: Domain,
-    -- | namespace
-    namespace :: Namespace,
-    -- | archive retention
-    archiveRetention :: ArchiveRetention,
-    -- | status update timeout
-    statusUpdateTimeout :: Timeout,
-    -- | creation command path
-    creationCommand :: Command,
-    -- | update command path
-    updateCommand :: Command,
-    -- | deletion command path
-    archiveCommand :: Command,
-    -- | checking command path
-    checkingCommand :: Command,
-    -- | cleanup command path
-    cleanupCommand :: Command,
-    -- | archive checking command path
-    archiveCheckingCommand :: Command,
-    -- | tag checking command path
-    tagCheckingCommand :: Command,
-    infoCommand :: Command,
-    notificationCommand :: Maybe Command,
-    -- | Deployments currently being processed which has not yet been
+    pool :: PgPool
+  , -- | logger
+    logger :: TimedFastLogger
+  , -- | channel for WS events for the frontend
+    eventSink :: TChan WSEvent
+  , -- | background workers counter
+    bgWorkersCounter :: IORef Int
+  , -- | flag of activating graceful shutdown
+    gracefulShutdownActivated :: IORef Bool
+  , -- | semaphore for graceful shutdown
+    shutdownSem :: MVar ()
+  , -- | project name
+    projectName :: ProjectName
+  , -- | base domain
+    baseDomain :: Domain
+  , -- | namespace
+    namespace :: Namespace
+  , -- | archive retention
+    archiveRetention :: ArchiveRetention
+  , -- | status update timeout
+    statusUpdateTimeout :: Timeout
+  , -- | creation command path
+    creationCommand :: Command
+  , -- | update command path
+    updateCommand :: Command
+  , -- | deletion command path
+    archiveCommand :: Command
+  , -- | checking command path
+    checkingCommand :: Command
+  , -- | cleanup command path
+    cleanupCommand :: Command
+  , -- | archive checking command path
+    archiveCheckingCommand :: Command
+  , -- | tag checking command path
+    tagCheckingCommand :: Command
+  , infoCommand :: Command
+  , notificationCommand :: Maybe Command
+  , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: LockedDeployments
   }
-  deriving (Generic)
+  deriving stock (Generic)
 
 -- | Deployment exception definition.
 data DeploymentException
   = DeploymentFailed Int
   | ThereIsActiveDeployment
-  deriving (Show)
+  deriving stock (Show)
 
 instance Exception DeploymentException
 
@@ -122,13 +122,13 @@ data DeploymentListType
   = AllDeployments
   | ArchivedOnlyDeployments
   | ActiveOnlyDeployments
-  deriving (Show)
+  deriving stock (Show)
 
 -- | Full info list type definition.
 data FullInfoListType
   = FullInfoForAll
   | FullInfoOnlyForOne DeploymentName
-  deriving (Show)
+  deriving stock (Show)
 
 runOctopodServer :: IO ()
 runOctopodServer = do
@@ -430,7 +430,7 @@ createH dep = do
       (ec, out, err) <- liftBase $ createDeployment dep st
       t2 <- liftBase $ now
       let elTime = elapsedTime t2 t1
-      liftIO . withResource pgPool $ \conn ->
+      withResource pgPool $ \conn ->
         -- calling it directly now is fine since there is no previous status.
         createDeploymentLog conn dep "create" ec elTime out err
       liftBase $ sendReloadEvent st
@@ -463,16 +463,16 @@ createDeployment dep st = do
   let log :: Text -> IO ()
       log = logInfo (logger st)
       args =
-        [ "--project-name",
-          coerce $ projectName st,
-          "--base-domain",
-          coerce $ baseDomain st,
-          "--namespace",
-          coerce $ namespace st,
-          "--name",
-          coerce $ name dep,
-          "--tag",
-          coerce $ tag dep
+        [ "--project-name"
+        , coerce $ projectName st
+        , "--base-domain"
+        , coerce $ baseDomain st
+        , "--namespace"
+        , coerce $ namespace st
+        , "--name"
+        , coerce $ name dep
+        , "--tag"
+        , coerce $ tag dep
         ]
           ++ applicationOverridesToArgs (appOverrides dep)
           ++ deploymentOverridesToArgs (deploymentOverrides dep)
@@ -538,12 +538,12 @@ selectDeployment dName = do
       _ -> throwError err500
 
 data StatusTransitionProcessOutput = StatusTransitionProcessOutput
-  { exitCode :: ExitCode,
-    duration :: Duration,
-    stdout :: Stdout,
-    stderr :: Stderr
+  { exitCode :: ExitCode
+  , duration :: Duration
+  , stdout :: Stdout
+  , stderr :: Stderr
   }
-  deriving (Generic, Show)
+  deriving stock (Generic, Show)
 
 data DeploymentStatusTransition
   = TransitionArchived
@@ -554,7 +554,7 @@ data DeploymentStatusTransition
   | TransitionUpdatePending StatusTransitionProcessOutput
   | TransitionCreatePending StatusTransitionProcessOutput
   | TransitionFailure FailureType
-  deriving (Show)
+  deriving stock (Show)
 
 transitionStatus :: DeploymentStatusTransition -> DeploymentStatus
 transitionStatus TransitionArchived {} = Archived
@@ -577,7 +577,7 @@ processOutput (TransitionCreatePending x) = Just (x, Action "create")
 processOutput TransitionFailure {} = Nothing
 
 transitionToStatusS ::
-  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m, MonadIO m) =>
   DeploymentName ->
   DeploymentStatusTransition ->
   m ()
@@ -621,7 +621,7 @@ getDeploymentS conn dName =
     _ -> throwError err404 {errBody = "Deployment not found."}
 
 transitionToStatus ::
-  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m, MonadIO m) =>
   DeploymentName ->
   DeploymentStatusTransition ->
   ExceptT StatusTransitionError m ()
@@ -641,7 +641,7 @@ transitionToStatus dName s = do
             <> (if newS == ArchivePending then ", archived_at = now()" else mempty)
             <> " WHERE name = ?"
     void . liftBase $ execute conn q (newS, dName)
-    liftBase $
+    lift $
       forM_ (processOutput s) $ \(output, act) ->
         createDeploymentLog
           conn
@@ -694,7 +694,7 @@ assertDeploymentTransitionPossibleS dName new =
 data StatusTransitionError
   = InvalidStatusTransition DeploymentName DeploymentStatus DeploymentStatus
   | DeploymentNotFound DeploymentName
-  deriving (Show)
+  deriving stock (Show)
 
 possibleTransitions :: DeploymentStatus -> DeploymentStatus -> Bool
 possibleTransitions CreatePending = anyPred [is #_Running, is #_Failure]
@@ -715,14 +715,14 @@ archiveH dName = do
   st <- ask
   let log = liftBase . logInfo (logger st)
       args =
-        [ "--project-name",
-          coerce $ projectName st,
-          "--base-domain",
-          coerce $ baseDomain st,
-          "--namespace",
-          coerce $ namespace st,
-          "--name",
-          coerce dName
+        [ "--project-name"
+        , coerce $ projectName st
+        , "--base-domain"
+        , coerce $ baseDomain st
+        , "--namespace"
+        , coerce $ namespace st
+        , "--name"
+        , coerce dName
         ]
       cmd = coerce $ archiveCommand st
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
@@ -733,10 +733,10 @@ archiveH dName = do
     transitionToStatusS dName $
       TransitionArchivePending
         StatusTransitionProcessOutput
-          { exitCode = ec,
-            duration = elTime,
-            stdout = out,
-            stderr = err
+          { exitCode = ec
+          , duration = elTime
+          , stdout = out
+          , stderr = err
           }
     handleExitCode ec
   pure Success
@@ -748,11 +748,11 @@ updateH dName dUpdate = do
   t1 <- liftIO $ now
   st <- ask
   let DeploymentUpdate
-        { newTag = dTag,
-          newAppOverrides = newAppOvs,
-          oldAppOverrides = oldAppOvs,
-          newDeploymentOverrides = newDepOvs,
-          oldDeploymentOverrides = oldDepOvs
+        { newTag = dTag
+        , newAppOverrides = newAppOvs
+        , oldAppOverrides = oldAppOvs
+        , newDeploymentOverrides = newDepOvs
+        , oldDeploymentOverrides = oldDepOvs
         } = dUpdate
       pgPool = pool st
       log = logInfo (logger st)
@@ -769,16 +769,16 @@ updateH dName dUpdate = do
     liftBase $ updateDeploymentInfo dName st
     liftBase $ sendReloadEvent st
     let args =
-          [ "--project-name",
-            coerce $ projectName st,
-            "--base-domain",
-            coerce $ baseDomain st,
-            "--namespace",
-            coerce $ namespace st,
-            "--name",
-            coerce $ dName,
-            "--tag",
-            coerce $ dTag
+          [ "--project-name"
+          , coerce $ projectName st
+          , "--base-domain"
+          , coerce $ baseDomain st
+          , "--namespace"
+          , coerce $ namespace st
+          , "--name"
+          , coerce $ dName
+          , "--tag"
+          , coerce $ dTag
           ]
             ++ applicationOverridesToArgs appOvs
             ++ deploymentOverridesToArgs depOvs
@@ -795,10 +795,10 @@ updateH dName dUpdate = do
     transitionToStatusS dName $
       TransitionUpdatePending
         StatusTransitionProcessOutput
-          { exitCode = ec,
-            duration = elTime,
-            stdout = out,
-            stderr = err
+          { exitCode = ec
+          , duration = elTime
+          , stdout = out
+          , stderr = err
           }
     handleExitCode ec
   return Success
@@ -1020,14 +1020,14 @@ cleanupDeployment dName st = do
   let log = logInfo (logger st)
       pgPool = pool st
       args =
-        [ "--project-name",
-          coerce $ projectName st,
-          "--base-domain",
-          coerce $ baseDomain st,
-          "--namespace",
-          coerce $ namespace st,
-          "--name",
-          coerce dName
+        [ "--project-name"
+        , coerce $ projectName st
+        , "--base-domain"
+        , coerce $ baseDomain st
+        , "--namespace"
+        , coerce $ namespace st
+        , "--name"
+        , coerce dName
         ]
       cmd = coerce $ cleanupCommand st
   log $ "call " <> unwords (cmd : args)
@@ -1113,10 +1113,10 @@ restoreH dName = do
     transitionToStatusS dName $
       TransitionCreatePending
         StatusTransitionProcessOutput
-          { exitCode = ec,
-            duration = elTime,
-            stdout = out,
-            stderr = err
+          { exitCode = ec
+          , duration = elTime
+          , stdout = out
+          , stderr = err
           }
     handleExitCode ec
   pure Success
@@ -1142,6 +1142,7 @@ handleExitCode (ExitFailure c) = liftBase . throwIO $ DeploymentFailed c
 
 -- | Helper to log a deployment action.
 createDeploymentLog ::
+  (MonadError ServerError m, MonadIO m) =>
   Connection ->
   Deployment ->
   Action ->
@@ -1149,7 +1150,7 @@ createDeploymentLog ::
   Duration ->
   Stdout ->
   Stderr ->
-  IO ()
+  m ()
 createDeploymentLog conn dep act ec dur out err = do
   let (Deployment dName dTag appOvs depOvs) = dep
       exitCode' =
@@ -1172,27 +1173,32 @@ createDeploymentLog conn dep act ec dur out err = do
         "INSERT INTO deployment_log_overrides \
         \(key, value, deployment_log_id, scope, visibility) \
         \VALUES (?, ?, ?, ?, ?)"
-  aIds :: [Only Int] <-
-    query
-      conn
-      qInsertLog
-      (act, dTag, exitCode', dur', out', err', dName)
+  (Only aId) :: Only Int <-
+    liftIO
+      ( query
+          conn
+          qInsertLog
+          (act, dTag, exitCode', dur', out', err', dName)
+      )
+      >>= ensureOne
   void $
     for appOvs $ \o -> do
-      let [Only aId] = aIds
-          oKey = overrideKey . unApplicationOverride $ o
+      let oKey = overrideKey . unApplicationOverride $ o
           oValue = overrideValue . unApplicationOverride $ o
           oScope = show ApplicationScope
           oVis = show . overrideVisibility . unApplicationOverride $ o
-      execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
+      liftIO $ execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
   void $
     for depOvs $ \o -> do
-      let [Only aId] = aIds
-          oKey = overrideKey . unDeploymentOverride $ o
+      let oKey = overrideKey . unDeploymentOverride $ o
           oValue = overrideValue . unDeploymentOverride $ o
           oScope = show DeploymentScope
           oVis = show . overrideVisibility . unDeploymentOverride $ o
-      execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
+      liftIO $ execute conn qInsertLogOverride (oKey, oValue, aId, oScope, oVis)
+
+ensureOne :: MonadError ServerError m => [a] -> m a
+ensureOne [x] = return x
+ensureOne _ = throwError err500
 
 -- | Helper to get deployment metadata from the database.
 selectDeploymentMetadata ::
@@ -1248,16 +1254,16 @@ failIfImageNotFound dName dTag = do
   let log :: Text -> IO ()
       log = logInfo (logger st)
       args =
-        [ "--project-name",
-          coerce $ projectName st,
-          "--base-domain",
-          coerce $ baseDomain st,
-          "--namespace",
-          coerce $ namespace st,
-          "--name",
-          coerce $ dName,
-          "--tag",
-          coerce $ dTag
+        [ "--project-name"
+        , coerce $ projectName st
+        , "--base-domain"
+        , coerce $ baseDomain st
+        , "--namespace"
+        , coerce $ namespace st
+        , "--name"
+        , coerce $ dName
+        , "--tag"
+        , coerce $ dTag
         ]
       cmd = coerce $ tagCheckingCommand st
 

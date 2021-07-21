@@ -43,5 +43,15 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   ghc-options:
-    -Wall
-    -Werror
+    -Weverything
+    -Wno-implicit-prelude
+    -Wno-missing-safe-haskell-mode
+    -Wno-safe
+    -Wno-prepositive-qualified-module
+    -Wno-missing-import-lists
+    -Wno-all-missed-specialisations
+    -Wno-missing-local-signatures
+    -Wno-partial-fields
+    -Wno-unsafe
+    -Wno-monomorphism-restriction
+    -Wno-missed-specialisations

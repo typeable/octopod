@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Orphans where
+module Orphans () where
 
 import Common.Types
 import Database.PostgreSQL.Simple.FromField (FromField)
