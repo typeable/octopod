@@ -9,14 +9,24 @@ let
       root = ./.;
       name = "octopod";
       include = [
-        (nix-filter.inDirectory ./octo-cli)
-        (nix-filter.inDirectory ./octopod-backend)
-        (nix-filter.inDirectory ./octopod-common)
-        (nix-filter.inDirectory ./octopod-frontend)
-        (nix-filter.inDirectory ./octopod-api)
+        ./octopod-backend/octopod-backend.cabal
+        ./octo-cli/octo-cli.cabal
+        ./octopod-api/octopod-api.cabal
+        ./octopod-common/octopod-common.cabal
+        ./octopod-frontend/octopod-frontend.cabal
         ./cabal.project
       ];
     };
+
+    modules = [
+      { packages.octopod-backend.src = ./octopod-backend;
+        packages.octo-cli.src = ./octo-cli;
+        packages.octopod-api.src = ./octopod-api;
+        packages.octopod-frontend.src = ./octopod-frontend;
+        packages.octopod-common.src = ./octopod-common;
+      }
+    ];
+
     index-state = "2021-07-02T00:00:00Z";
     compiler-nix-name = "ghc8105";
   };
