@@ -1,7 +1,8 @@
 { sources ? import ./nix/sources.nix
-, haskellNix ? import sources.haskellNix { }
-, pkgs ? import haskellNix.sources.nixpkgs-2105 haskellNix.nixpkgsArgs
+, haskellNix ? import sources.haskellNix { inherit system; }
+, pkgs ? import haskellNix.sources.nixpkgs-2105 (haskellNix.nixpkgsArgs // { inherit system; })
 , nix-filter ? import sources.nix-filter
+, system ? builtins.currentSystem
 }:
 let
   hsPkgs = pkgs.haskell-nix.cabalProject {
@@ -19,7 +20,11 @@ let
     };
 
     modules = [
-      { packages.octopod-backend.src = ./octopod-backend;
+      {
+        dontStrip = false;
+        dontPatchELF = false;
+        enableDeadCodeElimination = true;
+        packages.octopod-backend.src = ./octopod-backend;
         packages.octo-cli.src = ./octo-cli;
         packages.octopod-api.src = ./octopod-api;
         packages.octopod-frontend.src = ./octopod-frontend;
