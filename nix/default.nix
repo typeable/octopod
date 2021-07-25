@@ -42,9 +42,6 @@ let
       useradd octopod -d /home/octopod
       chown octopod.octopod /home/octopod
 
-      mkdir /app
-      cp -av ${octopod-backend}/bin/octopod-exe /app/octopod-exe
-
       mkdir -p /migrations/{deploy,revert,verify}
       cp -av ${migrations}/* /migrations/
 
@@ -57,7 +54,7 @@ let
     '';
 
     config = {
-      Entrypoint = [ "/app/octopod-exe" ];
+      Entrypoint = [ "${octopod-backend}/bin/octopod-exe" ];
       Cmd = [
         "--port"
         "4443"
@@ -79,12 +76,10 @@ let
 
   octo-cli-container = pkgs.dockerTools.buildImage {
     name = "octo-cli-container-slim";
-    contents = with pkgs; [ cacert octo-cli ];
+    contents = with pkgs; [ cacert ];
 
     config = {
-      Entrypoint = [
-        "/bin/octo"
-      ];
+      Entrypoint = [ "${octo-cli}/bin/octo" ];
     };
   };
 in
