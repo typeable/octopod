@@ -19,6 +19,7 @@ export ARCHIVE_CHECKING_COMMAND=$MOUNT_DIR/echo.sh
 export TAG_CHECKING_COMMAND=$MOUNT_DIR/echo.sh
 export INFO_COMMAND=$MOUNT_DIR/info.sh
 export NOTIFICATION_COMMAND=$MOUNT_DIR/write.sh
+export POWER_AUTHORIZATION_HEADER="123"
 $1/bin/octopod-exe \
     --port 4443 \
     --ui-port 3002 \
