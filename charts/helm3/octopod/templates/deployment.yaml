@@ -97,40 +97,19 @@ spec:
             protocol: TCP
           - containerPort: 4000
             protocol: TCP
-          {{- if .Values.vault.enabled }}
           command:
           - "sh"
           - "-ec"
           - |
+            {{- if .Values.vault.enabled }}
             for i in /vault/secrets/*;do source $i;done
-            exec /app/octopod-exe \
+            {{- end }}
+            exec $ENTRYPOINT \
             --port {{ .Values.service.ports.powerApp | quote }} \
             --ui-port {{ .Values.service.ports.app | quote }} \
             --ws-port {{ .Values.service.ports.ws | quote }} \
             --db host="'{{ include "postgresqlHost" . }}' port=5432 user='{{ .Values.postgresql.postgresqlUsername }}' password=$(PG_PASS)" \
-            --db-pool-size "10" \
-            --tls-cert-path /tls/server_cert.pem \
-            --tls-key-path /tls/server_key.pem \
-            --tls-store-path /tls_store \
-          {{- else }}
-          args:
-          - --port
-          - {{ .Values.service.ports.powerApp | quote }}
-          - --ui-port
-          - {{ .Values.service.ports.app | quote }}
-          - --ws-port
-          - {{ .Values.service.ports.ws | quote }}
-          - --db
-          - host='{{ include "postgresqlHost" . }}' port=5432 user='{{ .Values.postgresql.postgresqlUsername }}' password=$(PG_PASS)
-          - --db-pool-size
-          - "10"
-          - --tls-cert-path
-          - /tls/server_cert.pem
-          - --tls-key-path
-          - /tls/server_key.pem
-          - --tls-store-path
-          - /tls_store
-          {{- end }}
+            --db-pool-size "10"
           envFrom:
             - configMapRef:
                 name: {{ include "octopod.fullname" . }}
