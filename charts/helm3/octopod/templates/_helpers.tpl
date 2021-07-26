@@ -124,3 +124,15 @@ octopod-powerapp.{{ .Values.octopod.baseDomain }}
 octopod-app.{{ .Values.octopod.baseDomain }}
 {{- end }}
 {{- end }}
+
+{{- define "octopodCliAuthSecretName" -}}
+{{- printf "%s-cli-auth-secret" (include "octopod.fullname" .) }}
+{{- end }}
+
+{{- define "octopodCliAuthSecret" -}}
+{{- if .Values.octopod.cliAuthSecret -}}
+{{ .Values.octopod.cliAuthSecret }}
+{{- else }}
+{{- randAlphaNum 32 }}
+{{- end }}
+{{- end }}

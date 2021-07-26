@@ -11,13 +11,15 @@ metadata:
   labels:
     {{- include "octopod.labels" . | nindent 4 }}
   annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
     kubernetes.io/ingress.class: {{ .Values.ingress.ingressClass | quote }}
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-next-upstream: "http_502 error timeout"
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     {{- with .Values.ingress.powerApp.annotations }}
       {{- toYaml . | nindent 4 }}
     {{- end }}

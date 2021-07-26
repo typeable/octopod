@@ -101,7 +101,7 @@ The following tables lists the configurable parameters of the Octopod chart and 
 | nodeSelector | object | `{}` | Node selector if you want octopod to use specific nodes onn your cluster |
 | octopod.archiveRetention | int | `1209600` |  |
 | octopod.baseDomain | string | `""` | Domain that will be used as a ase for Octopod deploymets and ingress hosts|
-| octopod.certsConfigMapName | string | `"octopod-certs"` | Config map with self-signed certificates |
+| octopod.cliAuthSecret | string | `nil` | Auth Header for accessing octopod using octo CLI |
 | octopod.deploymentNamespace | string | `"octopod-deployment"` | Name of a namespace which will be used for all Octopod deployments (you need to create it yourself) |
 | octopod.env | object | `{}` | key value map for supplying additional environment variables for octopod or your control scripts |
 | octopod.migrations.enabled | bool | `true` | Enable or not automatic DB schema migrations |

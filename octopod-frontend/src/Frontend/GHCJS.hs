@@ -1,22 +1,30 @@
-{-|
-Module      : Frontend.GHCJS
-Description : GHCJS functions.
+-- |
+--Module      : Frontend.GHCJS
+--Description : GHCJS functions.
+--
+--This module contains all functions that require GHCJS imports.
+module Frontend.GHCJS
+  ( appUrlKey,
+    wsUrlKey,
+    appAuthKey,
+    ProjectConfig (..),
+    initConfig,
+    getVar,
+    getAppUrl,
+    getAppAuth,
+    getWsUrl,
+  )
+where
 
-This module contains all functions that require GHCJS imports.
--}
-
-module Frontend.GHCJS where
-
-import           Control.Monad.Catch
-import           Data.Aeson as A (Result(..), Value, fromJSON)
-import           Data.Text as T (Text, pack)
-import           Deriving.Aeson.Stock
-import           GHCJS.DOM
-import           GHCJS.DOM.Response
-import           GHCJS.DOM.Storage
-import           GHCJS.DOM.Types
-import           GHCJS.DOM.Window
-
+import Control.Monad.Catch
+import Data.Aeson as A (Result (..), Value, fromJSON)
+import Data.Text as T (Text, pack)
+import Deriving.Aeson.Stock
+import GHCJS.DOM
+import GHCJS.DOM.Response
+import GHCJS.DOM.Storage
+import GHCJS.DOM.Types
+import GHCJS.DOM.Window
 
 appUrlKey, wsUrlKey, appAuthKey :: JSString
 appUrlKey = "app"
@@ -29,13 +37,16 @@ appAuthKey = "auth"
 -- | There are project settings that contain the host for API requests,
 -- websocket host and API authentication token.
 data ProjectConfig = ProjectConfig
-  { appUrl :: T.Text  -- ^ API host.
-  , wsUrl :: T.Text   -- ^ WS host.
-  , appAuth :: T.Text -- ^ API authentication token.
-  , kubernetesDashboardUrlTemplate :: Maybe T.Text
-  -- ^ A k8s dashboard url template to which the name of the deployment is appended.
+  { -- | API host.
+    appUrl :: T.Text
+  , -- | WS host.
+    wsUrl :: T.Text
+  , -- | API authentication token.
+    appAuth :: T.Text
+  , -- | A k8s dashboard url template to which the name of the deployment is appended.
+    kubernetesDashboardUrlTemplate :: Maybe T.Text
   }
-  deriving (Generic, Show, Eq)
+  deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake ProjectConfig
 
 -- | Reads settings from the config file and puts them into session storage.
@@ -63,10 +74,12 @@ initConfig = liftJSM $ catchAll initConfig' (const $ pure Nothing)
 
 -- | Gets a value from session storage for the given key.
 -- Throws an error if key doesn't exist.
-getVar
-  :: MonadJSM m
-  => JSString -- ^ Key in session storage.
-  -> m T.Text -- ^ Value from session storage.
+getVar ::
+  MonadJSM m =>
+  -- | Key in session storage.
+  JSString ->
+  -- | Value from session storage.
+  m T.Text
 getVar k = do
   w <- currentWindowUnchecked
   stor <- getSessionStorage w

@@ -1,48 +1,48 @@
-{-|
-Module      : Frontend.Route
-Description : Router setup.
-
-This module contains the type-level routing scheme and the router encoder.
-Also defines a 'Wrapped' instance for 'DeploymentName'. This helps
-simplify the router encoder.
-Routing is provided by the 'obelisk-router' package.
--}
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-module Frontend.Route where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-import           Control.Category ((.))
-import           Control.Lens (makeWrapped)
-import           Data.Functor.Identity
-import           Data.Text (Text)
-import           Obelisk.Route
-import           Obelisk.Route.TH
-import           Prelude hiding ((.))
+-- |
+--Module      : Frontend.Route
+--Description : Router setup.
+--
+--This module contains the type-level routing scheme and the router encoder.
+--Also defines a 'Wrapped' instance for 'DeploymentName'. This helps
+--simplify the router encoder.
+--Routing is provided by the 'obelisk-router' package.
+module Frontend.Route
+  ( routeEncoder,
+    Routes (..),
+  )
+where
 
-import           Common.Types
+import Control.Category ((.))
+import Control.Lens (makeWrapped)
+import Data.Functor.Identity
+import Data.Text (Text)
+import Obelisk.Route
+import Obelisk.Route.TH
+import Prelude hiding ((.))
 
-makeWrapped ''DeploymentName
+import Common.Types
+import Data.Kind
 
 -- | Routing scheme definition.
-data Routes :: * -> * where
+data Routes :: Type -> Type where
   DashboardRoute :: Routes (Maybe DeploymentName)
-deriving instance Show (Routes a)
 
-concat <$> mapM deriveRouteComponent
-  [ ''Routes
+deriving stock instance Show (Routes a)
+
+fmap mconcat . sequence $
+  [ makeWrapped ''DeploymentName
+  , deriveRouteComponent ''Routes
   ]
 
 -- | URL encoder and decoder for 'Routes' scheme.
-routeEncoder
-  :: Encoder (Either Text) Identity (R Routes) PageName
+routeEncoder ::
+  Encoder (Either Text) Identity (R Routes) PageName
 routeEncoder = handleEncoder (const (DashboardRoute :/ Nothing)) $
   pathComponentEncoder $ \case
-    DashboardRoute -> PathSegment "deployments"
-      $ maybeEncoder (unitEncoder mempty)
-      $ singlePathSegmentEncoder . unwrappedEncoder
+    DashboardRoute ->
+      PathSegment "deployments" $
+        maybeEncoder (unitEncoder mempty) $
+          singlePathSegmentEncoder . unwrappedEncoder

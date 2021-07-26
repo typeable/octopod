@@ -1,14 +1,15 @@
 module Data.Text.Search
-  ( fuzzySearch
-  , FuzzySearchStringChunk(..)
-  ) where
+  ( fuzzySearch,
+    FuzzySearchStringChunk (..),
+  )
+where
 
-import           Control.Applicative
-import           Data.Bifunctor
-import           Data.Char
-import           Data.Function
-import           Data.List
-import           Data.Text (Text)
+import Control.Applicative
+import Data.Bifunctor
+import Data.Char
+import Data.Function
+import qualified Data.List as L
+import Data.Text (Text)
 import qualified Data.Text as T
 
 type Needle = Text
@@ -20,10 +21,10 @@ fuzzySearch' :: Needle -> Haystack -> Running -> Penalty -> [([FuzzySearchString
 fuzzySearch' needle haystack i p = case (T.uncons needle, T.uncons haystack) of
   (Just _, Nothing) -> []
   (Just (n, eedle), Just (h, aystack)) ->
-    bimap (prependNotMatched h)  (+ (i - p)) <$> fuzzySearch' needle aystack 0 p
-    <|> if toLower n == toLower h
-      then first (prependMatched h) <$> fuzzySearch' eedle aystack (i * 2 + 1) 1
-      else empty
+    bimap (prependNotMatched h) (+ (i - p)) <$> fuzzySearch' needle aystack 0 p
+      <|> if toLower n == toLower h
+        then first (prependMatched h) <$> fuzzySearch' eedle aystack (i * 2 + 1) 1
+        else empty
   (Nothing, Nothing) -> [([], i)]
   (Nothing, Just _) -> [([NotMatched $ T.unpack haystack], i)]
 
@@ -41,7 +42,7 @@ fuzzySearch :: Needle -> Haystack -> Maybe ([FuzzySearchStringChunk Text], Int)
 fuzzySearch "" h = Just ([NotMatched h], 0)
 fuzzySearch n h = case fuzzySearch' n h 0 0 of
   [] -> Nothing
-  xs@(_:_) -> Just . (first . fmap . fmap) T.pack $ maximumBy (compare `on` snd) xs
+  xs@(_ : _) -> Just . (first . fmap . fmap) T.pack $ L.maximumBy (compare `on` snd) xs
 
 data FuzzySearchStringChunk a = NotMatched !a | Matched !a
-  deriving (Show, Eq, Functor)
+  deriving stock (Show, Eq, Functor)

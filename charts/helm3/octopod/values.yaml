@@ -76,7 +76,6 @@ tolerations: []
 affinity: {}
 
 octopod:
-  certsConfigMapName: octopod-certs 
   projectName: Octopod
   deploymentNamespace: octopod-deployment
   baseDomain: ""
