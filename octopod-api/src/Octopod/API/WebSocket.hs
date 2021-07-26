@@ -1,6 +1,12 @@
 {-# LANGUAGE CPP #-}
 
-module Octopod.API.WebSocket where
+module Octopod.API.WebSocket
+  ( ApiWSPath,
+#ifndef ghcjs_HOST_OS
+    WebSocketAPI,
+#endif
+  )
+where
 
 #ifndef ghcjs_HOST_OS
 
@@ -10,9 +16,7 @@ import           Servant.API.WebSocketConduit
 
 #endif
 
-
 type ApiWSPath = "event"
-
 
 #ifndef ghcjs_HOST_OS
 

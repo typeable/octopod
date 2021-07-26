@@ -1,6 +1,6 @@
-module Main where
+module Main (main) where
 
-import           Octopod.Server
+import Octopod.Server
 
 main :: IO ()
 main = runOctopodServer

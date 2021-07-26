@@ -1,6 +1,6 @@
-module Main where
+module Main (main) where
 
-import           Octopod.CLI
+import Octopod.CLI
 
 main :: IO ()
 main = runOcto

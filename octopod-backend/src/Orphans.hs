@@ -1,16 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Orphans where
 
-import           Database.PostgreSQL.Simple.FromField (FromField)
-import           Database.PostgreSQL.Simple.ToField (ToField)
+module Orphans () where
 
-import           Common.Types
+import Common.Types
+import Database.PostgreSQL.Simple.FromField (FromField)
+import Database.PostgreSQL.Simple.ToField (ToField)
 
-deriving instance FromField Action
-deriving instance ToField Action
+deriving newtype instance FromField Action
 
-deriving instance FromField DeploymentTag
-deriving instance ToField DeploymentTag
+deriving newtype instance ToField Action
 
-deriving instance FromField DeploymentName
-deriving instance ToField DeploymentName
+deriving newtype instance FromField DeploymentTag
+
+deriving newtype instance ToField DeploymentTag
+
+deriving newtype instance FromField DeploymentName
+
+deriving newtype instance ToField DeploymentName
