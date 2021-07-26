@@ -53,34 +53,41 @@ let
       cp -av ${octopod-css}/favicons/* /www/
     '';
 
-    config = {
-      Entrypoint = [ "${octopod-backend}/bin/octopod-exe" ];
-      Cmd = [
-        "--port"
-        "4443"
-        "--ui-port"
-        "4000"
-        "--ws-port"
-        "4020"
-        "--db"
-        "host='127.0.0.1' port=5432 user='octopod' password='octopod'"
-        "--db-pool-size"
-        "10"
-      ];
-      Env = [
-        "PATH=/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        "USER=octopod"
-      ];
-    };
+    config =
+      let entrypoint = "${octopod-backend}/bin/octopod-exe"; in
+      {
+        Entrypoint = [ entrypoint ];
+        Cmd = [
+          "--port"
+          "4443"
+          "--ui-port"
+          "4000"
+          "--ws-port"
+          "4020"
+          "--db"
+          "host='127.0.0.1' port=5432 user='octopod' password='octopod'"
+          "--db-pool-size"
+          "10"
+        ];
+        Env = [
+          "PATH=/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          "USER=octopod"
+          "ENTRYPOINT=${entrypoint}"
+        ];
+      };
   };
 
   octo-cli-container = pkgs.dockerTools.buildImage {
     name = "octo-cli-container-slim";
     contents = with pkgs; [ cacert ];
 
-    config = {
-      Entrypoint = [ "${octo-cli}/bin/octo" ];
-    };
+    config = let entrypoint = "${octo-cli}/bin/octo"; in
+      {
+        Entrypoint = [ entrypoint ];
+        Env = [
+          "ENTRYPOINT=${entrypoint}"
+        ];
+      };
   };
 in
 {
