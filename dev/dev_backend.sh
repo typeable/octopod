@@ -25,7 +25,4 @@ $1/bin/octopod-exe \
     --ui-port 3002 \
     --ws-port 4020 \
     --db "host='127.0.0.1' port=5432 user='octopod' password='octopod'" \
-    --db-pool-size 10 \
-    --tls-cert-path dev/certs/server_cert.pem \
-    --tls-key-path dev/certs/server_key.pem \
-    --tls-store-path /tmp/tls_store
+    --db-pool-size 10
