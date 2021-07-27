@@ -98,8 +98,8 @@ editDeploymentPopupBody dfi errEv = divClass "popup__content" $
     let
       oldAppVarDyn = coerce <$> getOldVars dfiAppVars <$> appVarsDyn
       newAppVarDyn = coerce <$> getNewVars dfiAppVars <$> appVarsDyn
-      oldDeploymentVarDyn = coerce <$> getOldVars dfiAppVars <$> deploymentVarsDyn
-      newDeploymentVarDyn = coerce <$> getNewVars dfiAppVars <$> deploymentVarsDyn
+      oldDeploymentVarDyn = coerce <$> getOldVars dfiDeploymentVars <$> deploymentVarsDyn
+      newDeploymentVarDyn = coerce <$> getNewVars dfiDeploymentVars <$> deploymentVarsDyn
     validDyn <- holdDyn True $ updated tOkEv
     pure $ (DeploymentUpdate
       <$> (DeploymentTag <$> tagDyn)
