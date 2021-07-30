@@ -121,7 +121,7 @@ headWidget projectNameEv = do
     "script"
     ("src" =: "/static/vendors/outline/outline.js")
     blank
-  projectNameDyn <- holdDyn "Octopod" $ ("Octopod – " <>) . uProjectName <$> projectNameEv
+  projectNameDyn <- holdDyn "Octopod" $ (<> " – Octopod") . uProjectName <$> projectNameEv
   el "title" $ dynText projectNameDyn
 
   -- favicon attributes
