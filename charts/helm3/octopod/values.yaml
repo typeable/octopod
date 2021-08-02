@@ -83,13 +83,24 @@ octopod:
   archiveRetention: 1209600
   migrations:
     enabled: true
-  env: {}
+  env:
+    HELM_BIN: "/utils/helm"
+    KUBECTL_BIN: "/utils/kubectl"
+    DEFAULTS: |
+     {
+      "chart_name": "wordpress",
+      "chart_repo_name": "bitnami",
+      "chart_repo_url": "https://charts.bitnami.com/bitnami",
+      "chart_version": "12.0.0",
+      "use_tls": false,
+      "default_overrides": []
+     }
   vaultEnv: {}
 controlScripts:
   image:
     repository: typeable/octopod-generic-utils
     pullPolicy: IfNotPresent
-    tag: 0.0.1
+    tag: 0.0.2
 sqitch:
   image:
     repository: typeable/sqitch
