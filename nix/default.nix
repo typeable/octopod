@@ -11,14 +11,12 @@ let
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
 
-  terser = (import sources.nixpkgs { inherit system; }).nodePackages.terser;
-
   octopod-frontend-ugly = pkgs.runCommand "octopod-frontend-ugly"
     { } ''
     mkdir $out
     cp ${hsPkgs.octopod-frontend-pretty}/index.html $out/index.html
 
-    ${terser}/bin/terser ${hsPkgs.octopod-frontend-pretty}/all.js -o $out/all.js -mangle -c
+    ${pkgs.closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${hsPkgs.octopod-frontend-pretty}/all.js --js_output_file $out/all.js
   '';
 
   octopod-server-container = pkgs.dockerTools.buildImage {
