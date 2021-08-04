@@ -11,13 +11,18 @@ let
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
 
-  octopod-frontend-ugly = pkgs.runCommand "octopod-frontend-ugly"
-    { } ''
-    mkdir $out
-    cp ${hsPkgs.octopod-frontend-pretty}/index.html $out/index.html
+  closurecompiler = (import sources.nixpkgs { inherit system; }).closurecompiler;
 
-    ${pkgs.closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${hsPkgs.octopod-frontend-pretty}/all.js --js_output_file $out/all.js
-  '';
+  octopod-frontend-ugly =
+    let frontend = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
+    in
+    pkgs.runCommand "octopod-frontend-ugly"
+      { } ''
+      mkdir $out
+      cp ${../octopod-frontend/index.html} $out/index.html
+
+      ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/bin/frontend.jsexe/all.js --externs ${frontend}/bin/frontend.jsexe/all.js.externs --js_output_file $out/all.js
+    '';
 
   octopod-server-container = pkgs.dockerTools.buildImage {
     name = "octopod-server-container-slim";

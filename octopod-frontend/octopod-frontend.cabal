@@ -21,6 +21,8 @@ flag development
   description: mock host
 
 executable frontend
+  if impl(ghcjs >= 0.2.1)
+     ghcjs-options:     -dedupe
   if flag(development)
     cpp-options:       -DDEVELOPMENT
   main-is:             Main.hs
