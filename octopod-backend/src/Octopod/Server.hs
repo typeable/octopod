@@ -8,7 +8,7 @@ import Control.Concurrent.Async (race_)
 import qualified Control.Concurrent.Lifted as L
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
-import Control.Exception (Exception, throwIO, try)
+import Control.Exception (Exception, displayException, throwIO, try)
 import qualified Control.Exception.Lifted as L
 import Control.Lens hiding (Context, pre)
 import Control.Lens.Extras
@@ -34,6 +34,7 @@ import Data.Int (Int64)
 import Data.Maybe
 import Data.Pool
 import Data.Text (lines, pack, unpack, unwords)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable
 import Database.PostgreSQL.Simple hiding ((:.))
@@ -391,7 +392,7 @@ createH dep = do
   t1 <- liftIO $ now
   st <- ask
   let pgPool = pool st
-  failIfImageNotFound (name dep) (tag dep)
+  failIfImageNotFound dep
   failIfGracefulShutdownActivated
   runDeploymentBgWorker
     Nothing
@@ -426,7 +427,7 @@ createH dep = do
       liftIO . withResource pgPool $ \conn ->
         upsertNewOverrides conn dId (appOverrides dep) (deploymentOverrides dep)
       liftBase $ sendReloadEvent st
-      liftBase $ updateDeploymentInfo (name dep) st
+      updateDeploymentInfo (name dep)
       (ec, out, err) <- liftBase $ createDeployment dep st
       t2 <- liftBase $ now
       let elTime = elapsedTime t2 t1
@@ -438,17 +439,21 @@ createH dep = do
   pure Success
 
 -- | Updates deployment info.
-updateDeploymentInfo :: DeploymentName -> AppState -> IO ()
-updateDeploymentInfo dName st = do
-  let log = logWarning (logger st)
-      args = infoCommandArgs (projectName st) (baseDomain st) (namespace st) dName
-      cmd = coerce $ infoCommand st
-  liftIO $ do
-    (ec, out, err) <- runCommand (unpack cmd) (coerce args)
+updateDeploymentInfo ::
+  (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
+  DeploymentName ->
+  m ()
+updateDeploymentInfo dName = do
+  log <- asks (logWarning . logger)
+  pgPool <- asks pool
+  DeploymentFullInfo {deployment = dep} <-
+    withResource pgPool $ \conn -> getDeploymentS conn dName
+  (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs dep
+  liftBase $
     case ec of
       ExitSuccess -> do
         dMeta <- parseDeploymentMetadata (lines . unStdout $ out)
-        upsertDeploymentMetadata (pool st) dName dMeta
+        upsertDeploymentMetadata pgPool dName dMeta
       ExitFailure _ ->
         log $
           "could not get deployment info, exit code: " <> (pack . show $ ec)
@@ -484,23 +489,6 @@ createDeployment dep st = do
     log $ "deployment created, deployment: " <> (pack . show $ dep)
     pure (ec, out, err)
 
--- | Converts an application-level override list to command arguments.
-applicationOverrideToArg :: ApplicationOverride -> [Text]
-applicationOverrideToArg o = ["--app-env-override", overrideToArg . coerce $ o]
-
--- | Helper to convert an application-level override to command arguments.
-applicationOverridesToArgs :: ApplicationOverrides -> [Text]
-applicationOverridesToArgs ovs = concat [applicationOverrideToArg o | o <- ovs]
-
--- | Converts a deployment-level override list to command arguments.
-deploymentOverrideToArg :: DeploymentOverride -> [Text]
-deploymentOverrideToArg o =
-  ["--deployment-override", overrideToArg . coerce $ o]
-
--- | Helper to convert a deployment-level override to command arguments.
-deploymentOverridesToArgs :: DeploymentOverrides -> [Text]
-deploymentOverridesToArgs ovs = concat [deploymentOverrideToArg o | o <- ovs]
-
 -- | Helper to get deployment logs.
 selectDeploymentLogs ::
   PgPool ->
@@ -527,15 +515,22 @@ selectDeployment ::
   AppM Deployment
 selectDeployment dName = do
   pgPool <- asks pool
+  liftBaseOp (withResource pgPool) $ \conn ->
+    liftIO (selectDeploymentIO conn dName) >>= either throwError pure
+
+selectDeploymentIO ::
+  Connection ->
+  DeploymentName ->
+  IO (Either ServerError Deployment)
+selectDeploymentIO conn dName = do
   let q = "SELECT name, tag FROM deployments WHERE name = ?"
-  liftBaseOp (withResource pgPool) $ \conn -> do
-    retrieved <- liftBase $ query conn q (Only dName)
-    case retrieved of
-      [(n, t)] -> do
-        (appOvs, stOvs) <- liftBase $ selectOverrides conn n
-        pure $ Deployment n t appOvs stOvs
-      [] -> throwError err404 {errBody = "Deployment not found."}
-      _ -> throwError err500
+  retrieved <- liftBase $ query conn q (Only dName)
+  case retrieved of
+    [(n, t)] -> do
+      (appOvs, stOvs) <- liftBase $ selectOverrides conn n
+      pure . Right $ Deployment n t appOvs stOvs
+    [] -> pure . Left $ err404 {errBody = "Deployment not found."}
+    _ -> pure . Left $ err500
 
 data StatusTransitionProcessOutput = StatusTransitionProcessOutput
   { exitCode :: ExitCode
@@ -757,7 +752,8 @@ updateH dName dUpdate = do
       pgPool = pool st
       log = logInfo (logger st)
   dId <- selectDeploymentId pgPool dName
-  failIfImageNotFound dName dTag
+  olDep <- selectDeployment dName
+  failIfImageNotFound (applyDeploymentUpdate dUpdate olDep)
   failIfGracefulShutdownActivated
   runDeploymentBgWorker (Just UpdatePending) dName (pure ()) $ \() -> do
     (appOvs, depOvs) <- liftBase . withResource pgPool $ \conn ->
@@ -766,7 +762,7 @@ updateH dName dUpdate = do
         upsertNewOverrides conn dId newAppOvs newDepOvs
         updateTag conn dId dTag
         selectOverrides conn dName
-    liftBase $ updateDeploymentInfo dName st
+    updateDeploymentInfo dName
     liftBase $ sendReloadEvent st
     let args =
           [ "--project-name"
@@ -1000,7 +996,7 @@ statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
   pgPool <- asks pool
   dep <- withResource pgPool $ \conn -> getDeploymentS conn dName
-  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs dName (dep ^. #deployment . #tag)
+  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs (dep ^. #deployment)
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -1102,11 +1098,11 @@ restoreH dName = do
   t1 <- liftIO $ now
   st <- ask
   dep <- selectDeployment dName
-  failIfImageNotFound (name dep) (tag dep)
+  failIfImageNotFound dep
   failIfGracefulShutdownActivated
   runDeploymentBgWorker (Just CreatePending) dName (pure ()) $ \() -> do
     dep' <- selectDeployment dName
-    liftBase $ updateDeploymentInfo dName st
+    updateDeploymentInfo dName
     (ec, out, err) <- liftBase $ createDeployment dep' st
     t2 <- liftBase now
     let elTime = elapsedTime t2 t1
@@ -1248,28 +1244,9 @@ upsertDeploymentMetadata pgPool dName dMetadatas = do
 
 -- | Checks the existence of a deployment tag.
 -- Returns 404 'Tag not found' response if the deployment tag doesn't exist.
-failIfImageNotFound :: DeploymentName -> DeploymentTag -> AppM ()
-failIfImageNotFound dName dTag = do
-  st <- ask
-  let log :: Text -> IO ()
-      log = logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce $ dName
-        , "--tag"
-        , coerce $ dTag
-        ]
-      cmd = coerce $ tagCheckingCommand st
-
-  ec <- liftIO $ do
-    log $ "call " <> unwords (cmd : args)
-    runCommandWithoutPipes (unpack cmd) (unpack <$> args)
+failIfImageNotFound :: Deployment -> AppM ()
+failIfImageNotFound dep = do
+  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
@@ -1316,11 +1293,19 @@ runStatusUpdater state = do
       withResource pgPool $ \conn -> query conn selectDeps (Only interval)
     let checkList :: [(DeploymentName, DeploymentStatus, Timestamp, DeploymentTag)] =
           (\(n, s, t, dTag) -> (n, s, coerce t, dTag)) <$> rows
-    checkResult <- for checkList $ \(dName, dStatus, ts, dTag) -> do
+    checkResult <- for checkList $ \(dName, dStatus, ts, _) -> do
       let timeout = statusUpdateTimeout state
       (ec, _, _) <- flip runReaderT state case dStatus of
         ArchivePending -> runCommandArgs archiveCheckingCommand =<< archiveCheckArgs dName
-        _ -> runCommandArgs checkingCommand =<< checkCommandArgs dName dTag
+        _ -> do
+          liftBase (withResource pgPool $ \conn -> selectDeploymentIO conn dName) >>= \case
+            Right dep -> runCommandArgs checkingCommand =<< checkCommandArgs dep
+            Left err -> do
+              log <- asks logger
+              let err' = T.pack $ displayException $ err
+              liftIO $ logWarning log err'
+              pure (ExitFailure 1, Stdout "Didn't call script", Stderr err')
+
       pure (dName, statusTransition ec dStatus ts timeout, dStatus)
     updated <-
       for checkResult $ \(dName, transitionM, dStatus) ->

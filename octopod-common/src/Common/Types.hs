@@ -10,7 +10,7 @@ module Common.Types where
 import Data.Bifunctor
 import Data.Coerce
 import Data.String
-import Data.Text as T
+import Data.Text as T hiding (filter)
 import Data.Traversable
 import Deriving.Aeson.Stock
 import Web.HttpApiData
@@ -186,6 +186,19 @@ data DeploymentUpdate = DeploymentUpdate
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
+
+applyDeploymentUpdate :: DeploymentUpdate -> Deployment -> Deployment
+applyDeploymentUpdate du d =
+  Deployment
+    { name = name d
+    , tag = newTag du
+    , appOverrides =
+        filter (`notElem` oldAppOverrides du) (appOverrides d)
+          <> newAppOverrides du
+    , deploymentOverrides =
+        filter (`notElem` oldDeploymentOverrides du) (deploymentOverrides d)
+          <> newDeploymentOverrides du
+    }
 
 data CurrentStatus
   = Ok

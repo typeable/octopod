@@ -75,3 +75,4 @@ newtype Command = Command {unCommand :: Text}
 newtype ControlScriptArgs = ControlScriptArgs
   {unControlScriptArgs :: [String]}
   deriving stock (Show)
+  deriving newtype (Semigroup, Monoid)

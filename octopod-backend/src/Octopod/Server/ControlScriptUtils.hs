@@ -12,6 +12,13 @@ module Octopod.Server.ControlScriptUtils
     runCommandArgs',
     checkCommandArgs,
     archiveCheckArgs,
+    tagCheckCommandArgs,
+
+    -- * Helpers
+    applicationOverrideToArg,
+    applicationOverridesToArgs,
+    deploymentOverrideToArg,
+    deploymentOverridesToArgs,
   )
 where
 
@@ -20,6 +27,7 @@ import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as TL
 import Data.Coerce
 import Data.Generics.Product.Typed
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Octopod.Server.Logger
@@ -30,22 +38,32 @@ import Types
 
 -- | Creates command arguments for the 'info' deployment control script.
 infoCommandArgs ::
-  ProjectName ->
-  Domain ->
-  Namespace ->
-  DeploymentName ->
-  ControlScriptArgs
-infoCommandArgs pName domain ns dName =
-  ControlScriptArgs
-    [ "--project-name"
-    , T.unpack . coerce $ pName
-    , "--base-domain"
-    , T.unpack . coerce $ domain
-    , "--namespace"
-    , T.unpack . coerce $ ns
-    , "--name"
-    , T.unpack . coerce $ dName
-    ]
+  ( MonadReader r m
+  , HasType Namespace r
+  , HasType ProjectName r
+  , HasType Domain r
+  ) =>
+  Deployment ->
+  m ControlScriptArgs
+infoCommandArgs dep = do
+  (Namespace namespace) <- asks getTyped
+  (ProjectName projectName) <- asks getTyped
+  (Domain domain) <- asks getTyped
+  return $
+    ControlScriptArgs
+      [ "--project-name"
+      , T.unpack . coerce $ projectName
+      , "--base-domain"
+      , T.unpack . coerce $ domain
+      , "--namespace"
+      , T.unpack . coerce $ namespace
+      , "--name"
+      , T.unpack . coerce $ name dep
+      , "--tag"
+      , T.unpack . coerce $ tag dep
+      ]
+      <> getApplicationOverrideArgs dep
+      <> getDeploymentOverrideArgs dep
 
 notificationCommandArgs ::
   ( MonadReader r m
@@ -88,26 +106,55 @@ checkCommandArgs ::
   , HasType ProjectName r
   , HasType Domain r
   ) =>
-  DeploymentName ->
-  DeploymentTag ->
+  Deployment ->
   m ControlScriptArgs
-checkCommandArgs dName dTag = do
+checkCommandArgs dep = do
+  (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
-  (Namespace namespace) <- asks getTyped
   return $
     ControlScriptArgs
-      [ "--namespace"
-      , T.unpack namespace
-      , "--name"
-      , T.unpack . coerce $ dName
-      , "--tag"
-      , T.unpack . unDeploymentTag $ dTag
-      , "--project-name"
-      , T.unpack projectName
+      [ "--project-name"
+      , T.unpack . coerce $ projectName
       , "--base-domain"
-      , T.unpack domain
+      , T.unpack . coerce $ domain
+      , "--namespace"
+      , T.unpack . coerce $ namespace
+      , "--name"
+      , T.unpack . coerce $ name dep
+      , "--tag"
+      , T.unpack . coerce $ tag dep
       ]
+      <> getApplicationOverrideArgs dep
+      <> getDeploymentOverrideArgs dep
+
+tagCheckCommandArgs ::
+  ( MonadReader r m
+  , HasType Namespace r
+  , HasType ProjectName r
+  , HasType Domain r
+  ) =>
+  Deployment ->
+  m ControlScriptArgs
+tagCheckCommandArgs dep = do
+  (Namespace namespace) <- asks getTyped
+  (ProjectName projectName) <- asks getTyped
+  (Domain domain) <- asks getTyped
+  return $
+    ControlScriptArgs
+      [ "--project-name"
+      , T.unpack . coerce $ projectName
+      , "--base-domain"
+      , T.unpack . coerce $ domain
+      , "--namespace"
+      , T.unpack . coerce $ namespace
+      , "--name"
+      , T.unpack . coerce $ name dep
+      , "--tag"
+      , T.unpack . coerce $ tag dep
+      ]
+      <> getApplicationOverrideArgs dep
+      <> getDeploymentOverrideArgs dep
 
 archiveCheckArgs ::
   ( MonadReader r m
@@ -171,3 +218,28 @@ runCommand cmd args = do
 runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
 runCommandWithoutPipes cmd args =
   withProcessWait (proc cmd args) waitExitCode
+
+-- | Converts an application-level override list to command arguments.
+applicationOverrideToArg :: ApplicationOverride -> [Text]
+applicationOverrideToArg o = ["--app-env-override", overrideToArg . coerce $ o]
+
+-- | Helper to convert an application-level override to command arguments.
+applicationOverridesToArgs :: ApplicationOverrides -> [Text]
+applicationOverridesToArgs ovs = concat [applicationOverrideToArg o | o <- ovs]
+
+getApplicationOverrideArgs :: Deployment -> ControlScriptArgs
+getApplicationOverrideArgs =
+  ControlScriptArgs . map T.unpack . applicationOverridesToArgs . appOverrides
+
+-- | Converts a deployment-level override list to command arguments.
+deploymentOverrideToArg :: DeploymentOverride -> [Text]
+deploymentOverrideToArg o =
+  ["--deployment-override", overrideToArg . coerce $ o]
+
+-- | Helper to convert a deployment-level override to command arguments.
+deploymentOverridesToArgs :: DeploymentOverrides -> [Text]
+deploymentOverridesToArgs ovs = concat [deploymentOverrideToArg o | o <- ovs]
+
+getDeploymentOverrideArgs :: Deployment -> ControlScriptArgs
+getDeploymentOverrideArgs =
+  ControlScriptArgs . map T.unpack . deploymentOverridesToArgs . deploymentOverrides
