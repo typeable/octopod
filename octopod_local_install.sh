@@ -13,9 +13,21 @@ fi
 if [ $(kind version | awk -F ' ' '{print $2}') != "v0.11.1" ]; then
     echo "Warning! This kind version hasn't been tested"
 fi
+if kind get clusters | grep -q octopod; then
+    echo -n 'Octopod kind cluster already exists. Do you want do delete it? [y/n] ';
+    read confirm
+    if [ "$confirm" != 'y' ]; then
+       echo "Exiting"
+       exit 0
+    else
+       echo "Deleting and recreating cluster"
+       kind delete cluster --name octopod
+    fi
+fi
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+name: octopod
 networking:
   kubeProxyMode: "ipvs"
 nodes:
