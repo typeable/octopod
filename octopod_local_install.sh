@@ -88,4 +88,4 @@ kubectl create ns octopod
 kubectl create ns octopod-deployment
 helm repo add --force-update typeable https://typeable.github.io/octopod
 helm repo update
-helm -n octopod install octopod typeable/octopod --set octopod.baseDomain="lvh.me" --set ingress.tls.enabled=false
+helm -n octopod install octopod typeable/octopod --wait --timeout=5m --set octopod.baseDomain="lvh.me" --set ingress.tls.enabled=false
