@@ -14,14 +14,14 @@ let
   closurecompiler = (import sources.nixpkgs { inherit system; }).closurecompiler;
 
   octopod-frontend-ugly =
-    let frontend = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
+    let frontend = hsPkgs.octopod-frontend-pretty;
     in
     pkgs.runCommand "octopod-frontend-ugly"
       { } ''
       mkdir $out
       cp ${../octopod-frontend/index.html} $out/index.html
 
-      ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/bin/frontend.jsexe/all.js --externs ${frontend}/bin/frontend.jsexe/all.js.externs --js_output_file $out/all.js
+      ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/all.js --externs ${frontend}/all.js.externs --js_output_file $out/all.js
     '';
 
   octopod-server-container = pkgs.dockerTools.buildImage {
