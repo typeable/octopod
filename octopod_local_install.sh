@@ -1,4 +1,18 @@
+#!/bin/bash
 set -e
+for cmd in kind kubectl helm; do
+   if ! command -v $cmd &> /dev/null; then
+           echo "$cmd is not installed. Please, install it!"
+           exit 1;
+   fi
+done
+if [ $(helm version --short | awk -F '.' '{print $1}') != "v3" ]; then
+    echo 'Your version of helm is not supported. Please install helm 3'
+    exit 1
+fi
+if [ $(kind version | awk -F ' ' '{print $2}') != "v0.11.1" ]; then
+    echo "Warning! This kind version hasn't been tested"
+fi
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
