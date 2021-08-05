@@ -45,6 +45,60 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
+        - name: copy-migrations
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command:
+          - "bash"
+          - "-ec"
+          - |
+            set -ex
+
+            # copy migrations
+            cp -av /migrations/* /mymigrations
+
+            # create sqitch.conf
+            echo '[core]' > /mymigrations/sqitch.conf
+            echo 'engine = pg' >> /mymigrations/sqitch.conf
+            echo 'plan_file = sqitch.plan' >> /mymigrations/sqitch.conf
+            echo 'top_dir = .' >> /mymigrations/sqitch.conf
+            echo '[engine "pg"]' >> /mymigrations/sqitch.conf
+            echo '  registry = sqitch' >> /mymigrations/sqitch.conf
+            echo '[deploy]' >> /mymigrations/sqitch.conf
+            echo '  verify = true' >> /mymigrations/sqitch.conf
+            echo '[rebase]' >> /mymigrations/sqitch.conf
+            echo '  verify = true' >> /mymigrations/sqitch.conf
+            echo '[target "octopod"]' >> /mymigrations/sqitch.conf
+            echo 'uri = db:pg://{{ .Values.postgresql.postgresqlUsername }}:$(PG_PASS)@{{ include "postgresqlHost" . }}/{{ .Values.postgresql.postgresqlDatabase }}' >> /mymigrations/sqitch.conf
+          env:
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresqlSecretName" . }}
+                  key: postgresql-password
+          volumeMounts:
+          - name: migrations
+            mountPath: /mymigrations
+        - name: run-migrations
+          image: "{{ .Values.sqitch.image.repository }}:{{ .Values.sqitch.image.tag }}"
+          command:
+          - "bash"
+          - "-c"
+          - |
+            set -x
+            echo 'checking connection to postgresql...'
+            for i in $(seq 1 6); do psql "postgres://{{ .Values.postgresql.postgresqlUsername }}:$(PG_PASS)@{{ include "postgresqlHost" . }}/{{ .Values.postgresql.postgresqlDatabase }}" -c ''; if [ $? -eq 0 ]; then break; fi; sleep 10; done
+            set -e
+            echo 'run migrations...'
+            cd /migrations && /usr/local/bin/sqitch deploy octopod
+          env:
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresqlSecretName" . }}
+                  key: postgresql-password
+          volumeMounts:
+          - name: migrations
+            mountPath: /migrations
         - name: copy-control-scripts
           image: "{{ .Values.controlScripts.image.repository }}:{{ .Values.controlScripts.image.tag }}"
           imagePullPolicy: {{ .Values.controlScripts.image.pullPolicy }}
@@ -178,6 +232,8 @@ spec:
       - name: control-scripts
         emptyDir: {}
       - name: www
+        emptyDir: {}
+      - name: migrations
         emptyDir: {}
       - name: nginx-config
         configMap:
