@@ -38,10 +38,13 @@ let
 in
 hsPkgs // {
   octopod-frontend-pretty =
+    let frontend = hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend;
+    in
     pkgs.runCommand "octopod-frontend-pretty"
       { } ''
       mkdir $out
       cp ${./octopod-frontend/index.html} $out/index.html
-      cp ${hsPkgs.projectCross.ghcjs.hsPkgs.octopod-frontend.components.exes.frontend}/bin/frontend.jsexe/all.js $out/all.js
+      cp ${frontend}/bin/frontend.jsexe/all.js $out/all.js
+      cp ${frontend}/bin/frontend.jsexe/all.js.externs $out/all.js.externs
     '';
 }

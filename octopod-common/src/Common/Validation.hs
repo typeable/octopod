@@ -8,13 +8,13 @@ module Common.Validation
   )
 where
 
-import Data.ByteString (ByteString)
-import Data.Text.Encoding as T (encodeUtf8)
-import Text.Regex.TDFA
-
 import Common.Types
+import Data.Char
+import qualified Data.Text as T
 
 -- | Validates a deployment name.
 isNameValid :: DeploymentName -> Bool
-isNameValid (DeploymentName n) =
-  T.encodeUtf8 n =~ ("^[a-z][a-z0-9\\-]{1,16}$" :: ByteString)
+isNameValid (DeploymentName (T.uncons -> Just (n, nn))) =
+  let l = T.length nn
+   in l > 0 && l < 16 && isAsciiLower n && T.all (\c -> c == '-' || isAsciiLower c || isDigit c) nn
+isNameValid _ = False
