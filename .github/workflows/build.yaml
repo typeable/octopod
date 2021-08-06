@@ -94,7 +94,7 @@ jobs:
 
       - name: Login to DockerHub
         id: login-docker-hub
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/staging'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/staging'  || github.ref == 'refs/heads/develop'
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -111,6 +111,18 @@ jobs:
           image_name=`cat octopod-server-docker | docker load | awk '{print $3}'`
           docker tag $image_name typeable/octopod:latest
           docker push typeable/octopod:latest
+
+      - name: Push Nightly Docker Images to DockerHub
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          # push docker images to DockerHub
+          image_name=`cat octo-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octo:nightly
+          docker push typeable/octo:nightly
+
+          image_name=`cat octopod-server-docker | docker load | awk '{print $3}'`
+          docker tag $image_name typeable/octopod:nightly
+          docker push typeable/octopod:nightly
 
       - name: Rename Docker image archives
         run: |
