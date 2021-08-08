@@ -54,6 +54,7 @@ library
                      , TypeFamilies
                      , QuantifiedConstraints
                      , DeriveAnyClass
+                     , ViewPatterns
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args

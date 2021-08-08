@@ -181,6 +181,8 @@ This script checks the status of the deployment.
 
 This script receives the following additional command-line arguments as input:
 * `--tag` – The _Docker Image tag_ that should be checked.
+* `--app-env-override` [⭐](#star) – App-level overrides. These overrides should be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
+* `--deployment-override` [⭐](#star) – Deployment-level overrides. These overrides should be used to set up the deployment environment itself, rather than be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
 
 If the script exits with `0`, it means that the deployment is healthy and up. If the script exits with a non-zero exit code, it means that the deployment is not healthy or down.
 
@@ -194,7 +196,7 @@ You can specify exactly what error occured using exit codes:
 The script might be called something like this:
 
 ```bash
-check --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button"
+check ---project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --app-env-override "EMAIL_TOKEN=123123" --app-env-override "SECRET_BUTTON_ENABLED=True" --deployment-override "FANCY_DATABASE=True"
 ```
 
 #### Sample implementation
@@ -261,13 +263,15 @@ This script is called right before [`create`](#-create) and [`update`](#-update)
 
 This script receives the following additional command-line arguments as input:
 * `--tag` – The _Docker Image tag_ that should be checked.
+* `--app-env-override` [⭐](#star) – App-level overrides. These overrides should be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
+* `--deployment-override` [⭐](#star) – Deployment-level overrides. These overrides should be used to set up the deployment environment itself, rather than be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
 
 #### Execution example
 
 The script might be called something like this:
 
 ```bash
-tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a"
+tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --app-env-override "EMAIL_TOKEN=123123" --app-env-override "SECRET_BUTTON_ENABLED=True" --deployment-override "FANCY_DATABASE=True"
 ```
 
 ### 👀 info
@@ -275,6 +279,11 @@ tag_check --project-name "Cactus store" --base-domain "cactus-store.com" --names
 #### Description
 
 This script returns user-facing metadata about a deployment. Currently, the metadata consists of URLs that are relevant for the deployment. Things like the deployment URL, the URL to view logs, and the database URL.
+
+This script receives the following additional command-line arguments as input:
+* `--tag` – The _Docker Image tag_ that should be checked.
+* `--app-env-override` [⭐](#star) – App-level overrides. These overrides should be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
+* `--deployment-override` [⭐](#star) – Deployment-level overrides. These overrides should be used to set up the deployment environment itself, rather than be passed to the server being deployed. These overrides are specified in the _Web UI_. They are passed in the format of `KEY=VALUE` pairs.
 
 The script should return the metadata as a two-column CSV table:
 
@@ -290,7 +299,7 @@ This script receives only [the default command-line arguments](#general-behavior
 The script might be called something like this:
 
 ```bash
-info --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button"
+info --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --tag "c9bbc3fcc69e5aa094bca110c6f79419ab7be77a" --app-env-override "EMAIL_TOKEN=123123" --app-env-override "SECRET_BUTTON_ENABLED=True" --deployment-override "FANCY_DATABASE=True"
 ```
 
 #### Sample implementation
