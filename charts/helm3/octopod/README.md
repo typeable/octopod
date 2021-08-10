@@ -6,9 +6,9 @@
 
 ## TL;DR
 ```console
-helm repo add typeable https://typeable.github.io/octopod/
-kubectl create ns octopod-deployment
-helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
+$ helm repo add typeable https://typeable.github.io/octopod/
+$ kubectl create ns octopod-deployment
+$ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 ## Introduction
@@ -38,7 +38,7 @@ To install the chart with the release name `my-release` from current directory e
 
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
-# helm -n octopod install my-release typeable/octopod --set octopod.baseDomain="your-domain.com"
+$ helm -n octopod install my-release typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 The command deploys Octopod on the Kubernetes cluster in the default configuration inside octopod namespace. The [Parameters](#parameters) section lists the parameters that can be configured during installation.
@@ -57,9 +57,9 @@ The command removes all the Kubernetes components but PVC's associated with the 
 Some values (as passwords) in this chart (and it's dependencies) are generated automatically, but due to [limitation](https://github.com/helm/charts/issues/5167) in the helm the values are changing on every upgrade. To prevent this you must fix this values by providing them via --set flags or values file.
 
 These values are:
-- postgresql.postgresqlPassword - main db password
-- postgresql.postgresqlPostgresPassword - password for "postgres" user
-- octopod.cliAuthSecret - auth header for octo cli tool
+- `postgresql.postgresqlPassword` - main db password
+- `postgresql.postgresqlPostgresPassword` - password for "postgres" user
+- `octopod.cliAuthSecret` - auth header for octo cli tool
 
 Please note, that by not providing these values you can fail successfully execute `helm upgrade` or operate octopod after upgrade.
 
