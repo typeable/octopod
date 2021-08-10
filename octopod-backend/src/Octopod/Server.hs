@@ -499,12 +499,12 @@ selectDeploymentLogs ::
   (MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   m [DeploymentLog]
-selectDeploymentLogs dName = runStatement . select $ do
+selectDeploymentLogs dName = (fmap . fmap) extractDeploymentLog . runStatement . select $ do
   dls <- each deploymentLogSchema
   ds <- each deploymentSchema
   where_ $ ds ^. #name ==. litExpr dName
   where_ $ dls ^. #deploymentId ==. ds ^. #id_
-  pure $ extractDeploymentLog dls
+  pure dls
 
 data StatusTransitionProcessOutput = StatusTransitionProcessOutput
   { exitCode :: ExitCode
@@ -611,8 +611,11 @@ transitionToStatus dName s = do
           _ -> throwError $ DeploymentNotFound dName
     assertStatusTransitionPossible dName oldS newS
     dep <-
-      lift . statement () . update $
-        Update
+      (fmap . fmap) extractDeployment
+        . lift
+        . statement ()
+        . update
+        $ Update
           { target = deploymentSchema
           , from = pure ()
           , set = \() dep ->
@@ -621,7 +624,7 @@ transitionToStatus dName s = do
                 & #updatedAt .~ now
                 & if newS == Archived then #archivedAt .~ nullify now else id
           , updateWhere = \() dep -> dep ^. #name ==. litExpr dName
-          , returning = Projection extractDeployment
+          , returning = Projection id
           }
     pure (dep, oldS)
   (deps, oldS) <- either throwError pure res
@@ -739,20 +742,21 @@ updateH dName dUpdate = do
   failIfGracefulShutdownActivated
   runDeploymentBgWorker (Just UpdatePending) dName (pure ()) $ \() -> do
     dep <-
-      runStatement
-        ( update
-            Update
-              { target = deploymentSchema
-              , from = pure ()
-              , set = \() ds ->
-                  ds & #appOverrides .~ litExpr (dUpdate ^. #appOverrides)
-                    & #deploymentOverrides .~ litExpr (dUpdate ^. #deploymentOverrides)
-                    & #tag .~ litExpr (dUpdate ^. #newTag)
-              , updateWhere = \() ds -> ds ^. #name ==. litExpr dName
-              , returning = Projection extractDeployment
-              }
-        )
-        >>= ensureOne
+      fmap extractDeployment $
+        runStatement
+          ( update
+              Update
+                { target = deploymentSchema
+                , from = pure ()
+                , set = \() ds ->
+                    ds & #appOverrides .~ litExpr (dUpdate ^. #appOverrides)
+                      & #deploymentOverrides .~ litExpr (dUpdate ^. #deploymentOverrides)
+                      & #tag .~ litExpr (dUpdate ^. #newTag)
+                , updateWhere = \() ds -> ds ^. #name ==. litExpr dName
+                , returning = Projection id
+                }
+          )
+          >>= ensureOne
 
     updateDeploymentInfo dName
     liftBase $ sendReloadEvent st

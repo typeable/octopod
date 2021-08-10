@@ -53,7 +53,6 @@ library
                      , http-api-data
                      , lens
                      , text
-                     , rel8
                      , containers
                      , time
   hs-source-dirs:      src

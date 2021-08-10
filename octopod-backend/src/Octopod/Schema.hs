@@ -14,6 +14,7 @@ import Data.Generics.Product
 import Data.Int
 import Data.Time
 import GHC.Generics (Generic)
+import Orphans ()
 import Rel8
 import Types
 
@@ -56,7 +57,7 @@ data DeploymentSchema f = DeploymentSchema
   deriving stock (Generic)
   deriving anyclass (Rel8able)
 
-extractDeployment :: DeploymentSchema f -> Deployment' f
+extractDeployment :: DeploymentSchema Result -> Deployment
 extractDeployment = upcast
 
 extractDeploymentFullInfo ::
@@ -115,5 +116,5 @@ deploymentLogSchema =
           }
     }
 
-extractDeploymentLog :: DeploymentLogSchema f -> DeploymentLog' f
+extractDeploymentLog :: DeploymentLogSchema Result -> DeploymentLog
 extractDeploymentLog = upcast
