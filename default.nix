@@ -35,7 +35,7 @@ let
       }
     ];
 
-    index-state = "2021-07-02T00:00:00Z";
+    index-state = "2021-08-04T00:00:00Z";
     compiler-nix-name = "ghc8105";
   };
 in

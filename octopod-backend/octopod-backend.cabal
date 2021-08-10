@@ -63,9 +63,9 @@ library
       Octopod.Server.Posix
       Orphans
       Types
-      Database.PostgreSQL.Simple.Instances
       Control.Octopod.DeploymentLock
       Octopod.PowerAPI.Auth.Server
+      Octopod.Schema
   hs-source-dirs:
       src
   build-depends:
@@ -73,7 +73,6 @@ library
     , async
     , base >=4.7 && <5
     , bytestring
-    , chronos
     , conduit
     , deriving-aeson
     , octopod-common
@@ -107,6 +106,10 @@ library
     , servant-auth-server
     , wai
     , jose
+    , rel8
+    , time
+    , hasql
+    , hasql-transaction
   default-language: Haskell2010
 
 executable octopod-exe

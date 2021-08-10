@@ -22,6 +22,7 @@ import Frontend.Utils (errorCommonWidget, loadingCommonWidget)
 import Page.Deployment
 import Page.Deployments
 
+
 main :: IO ()
 main = mdo
   mainWidgetWithHead'

@@ -35,6 +35,16 @@ library
                      , TypeApplications
                      , TypeOperators
                      , ViewPatterns
+                     , DeriveAnyClass
+                     , OverloadedLabels
+                     , StandaloneDeriving
+                     , TypeSynonymInstances
+                     , FlexibleInstances
+                     , DataKinds
+                     , KindSignatures
+                     , EmptyDataDeriving
+                     , TupleSections
+                     , AllowAmbiguousTypes
   build-depends:       base
                      , aeson
                      , bytestring
@@ -43,6 +53,9 @@ library
                      , http-api-data
                      , lens
                      , text
+                     , rel8
+                     , containers
+                     , time
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:
@@ -56,3 +69,4 @@ library
     -Wno-missing-local-signatures
     -Wno-partial-fields
     -Wno-unsafe
+    -Wno-missed-specialisations
