@@ -1,7 +1,5 @@
 # Octopod
 
-### This is beta version of a chart!
-
 [Octopod](https://octopod.site/) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
 ## TL;DR
