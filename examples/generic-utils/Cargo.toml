@@ -1,0 +1,58 @@
+[package]
+name = "generic-utils"
+version = "0.1.0"
+authors = ["Aleksei Sizov <a.sizov@typeable.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+structopt = "0.3"
+log = "0.4"
+env_logger = "0.8.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.8"
+envy = "0.4"
+yaml-rust = "0.4"
+kube = "0.58.1"
+k8s-openapi = { version = "0.12.0", features = ["v1_19"]}
+tokio = { version = "1.7.0", features = ["full"] }
+dkregistry = { git = "https://github.com/camallo/dkregistry-rs", rev = "854d0da53bef5dd85b5e901123e85d43af97c74e"} # Version in crates uses old tokio
+regex = "1"
+
+[[bin]]
+name = "create"
+path = "src/create_update.rs"
+
+[[bin]]
+name = "update"
+path = "src/create_update.rs"
+
+[[bin]]
+name = "archive"
+path = "src/archive.rs"
+
+[[bin]]
+name = "info"
+path = "src/info.rs"
+
+[[bin]]
+name = "cleanup"
+path = "src/cleanup.rs"
+
+[[bin]]
+name = "check"
+path = "src/check.rs"
+
+[[bin]]
+name = "archive_check"
+path = "src/archive_check.rs"
+
+[[bin]]
+name = "init"
+path = "src/init.rs"
+
+[[bin]]
+name = "tag_check"
+path = "src/tag_check.rs"
