@@ -7,19 +7,18 @@
 -- This module contains common types between the backend and the frontend.
 module Common.Types where
 
+import Control.Lens
 import Data.Aeson hiding (Result)
-import Data.Bifunctor
 import Data.Generics.Labels ()
 import Data.Int
-import Data.Map (Map)
-import qualified Data.Map as M
-import qualified Data.Map.Merge.Strict as M
+import Data.Map.Ordered.Strict (OMap, (<>|))
+import qualified Data.Map.Ordered.Strict as OM
+import Data.Map.Ordered.Strict.Extra ()
 import Data.Maybe
 import Data.Text as T hiding (filter)
 import Data.Time
 import Data.Traversable
 import Deriving.Aeson.Stock
-
 import Web.HttpApiData
 
 data OverrideLevel = ApplicationLevel | DeploymentLevel
@@ -37,41 +36,51 @@ data OverrideValue = ValueAdded Text | ValueDeleted
   deriving (ToJSON, FromJSON) via Snake OverrideValue
   deriving stock (Eq, Ord, Show, Generic)
 
-newtype DefaultConfig (l :: OverrideLevel) = DefaultConfig (Map Text Text)
+newtype DefaultConfig (l :: OverrideLevel) = DefaultConfig (OMap Text Text)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
-newtype Config (l :: OverrideLevel) = Config (Map Text Text)
+newtype Config (l :: OverrideLevel) = Config {unConfig :: OMap Text Text}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
 data FullDefaultConfig = FullDefaultConfig
   { appDefaultConfig :: DefaultConfig 'ApplicationLevel
   , depDefaultConfig :: DefaultConfig 'DeploymentLevel
   }
+  deriving stock (Show, Ord, Eq, Generic)
+  deriving (ToJSON, FromJSON) via Snake FullDefaultConfig
+
+data FullConfig = FullConfig
+  { appConfig :: Config 'ApplicationLevel
+  , depConfig :: Config 'DeploymentLevel
+  }
+  deriving stock (Show, Ord, Eq, Generic)
+  deriving (ToJSON, FromJSON) via Snake FullConfig
 
 applyOverrides :: Overrides l -> DefaultConfig l -> Config l
 applyOverrides (Overrides oo) (DefaultConfig dd) =
-  Config $
-    M.merge
-      M.preserveMissing
-      ( M.mapMaybeMissing $ \_ -> \case
-          ValueAdded v -> Just v
-          ValueDeleted -> Nothing
-      )
-      ( M.zipWithMaybeMatched $ \_ _ -> \case
-          ValueAdded v -> Just v
-          ValueDeleted -> Nothing
-      )
-      dd
-      oo
+  Config . extract $ oo <>| (ValueAdded <$> dd)
+  where
+    extract :: OMap Text OverrideValue -> OMap Text Text
+    extract =
+      fmap
+        ( \case
+            ValueAdded v -> v
+            ValueDeleted -> error "invariant"
+        )
+        . OM.filter
+          ( \_ -> \case
+              ValueAdded _ -> True
+              ValueDeleted -> False
+          )
 
-newtype Overrides (l :: OverrideLevel) = Overrides (Map Text OverrideValue)
+newtype Overrides (l :: OverrideLevel) = Overrides {unOverrides :: OMap Text OverrideValue}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
 instance Semigroup (Overrides l) where
-  (Overrides lhs) <> (Overrides rhs) = Overrides $ rhs <> lhs
+  (Overrides lhs) <> (Overrides rhs) = Overrides $ rhs <>| lhs
 
 instance Monoid (Overrides l) where
-  mempty = Overrides mempty
+  mempty = Overrides OM.empty
 
 newtype DeploymentId = DeploymentId {unDeploymentId :: Int64}
   deriving stock (Show)
@@ -92,7 +101,7 @@ newtype ArchivedFlag = ArchivedFlag {unArchivedFlag :: Bool}
   deriving newtype (Show, FromJSON, ToJSON)
 
 newtype Duration = Duration {unDuration :: CalendarDiffTime}
-  deriving newtype (Show, Eq, FromJSON, ToJSON)
+  deriving newtype (Show, Eq, FromJSON, ToJSON, FormatTime)
 
 newtype Timestamp = Timestamp {unTimestamp :: CalendarDiffTime}
   deriving newtype (Show, Eq, FromJSON, ToJSON)
@@ -167,7 +176,7 @@ data DeploymentLog = DeploymentLog
   deriving stock (Generic, Show, Eq)
   deriving (ToJSON, FromJSON) via Snake DeploymentLog
 
-newtype DeploymentMetadata = DeploymentMetadata [DeploymentMetadatum]
+newtype DeploymentMetadata = DeploymentMetadata {unDeploymentMetadata :: [DeploymentMetadatum]}
   deriving newtype (Eq, Show, Ord, FromJSON, ToJSON)
 
 data DeploymentMetadatum = DeploymentMetadatum
@@ -193,9 +202,17 @@ data DeploymentFullInfo = DeploymentFullInfo
   , metadata :: DeploymentMetadata
   , createdAt :: UTCTime
   , updatedAt :: UTCTime
+  , deploymentDefaultConfig :: FullDefaultConfig
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
+getDeploymentConfig :: DeploymentFullInfo -> FullConfig
+getDeploymentConfig d =
+  FullConfig
+    { appConfig = applyOverrides (d ^. #deployment . #appOverrides) (d ^. #deploymentDefaultConfig . #appDefaultConfig)
+    , depConfig = applyOverrides (d ^. #deployment . #deploymentOverrides) (d ^. #deploymentDefaultConfig . #depDefaultConfig)
+    }
 
 isDeploymentArchived :: DeploymentFullInfo -> Bool
 isDeploymentArchived DeploymentFullInfo {status = s} = case s of
@@ -263,7 +280,7 @@ parseSetOverrides texts = do
     Just x -> Right x
     Nothing ->
       Left $ "Malformed override key-value pair " <> text <> ", should be similar to FOO=bar"
-  return . Overrides $ M.fromList pairs'
+  return . Overrides $ OM.fromList pairs'
   where
     parseSingleOverride :: Text -> Maybe (Text, OverrideValue)
     parseSingleOverride t
@@ -273,10 +290,10 @@ parseSetOverrides texts = do
     parseSingleOverride _ = Nothing
 
 parseUnsetOverrides :: [Text] -> Overrides l
-parseUnsetOverrides = Overrides . M.fromList . fmap (,ValueDeleted)
+parseUnsetOverrides = Overrides . OM.fromList . fmap (,ValueDeleted)
 
 formatOverrides :: Overrides l -> Text
-formatOverrides (Overrides m) = T.unlines . fmap (\(k, v) -> k <> "=" <> showValue v) . M.toList $ m
+formatOverrides (Overrides m) = T.unlines . fmap (\(k, v) -> k <> "=" <> showValue v) . OM.assocs $ m
   where
     showValue (ValueAdded v) = v
     showValue ValueDeleted = "<removed>"

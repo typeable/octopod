@@ -14,7 +14,7 @@ import Data.Generics.Labels ()
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
-import Data.Text as T (Text, pack)
+import Data.Text as T (Text, null, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
 import GHCJS.DOM
@@ -26,6 +26,9 @@ import Reflex.Dom as R
 
 import Common.Types as CT
 import Control.Monad.Reader
+import Data.Functor
+import qualified Data.Map as M
+import qualified Data.Map.Ordered.Strict as OM
 import Frontend.GHCJS
 
 -- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
@@ -374,18 +377,13 @@ elDynAttrWithModifyConfig' f elementTag attrs child = do
   pure result
 
 -- | Formats posix seconds to date in iso8601.
-formatPosixToDate :: Int -> Text
-formatPosixToDate =
-  pack
-    . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-    . intToUTCTime
+formatPosixToDate :: FormatTime t => t -> Text
+formatPosixToDate = pack . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
 
 -- | Formats posix seconds to date in iso8601 with time.
-formatPosixToDateTime :: Int -> Text
+formatPosixToDateTime :: FormatTime t => t -> Text
 formatPosixToDateTime =
-  pack
-    . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
-    . intToUTCTime
+  pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
 
 -- | Widget displaying the current deployment status.
 statusWidget :: MonadWidget t m => Dynamic t PreciseDeploymentStatus -> m ()
@@ -487,9 +485,9 @@ errorCommonWidget =
 overridesWidget ::
   MonadWidget t m =>
   -- | List of overrides.
-  Overrides ->
+  Overrides l ->
   m ()
-overridesWidget envs = divClass "listing listing--for-text" $ do
+overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for-text" $ do
   let visible = take 3 envs
       envLength = length envs
   listing visible
@@ -512,10 +510,12 @@ overridesWidget envs = divClass "listing listing--for-text" $ do
     blank
   where
     listing envs' = do
-      forM_ envs' $ \(Override var val _) ->
+      forM_ envs' $ \(var, val) ->
         divClass "listing__item" $ do
           el "b" $ text $ var <> ": "
-          text val
+          case val of
+            ValueAdded v -> text v
+            ValueDeleted -> el "i" $ text "<deleted>"
 
 -- | @if-then-else@ helper for cases when bool value is wrapped in 'Dynamic'.
 ifThenElseDyn ::
@@ -572,3 +572,60 @@ kubeDashboardUrl deploymentInfo = do
   template <- asks kubernetesDashboardUrlTemplate
   let name = unDeploymentName . view (#deployment . #name) <$> deploymentInfo
   return $ name <&> (\n -> (<> n) <$> template)
+
+-- | Widget with override fields. This widget supports adding and
+-- removing key-value pairs.
+envVarsInput ::
+  MonadWidget t m =>
+  -- | Overrides header.
+  Text ->
+  -- | Current deployment overrides.
+  (Overrides l) ->
+  -- | Updated deployment overrides.
+  m (Dynamic t (Overrides l))
+envVarsInput overridesHeader evs = do
+  elClass "section" "deployment__section" $ do
+    elClass "h3" "deployment__sub-heading" $ text overridesHeader
+    elClass "div" "deployment__widget" $
+      elClass "div" "overrides" $ mdo
+        let initEnvs = evs -- L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap evs
+            emptyVar = ("", ValueAdded "")
+            addEv = clickEv $> Overrides (OM.singleton emptyVar)
+            getValue (k, ValueAdded t) = Just (k, t)
+            getValue (_, ValueDeleted) = Nothing
+        envsDyn <- foldDyn (<>) initEnvs $ leftmost [addEv, updEv]
+        (_, updEv) <-
+          runEventWriterT $
+            listWithKey
+              (M.fromList . zip [0 :: Int ..] . mapMaybe getValue . OM.assocs . unOverrides <$> envsDyn)
+              (const envVarInput)
+        let addingIsEnabled = all ((not . T.null) . fst) . OM.assocs . unOverrides <$> envsDyn
+        clickEv <-
+          buttonClassEnabled'
+            "overrides__add dash dash--add"
+            "Add an override"
+            addingIsEnabled
+            "dash--disabled"
+        pure envsDyn
+
+-- | Widget for entering a key-value pair. The updated overrides list is
+-- written to the 'EventWriter'.
+envVarInput ::
+  (EventWriter t (Overrides l) m, MonadWidget t m) =>
+  -- | Current variable key and value.
+  Dynamic t (Text, Text) ->
+  m ()
+envVarInput epDyn = do
+  (k, v) <- sample $ current epDyn
+  divClass "overrides__item" $ do
+    (keyDyn, _) <- octopodTextInput' "overrides__key" "key" (Just k) never
+    (valDyn, _) <- octopodTextInput' "overrides__value" "value" (Just v) never
+    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
+    let envEv =
+          updated $
+            zipDynWith
+              (\k' v' -> Overrides (OM.singleton (k', ValueAdded v')))
+              keyDyn
+              valDyn
+        deleteEv = Overrides (OM.singleton (k, ValueDeleted)) <$ closeEv
+    tellEvent $ leftmost [deleteEv, envEv]

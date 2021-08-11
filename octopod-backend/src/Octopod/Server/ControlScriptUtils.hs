@@ -26,7 +26,7 @@ import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as TL
 import Data.Coerce
 import Data.Generics.Product.Typed
-import qualified Data.Map as M
+import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Octopod.Server.Logger
@@ -227,7 +227,7 @@ overridesArgs :: forall l. KnownOverrideLevel l => Config l -> ControlScriptArgs
 overridesArgs (Config cc) =
   ControlScriptArgs
     . concatMap (\(T.unpack -> k, T.unpack -> v) -> [argumentName, k <> "=" <> v])
-    . M.toList
+    . MO.assocs
     $ cc
   where
     argumentName = case knownOverrideLevel @l of

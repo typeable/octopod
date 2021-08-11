@@ -83,6 +83,7 @@ executable frontend
                      , FunctionalDependencies
                      , AllowAmbiguousTypes
                      , OverloadedLabels
+                     , ViewPatterns
   build-depends:       aeson
                      , base
                      , bytestring
@@ -104,5 +105,6 @@ executable frontend
                      , mtl
                      , semialign
                      , these
+                     , ordered-containers
   hs-source-dirs:      src
   default-language:    Haskell2010

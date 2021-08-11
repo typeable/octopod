@@ -18,6 +18,7 @@ library
   exposed-modules:     Common.Types
                      , Common.Utils
                      , Common.Validation
+                     , Data.Map.Ordered.Strict.Extra
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -55,6 +56,7 @@ library
                      , text
                      , containers
                      , time
+                     , ordered-containers
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:

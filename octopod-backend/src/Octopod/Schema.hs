@@ -2,14 +2,12 @@ module Octopod.Schema
   ( DeploymentSchema (..),
     deploymentSchema,
     extractDeployment,
-    extractDeploymentFullInfo,
     DeploymentLogSchema (..),
     deploymentLogSchema,
     extractDeploymentLog,
   )
 where
 
-import Control.Lens
 import Data.Generics.Product
 import Data.Int
 import Data.Time
@@ -59,23 +57,6 @@ data DeploymentSchema f = DeploymentSchema
 
 extractDeployment :: DeploymentSchema Result -> Deployment
 extractDeployment = upcast
-
-extractDeploymentFullInfo ::
-  -- | Is the deployment locked?
-  Bool ->
-  DeploymentSchema Result ->
-  DeploymentFullInfo
-extractDeploymentFullInfo locked d =
-  DeploymentFullInfo
-    { deployment = extractDeployment d
-    , status =
-        if locked
-          then DeploymentPending $ d ^. #status
-          else DeploymentNotPending $ d ^. #status
-    , metadata = d ^. #metadata
-    , createdAt = d ^. #createdAt
-    , updatedAt = d ^. #updatedAt
-    }
 
 data DeploymentLogSchema f = DeploymentLogSchema
   { actionId :: Column f ActionId

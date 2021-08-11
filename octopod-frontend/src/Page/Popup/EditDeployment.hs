@@ -11,12 +11,9 @@ import Data.Coerce
 import Data.Functor
 import Data.Generics.Product
 import Data.Generics.Sum
-import Data.List (deleteFirstsBy)
-import qualified Data.List as L
-import Data.Map as M
 import Data.Monoid
 import qualified Data.Text as T
-import Reflex.Dom as R
+import Reflex.Dom as R hiding (mapMaybe)
 import Prelude as P
 
 import Common.Types
@@ -101,18 +98,12 @@ editDeploymentPopupBody dfi errEv = divClass "popup__content" $
     (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
     appVarsDyn <- envVarsInput "App overrides" dfiAppVars
     deploymentVarsDyn <- envVarsInput "Deployment overrides" dfiDeploymentVars
-    let oldAppVarDyn = coerce <$> getOldVars dfiAppVars <$> appVarsDyn
-        newAppVarDyn = coerce <$> getNewVars dfiAppVars <$> appVarsDyn
-        oldDeploymentVarDyn = coerce <$> getOldVars dfiDeploymentVars <$> deploymentVarsDyn
-        newDeploymentVarDyn = coerce <$> getNewVars dfiDeploymentVars <$> deploymentVarsDyn
     validDyn <- holdDyn True $ updated tOkEv
-    pure $
+    pure
       ( DeploymentUpdate
           <$> (DeploymentTag <$> tagDyn)
-          <*> newAppVarDyn
-          <*> oldAppVarDyn
-          <*> newDeploymentVarDyn
-          <*> oldDeploymentVarDyn
+          <*> appVarsDyn
+          <*> deploymentVarsDyn
       , validDyn
       )
   where
@@ -120,11 +111,8 @@ editDeploymentPopupBody dfi errEv = divClass "popup__content" $
       let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
           tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
           badTagText = "Tag should not be empty"
-          badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
+          badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
        in leftmost [tagErrEv, badNameEv]
-    getOldVars i u = deleteFirstsBy cmpKey i u
-    getNewVars i u = deleteFirstsBy (==) u i
-    cmpKey (Override k1 _ v1) (Override k2 _ v2) = k1 == k2 && v1 == v2
 
 -- | The widget used to display errors.
 errorHeader ::
@@ -138,74 +126,3 @@ errorHeader appErrEv = do
       divClass "deployment__output notification notification--danger" $ do
         el "b" $ text "App error: "
         text appErr
-
--- | Widget with override fields. This widget supports adding and
--- removing key-value pairs.
-envVarsInput ::
-  MonadWidget t m =>
-  -- | Overrides header.
-  Text ->
-  -- | Current deployment overrides.
-  Overrides ->
-  -- | Updated deployment overrides.
-  m (Dynamic t Overrides)
-envVarsInput overridesHeader evs = do
-  elClass "section" "deployment__section" $ do
-    elClass "h3" "deployment__sub-heading" $ text overridesHeader
-    elClass "div" "deployment__widget" $
-      elClass "div" "overrides" $ mdo
-        let initEnvs = L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap evs
-            emptyVar = Override "" "" Public
-            addEv = clickEv $> Endo (fst . insertUniq emptyVar)
-        envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
-        (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
-        let addingIsEnabled = all ((not . T.null) . overrideKey) . elemsUniq <$> envsDyn
-        clickEv <-
-          buttonClassEnabled'
-            "overrides__add dash dash--add"
-            "Add an override"
-            addingIsEnabled
-            "dash--disabled"
-        pure $ elemsUniq <$> envsDyn
-
--- | Widget for entering a key-value pair. The updated overrides list is
--- written to the 'EventWriter'.
-envVarInput ::
-  (EventWriter t (Endo (UniqKeyMap Override)) m, MonadWidget t m) =>
-  -- | Index of variable in overrides list.
-  Int ->
-  -- | Current variable key and value.
-  Dynamic t Override ->
-  m ()
-envVarInput ix epDyn = do
-  ep <- sample $ current epDyn
-  divClass "overrides__item" $ do
-    (keyDyn, _) <-
-      octopodTextInput' "overrides__key" "key" (Just $ overrideKey ep) never
-    (valDyn, _) <-
-      octopodTextInput' "overrides__value" "value" (Just $ overrideValue ep) never
-    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    let envEv = updated $ zipDynWith (\k v -> Override k v Public) keyDyn valDyn
-        deleteEv = Endo (deleteUniq ix) <$ closeEv
-        updEv = Endo . updateUniq ix . const <$> envEv
-    tellEvent $ leftmost [deleteEv, updEv]
-
-data UniqKeyMap v = UniqKeyMap (Map Int v) (Int)
-
-uniqMap :: UniqKeyMap v -> Map Int v
-uniqMap (UniqKeyMap m _) = m
-
-insertUniq :: v -> UniqKeyMap v -> (UniqKeyMap v, Int)
-insertUniq v (UniqKeyMap m x) = (UniqKeyMap (M.insert x v m) (x + 1), x)
-
-deleteUniq :: Int -> UniqKeyMap v -> UniqKeyMap v
-deleteUniq k (UniqKeyMap m x) = UniqKeyMap (M.delete k m) x
-
-updateUniq :: Int -> (v -> v) -> UniqKeyMap v -> UniqKeyMap v
-updateUniq k f (UniqKeyMap m x) = UniqKeyMap (M.adjust f k m) x
-
-elemsUniq :: UniqKeyMap v -> [v]
-elemsUniq (UniqKeyMap m _) = M.elems m
-
-emptyUniqKeyMap :: UniqKeyMap v
-emptyUniqKeyMap = UniqKeyMap mempty 0

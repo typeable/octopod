@@ -110,6 +110,7 @@ library
     , time
     , hasql
     , hasql-transaction
+    , ordered-containers
   default-language: Haskell2010
 
 executable octopod-exe

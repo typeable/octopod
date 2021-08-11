@@ -9,7 +9,7 @@ import Control.Lens
 import Control.Monad
 import Data.Coerce
 import Data.Generics.Product (field)
-import Data.Text as T (Text)
+import Data.Text as T (Text, pack)
 import Obelisk.Route.Frontend
 import Reflex.Dom as R
 import Servant.Reflex
@@ -19,6 +19,8 @@ import Common.Utils
 import Control.Monad.Reader
 import Data.Align
 import Data.Generics.Labels ()
+import qualified Data.Map.Ordered.Strict as OM
+import Data.Time
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
@@ -178,6 +180,7 @@ deploymentBody ::
   m ()
 deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
   let nameDyn = dfiDyn <^.> dfiName
+      cfg = dfiDyn <&> getDeploymentConfig
   divClass "deployment__summary" $ do
     divClass "deployment__stat" $ do
       elClass "b" "deployment__param" $ text "Status"
@@ -198,24 +201,16 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
     elClass "h3" "deployment__sub-heading" $ text "Tag"
     divClass "deployment__widget" $ dynText tagDyn
   elClass "section" "deployment__section" $ do
-    let urlsDyn = dfiDyn <^.> field @"metadata"
+    let urlsDyn = dfiDyn <^.> field @"metadata" . to unDeploymentMetadata
     elClass "h3" "deployment__sub-heading" $ text "Links"
     divClass "deployment__widget" $
       divClass "listing" $
         void $ simpleList urlsDyn renderMetadataLink
   elClass "section" "deployment__section" $ do
-    let envsDyn =
-          dfiDyn
-            <^.> field @"deployment"
-              . field @"appOverrides"
-              . coerced
+    let envsDyn = cfg <^.> #appConfig
     allEnvsWidget "App overrides" envsDyn
   elClass "section" "deployment__section" $ do
-    let envsDyn =
-          dfiDyn
-            <^.> field @"deployment"
-              . field @"deploymentOverrides"
-              . coerced
+    let envsDyn = cfg <^.> #depConfig
     allEnvsWidget "Deployment overrides" envsDyn
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text "Actions"
@@ -229,16 +224,16 @@ allEnvsWidget ::
   -- | Widget header.
   Text ->
   -- | Overrides list.
-  Dynamic t Overrides ->
+  Dynamic t (Config l) ->
   m ()
 allEnvsWidget headerText envsDyn = do
   elClass "h3" "deployment__sub-heading" $ text headerText
   divClass "deployment__widget" $
     divClass "listing listing--for-text listing--larger" $
       void $
-        simpleList envsDyn $ \envDyn -> do
-          let varDyn = overrideKey <$> envDyn
-              valDyn = overrideValue <$> envDyn
+        simpleList (OM.assocs . unConfig <$> envsDyn) $ \envDyn -> do
+          let varDyn = fst <$> envDyn
+              valDyn = snd <$> envDyn
           divClass "listing__item" $ do
             el "b" $ do
               dynText varDyn
@@ -324,29 +319,24 @@ actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog {..} = do
   el "tr" $ do
     el "td" $ do
-      text $ coerce action
+      text . T.pack $ show action
       let statusClass =
             "status "
               <> if exitCode == 0 then "status--success" else "status--failure"
       divClass statusClass blank
     el "td" $ text $ coerce deploymentTag
-    el "td" $ overridesWidget $ coerce $ deploymentAppOverrides
-    el "td" $ overridesWidget $ coerce $ deploymentDepOverrides
+    el "td" $ overridesWidget $ deploymentAppOverrides
+    el "td" $ overridesWidget $ deploymentDepOverrides
     el "td" $ text $ showT $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration
 
+-- | Formats posix seconds to date in iso8601 with time.
+formatDuration :: FormatTime t => t -> Text
+formatDuration = pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%mm %Ss"))
+
 -- | Convert the duration of an action from milliseconds
 -- to a human readable format.
-formatDuration ::
-  -- | Duration in milliseconds.
-  Duration ->
-  Text
-formatDuration (Duration d) = m <> "m " <> s <> "s"
-  where
-    m = showT $ d `div` (1000 * 60)
-    s = showT $ d `div` (1000)
-
 -- | Widget with a button that returns to deployments list page.
 backButton ::
   ( MonadWidget t m

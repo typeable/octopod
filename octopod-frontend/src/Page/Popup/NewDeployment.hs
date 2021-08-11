@@ -7,10 +7,8 @@ module Page.Popup.NewDeployment (newDeploymentPopup) where
 
 import Control.Lens (preview, _1, _2)
 import Control.Monad
-import Data.Coerce
 import Data.Functor
 import Data.Generics.Sum
-import Data.Map as M
 import Data.Monoid
 import Data.Text as T (Text, intercalate)
 import Reflex.Dom as R
@@ -83,15 +81,15 @@ newDeploymentPopupBody errEv = divClass "popup__content" $
     errorHeader appErrEv
     (nameDyn, nOkDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
     (tagDyn, tOkDyn) <- octopodTextInput "tag" "Tag" "Tag" Nothing tagErrEv
-    appVarsDyn <- envVarsInput "App overrides"
-    deploymentVarsDyn <- envVarsInput "Deployment overrides"
+    appVarsDyn <- envVarsInput "App overrides" mempty
+    deploymentVarsDyn <- envVarsInput "Deployment overrides" mempty
     validDyn <- holdDyn False $ updated $ zipDynWith (&&) nOkDyn tOkDyn
-    pure $
+    pure
       ( Deployment
           <$> (DeploymentName <$> nameDyn)
           <*> (DeploymentTag <$> tagDyn)
-          <*> (coerce <$> appVarsDyn)
-          <*> (coerce <$> deploymentVarsDyn)
+          <*> appVarsDyn
+          <*> deploymentVarsDyn
       , validDyn
       )
   where
@@ -123,47 +121,3 @@ errorHeader appErrEv = do
       divClass "deployment__output notification notification--danger" $ do
         el "b" $ text "App error: "
         text appErr
-
--- | Widget with override fields. This widget supports adding and
--- a removing key-value pairs.
-envVarsInput ::
-  MonadWidget t m =>
-  -- | Widget header.
-  Text ->
-  m (Dynamic t [Override])
-envVarsInput headerText = do
-  elClass "section" "deployment__section" $ do
-    elClass "h3" "deployment__sub-heading" $ text headerText
-    elClass "div" "deployment__widget" $
-      elClass "div" "overrides" $ mdo
-        let emptyVar = Override "" "" Public
-            addEv = clickEv $> Endo (\envs -> P.length envs =: emptyVar <> envs)
-        envsDyn <- foldDyn appEndo mempty $ leftmost [addEv, updEv]
-        (_, updEv) <- runEventWriterT $ listWithKey envsDyn envVarInput
-        let addDisabledDyn = all ((/= "") . overrideKey) . elems <$> envsDyn
-        clickEv <-
-          buttonClassEnabled'
-            "overrides__add dash dash--add"
-            "Add an override"
-            addDisabledDyn
-            "dash--disabled"
-        pure $ elems <$> envsDyn
-
--- | Widget for a key-value pair. It returns an event carrying an update
--- of overrides list via 'EventWriter'.
-envVarInput ::
-  (EventWriter t (Endo (Map Int Override)) m, MonadWidget t m) =>
-  -- | Index of variable in overrides list.
-  Int ->
-  -- | Current variable key and value.
-  Dynamic t Override ->
-  m ()
-envVarInput ix _ = do
-  divClass "overrides__item" $ do
-    (keyDyn, _) <- octopodTextInput' "overrides__key" "key" Nothing never
-    (valDyn, _) <- octopodTextInput' "overrides__value" "value" Nothing never
-    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    let envEv = updated $ zipDynWith (\k v -> Override k v Public) keyDyn valDyn
-        deleteEv = Endo (M.delete ix) <$ closeEv
-        updEv = Endo . flip update ix . const . Just <$> envEv
-    tellEvent $ leftmost [deleteEv, updEv]

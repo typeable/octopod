@@ -353,9 +353,7 @@ getSingleFullInfo dName = do
     d <- each deploymentSchema
     where_ $ d ^. #name ==. litExpr dName
     pure d
-  deployments <- forM deploymentsSchema $ \ds -> do
-    locked <- isDeploymentLocked $ ds ^. #name
-    pure $ extractDeploymentFullInfo locked ds
+  deployments <- forM deploymentsSchema extractDeploymentFullInfo
   liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return $ listToMaybe deployments
 
@@ -365,9 +363,7 @@ getFullInfo ::
 getFullInfo = do
   AppState {logger = l} <- ask
   deploymentsSchema <- runStatement . select $ each deploymentSchema
-  deployments <- forM deploymentsSchema $ \ds -> do
-    locked <- isDeploymentLocked $ ds ^. #name
-    pure $ extractDeploymentFullInfo locked ds
+  deployments <- forM deploymentsSchema extractDeploymentFullInfo
   liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
 
@@ -1229,3 +1225,24 @@ runDeploymentBgWorker newS dName pre post = do
       -- it should be fine.
       _ :: a <- restoreM stm
       return ()
+
+extractDeploymentFullInfo ::
+  (MonadReader AppState m, MonadBase IO m) =>
+  DeploymentSchema Result ->
+  m DeploymentFullInfo
+extractDeploymentFullInfo d = do
+  let dName = d ^. #name
+  locked <- isDeploymentLocked dName
+  dCfg <- getDefaultConfig dName
+  pure
+    DeploymentFullInfo
+      { deployment = extractDeployment d
+      , status =
+          if locked
+            then DeploymentPending $ d ^. #status
+            else DeploymentNotPending $ d ^. #status
+      , metadata = d ^. #metadata
+      , createdAt = d ^. #createdAt
+      , updatedAt = d ^. #updatedAt
+      , deploymentDefaultConfig = dCfg
+      }
