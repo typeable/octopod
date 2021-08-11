@@ -35,65 +35,8 @@ There is currently no way to give someone access to _octo CLI_ without giving th
 _Octopod Server_ is deployed in the `octopod` _Kubernetes_ namespace. Deployments are deployed in the `deployments` namespace.
 _Octopod Server_ uses the `octopod` [_Service Account_][kubernetes-service-account].
 
-Freeing resources might require _Octopod Server_ / _control scripts_ to have privileges to delete certificates and [_Persistent Volumes Claims_][kubernetes-pvc]. (It depends on the specifics of the _Kubernetes_ setup and _control scripts_)
-
-Access can be configured through [_RBAC_][kubernetes-rbac]:
-
-### Privileges to delete certificates
-
-```yaml
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cert-control-clusterrole
-rules:
-  - apiGroups: ["cert-manager.io"]
-    resources: ["certificates"]
-    verbs: ["list", "delete", "deletecollection"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: octopod-cert-control-rolebinding
-  namespace: deployments
-roleRef:
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-  name: cert-control-clusterrole
-subjects:
-  - kind: ServiceAccount
-    name: octopod
-    namespace: octopod
-```
-
-### Privileges to delete _Persistent Volumes Claims_
-
-```yaml
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: pvc-control-clusterrole
-rules:
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["list", "delete", "deletecollection"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: octopod-pvc-control-rolebinding
-  namespace: deployments
-roleRef:
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-  name: pvc-control-clusterrole
-subjects:
-  - kind: ServiceAccount
-    name: octopod
-    namespace: octopod
-```
+Octopod needs a sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extended.
+RBAC rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/helm3/octopod/templates/rbac.yaml)
 
 ## Web UI authentication
 
@@ -105,7 +48,7 @@ The [_Web UI_](Technical_architecture.md#-web-ui) on its own does not have any a
 
 ## octo CLI authentication
 
-Authentication between _octo CLI_ and _Octopod Server_ is done through an SSL certificate that is generated [when deploying _Octopod_](../en/Octopod_deployment_guide.md#creating-ssl-certificates).
+Authentication between _octo CLI_ and _Octopod Server_ is done through special token which is generated automatically or specified by user in `octopod.cliAuthSecret` parameter, as described [here](../../charts/helm3/octopod#parameters)
 
 [kubernetes-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account
 [kubernetes-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac
