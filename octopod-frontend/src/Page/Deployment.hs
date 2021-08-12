@@ -333,7 +333,7 @@ actinRow DeploymentLog {..} = do
 
 -- | Formats posix seconds to date in iso8601 with time.
 formatDuration :: FormatTime t => t -> Text
-formatDuration = pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%mm %Ss"))
+formatDuration = pack . formatTime defaultTimeLocale "%mm %Ss"
 
 -- | Convert the duration of an action from milliseconds
 -- to a human readable format.
