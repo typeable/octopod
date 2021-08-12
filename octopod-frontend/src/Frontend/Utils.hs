@@ -8,28 +8,29 @@
 --frontend modules.
 module Frontend.Utils where
 
+import Common.Types as CT
 import Control.Lens
 import Control.Monad
+import Control.Monad.Reader
+import Data.Functor
 import Data.Generics.Labels ()
+import qualified Data.List as L
 import Data.Map (Map)
+import qualified Data.Map as M
+import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromMaybe)
+import Data.Monoid
 import Data.Proxy (Proxy (..))
 import Data.Text as T (Text, null, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
+import Frontend.GHCJS
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
-
-import Common.Types as CT
-import Control.Monad.Reader
-import Data.Functor
-import qualified Data.Map as M
-import qualified Data.Map.Ordered.Strict as OM
-import Frontend.GHCJS
 
 -- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement = ClickedElement {unClickedElement :: Maybe DOM.Element}
@@ -576,56 +577,83 @@ kubeDashboardUrl deploymentInfo = do
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.
 envVarsInput ::
+  forall l t m.
   MonadWidget t m =>
   -- | Overrides header.
   Text ->
   -- | Current deployment overrides.
-  (Overrides l) ->
+  Overrides l ->
   -- | Updated deployment overrides.
   m (Dynamic t (Overrides l))
-envVarsInput overridesHeader evs = do
+envVarsInput overridesHeader (Overrides evs) = do
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text overridesHeader
     elClass "div" "deployment__widget" $
       elClass "div" "overrides" $ mdo
-        let initEnvs = evs -- L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap evs
-            emptyVar = ("", ValueAdded "")
-            addEv = clickEv $> Overrides (OM.singleton emptyVar)
-            getValue (k, ValueAdded t) = Just (k, t)
-            getValue (_, ValueDeleted) = Nothing
-        envsDyn <- foldDyn (<>) initEnvs $ leftmost [addEv, updEv]
-        (_, updEv) <-
-          runEventWriterT $
-            listWithKey
-              (M.fromList . zip [0 :: Int ..] . mapMaybe getValue . OM.assocs . unOverrides <$> envsDyn)
-              (const envVarInput)
-        let addingIsEnabled = all ((not . T.null) . fst) . OM.assocs . unOverrides <$> envsDyn
+        let initEnvs =
+              L.foldl'
+                ( \m -> \case
+                    (k, ValueAdded v) -> fst $ insertUniq (k, v) m
+                    (_, ValueDeleted) -> m
+                )
+                emptyUniqKeyMap
+                . OM.assocs
+                $ evs
+            toOverrides :: [Override] -> Overrides l
+            toOverrides = Overrides . OM.fromList . (fmap . fmap) ValueAdded
+            emptyVar = ("", "")
+            addEv = clickEv $> Endo (fst . insertUniq emptyVar)
+        envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
+        (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
+        let addingIsEnabled = all ((not . T.null) . fst) . elemsUniq <$> envsDyn
         clickEv <-
           buttonClassEnabled'
             "overrides__add dash dash--add"
             "Add an override"
             addingIsEnabled
             "dash--disabled"
-        pure envsDyn
+        pure $ toOverrides . elemsUniq <$> envsDyn
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
-  (EventWriter t (Overrides l) m, MonadWidget t m) =>
+  (EventWriter t (Endo (UniqKeyMap Override)) m, MonadWidget t m) =>
+  -- | Index of variable in overrides list.
+  Int ->
   -- | Current variable key and value.
-  Dynamic t (Text, Text) ->
+  Dynamic t Override ->
   m ()
-envVarInput epDyn = do
-  (k, v) <- sample $ current epDyn
+envVarInput i epDyn = do
+  ep <- sample $ current epDyn
   divClass "overrides__item" $ do
-    (keyDyn, _) <- octopodTextInput' "overrides__key" "key" (Just k) never
-    (valDyn, _) <- octopodTextInput' "overrides__value" "value" (Just v) never
+    (keyDyn, _) <-
+      octopodTextInput' "overrides__key" "key" (Just $ fst ep) never
+    (valDyn, _) <-
+      octopodTextInput' "overrides__value" "value" (Just $ snd ep) never
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    let envEv =
-          updated $
-            zipDynWith
-              (\k' v' -> Overrides (OM.singleton (k', ValueAdded v')))
-              keyDyn
-              valDyn
-        deleteEv = Overrides (OM.singleton (k, ValueDeleted)) <$ closeEv
-    tellEvent $ leftmost [deleteEv, envEv]
+    let envEv = updated $ zipDynWith (,) keyDyn valDyn
+        deleteEv = Endo (deleteUniq i) <$ closeEv
+        updEv = Endo . updateUniq i . const <$> envEv
+    tellEvent $ leftmost [deleteEv, updEv]
+
+data UniqKeyMap v = UniqKeyMap (Map Int v) Int
+
+uniqMap :: UniqKeyMap v -> Map Int v
+uniqMap (UniqKeyMap m _) = m
+
+insertUniq :: v -> UniqKeyMap v -> (UniqKeyMap v, Int)
+insertUniq v (UniqKeyMap m x) = (UniqKeyMap (M.insert x v m) (x + 1), x)
+
+deleteUniq :: Int -> UniqKeyMap v -> UniqKeyMap v
+deleteUniq k (UniqKeyMap m x) = UniqKeyMap (M.delete k m) x
+
+updateUniq :: Int -> (v -> v) -> UniqKeyMap v -> UniqKeyMap v
+updateUniq k f (UniqKeyMap m x) = UniqKeyMap (M.adjust f k m) x
+
+elemsUniq :: UniqKeyMap v -> [v]
+elemsUniq (UniqKeyMap m _) = M.elems m
+
+emptyUniqKeyMap :: UniqKeyMap v
+emptyUniqKeyMap = UniqKeyMap mempty 0
+
+type Override = (Text, Text)
