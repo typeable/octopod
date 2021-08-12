@@ -1069,13 +1069,13 @@ elapsedTime t1 t2 = Duration . calendarTimeTime $ t2 `diffUTCTime` t1
 -- | Runs the status updater.
 runStatusUpdater :: AppState -> IO ()
 runStatusUpdater state = do
-  currentTime <- liftBase getCurrentTime
-  let interval = 30 :: NominalDiffTime
-      cutoff = addUTCTime (negate interval) currentTime
-  let logErr :: MonadBase IO m => Text -> m ()
+  let interval = 15 :: NominalDiffTime
+      logErr :: MonadBase IO m => Text -> m ()
       logErr = liftBase . logWarning (logger state)
 
-  forever $
+  forever $ do
+    currentTime <- liftBase getCurrentTime
+    let cutoff = addUTCTime (negate interval) currentTime
     flip runReaderT state $ do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
@@ -1117,7 +1117,7 @@ runStatusUpdater state = do
                       Left e -> logErr $ show' e
                       Right (Left e) -> logErr $ show' e
       when (Prelude.or updated) $ liftBase $ sendReloadEvent state
-      liftBase $ threadDelay 5000000
+      liftBase $ threadDelay 2000000
 
 -- | Returns the new deployment status.
 statusTransition ::
