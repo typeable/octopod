@@ -86,7 +86,6 @@ library
     , optparse-applicative
     , optparse-generic
     , postgresql-error-codes
-    , postgresql-simple
     , resource-pool
     , servant
     , servant-server

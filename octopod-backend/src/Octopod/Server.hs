@@ -19,7 +19,6 @@ import Control.Monad.Trans.Control
 import Control.Octopod.DeploymentLock
 import Crypto.JOSE hiding (Context)
 import Data.Aeson (Value (..), encode, toJSON)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
@@ -39,8 +38,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Traversable
-import Database.PostgreSQL.Simple hiding (Connection, Query, (:.))
-import qualified Database.PostgreSQL.Simple
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
 import Hasql.Statement
@@ -69,15 +66,12 @@ import System.Posix.Signals (sigTERM)
 import Types
 import Prelude hiding (lines, log, unlines, unwords)
 
-type PgPool = Pool Database.PostgreSQL.Simple.Connection
-
 type AppM = ReaderT AppState Handler
 
 -- | Octopod Server state definition.
 data AppState = AppState
   { -- | postgres pool
-    pool :: PgPool
-  , dbPool :: Pool Connection
+    dbPool :: Pool Connection
   , -- | logger
     logger :: TimedFastLogger
   , -- | channel for WS events for the frontend
@@ -173,10 +167,6 @@ runOctopodServer = do
       lookupEnv "NOTIFICATION_COMMAND" <&> \case
         Just "" -> Nothing
         x -> x
-  pgPool <-
-    initConnectionPool
-      (unDBConnectionString $ octopodDB opts)
-      (unDBPoolSize $ octopodDBPoolSize opts)
   dbPool' <-
     createPool
       (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
@@ -188,7 +178,6 @@ runOctopodServer = do
   lockedDs <- initLockedDeployments
   let appSt =
         AppState
-          pgPool
           dbPool'
           logger'
           channel
@@ -250,11 +239,6 @@ runStatement q = do
         throwIO e
   withResource p $ \conn ->
     liftBase $ HasQL.run (HasQL.statement () q) conn >>= either handleException pure
-
--- | Initializes the connection pool.
-initConnectionPool :: ByteString -> Int -> IO PgPool
-initConnectionPool dbConnStr =
-  createPool (connectPostgreSQL dbConnStr) close 1 30
 
 -- | Helper to run the server.
 nt :: AppState -> AppM a -> Handler a
