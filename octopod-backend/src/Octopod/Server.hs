@@ -7,7 +7,7 @@ import Control.Concurrent.Async (race_)
 import qualified Control.Concurrent.Lifted as L
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
-import Control.Exception (Exception, throwIO)
+import Control.Exception (Exception (displayException), throwIO)
 import qualified Control.Exception.Lifted as L
 import Control.Lens hiding (Context, each, pre, (<.))
 import Control.Lens.Extras
@@ -25,6 +25,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
+import Data.Foldable
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Product
@@ -228,8 +229,13 @@ runTransaction ::
   m a
 runTransaction q = do
   p <- asks dbPool
+  log <- asks logger
+  let logErr = logWarning log
+      handleException e = do
+        liftBase $ logErr . T.pack $ displayException e
+        throwIO e
   withResource p $ \conn ->
-    liftBase $ HasQL.run (transaction Serializable Write q) conn >>= either throwIO pure
+    liftBase $ HasQL.run (transaction Serializable Write q) conn >>= either handleException pure
 
 runStatement ::
   (MonadReader AppState m, MonadBaseControl IO m) =>
@@ -237,8 +243,13 @@ runStatement ::
   m a
 runStatement q = do
   p <- asks dbPool
+  log <- asks logger
+  let logErr = logWarning log
+      handleException e = do
+        liftBase $ logErr . T.pack $ displayException e
+        throwIO e
   withResource p $ \conn ->
-    liftBase $ HasQL.run (HasQL.statement () q) conn >>= either throwIO pure
+    liftBase $ HasQL.run (HasQL.statement () q) conn >>= either handleException pure
 
 -- | Initializes the connection pool.
 initConnectionPool :: ByteString -> Int -> IO PgPool
@@ -984,37 +995,39 @@ createDeploymentLog ::
   Stdout ->
   Stderr ->
   m ()
-createDeploymentLog dep act ec dur out err =
-  runStatement $
-    insert
-      Insert
-        { into = deploymentLogSchema
-        , rows = do
-            dId <- do
-              ds <- each deploymentSchema
-              where_ $ ds ^. #name ==. litExpr (dep ^. #name)
-              pure $ ds ^. #id_
-            values
-              [ DeploymentLogSchema
-                  { actionId = unsafeDefault
-                  , deploymentId = dId
-                  , action = litExpr act
-                  , deploymentTag = litExpr $ dep ^. #tag
-                  , exitCode = litExpr $ case ec of
-                      ExitSuccess -> 0
-                      ExitFailure errCode -> fromIntegral errCode
-                  , createdAt = now
-                  , archived = false
-                  , duration = litExpr dur
-                  , stdout = litExpr out
-                  , stderr = litExpr err
-                  , deploymentAppOverrides = litExpr $ dep ^. #appOverrides
-                  , deploymentDepOverrides = litExpr $ dep ^. #deploymentOverrides
-                  }
-              ]
-        , onConflict = Abort
-        , returning = pure ()
-        }
+createDeploymentLog dep act ec dur out err = do
+  dId' <- runStatement $
+    select $ do
+      ds <- each deploymentSchema
+      where_ $ ds ^. #name ==. litExpr (dep ^. #name)
+      pure $ ds ^. #id_
+  for_ dId' $ \dId ->
+    runStatement $
+      insert
+        Insert
+          { into = deploymentLogSchema
+          , rows =
+              values
+                [ DeploymentLogSchema
+                    { actionId = unsafeDefault
+                    , deploymentId = litExpr dId
+                    , action = litExpr act
+                    , deploymentTag = litExpr $ dep ^. #tag
+                    , exitCode = litExpr $ case ec of
+                        ExitSuccess -> 0
+                        ExitFailure errCode -> fromIntegral errCode
+                    , createdAt = now
+                    , archived = false
+                    , duration = litExpr dur
+                    , stdout = litExpr out
+                    , stderr = litExpr err
+                    , deploymentAppOverrides = litExpr $ dep ^. #appOverrides
+                    , deploymentDepOverrides = litExpr $ dep ^. #deploymentOverrides
+                    }
+                ]
+          , onConflict = Abort
+          , returning = pure ()
+          }
 
 ensureOne :: MonadError ServerError m => [a] -> m a
 ensureOne [x] = return x
