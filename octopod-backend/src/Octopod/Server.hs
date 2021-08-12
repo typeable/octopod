@@ -30,6 +30,7 @@ import Data.Generics.Labels ()
 import Data.Generics.Product
 import Data.IORef
 import Data.Int
+import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
 import Data.Text (lines, pack, unpack, unwords)
@@ -460,7 +461,12 @@ updateDeploymentInfo dName = do
             <> coerce err
 
 getDefaultConfig :: Monad m => DeploymentName -> m FullDefaultConfig
-getDefaultConfig = undefined
+getDefaultConfig _ =
+  pure
+    FullDefaultConfig
+      { appDefaultConfig = DefaultConfig OM.empty
+      , depDefaultConfig = DefaultConfig OM.empty
+      }
 
 -- | Helper to create a new deployment.
 createDeployment ::

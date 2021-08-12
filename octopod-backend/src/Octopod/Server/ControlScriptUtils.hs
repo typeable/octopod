@@ -58,7 +58,7 @@ infoCommandArgs dCfg dep = do
       , "--namespace"
       , T.unpack . coerce $ namespace
       , "--name"
-      , T.unpack . coerce $ name dep
+      , T.unpack . coerce $ dep ^. #name
       , "--tag"
       , T.unpack . coerce $ tag dep
       ]
@@ -121,7 +121,7 @@ checkCommandArgs dCfg dep = do
       , "--namespace"
       , T.unpack . coerce $ namespace
       , "--name"
-      , T.unpack . coerce $ name dep
+      , T.unpack . coerce $ dep ^. #name
       , "--tag"
       , T.unpack . coerce $ tag dep
       ]
@@ -149,7 +149,7 @@ tagCheckCommandArgs dCfg dep = do
       , "--namespace"
       , T.unpack . coerce $ namespace
       , "--name"
-      , T.unpack . coerce $ name dep
+      , T.unpack . coerce $ dep ^. #name
       , "--tag"
       , T.unpack . coerce $ tag dep
       ]

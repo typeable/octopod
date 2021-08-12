@@ -11,14 +11,19 @@ import Control.Lens
 import Data.Aeson hiding (Result)
 import Data.Generics.Labels ()
 import Data.Int
+import qualified Data.List as L
 import Data.Map.Ordered.Strict (OMap, (<>|))
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Map.Ordered.Strict.Extra ()
 import Data.Maybe
-import Data.Text as T hiding (filter)
+import Data.Proxy
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Time
 import Data.Traversable
+import Deriving.Aeson
 import Deriving.Aeson.Stock
+import GHC.TypeLits
 import Web.HttpApiData
 
 data OverrideLevel = ApplicationLevel | DeploymentLevel
@@ -95,7 +100,14 @@ newtype DeploymentTag = DeploymentTag {unDeploymentTag :: Text}
 
 data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction
   deriving stock (Show, Read, Eq, Ord, Generic)
-  deriving (FromJSON, ToJSON) via Snake Action
+  deriving (FromJSON, ToJSON) via CustomJSON '[ConstructorTagModifier (StripSuffix "Action", CamelToSnake)] Action
+
+data StripSuffix (s :: Symbol)
+
+instance KnownSymbol k => StringModifier (StripSuffix k) where
+  getStringModifier = fromMaybe <*> stripSuffix (symbolVal (Proxy @k))
+    where
+      stripSuffix s str = reverse <$> L.stripPrefix (reverse s) (reverse str)
 
 newtype ArchivedFlag = ArchivedFlag {unArchivedFlag :: Bool}
   deriving newtype (Show, FromJSON, ToJSON)
@@ -181,9 +193,9 @@ newtype DeploymentMetadata = DeploymentMetadata {unDeploymentMetadata :: [Deploy
 
 data DeploymentMetadatum = DeploymentMetadatum
   { -- | The name of the link
-    deploymentMetadataKey :: Text
+    name :: Text
   , -- | The URL
-    deploymentMetadataValue :: Text
+    link :: Text
   }
   deriving stock (Generic, Show, Eq, Ord)
   deriving (FromJSON, ToJSON) via Snake DeploymentMetadatum
@@ -285,7 +297,7 @@ parseSetOverrides texts = do
     parseSingleOverride :: Text -> Maybe (Text, OverrideValue)
     parseSingleOverride t
       | Just i <- T.findIndex (== '=') t =
-        let (key, value) = bimap strip (T.tail . strip) $ T.splitAt i t
+        let (key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
          in Just (key, ValueAdded value)
     parseSingleOverride _ = Nothing
 
