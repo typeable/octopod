@@ -319,7 +319,7 @@ actinRow :: MonadWidget t m => DeploymentLog -> m ()
 actinRow DeploymentLog {..} = do
   el "tr" $ do
     el "td" $ do
-      text . T.pack $ show action
+      text $ actionToText action
       let statusClass =
             "status "
               <> if exitCode == 0 then "status--success" else "status--failure"

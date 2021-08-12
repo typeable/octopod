@@ -26,7 +26,8 @@ deriving newtype instance DBEq DeploymentName
 deriving newtype instance DBType DeploymentTag
 deriving newtype instance DBEq DeploymentTag
 
-deriving via ReadShow Action instance DBType Action
+instance DBType Action where
+  typeInformation = parseTypeInformationFromMapping actionText
 
 deriving newtype instance DBType ArchivedFlag
 
