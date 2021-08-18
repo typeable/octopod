@@ -1,8 +1,9 @@
-{ pkgsSrc ? sources.nixpkgs
+{ pkgsSrc ? import haskellNix.sources.nixpkgs-2105
 , sources ? import ../nix/sources.nix
+, haskellNix ? import sources.haskellNix {}
 , nix-filter ? import sources.nix-filter
 }:
-(import pkgsSrc {
+(pkgsSrc {
   overlays = [ (self: super: { nodejs = self.nodejs-10_x; }) ];
 }).mkYarnPackage {
   name = "octopod-css";
