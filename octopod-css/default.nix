@@ -1,11 +1,13 @@
-{ pkgsSrc ? import haskellNix.sources.nixpkgs-2105
+{ pkgsSrc ? (import ./.. {}).pkgsSrc
 , sources ? import ../nix/sources.nix
 , haskellNix ? import sources.haskellNix {}
 , nix-filter ? import sources.nix-filter
 }:
-(pkgsSrc {
+let
+pkgs = pkgsSrc {
   overlays = [ (self: super: { nodejs = self.nodejs-10_x; }) ];
-}).mkYarnPackage {
+};
+production-css = pkgs.mkYarnPackage {
   name = "octopod-css";
   src = nix-filter {
     root = ./.;
@@ -25,8 +27,18 @@
   installPhase = ''
     runHook preInstall
 
-    cp -R deps/octopod-css/production $out
+    cp -av deps/octopod-css/production $out
 
     runHook postInstall
   '';
-}
+};
+in
+pkgs.runCommand "octopod-production-assets"
+  { } ''
+  mkdir $out
+  cp -av ${./.}/favicons/* $out
+  mkdir $out/static
+  cp -av ${production-css}/images $out/static
+  cp -av ${production-css}/styles $out/static
+  cp -av ${production-css}/vendors $out/static
+''

@@ -1,10 +1,13 @@
 { sources ? import ./nix/sources.nix
 , haskellNix ? import sources.haskellNix { inherit system; }
-, pkgs ? import haskellNix.sources.nixpkgs-2105 (haskellNix.nixpkgsArgs // { inherit system; })
+, pkgsSrc ? import haskellNix.sources.nixpkgs-2105
+, pkgs ? pkgsSrc (haskellNix.nixpkgsArgs // { inherit system; })
 , nix-filter ? import sources.nix-filter
 , system ? builtins.currentSystem
 }:
 let
+  octopod-css = import ./octopod-css { inherit pkgsSrc; };
+
   hsPkgs = pkgs.haskell-nix.cabalProject {
     src = nix-filter {
       root = ./.;
@@ -43,8 +46,10 @@ hsPkgs // {
     pkgs.runCommand "octopod-frontend-pretty"
       { } ''
       mkdir $out
+      cp -av ${octopod-css}/* $out
       cp ${./octopod-frontend/index.html} $out/index.html
       cp ${frontend}/bin/frontend.jsexe/all.js $out/all.js
       cp ${frontend}/bin/frontend.jsexe/all.js.externs $out/all.js.externs
     '';
+  inherit pkgsSrc;
 }
