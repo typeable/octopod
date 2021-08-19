@@ -48,6 +48,7 @@ let
       mkdir -p /migrations/{deploy,revert,verify}
       cp -av ${migrations}/* /migrations/
 
+      mkdir /www
       cp -av ${octopod-frontend-ugly}/* /www
     '';
 
