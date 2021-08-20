@@ -3,21 +3,22 @@
 , nix-filter ? import sources.nix-filter
 , hsPkgs ? import ./.. { }
 , migrations ? ../migrations
+, octopod-css ? import ../octopod-css { inherit pkgsSrc; }
+, pkgsSrc ? hsPkgs.pkgsSrc
 }:
+let frontendConfig = pkgs.writeTextDir "config.json" ''
+  {
+    "app_url": "http://localhost:8000",
+    "ws_url": "ws://localhost:4020",
+    "app_auth": "",
+    "kubernetes_dashboard_url_template": "https://echo-url.github.io/#"
+  }
+'';
+in
 {
   frontend =
     let
-
       frontend = hsPkgs.octopod-frontend-pretty;
-
-      frontendConfig = pkgs.writeTextDir "config.json" ''
-        {
-          "app_url": "http://localhost:8000",
-          "ws_url": "ws://localhost:4020",
-          "app_auth": "",
-          "kubernetes_dashboard_url_template": "https://echo-url.github.io/#"
-        }
-      '';
 
       caddyConfig = pkgs.writeText "caddy-config" ''
         http://localhost:8000
@@ -30,6 +31,44 @@
 
         file_server {
           root ${frontend}
+        }
+
+        log {
+          output stdout
+          format single_field common_log
+        }
+      '';
+
+      caddyRun = pkgs.writeScript "run-caddy.sh" ''
+        #!${pkgs.bash}/bin/bash
+
+        ${pkgs.caddy}/bin/caddy run --config ${caddyConfig} --adapter caddyfile
+      '';
+    in
+    caddyRun;
+
+  caddyForGhcid =
+    let
+      caddyConfig = pkgs.writeText "caddy-config" ''
+        http://localhost:8000
+
+        reverse_proxy /api/* localhost:3002
+
+        @notStatic {
+          not file {
+            root ${octopod-css}
+          }
+          not path /config.json
+        }
+
+        reverse_proxy @notStatic localhost:3003
+
+        file_server /config.json {
+          root ${frontendConfig}
+        }
+
+        file_server {
+          root ${octopod-css}
         }
 
         log {

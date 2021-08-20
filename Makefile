@@ -35,3 +35,6 @@ run-backend-dev:
 
 run-frontend-dev:
 	`nix-build dev -A frontend -j auto`
+
+run-caddy-for-ghcid:
+	`nix-build dev -A caddyForGhcid -j auto`
