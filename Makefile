@@ -30,17 +30,8 @@ ghcid-frontend:
 push-octopod:
 	./build.sh build-and-push latest
 
-run-backend-dev: dev/certs/server_cert.pem dev/certs/server_key.pem
-	./dev/dev_backend.sh `nix-build -A octopod-backend.components.exes.octopod-exe -j auto`
+run-backend-dev:
+	`nix-build dev -A backend -j auto`
 
-run-frontend-dev: build-frontend
-	caddy run
-
-dev/certs/server_cert.pem dev/certs/server_key.pem:
-	openssl req -x509 -newkey rsa:4096 -keyout dev/certs/server_key.pem -out dev/certs/server_cert.pem -nodes -subj "/CN=localhost/O=Server"
-
-dev/certs/client_csr.pem dev/certs/client_key.pem:
-	openssl req -newkey rsa:4096 -keyout dev/certs/client_key.pem -out dev/certs/client_csr.pem -nodes -subj "/CN=Client"
-
-dev/certs/client_cert.pem: dev/certs/client_csr.pem dev/certs/server_cert.pem dev/certs/server_key.pem
-	openssl x509 -req -in dev/certs/client_csr.pem -CA dev/certs/server_cert.pem -CAkey dev/certs/server_key.pem -out dev/certs/client_cert.pem -set_serial 01 -days 3650)
+run-frontend-dev:
+	`nix-build dev -A frontend -j auto`

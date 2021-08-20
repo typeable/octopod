@@ -1,6 +1,5 @@
 { pkgsSrc ? (import ./.. { }).pkgsSrc
 , sources ? import ../nix/sources.nix
-, haskellNix ? import sources.haskellNix { }
 , nix-filter ? import sources.nix-filter
 }:
 let
