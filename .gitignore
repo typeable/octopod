@@ -9,3 +9,4 @@ frontend-result
 octopod-css/node_modules
 dev/certs/*
 tmp/*
+octopod-css/production
