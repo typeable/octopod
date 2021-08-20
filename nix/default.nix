@@ -1,5 +1,5 @@
 { sources ? import ./sources.nix
-, octopod-css ? import ../octopod-css {inherit pkgsSrc;}
+, octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , migrations ? ../migrations
 , system ? builtins.currentSystem
 , hsPkgs ? import ./.. { inherit system; }

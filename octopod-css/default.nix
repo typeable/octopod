@@ -1,40 +1,40 @@
-{ pkgsSrc ? (import ./.. {}).pkgsSrc
+{ pkgsSrc ? (import ./.. { }).pkgsSrc
 , sources ? import ../nix/sources.nix
-, haskellNix ? import sources.haskellNix {}
+, haskellNix ? import sources.haskellNix { }
 , nix-filter ? import sources.nix-filter
 }:
 let
-pkgs = pkgsSrc {
-  overlays = [ (self: super: { nodejs = self.nodejs-10_x; }) ];
-};
-production-css = pkgs.mkYarnPackage {
-  name = "octopod-css";
-  src = nix-filter {
-    root = ./.;
-    name = "octopod-css";
-    include = with nix-filter; [
-      (inDirectory ./development)
-      (inDirectory ./favicons)
-      ./gulpfile.js
-      ./package.json
-      ./.stylelintrc.json
-    ];
+  pkgs = pkgsSrc {
+    overlays = [ (self: super: { nodejs = self.nodejs-10_x; }) ];
   };
-  yarnLock = ./yarn.lock;
-  buildPhase = "yarn run gulp";
-  doDist = false;
-  distPhase = " ";
-  installPhase = ''
-    runHook preInstall
+  production-css = pkgs.mkYarnPackage {
+    name = "octopod-css";
+    src = nix-filter {
+      root = ./.;
+      name = "octopod-css";
+      include = with nix-filter; [
+        (inDirectory ./development)
+        (inDirectory ./favicons)
+        ./gulpfile.js
+        ./package.json
+        ./.stylelintrc.json
+      ];
+    };
+    yarnLock = ./yarn.lock;
+    buildPhase = "yarn run gulp";
+    doDist = false;
+    distPhase = " ";
+    installPhase = ''
+      runHook preInstall
 
-    cp -av deps/octopod-css/production $out
+      cp -av deps/octopod-css/production $out
 
-    runHook postInstall
-  '';
-};
+      runHook postInstall
+    '';
+  };
 in
 pkgs.runCommand "octopod-production-assets"
-  { } ''
+{ } ''
   mkdir $out
   cp -av ${./.}/favicons/* $out
   mkdir $out/static
