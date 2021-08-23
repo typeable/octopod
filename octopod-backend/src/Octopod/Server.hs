@@ -108,6 +108,10 @@ data AppState = AppState
     tagCheckingCommand :: Command
   , infoCommand :: Command
   , notificationCommand :: Maybe Command
+  , deploymentOverridesCommand :: Command
+  , deploymentOverrideKeysCommand :: Command
+  , applicationOverridesCommand :: Command
+  , applicationOverrideKeysCommand :: Command
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: LockedDeployments
@@ -153,14 +157,18 @@ runOctopodServer = do
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
   archRetention <- ArchiveRetention . fromIntegral . read @Int <$> getEnvOrDie "ARCHIVE_RETENTION"
   stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral . read @Int <$> getEnvOrDie "STATUS_UPDATE_TIMEOUT"
-  creationCmd <- coerce . pack <$> getEnvOrDie "CREATION_COMMAND"
-  updateCmd <- coerce . pack <$> getEnvOrDie "UPDATE_COMMAND"
-  archiveCmd <- coerce . pack <$> getEnvOrDie "ARCHIVE_COMMAND"
-  checkingCmd <- coerce . pack <$> getEnvOrDie "CHECKING_COMMAND"
-  cleanupCmd <- coerce . pack <$> getEnvOrDie "CLEANUP_COMMAND"
-  archiveCheckingCmd <- coerce . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
-  tagCheckingCmd <- coerce . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
-  infoCmd <- coerce . pack <$> getEnvOrDie "INFO_COMMAND"
+  creationCmd <- Command . pack <$> getEnvOrDie "CREATION_COMMAND"
+  updateCmd <- Command . pack <$> getEnvOrDie "UPDATE_COMMAND"
+  archiveCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_COMMAND"
+  checkingCmd <- Command . pack <$> getEnvOrDie "CHECKING_COMMAND"
+  cleanupCmd <- Command . pack <$> getEnvOrDie "CLEANUP_COMMAND"
+  archiveCheckingCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
+  tagCheckingCmd <- Command . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
+  infoCmd <- Command . pack <$> getEnvOrDie "INFO_COMMAND"
+  dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_OVERRIDES_COMMAND"
+  dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
+  aOverridesCmd <- Command . pack <$> getEnvOrDie "APPLICATION_OVERRIDES_COMMAND"
+  aKeysCmd <- Command . pack <$> getEnvOrDie "APPLICATION_KEYS_COMMAND"
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
   notificationCmd <-
     (fmap . fmap) (Command . pack) $
@@ -198,6 +206,10 @@ runOctopodServer = do
           tagCheckingCmd
           infoCmd
           notificationCmd
+          dOverridesCmd
+          dKeysCmd
+          aOverridesCmd
+          aKeysCmd
           lockedDs
       app' = app appSt
       wsApp' = wsApp channel
@@ -253,6 +265,12 @@ app s = serve api $ hoistServer api (nt s) server
 -- | Request handlers of the Web UI API application.
 server :: ServerT API AppM
 server =
+  defaultDeploymentKeysH
+    :<|> defaultDeploymentOverridesH
+    :<|> defaultApplicationKeysH
+    :<|> defaultApplicationOverridesH
+
+  :<|>
   ( listH :<|> createH :<|> archiveH :<|> updateH
       :<|> infoH
       :<|> fullInfoH
@@ -261,6 +279,11 @@ server =
   )
     :<|> pingH
     :<|> projectNameH
+
+defaultDeploymentKeysH = undefined
+defaultDeploymentOverridesH = undefined
+defaultApplicationKeysH = undefined
+defaultApplicationOverridesH = undefined
 
 -- | Application with the octo CLI API.
 powerApp :: AuthHeader -> AppState -> IO Application

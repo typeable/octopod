@@ -14,6 +14,12 @@ module Octopod.Server.ControlScriptUtils
     archiveCheckArgs,
     tagCheckCommandArgs,
 
+    -- * overrides
+    defaultDeploymentOverridesArgs,
+    deploymentOverrideKeys,
+    defaultApplicationOverridesArgs,
+    applicationOverrideKeys,
+
     -- * Helpers
     fullConfigArgs,
     overridesArgs,
@@ -65,6 +71,29 @@ genericDeploymentCommandArgs dCfg dep = do
       ]
       <> fullConfigArgs dCfg dep
 
+type GenericDeploymentCommandArgsNoConfig m r =
+  ( MonadReader r m
+  , HasType Namespace r
+  , HasType ProjectName r
+  , HasType Domain r
+  ) =>
+  m ControlScriptArgs
+
+genericDeploymentCommandArgsNoConfig :: GenericDeploymentCommandArgsNoConfig m r
+genericDeploymentCommandArgsNoConfig = do
+  (Namespace namespace) <- asks getTyped
+  (ProjectName projectName) <- asks getTyped
+  (Domain domain) <- asks getTyped
+  return $
+    ControlScriptArgs
+      [ "--project-name"
+      , T.unpack . coerce $ projectName
+      , "--base-domain"
+      , T.unpack . coerce $ domain
+      , "--namespace"
+      , T.unpack . coerce $ namespace
+      ]
+
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
 
@@ -73,6 +102,24 @@ checkCommandArgs = genericDeploymentCommandArgs
 
 tagCheckCommandArgs :: GenericDeploymentCommandArgs m r
 tagCheckCommandArgs = genericDeploymentCommandArgs
+
+defaultDeploymentOverridesArgs :: GenericDeploymentCommandArgsNoConfig m r
+defaultDeploymentOverridesArgs = genericDeploymentCommandArgsNoConfig
+
+deploymentOverrideKeys :: GenericDeploymentCommandArgsNoConfig m r
+deploymentOverrideKeys = genericDeploymentCommandArgsNoConfig
+
+defaultApplicationOverridesArgs ::
+  Config 'DeploymentLevel ->
+  GenericDeploymentCommandArgsNoConfig m r
+defaultApplicationOverridesArgs cfg =
+  (overridesArgs cfg <>) <$> genericDeploymentCommandArgsNoConfig
+
+applicationOverrideKeys ::
+  Config 'DeploymentLevel ->
+  GenericDeploymentCommandArgsNoConfig m r
+applicationOverrideKeys cfg =
+  (overridesArgs cfg <>) <$> genericDeploymentCommandArgsNoConfig
 
 notificationCommandArgs ::
   ( MonadReader r m

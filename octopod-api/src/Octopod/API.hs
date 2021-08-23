@@ -12,6 +12,7 @@ where
 import Servant.API
 
 import Common.Types
+import Data.Text (Text)
 import Octopod.API.WebSocket
 
 type CaptureName = Capture "name" DeploymentName
@@ -28,34 +29,52 @@ type StatusEndpoint c = c :> "status" :> Get '[JSON] CurrentDeploymentStatus
 type RestoreEndpoint c =
   c :> "restore" :> Patch '[JSON] CommandResponse
 
+type DefaultDeploymentOverrideKeys =
+  "deployment_override_keys" :> Get '[JSON] [Text]
+type DefaultDeploymentOverrides =
+  "deployment_overrides" :> Get '[JSON] (DefaultConfig 'DeploymentLevel)
+type DefaultApplicationOverrideKeys =
+  "application_override_keys"
+    :> ReqBody '[JSON] (Config 'DeploymentLevel)
+    :> Post '[JSON] [Text]
+type DefaultApplicationOverrides =
+  "application_overrides"
+    :> ReqBody '[JSON] (Config 'DeploymentLevel)
+    :> Post '[JSON] (DefaultConfig 'DeploymentLevel)
+
 type PingEndpoint = "ping" :> GetNoContent
 type ProjectNameEndpoint =
   "project_name" :> Get '[JSON] ProjectName
 
 type DeploymentAPI' c =
   "api" :> "v1"
-    :> ( "deployments"
-          :> ( ListEndpoint
-                -- endpoint to get deployment list
-                :<|> CreateEndpoint
-                -- endpoint to create a new deployment
-                :<|> ArchiveEndpoint c
-                -- endpoint to archive existing deployment
-                :<|> UpdateEndpoint c
-                -- endpoint to update exists deployment
-                :<|> InfoEndpoint c
-                -- endpoint to get deployment info
-                :<|> FullInfoEndpoint c
-                -- endpoint to get deployment full info
-                :<|> StatusEndpoint c
-                -- endpoint to get deployment status
-                :<|> RestoreEndpoint c
-                -- endpoint to restore deployment
-             )
-          :<|> PingEndpoint
-          -- endpoint to liveness probe
-          :<|> ProjectNameEndpoint
-          -- endpoint to get project name
+    :> ( DefaultDeploymentOverrideKeys
+          :<|> DefaultDeploymentOverrides
+          :<|> DefaultApplicationOverrideKeys
+          :<|> DefaultApplicationOverrides
+          :<|> ( "deployments"
+                  :> ( ListEndpoint
+                        -- endpoint to get deployment list
+                        :<|> CreateEndpoint
+                        -- endpoint to create a new deployment
+                        :<|> ArchiveEndpoint c
+                        -- endpoint to archive existing deployment
+                        :<|> UpdateEndpoint c
+                        -- endpoint to update exists deployment
+                        :<|> InfoEndpoint c
+                        -- endpoint to get deployment info
+                        :<|> FullInfoEndpoint c
+                        -- endpoint to get deployment full info
+                        :<|> StatusEndpoint c
+                        -- endpoint to get deployment status
+                        :<|> RestoreEndpoint c
+                        -- endpoint to restore deployment
+                     )
+                  :<|> PingEndpoint
+                  -- endpoint to liveness probe
+                  :<|> ProjectNameEndpoint
+                  -- endpoint to get project name
+               )
        )
 
 -- | API for frontend
