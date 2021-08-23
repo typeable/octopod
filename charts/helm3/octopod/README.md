@@ -52,7 +52,7 @@ $ helm -n octopod delete my-release
 The command removes all the Kubernetes components but PVC's associated with the postgres chart and deletes the release.
 
 ## Note about generated values
-Some values (as passwords) in this chart (and it's dependencies) are generated automatically, but due to [limitation](https://github.com/helm/charts/issues/5167) in the helm the values are changing on every upgrade. To prevent this you must fix this values by providing them via --set flags or values file.
+Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [a limitation in helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must fix these values by providing them via `--set` flags or "values" file.
 
 These values are:
 - `postgresql.postgresqlPassword` - main db password
