@@ -59,7 +59,7 @@ These values are:
 - `postgresql.postgresqlPostgresPassword` - password for "postgres" user
 - `octopod.cliAuthSecret` - auth header for octo cli tool
 
-Please note, that by not providing these values you can fail successfully execute `helm upgrade` or operate octopod after upgrade.
+Note: if these values are not provided the `helm upgrade` command can fail or Octopod will not work after the upgrade.
 
 ## Parameters
 
