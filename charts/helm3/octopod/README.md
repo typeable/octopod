@@ -58,6 +58,7 @@ These values are:
 - `postgresql.postgresqlPassword` - main db password
 - `postgresql.postgresqlPostgresPassword` - password for "postgres" user
 - `octopod.cliAuthSecret` - auth header for octo cli tool
+- `octopod.uiAuthSecret` - basic auth secret for ui->octopod communication
 
 Note: if these values are not provided the `helm upgrade` command can fail or Octopod will not work after the upgrade.
 
@@ -95,6 +96,7 @@ The following tables lists the configurable parameters of the Octopod chart and 
 | octopod.archiveRetention | int | `1209600` |  |
 | octopod.baseDomain | string | `""` | Domain that will be used as a ase for Octopod deploymets and ingress hosts|
 | octopod.cliAuthSecret | string | `nil` | Auth Header for accessing octopod using octo CLI |
+| octopod.uiAuthSecret | string | `nil` | Basic auth secret for securing communcation between octopod UI and backend API  |
 | octopod.deploymentNamespace | string | `"octopod-deployment"` | Name of a namespace which will be used for all Octopod deployments (you need to create it yourself) |
 | octopod.env | object | `{}` | key value map for supplying additional environment variables for octopod or your control scripts |
 | octopod.migrations.enabled | bool | `true` | Enable or not automatic DB schema migrations |
