@@ -1,20 +1,18 @@
-{-|
-Module      : Octopod.API
-Description : Backend endpoints.
-
-This module contains backend endpoints.
--}
-
-
+-- |
+--Module      : Octopod.API
+--Description : Backend endpoints.
+--
+--This module contains backend endpoints.
 module Octopod.API
-  ( module Octopod.API.WebSocket
-  , API
-  ) where
+  ( module Octopod.API.WebSocket,
+    API,
+  )
+where
 
-import           Servant.API
+import Servant.API
 
-import           Common.Types
-import           Octopod.API.WebSocket
+import Common.Types
+import Octopod.API.WebSocket
 
 type CaptureName = Capture "name" DeploymentName
 
@@ -35,30 +33,30 @@ type ProjectNameEndpoint =
   "project_name" :> Get '[JSON] ProjectName
 
 type DeploymentAPI' c =
-  "api" :> "v1" :>
-    ( "deployments" :>
-      (    ListEndpoint
-      -- endpoint to get deployment list
-      :<|> CreateEndpoint
-      -- endpoint to create a new deployment
-      :<|> ArchiveEndpoint c
-      -- endpoint to archive existing deployment
-      :<|> UpdateEndpoint c
-      -- endpoint to update exists deployment
-      :<|> InfoEndpoint c
-      -- endpoint to get deployment info
-      :<|> FullInfoEndpoint c
-      -- endpoint to get deployment full info
-      :<|> StatusEndpoint c
-      -- endpoint to get deployment status
-      :<|> RestoreEndpoint c
-      -- endpoint to restore deployment
-      )
-    :<|> PingEndpoint
-    -- endpoint to liveness probe
-    :<|> ProjectNameEndpoint
-    -- endpoint to get project name
-    )
+  "api" :> "v1"
+    :> ( "deployments"
+          :> ( ListEndpoint
+                -- endpoint to get deployment list
+                :<|> CreateEndpoint
+                -- endpoint to create a new deployment
+                :<|> ArchiveEndpoint c
+                -- endpoint to archive existing deployment
+                :<|> UpdateEndpoint c
+                -- endpoint to update exists deployment
+                :<|> InfoEndpoint c
+                -- endpoint to get deployment info
+                :<|> FullInfoEndpoint c
+                -- endpoint to get deployment full info
+                :<|> StatusEndpoint c
+                -- endpoint to get deployment status
+                :<|> RestoreEndpoint c
+                -- endpoint to restore deployment
+             )
+          :<|> PingEndpoint
+          -- endpoint to liveness probe
+          :<|> ProjectNameEndpoint
+          -- endpoint to get project name
+       )
 
 -- | API for frontend
 type API = DeploymentAPI' CaptureName
