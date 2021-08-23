@@ -35,8 +35,7 @@ import System.Log.FastLogger
 import System.Process.Typed
 import Types
 
--- | Creates command arguments for the 'info' deployment control script.
-infoCommandArgs ::
+type GenericDeploymentCommandArgs m r =
   ( MonadReader r m
   , HasType Namespace r
   , HasType ProjectName r
@@ -45,7 +44,9 @@ infoCommandArgs ::
   FullDefaultConfig ->
   Deployment ->
   m ControlScriptArgs
-infoCommandArgs dCfg dep = do
+
+genericDeploymentCommandArgs :: GenericDeploymentCommandArgs m r
+genericDeploymentCommandArgs dCfg dep = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -63,6 +64,15 @@ infoCommandArgs dCfg dep = do
       , T.unpack . coerce $ tag dep
       ]
       <> fullConfigArgs dCfg dep
+
+infoCommandArgs :: GenericDeploymentCommandArgs m r
+infoCommandArgs = genericDeploymentCommandArgs
+
+checkCommandArgs :: GenericDeploymentCommandArgs m r
+checkCommandArgs = genericDeploymentCommandArgs
+
+tagCheckCommandArgs :: GenericDeploymentCommandArgs m r
+tagCheckCommandArgs = genericDeploymentCommandArgs
 
 notificationCommandArgs ::
   ( MonadReader r m
@@ -98,62 +108,6 @@ notificationCommandArgs dName dTag old new = do
       , "--new-status"
       , T.unpack $ deploymentStatusToText new
       ]
-
-checkCommandArgs ::
-  ( MonadReader r m
-  , HasType Namespace r
-  , HasType ProjectName r
-  , HasType Domain r
-  ) =>
-  FullDefaultConfig ->
-  Deployment ->
-  m ControlScriptArgs
-checkCommandArgs dCfg dep = do
-  (Namespace namespace) <- asks getTyped
-  (ProjectName projectName) <- asks getTyped
-  (Domain domain) <- asks getTyped
-  return $
-    ControlScriptArgs
-      [ "--project-name"
-      , T.unpack . coerce $ projectName
-      , "--base-domain"
-      , T.unpack . coerce $ domain
-      , "--namespace"
-      , T.unpack . coerce $ namespace
-      , "--name"
-      , T.unpack . coerce $ dep ^. #name
-      , "--tag"
-      , T.unpack . coerce $ tag dep
-      ]
-      <> fullConfigArgs dCfg dep
-
-tagCheckCommandArgs ::
-  ( MonadReader r m
-  , HasType Namespace r
-  , HasType ProjectName r
-  , HasType Domain r
-  ) =>
-  FullDefaultConfig ->
-  Deployment ->
-  m ControlScriptArgs
-tagCheckCommandArgs dCfg dep = do
-  (Namespace namespace) <- asks getTyped
-  (ProjectName projectName) <- asks getTyped
-  (Domain domain) <- asks getTyped
-  return $
-    ControlScriptArgs
-      [ "--project-name"
-      , T.unpack . coerce $ projectName
-      , "--base-domain"
-      , T.unpack . coerce $ domain
-      , "--namespace"
-      , T.unpack . coerce $ namespace
-      , "--name"
-      , T.unpack . coerce $ dep ^. #name
-      , "--tag"
-      , T.unpack . coerce $ tag dep
-      ]
-      <> fullConfigArgs dCfg dep
 
 archiveCheckArgs ::
   ( MonadReader r m
