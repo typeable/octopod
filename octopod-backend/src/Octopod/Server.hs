@@ -19,6 +19,7 @@ import Control.Monad.Trans.Control
 import Control.Octopod.DeploymentLock
 import Crypto.JOSE hiding (Context)
 import Data.Aeson (Value (..), encode, toJSON)
+import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
@@ -269,21 +270,40 @@ server =
     :<|> defaultDeploymentOverridesH
     :<|> defaultApplicationKeysH
     :<|> defaultApplicationOverridesH
-
-  :<|>
-  ( listH :<|> createH :<|> archiveH :<|> updateH
-      :<|> infoH
-      :<|> fullInfoH
-      :<|> statusH
-      :<|> restoreH
-  )
+    :<|> ( listH :<|> createH :<|> archiveH :<|> updateH
+            :<|> infoH
+            :<|> fullInfoH
+            :<|> statusH
+            :<|> restoreH
+         )
     :<|> pingH
     :<|> projectNameH
 
-defaultDeploymentKeysH = undefined
-defaultDeploymentOverridesH = undefined
-defaultApplicationKeysH = undefined
-defaultApplicationOverridesH = undefined
+decodeCSVDefaultConfig :: Text -> DefaultConfig l
+decodeCSVDefaultConfig = DefaultConfig . OM.fromList . splitOnComma
+  where
+    splitOnComma :: Text -> [(Text, Text)]
+    splitOnComma = fmap (Bi.second T.tail . T.breakOn ",") . T.lines
+
+defaultDeploymentKeysH :: AppM [Text]
+defaultDeploymentKeysH = do
+  (_, Stdout out, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
+  pure $ T.lines out
+
+defaultDeploymentOverridesH :: AppM (DefaultConfig 'DeploymentLevel)
+defaultDeploymentOverridesH = do
+  (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
+  pure $ decodeCSVDefaultConfig out
+
+defaultApplicationKeysH :: Config 'DeploymentLevel -> AppM [Text]
+defaultApplicationKeysH cfg = do
+  (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
+  pure $ T.lines out
+
+defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'DeploymentLevel)
+defaultApplicationOverridesH cfg = do
+  (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
+  pure $ decodeCSVDefaultConfig out
 
 -- | Application with the octo CLI API.
 powerApp :: AuthHeader -> AppState -> IO Application
