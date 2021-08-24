@@ -33,4 +33,4 @@ Also several environment variables are used to parametrize default behavior
 - chart_version - version of a chart you want to install
 - chart_name - name of a chart you want to install
 
-This parametes if set up in DEFAULTS variable will be passed to every deployment until overrided in "deployment overrides" section of octopod
+These parameters, if set up in the `DEFAULTS` variable, will be passed to every deployment until overridden in the "deployment overrides" section of an Octopod deployment configuration.
