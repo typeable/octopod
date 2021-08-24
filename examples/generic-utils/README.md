@@ -17,7 +17,7 @@ You can get builded docker images [here](https://hub.docker.com/r/typeable/octop
 
 ### Parameters
 
-All scipts accept common parametes which are passed by the octopod when it invokes them.
+All scipts accept common parametes which are passed by Octopod when it invokes them.
 Also several environment variables are used to parametrize default behavior
 
 - HELM_BIN - path to a helm executable
