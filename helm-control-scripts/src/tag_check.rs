@@ -1,4 +1,4 @@
-use generic_utils::lib::*;
+use helm_control_scripts::lib::*;
 
 fn main() {
     let mut log_builder = Builder::from_default_env();
@@ -24,28 +24,7 @@ fn main() {
             panic!();
         }
     };
-    let helm_repo_add = HelmCmd {
-        name: String::from(&envs.helm_bin),
-        mode: HelmMode::RepoAdd,
-        release_name: String::from(""),
-        release_domain: String::from(""),
-        namespace: String::from(""),
-        deployment_parameters: deployment_parameters.clone(),
-        overrides: vec![],
-        default_values: vec![],
-        image_tag: String::from(""),
-    };
-    let helm_repo_update = HelmCmd {
-        name: String::from(&envs.helm_bin),
-        mode: HelmMode::RepoUpdate,
-        release_name: String::from(""),
-        release_domain: String::from(""),
-        namespace: String::from(""),
-        deployment_parameters: deployment_parameters.clone(),
-        overrides: vec![],
-        default_values: vec![],
-        image_tag: String::from(""),
-    };
+    helm_init(&envs, &deployment_parameters);
     let helm_template = HelmCmd {
         name: envs.helm_bin,
         mode: HelmMode::Template,
@@ -57,20 +36,6 @@ fn main() {
         default_values: default_values.default_overrides,
         image_tag: image_tag
     };
-    match helm_repo_add.run() {
-        Ok(_status) => info!("Repo add success!"),
-        Err(status) => {
-            error!("Error during helm execution");
-            panic!("{:?}", status);
-        }
-    }
-    match helm_repo_update.run() {
-        Ok(_status) => info!("Repo update success!"),
-        Err(status) => {
-            error!("Error during helm execution");
-            panic!("{:?}", status);
-        }
-    }
     match helm_template.run_stdout() {
         Ok(status) => {
             let (deployments, statefulsets, _ingresses, _old_ingresses) = match parse_to_k8s(status) {

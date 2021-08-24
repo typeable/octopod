@@ -1,8 +1,8 @@
-use generic_utils::lib::*;
+use helm_control_scripts::lib::*;
 
 fn main() {
     let mut log_builder = Builder::from_default_env();
-    log_builder.target(Target::Stderr).filter(None, LevelFilter::Info).init();
+    log_builder.target(Target::Stdout).filter(None, LevelFilter::Info).init();
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
@@ -24,29 +24,7 @@ fn main() {
             panic!();
         }
     };
-    let default_name = String::from(&cli_opts.name);
-    let helm_repo_add = HelmCmd {
-        name: String::from(&envs.helm_bin),
-        mode: HelmMode::RepoAdd,
-        release_name: String::from(""),
-        release_domain: String::from(""),
-        namespace: String::from(""),
-        deployment_parameters: deployment_parameters.clone(),
-        overrides: vec![],
-        default_values: vec![],
-        image_tag: String::from(""),
-    };
-    let helm_repo_update = HelmCmd {
-        name: String::from(&envs.helm_bin),
-        mode: HelmMode::RepoUpdate,
-        release_name: String::from(""),
-        release_domain: String::from(""),
-        namespace: String::from(""),
-        deployment_parameters: deployment_parameters.clone(),
-        overrides: vec![],
-        default_values: vec![],
-        image_tag: String::from(""),
-    };
+    let namespace = String::from(&cli_opts.namespace);
     let helm_template = HelmCmd {
         name: envs.helm_bin,
         mode: HelmMode::Template,
@@ -58,27 +36,20 @@ fn main() {
         default_values: default_values.default_overrides,
         image_tag: image_tag
     };
-    match helm_repo_add.run() {
-        Ok(_status) => info!("Repo add success!"),
-        Err(status) => {
-            error!("Error during helm execution");
-            panic!("{:?}", status);
-        }
-    }
-    match helm_repo_update.run() {
-        Ok(_status) => info!("Repo update success!"),
-        Err(status) => {
-            error!("Error during helm execution");
-            panic!("{:?}", status);
-        }
-    }
+    info!("Generated Helm args: {:?}", &helm_template.args());
     match helm_template.run_stdout() {
         Ok(status) => {
-            let (_deployments, _statefulsets, ingresses, old_ingresses) = match parse_to_k8s(status) {
+            let (deployments, statefulsets, _ingresses, _old_ingresses) = match parse_to_k8s(status) {
                 Ok((deployments, statefulsets, ingresses, old_ingresses)) => (deployments, statefulsets, ingresses, old_ingresses),
                 Err(err) => panic!("{}", err)
             };
-            print!("{}", print_kv(ingresses_to_hosts(ingresses, old_ingresses, default_name)));
+            match check_all(deployments, statefulsets, namespace) {
+                Ok(_status) => info!("Success!"),
+                Err(status) => {
+                    error!("Error checking statuses");
+                    panic!("{}", status);
+                }
+            }
         }
         Err(status) => {
             error!("Error during helm execution");

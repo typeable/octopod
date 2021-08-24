@@ -50,6 +50,7 @@ pub mod lib {
         pub helm_user: String,
         #[serde(default)]
         pub helm_pass: String,
+        pub helm_on_init_only: Option<bool>,
     }
     
     impl EnvVars {
@@ -108,6 +109,16 @@ pub mod lib {
                     }
                 }
                 return default_parameters;
+            }
+        }
+        pub fn new_env_only(default_values: &DefaultValues, envs: &EnvVars) -> Self {
+            Self {
+                chart_repo_url:  default_values.chart_repo_url.clone(),
+                chart_repo_name: default_values.chart_repo_name.clone(),
+                chart_repo_user: envs.helm_user.clone(),
+                chart_repo_pass: envs.helm_pass.clone(),
+                chart_version: default_values.chart_version.clone(),
+                chart_name: default_values.chart_name.clone(),
             }
         }
     }
@@ -596,5 +607,59 @@ pub mod lib {
             }
         }
         Ok(())
+    }
+    pub fn helm_repo_add_update(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) {
+        let helm_repo_add = HelmCmd {
+            name: String::from(&envs.helm_bin),
+            mode: HelmMode::RepoAdd,
+            release_name: String::from(""),
+            release_domain: String::from(""),
+            namespace: String::from(""),
+            deployment_parameters: deployment_parameters.clone(),
+            overrides: vec![],
+            default_values: vec![],
+            image_tag: String::from(""),
+        };
+        let helm_repo_update = HelmCmd {
+            name: String::from(&envs.helm_bin),
+            mode: HelmMode::RepoUpdate,
+            release_name: String::from(""),
+            release_domain: String::from(""),
+            namespace: String::from(""),
+            deployment_parameters: deployment_parameters.clone(),
+            overrides: vec![],
+            default_values: vec![],
+            image_tag: String::from(""),
+        };
+        match helm_repo_add.run() {
+            Ok(_status) => info!("Repo add success!"),
+            Err(status) => {
+                error!("Error during helm execution");
+                panic!("{:?}", status);
+            }
+        }
+        match helm_repo_update.run() {
+            Ok(_status) => info!("Repo update success!"),
+            Err(status) => {
+                error!("Error during helm execution");
+                panic!("{:?}", status);
+            }
+        }
+    }
+    pub fn helm_init(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) {
+        match &envs.helm_on_init_only {
+            Some(enabled) => {
+                if *enabled {
+                    info!("Skipping helm initialization, it must be initialied on init");
+                } else {
+                    info!("Starting helm initialization");
+                    helm_repo_add_update(&envs, &deployment_parameters);
+                }
+            },
+            None => {
+                info!("Starting helm initialization");
+                helm_repo_add_update(&envs, &deployment_parameters);
+            }
+        }
     }
 }

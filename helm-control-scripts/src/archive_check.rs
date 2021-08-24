@@ -1,4 +1,4 @@
-use generic_utils::lib::*;
+use helm_control_scripts::lib::*;
 
 fn main() {
     let mut log_builder = Builder::from_default_env();
