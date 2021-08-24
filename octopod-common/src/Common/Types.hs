@@ -9,6 +9,7 @@ module Common.Types where
 
 import Control.Lens
 import Data.Aeson hiding (Result)
+import Data.Csv
 import Data.Generics.Labels ()
 import Data.Int
 import Data.Map.Ordered.Strict (OMap, (<>|))
@@ -203,6 +204,7 @@ data DeploymentMetadatum = DeploymentMetadatum
   }
   deriving stock (Generic, Show, Eq, Ord)
   deriving (FromJSON, ToJSON) via Snake DeploymentMetadatum
+  deriving anyclass (FromRecord)
 
 data DeploymentInfo = DeploymentInfo
   { deployment :: Deployment

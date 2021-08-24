@@ -19,26 +19,21 @@ module Types
   )
 where
 
-import Data.Bifunctor
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BS
+import Data.Csv
+import Data.Foldable
 import Data.Text as T
-import Data.Traversable
+import Data.Text.Encoding as T
 
 import Common.Types
 import Data.Time
 
 -- | Parses deployment metadata.
-parseDeploymentMetadata :: [Text] -> IO DeploymentMetadata
-parseDeploymentMetadata texts = fmap DeploymentMetadata $
-  for texts $ \t ->
-    case T.findIndex (== ',') t of
-      Just i -> do
-        let (key, value) = bimap strip (T.tail . strip) $ T.splitAt i t
-        pure $ DeploymentMetadatum key value
-      Nothing ->
-        error $
-          "Malformed metadata key-value pair " <> T.unpack t
-            <> ", should be similar to foo,bar"
+parseDeploymentMetadata :: Text -> IO DeploymentMetadata
+parseDeploymentMetadata text = case decode NoHeader $ BS.fromStrict $ T.encodeUtf8 text of
+  Left err -> error $ "Could not parse metadata: " <> err
+  Right rows -> pure $ DeploymentMetadata $ toList rows
 
 -- | Server port.
 newtype ServerPort = ServerPort {unServerPort :: Int}

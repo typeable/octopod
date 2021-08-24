@@ -33,7 +33,7 @@ import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
-import Data.Text (lines, pack, unpack, unwords)
+import Data.Text (pack, unpack, unwords)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
@@ -444,7 +444,7 @@ updateDeploymentInfo dName = do
   (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs dc dep
   case ec of
     ExitSuccess -> do
-      dMeta <- liftBase $ parseDeploymentMetadata (lines . unStdout $ out)
+      dMeta <- liftBase $ parseDeploymentMetadata (unStdout out)
       upsertDeploymentMetadatum dName dMeta
     ExitFailure _ ->
       liftBase $
