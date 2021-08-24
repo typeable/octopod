@@ -24,7 +24,7 @@ metadata:
       {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  {{- if .Values.ingress.tls }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
         - {{ include "powerAppIngressHost" . }}

@@ -1,5 +1,6 @@
 {
-  "name": "template",
+  "name": "octopod-css",
+  "version": "0.1.0",
   "dependencies": {
     "del": "2.2.0",
     "gulp": "3.9.1",

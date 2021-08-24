@@ -1,13 +1,12 @@
 { sources ? import ./sources.nix
-, octopod-css ? ../octopod-css
+, octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , migrations ? ../migrations
 , system ? builtins.currentSystem
+, hsPkgs ? import ./.. { inherit system; }
+, pkgs ? hsPkgs.pkgs
+, pkgsSrc ? hsPkgs.pkgsSrc
 }:
 let
-  hsPkgs = import ./.. { inherit system; };
-
-  pkgs = hsPkgs.pkgs;
-
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
 
@@ -19,7 +18,8 @@ let
     pkgs.runCommand "octopod-frontend-ugly"
       { } ''
       mkdir $out
-      cp ${../octopod-frontend/index.html} $out/index.html
+      cp -av ${frontend}/* $out
+      rm $out/all.js
 
       ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/all.js --externs ${frontend}/all.js.externs --js_output_file $out/all.js
     '';
@@ -48,12 +48,8 @@ let
       mkdir -p /migrations/{deploy,revert,verify}
       cp -av ${migrations}/* /migrations/
 
-      mkdir -p /www/static/{images,styles,vendors/outline}
-      cp -av ${octopod-frontend-ugly}/* /www/
-      cp -av ${octopod-css}/production/images/* /www/static/images/
-      cp -av ${octopod-css}/production/styles/* /www/static/styles/
-      cp -av ${octopod-css}/production/vendors/outline/* /www/static/vendors/outline/
-      cp -av ${octopod-css}/favicons/* /www/
+      mkdir /www
+      cp -av ${octopod-frontend-ugly}/* /www
     '';
 
     config =
