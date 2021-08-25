@@ -16,8 +16,10 @@ import Prelude as P
 
 import Common.Types
 import Common.Validation (isNameValid)
+import Data.Maybe
 import Frontend.API
 import Frontend.Utils
+import Reflex.Network
 import Servant.Reflex
 
 -- | The root function for \"new deployment\" sidebar.
@@ -33,8 +35,14 @@ newDeploymentPopup showEv hideEv = void $
     const $ mdo
       divClass "popup__body" $ mdo
         (closeEv', saveEv) <- newDeploymentPopupHeader enabledDyn
-        (deploymentDyn, validDyn) <- newDeploymentPopupBody respEv
-        respEv <- createEndpoint (Right <$> deploymentDyn) saveEv
+        deploymentMDyn <- newDeploymentPopupBody respEv
+        respEv <-
+          holdDyn (pure never) >=> networkView >=> switchHold never $
+            tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
+              pb <- getPostBuild
+              createEndpoint
+                (pure $ Right dep)
+                pb
         sentDyn <-
           holdDyn False $
             leftmost
@@ -44,7 +52,7 @@ newDeploymentPopup showEv hideEv = void $
         let successEv =
               fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
             closeEv = leftmost [closeEv', successEv]
-            enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
+            enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
         pure (never, closeEv)
 
 -- | The header of sidebar contains control buttons: \"Save\" and \"Close\".
@@ -70,19 +78,24 @@ newDeploymentPopupBody ::
   -- | Request failure event.
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns new deployment and validation states.
-  m (Dynamic t Deployment, Dynamic t Bool)
+  m (Dynamic t (Maybe Deployment))
 newDeploymentPopupBody errEv = divClass "popup__content" $
-  divClass "deployment" $ mdo
-    let commandResponseEv = fmapMaybe commandResponse errEv
-        nameErrEv = getNameError commandResponseEv nameDyn
-    errorHeader err
-    (nameDyn, validNameDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
-    (du, validDyn, err) <- deploymentPopupBody Nothing mempty mempty errEv
-    let dep = do
-          du' <- du
-          name <- DeploymentName <$> nameDyn
-          pure $ Deployment name (du' ^. #newTag) (du' ^. #appOverrides) (du' ^. #deploymentOverrides)
-    pure (dep, (&&) <$> validDyn <*> validNameDyn)
+  divClass "deployment" $
+    wrapRequestErrors $ \hReq -> mdo
+      let commandResponseEv = fmapMaybe commandResponse errEv
+          nameErrEv = getNameError commandResponseEv nameDyn
+      (nameDyn, validNameDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
+      depDyn <- deploymentPopupBody hReq Nothing mempty mempty errEv
+      let dep = do
+            depDyn >>= \case
+              Nothing -> pure Nothing
+              Just du' -> do
+                name <- DeploymentName <$> nameDyn
+                pure . Just $ Deployment name (du' ^. #newTag) (du' ^. #appOverrides) (du' ^. #deploymentOverrides)
+      pure $ do
+        validNameDyn >>= \case
+          False -> pure Nothing
+          True -> dep
   where
     getNameError crEv nameDyn =
       let nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1)) crEv

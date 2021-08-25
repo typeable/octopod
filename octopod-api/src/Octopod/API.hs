@@ -40,7 +40,7 @@ type DefaultApplicationOverrideKeys =
 type DefaultApplicationOverrides =
   "application_overrides"
     :> ReqBody '[JSON] (Config 'DeploymentLevel)
-    :> Post '[JSON] (DefaultConfig 'DeploymentLevel)
+    :> Post '[JSON] (DefaultConfig 'ApplicationLevel)
 
 type PingEndpoint = "ping" :> GetNoContent
 type ProjectNameEndpoint =

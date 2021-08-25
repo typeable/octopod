@@ -11,7 +11,7 @@ module Frontend.API
   ( deploymentOverrideKeys,
     defaultDeploymentOverrides,
     applicationOverrideKeys,
-    defaultApplicationOverrdes,
+    defaultApplicationOverrides,
     apiClients,
     listEndpoint,
     createEndpoint,
@@ -82,11 +82,11 @@ applicationOverrideKeys ::
   Dynamic t (Either Text (Config 'DeploymentLevel)) ->
   Event t () ->
   m (Event t (ReqResult () [Text]))
-defaultApplicationOverrdes ::
+defaultApplicationOverrides ::
   MonadWidget t m =>
   Dynamic t (Either Text (Config 'DeploymentLevel)) ->
   Event t () ->
-  m (Event t (ReqResult () (DefaultConfig 'DeploymentLevel)))
+  m (Event t (ReqResult () (DefaultConfig 'ApplicationLevel)))
 listEndpoint ::
   MonadWidget t m =>
   Event t () ->
@@ -138,7 +138,7 @@ projectName ::
 deploymentOverrideKeys
   :<|> defaultDeploymentOverrides
   :<|> applicationOverrideKeys
-  :<|> defaultApplicationOverrdes
+  :<|> defaultApplicationOverrides
   :<|> ( listEndpoint
           :<|> createEndpoint
           :<|> archiveEndpoint

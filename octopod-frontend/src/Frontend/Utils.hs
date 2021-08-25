@@ -25,6 +25,8 @@ import Data.Proxy (Proxy (..))
 import Data.Text as T (Text, intercalate, null, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
+import Data.Unique
+import Data.Witherable
 import Frontend.API
 import Frontend.GHCJS
 import GHCJS.DOM
@@ -580,29 +582,50 @@ kubeDashboardUrl deploymentInfo = do
 
 deploymentPopupBody ::
   MonadWidget t m =>
+  RequestErrorHandler t m ->
   Maybe DeploymentTag ->
   Overrides 'ApplicationLevel ->
   Overrides 'DeploymentLevel ->
   -- | \"Edit request\" failure event.
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns deployment update and validation state.
-  m (Dynamic t DeploymentUpdate, Dynamic t Bool, Event t Text)
-deploymentPopupBody defTag defAppOv defDepOv errEv = mdo
+  m (Dynamic t (Maybe DeploymentUpdate))
+deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
+  pb <- getPostBuild
+  defDep <- defaultDeploymentOverrides pb >>= hReq
+
   let commandResponseEv = fmapMaybe commandResponse errEv
-      appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
       tagErrEv = getTagError commandResponseEv tagDyn
+  void $ hReq (errEv `R.difference` commandResponseEv)
+
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
-  appVarsDyn <- envVarsInput "App overrides" defAppOv
-  deploymentVarsDyn <- envVarsInput "Deployment overrides" defDepOv
+
+  let holdDCfg n dDCfg ovs =
+        fmap join . widgetHold (pure . pure $ Nothing) $
+          dDCfg <&> \dCfg ->
+            fmap (Just . (dCfg,)) <$> envVarsInput n dCfg ovs
+  deploymentCfgDyn <- holdDCfg "Deployment overrides" defDep defDepOv
+  let readyDeploymentCfgEv = fmap snd . catMaybes $ updated deploymentCfgDyn
+  readyDeploymentCfgDyn <- holdDyn (error "invariant") readyDeploymentCfgEv
+  appDep <- defaultApplicationOverrides (Right <$> readyDeploymentCfgDyn) (readyDeploymentCfgEv $> ()) >>= hReq
+  appplicationCfgDyn <- holdDCfg "App overrides" appDep defAppOv
   validDyn <- holdDyn True $ updated tOkEv
-  pure
-    ( DeploymentUpdate
-        <$> (DeploymentTag <$> tagDyn)
-        <*> appVarsDyn
-        <*> deploymentVarsDyn
-    , validDyn
-    , appErrEv
-    )
+  pure $
+    validDyn >>= \case
+      False -> pure Nothing
+      True -> do
+        depCfgM <- deploymentCfgDyn
+        appCfgM <- appplicationCfgDyn
+        tag' <- DeploymentTag <$> tagDyn
+        pure $ do
+          (defDepCfg, depCfg) <- depCfgM
+          (defAppCfg, appCfg) <- appCfgM
+          pure $
+            DeploymentUpdate
+              { newTag = tag'
+              , appOverrides = extractOverrides defAppCfg appCfg
+              , deploymentOverrides = extractOverrides defDepCfg depCfg
+              }
   where
     getTagError crEv tagDyn =
       let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
@@ -611,18 +634,36 @@ deploymentPopupBody defTag defAppOv defDepOv errEv = mdo
           badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
        in leftmost [tagErrEv, badNameEv]
 
+type RequestErrorHandler t m = forall tag a. Event t (ReqResult tag a) -> m (Event t a)
+
+wrapRequestErrors ::
+  MonadWidget t m =>
+  ( forall w.
+    Semigroup w =>
+    RequestErrorHandler t (EventWriterT t w m) ->
+    EventWriterT t w m x
+  ) ->
+  m x
+wrapRequestErrors f = mdo
+  errs <- foldDyn (flip (<>)) mempty ev
+  void $ list (patchMapNewElementsMap <$> errs) errorHeader
+  (x, ev :: Event t (PatchMap Unique Text)) <- runEventWriterT $
+    f $ \reqEv -> do
+      k <- liftIO newUnique
+      tellEvent $ fmapCheap (PatchMap . M.singleton k . reqErrorBody) reqEv
+      pure $ fmapMaybeCheap reqSuccess reqEv
+  pure x
+
 -- | The widget used to display errors.
 errorHeader ::
   MonadWidget t m =>
   -- | Message text.
-  Event t Text ->
+  Dynamic t Text ->
   m ()
-errorHeader appErrEv = do
-  widgetHold_ blank $
-    appErrEv <&> \appErr -> do
-      divClass "deployment__output notification notification--danger" $ do
-        el "b" $ text "App error: "
-        text appErr
+errorHeader appErr = do
+  divClass "deployment__output notification notification--danger" $ do
+    el "b" $ text "App error: "
+    dynText appErr
 
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.
@@ -631,26 +672,23 @@ envVarsInput ::
   MonadWidget t m =>
   -- | Overrides header.
   Text ->
+  DefaultConfig l ->
   -- | Current deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
-  m (Dynamic t (Overrides l))
-envVarsInput overridesHeader (Overrides evs) = do
+  m (Dynamic t (Config l))
+envVarsInput overridesHeader dCfg ovs = do
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text overridesHeader
     elClass "div" "deployment__widget" $
       elClass "div" "overrides" $ mdo
-        let initEnvs =
+        let (Config evs) = applyOverrides ovs dCfg
+            initEnvs =
               L.foldl'
-                ( \m -> \case
-                    (k, ValueAdded v) -> fst $ insertUniq (k, v) m
-                    (_, ValueDeleted) -> m
-                )
+                (\m (k, v) -> fst $ insertUniq (k, v) m)
                 emptyUniqKeyMap
                 . OM.assocs
                 $ evs
-            toOverrides :: [Override] -> Overrides l
-            toOverrides = Overrides . OM.fromList . (fmap . fmap) ValueAdded
             emptyVar = ("", "")
             addEv = clickEv $> Endo (fst . insertUniq emptyVar)
         envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
@@ -662,16 +700,16 @@ envVarsInput overridesHeader (Overrides evs) = do
             "Add an override"
             addingIsEnabled
             "dash--disabled"
-        pure $ toOverrides . elemsUniq <$> envsDyn
+        pure $ Config . OM.fromList . elemsUniq <$> envsDyn
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
-  (EventWriter t (Endo (UniqKeyMap Override)) m, MonadWidget t m) =>
+  (EventWriter t (Endo (UniqKeyMap (Text, Text))) m, MonadWidget t m) =>
   -- | Index of variable in overrides list.
   Int ->
   -- | Current variable key and value.
-  Dynamic t Override ->
+  Dynamic t (Text, Text) ->
   m ()
 envVarInput i epDyn = do
   ep <- sample $ current epDyn
@@ -706,4 +744,5 @@ elemsUniq (UniqKeyMap m _) = M.elems m
 emptyUniqKeyMap :: UniqKeyMap v
 emptyUniqKeyMap = UniqKeyMap mempty 0
 
-type Override = (Text, Text)
+holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
+holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev

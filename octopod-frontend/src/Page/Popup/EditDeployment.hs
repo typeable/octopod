@@ -16,8 +16,10 @@ import Prelude as P
 
 import Common.Types
 import Common.Utils
+import Data.Maybe
 import Frontend.API
 import Frontend.Utils
+import Reflex.Network
 import Servant.Reflex
 
 -- | The root function for \"edit deployment\" sidebar.
@@ -33,12 +35,15 @@ editDeploymentPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
     (closeEv', saveEv) <- editDeploymentPopupHeader dname enabledDyn
-    (deploymentDyn, validDyn) <- editDeploymentPopupBody dfi respEv
+    deploymentMDyn <- editDeploymentPopupBody dfi respEv
     respEv <-
-      updateEndpoint
-        (constDyn $ Right dname)
-        (Right <$> deploymentDyn)
-        saveEv
+      holdDyn (pure never) >=> networkView >=> switchHold never $
+        tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
+          pb <- getPostBuild
+          updateEndpoint
+            (constDyn $ Right dname)
+            (pure $ Right dep)
+            pb
     sentDyn <-
       holdDyn False $
         leftmost
@@ -48,7 +53,7 @@ editDeploymentPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
     let successEv =
           fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
         closeEv = leftmost [closeEv', successEv]
-        enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
+        enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
     pure (updated sentDyn, closeEv)
 
 -- | The header of the sidebar contains the deployment name and control buttons:
@@ -80,15 +85,13 @@ editDeploymentPopupBody ::
   -- | \"Edit request\" failure event.
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns deployment update and validation state.
-  m (Dynamic t DeploymentUpdate, Dynamic t Bool)
-editDeploymentPopupBody dfi errEv = mdo
-  errorHeader err
-  (du, valid, err) <-
-    divClass "popup__content" $
-      divClass "deployment" $
-        deploymentPopupBody
-          (dfi ^. #deployment . #tag . coerced . to Just)
-          (dfi ^. #deployment . #appOverrides)
-          (dfi ^. #deployment . #deploymentOverrides)
-          errEv
-  pure (du, valid)
+  m (Dynamic t (Maybe DeploymentUpdate))
+editDeploymentPopupBody dfi errEv = wrapRequestErrors $ \hReq -> do
+  divClass "popup__content" $
+    divClass "deployment" $
+      deploymentPopupBody
+        hReq
+        (dfi ^. #deployment . #tag . coerced . to Just)
+        (dfi ^. #deployment . #appOverrides)
+        (dfi ^. #deployment . #deploymentOverrides)
+        errEv
