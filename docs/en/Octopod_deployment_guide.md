@@ -12,13 +12,13 @@
 There are several options to install octopod depending on your needs.
 
 ### If you have a kubernetes cluster
-You can install octopod on any kubernetes cluster using the [Helm chart](../../charts/helm3/octopod).
+You can install octopod on any kubernetes cluster using the [Helm chart](../../charts/octopod).
 Your cluster must satisfy following requirements:
 - PVC support
 - Ingress contoller ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed
 - Kubernetes version >= 1.19.0
 
-After checking the requirements you can follow [instruction](../../charts/helm3/octopod/README.md) provided with the helm chart to install octopod on your cluster.
+After checking the requirements you can follow [instruction](../../charts/octopod/README.md) provided with the helm chart to install octopod on your cluster.
 
 ### If you want to try it locally
 You can use [octopod_local_install.sh](../../octopod_local_install.sh) script to bootstrap kind cluster with octopod installed in it.
