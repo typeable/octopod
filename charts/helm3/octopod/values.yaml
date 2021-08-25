@@ -97,7 +97,7 @@ octopod:
   vaultEnv: {}
 controlScripts:
   image:
-    repository: typeable/octopod-generic-utils
+    repository: typeable/octopod-helm-control-scripts
     pullPolicy: IfNotPresent
     tag: 0.1.0
 sqitch:
