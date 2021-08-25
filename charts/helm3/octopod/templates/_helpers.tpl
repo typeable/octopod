@@ -136,3 +136,11 @@ octopod-app.{{ .Values.octopod.baseDomain }}
 {{- randAlphaNum 32 }}
 {{- end }}
 {{- end }}
+
+{{- define "octopodUiAuthSecret" -}}
+{{- if .Values.octopod.uiAuthSecret -}}
+{{ .Values.octopod.uiAuthSecret }}
+{{- else }}
+{{- randAlphaNum 32 }}
+{{- end }}
+{{- end }}

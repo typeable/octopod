@@ -1,14 +1,12 @@
 # Octopod
 
-### This is beta version of a chart!
-
 [Octopod](https://octopod.site/) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
 ## TL;DR
 ```console
-helm repo add typeable https://typeable.github.io/octopod/
-kubectl create ns octopod-deployment
-helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
+$ helm repo add typeable https://typeable.github.io/octopod/
+$ kubectl create ns octopod-deployment
+$ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 ## Introduction
@@ -33,27 +31,12 @@ Second in which Octopod will deploy all it's deployments (configured in octopod.
 ```console
 $ kubectl create namespace octopod-deployments
 ```
-Also you need to generate certificates for octo client<->octopod server communication.
-
-Generate certificates
-```bash
-mkdir certs
-cd certs && \
-openssl req -x509 -newkey rsa:4096 -keyout server_key.pem -out server_cert.pem -nodes -subj "/CN=localhost/O=Server" && \
-openssl req -newkey rsa:4096 -keyout client_key.pem -out client_csr.pem -nodes -subj "/CN=Client" && \
-openssl x509 -req -in client_csr.pem -CA server_cert.pem -CAkey server_key.pem -out client_cert.pem -set_serial 01 -days 3650
-
-```
-Create configmap from generated certificates
-```console
-kubectl create configmap octopod-certs -n octopod --from-file=./certs
-```
-Name for configmap is cofigured in octopod.certsConfigMapName  
+  
 To install the chart with the release name `my-release` from current directory execute:
 
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
-# helm -n octopod install my-release typeable/octopod 
+$ helm -n octopod install my-release typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 The command deploys Octopod on the Kubernetes cluster in the default configuration inside octopod namespace. The [Parameters](#parameters) section lists the parameters that can be configured during installation.
@@ -67,6 +50,17 @@ $ helm -n octopod delete my-release
 ```
 
 The command removes all the Kubernetes components but PVC's associated with the postgres chart and deletes the release.
+
+## Note about generated values
+Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [a limitation in helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must fix these values by providing them via `--set` flags or in the [values file](https://helm.sh/docs/chart_template_guide/values_files/).
+
+These values are:
+- `postgresql.postgresqlPassword` - main db password
+- `postgresql.postgresqlPostgresPassword` - password for "postgres" user
+- `octopod.cliAuthSecret` - auth header for octo cli tool
+- `octopod.uiAuthSecret` - basic auth secret for ui->octopod communication
+
+Note: if these values are not provided, the `helm upgrade` command can fail or Octopod will not work after the upgrade.
 
 ## Parameters
 
@@ -102,6 +96,7 @@ The following tables lists the configurable parameters of the Octopod chart and 
 | octopod.archiveRetention | int | `1209600` |  |
 | octopod.baseDomain | string | `""` | Domain that will be used as a ase for Octopod deploymets and ingress hosts|
 | octopod.cliAuthSecret | string | `nil` | Auth Header for accessing octopod using octo CLI |
+| octopod.uiAuthSecret | string | `nil` | Basic auth secret for securing communcation between octopod UI and backend API  |
 | octopod.deploymentNamespace | string | `"octopod-deployment"` | Name of a namespace which will be used for all Octopod deployments (you need to create it yourself) |
 | octopod.env | object | `{}` | key value map for supplying additional environment variables for octopod or your control scripts |
 | octopod.migrations.enabled | bool | `true` | Enable or not automatic DB schema migrations |

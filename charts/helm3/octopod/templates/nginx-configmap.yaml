@@ -1,4 +1,4 @@
-{{- $octopodAppAuthPassword := randAlphaNum 32 -}}
+{{- $octopodAppAuthPassword := include "octopodUiAuthSecret" . -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
