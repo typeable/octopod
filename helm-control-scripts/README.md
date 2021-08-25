@@ -1,7 +1,7 @@
 # Generic scripts
 
-This is a complete suite of the octopod control scripts to deploy helm charts.
-You can get built docker images [here](https://hub.docker.com/r/typeable/octopod-generic-utils)
+This is a complete suite of Octopod control scripts to deploy helm charts.
+You can get pre-built docker images from [hub.docker.com/r/typeable/octopod-generic-utils](https://hub.docker.com/r/typeable/octopod-generic-utils).
 
 ### Contents
 
