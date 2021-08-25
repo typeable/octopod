@@ -8,7 +8,11 @@
 --are generated from the servant API) and functions that work with request
 --results.
 module Frontend.API
-  ( apiClients,
+  ( deploymentOverrideKeys,
+    defaultDeploymentOverrides,
+    applicationOverrideKeys,
+    defaultApplicationOverrdes,
+    apiClients,
     listEndpoint,
     createEndpoint,
     archiveEndpoint,
@@ -65,6 +69,24 @@ apiClients =
           & xhrRequest_url %~ (T.append url)
     host = SR.BasePath "/"
 
+deploymentOverrideKeys ::
+  MonadWidget t m =>
+  Event t () ->
+  m (Event t (ReqResult () [Text]))
+defaultDeploymentOverrides ::
+  MonadWidget t m =>
+  Event t () ->
+  m (Event t (ReqResult () (DefaultConfig 'DeploymentLevel)))
+applicationOverrideKeys ::
+  MonadWidget t m =>
+  Dynamic t (Either Text (Config 'DeploymentLevel)) ->
+  Event t () ->
+  m (Event t (ReqResult () [Text]))
+defaultApplicationOverrdes ::
+  MonadWidget t m =>
+  Dynamic t (Either Text (Config 'DeploymentLevel)) ->
+  Event t () ->
+  m (Event t (ReqResult () (DefaultConfig 'DeploymentLevel)))
 listEndpoint ::
   MonadWidget t m =>
   Event t () ->
@@ -113,15 +135,19 @@ projectName ::
   MonadWidget t m =>
   Event t () ->
   m (Event t (ReqResult () ProjectName))
-( listEndpoint
-    :<|> createEndpoint
-    :<|> archiveEndpoint
-    :<|> updateEndpoint
-    :<|> infoEndpoint
-    :<|> fullInfoEndpoint
-    :<|> statusEndpoint
-    :<|> restoreEndpoint
-  )
+deploymentOverrideKeys
+  :<|> defaultDeploymentOverrides
+  :<|> applicationOverrideKeys
+  :<|> defaultApplicationOverrdes
+  :<|> ( listEndpoint
+          :<|> createEndpoint
+          :<|> archiveEndpoint
+          :<|> updateEndpoint
+          :<|> infoEndpoint
+          :<|> fullInfoEndpoint
+          :<|> statusEndpoint
+          :<|> restoreEndpoint
+        )
   :<|> pingEndpoint
   :<|> projectName = apiClients
 

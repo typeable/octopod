@@ -84,6 +84,7 @@ executable frontend
                      , AllowAmbiguousTypes
                      , OverloadedLabels
                      , ViewPatterns
+                     , ApplicativeDo
   build-depends:       aeson
                      , base
                      , bytestring

@@ -14,6 +14,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Data.Functor
 import Data.Generics.Labels ()
+import Data.Generics.Sum
 import qualified Data.List as L
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -21,9 +22,10 @@ import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Proxy (Proxy (..))
-import Data.Text as T (Text, null, pack)
+import Data.Text as T (Text, intercalate, null, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
+import Frontend.API
 import Frontend.GHCJS
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
@@ -31,6 +33,8 @@ import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
+import Servant.Common.Req
+import Servant.Reflex.Extra
 
 -- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement = ClickedElement {unClickedElement :: Maybe DOM.Element}
@@ -573,6 +577,52 @@ kubeDashboardUrl deploymentInfo = do
   template <- asks kubernetesDashboardUrlTemplate
   let name = unDeploymentName . view (#deployment . #name) <$> deploymentInfo
   return $ name <&> (\n -> (<> n) <$> template)
+
+deploymentPopupBody ::
+  MonadWidget t m =>
+  Maybe DeploymentTag ->
+  Overrides 'ApplicationLevel ->
+  Overrides 'DeploymentLevel ->
+  -- | \"Edit request\" failure event.
+  Event t (ReqResult tag CommandResponse) ->
+  -- | Returns deployment update and validation state.
+  m (Dynamic t DeploymentUpdate, Dynamic t Bool, Event t Text)
+deploymentPopupBody defTag defAppOv defDepOv errEv = mdo
+  let commandResponseEv = fmapMaybe commandResponse errEv
+      appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
+      tagErrEv = getTagError commandResponseEv tagDyn
+  (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
+  appVarsDyn <- envVarsInput "App overrides" defAppOv
+  deploymentVarsDyn <- envVarsInput "Deployment overrides" defDepOv
+  validDyn <- holdDyn True $ updated tOkEv
+  pure
+    ( DeploymentUpdate
+        <$> (DeploymentTag <$> tagDyn)
+        <*> appVarsDyn
+        <*> deploymentVarsDyn
+    , validDyn
+    , appErrEv
+    )
+  where
+    getTagError crEv tagDyn =
+      let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
+          tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
+          badTagText = "Tag should not be empty"
+          badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
+       in leftmost [tagErrEv, badNameEv]
+
+-- | The widget used to display errors.
+errorHeader ::
+  MonadWidget t m =>
+  -- | Message text.
+  Event t Text ->
+  m ()
+errorHeader appErrEv = do
+  widgetHold_ blank $
+    appErrEv <&> \appErr -> do
+      divClass "deployment__output notification notification--danger" $ do
+        el "b" $ text "App error: "
+        text appErr
 
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.

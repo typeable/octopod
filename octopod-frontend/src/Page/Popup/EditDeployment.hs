@@ -5,24 +5,20 @@
 --This module contains the definition of the "edit deployment" sidebar.
 module Page.Popup.EditDeployment (editDeploymentPopup) where
 
-import Control.Lens (coerced, preview, to, (^.), _2)
+import Control.Lens
 import Control.Monad
 import Data.Coerce
 import Data.Functor
-import Data.Generics.Product
 import Data.Generics.Sum
 import Data.Monoid
-import qualified Data.Text as T
 import Reflex.Dom as R hiding (mapMaybe)
 import Prelude as P
 
 import Common.Types
 import Common.Utils
-import Data.Text (Text)
 import Frontend.API
 import Frontend.Utils
 import Servant.Reflex
-import Servant.Reflex.Extra
 
 -- | The root function for \"edit deployment\" sidebar.
 editDeploymentPopup ::
@@ -85,44 +81,14 @@ editDeploymentPopupBody ::
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns deployment update and validation state.
   m (Dynamic t DeploymentUpdate, Dynamic t Bool)
-editDeploymentPopupBody dfi errEv = divClass "popup__content" $
-  divClass "deployment" $ mdo
-    let commandResponseEv = fmapMaybe commandResponse errEv
-        appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
-        dfiTag = dfi ^. field @"deployment" . field @"tag" . coerced . to Just
-        dfiAppVars = dfi ^. field @"deployment" . field @"appOverrides" . coerced
-        dfiDeploymentVars =
-          dfi ^. field @"deployment" . field @"deploymentOverrides" . coerced
-        tagErrEv = getTagError commandResponseEv tagDyn
-    errorHeader appErrEv
-    (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" dfiTag tagErrEv
-    appVarsDyn <- envVarsInput "App overrides" dfiAppVars
-    deploymentVarsDyn <- envVarsInput "Deployment overrides" dfiDeploymentVars
-    validDyn <- holdDyn True $ updated tOkEv
-    pure
-      ( DeploymentUpdate
-          <$> (DeploymentTag <$> tagDyn)
-          <*> appVarsDyn
-          <*> deploymentVarsDyn
-      , validDyn
-      )
-  where
-    getTagError crEv tagDyn =
-      let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
-          tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
-          badTagText = "Tag should not be empty"
-          badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
-       in leftmost [tagErrEv, badNameEv]
-
--- | The widget used to display errors.
-errorHeader ::
-  MonadWidget t m =>
-  -- | Message text.
-  Event t Text ->
-  m ()
-errorHeader appErrEv = do
-  widgetHold_ blank $
-    appErrEv <&> \appErr -> do
-      divClass "deployment__output notification notification--danger" $ do
-        el "b" $ text "App error: "
-        text appErr
+editDeploymentPopupBody dfi errEv = mdo
+  errorHeader err
+  (du, valid, err) <-
+    divClass "popup__content" $
+      divClass "deployment" $
+        deploymentPopupBody
+          (dfi ^. #deployment . #tag . coerced . to Just)
+          (dfi ^. #deployment . #appOverrides)
+          (dfi ^. #deployment . #deploymentOverrides)
+          errEv
+  pure (du, valid)

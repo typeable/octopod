@@ -138,10 +138,10 @@ in
         export TAG_CHECKING_COMMAND=${echoScript}
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
-        export DEPLOYMENT_OVERRIDES_COMMAND=${echoScript}
-        export DEPLOYMENT_KEYS_COMMAND=${echoScript}
-        export APPLICATION_OVERRIDES_COMMAND=${echoScript}
-        export APPLICATION_KEYS_COMMAND=${echoScript}
+        export DEPLOYMENT_OVERRIDES_COMMAND=${infoScript}
+        export DEPLOYMENT_KEYS_COMMAND=${infoScript}
+        export APPLICATION_OVERRIDES_COMMAND=${infoScript}
+        export APPLICATION_KEYS_COMMAND=${infoScript}
         export POWER_AUTHORIZATION_HEADER="123"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
