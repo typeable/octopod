@@ -34,7 +34,7 @@ _Octopod Server_ is deployed in the `octopod` _Kubernetes_ namespace. Deployment
 _Octopod Server_ uses the `octopod` [_Service Account_][kubernetes-service-account].
 
 Octopod needs a sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extended.
-RBAC rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/octopod/templates/rbac.yaml)
+[RBAC][kubernetes-rbac] rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/octopod/templates/rbac.yaml)
 
 ## Web UI authentication
 
