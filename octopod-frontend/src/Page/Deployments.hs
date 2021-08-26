@@ -292,7 +292,9 @@ activeDeploymentWidget clickedEv dDyn' = do
         el "td" $ do
           name
           statusWidget $ constDyn status
-        el "td" $ divClass "listing" $ forM_ metadata (renderMetadataLink . pure)
+        el "td" $
+          divClass "listing" $
+            forM_ (unDeploymentMetadata metadata) (renderMetadataLink . pure)
         el "td" tag'
         el "td" $
           overridesWidget $ deployment ^. field @"appOverrides" . coerced

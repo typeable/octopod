@@ -25,15 +25,16 @@ import Data.Text as T
 import Data.Traversable
 
 import Common.Types
+import Data.Time
 
 -- | Parses deployment metadata.
-parseDeploymentMetadata :: [Text] -> IO [DeploymentMetadata]
-parseDeploymentMetadata texts =
+parseDeploymentMetadata :: [Text] -> IO DeploymentMetadata
+parseDeploymentMetadata texts = fmap DeploymentMetadata $
   for texts $ \t ->
     case T.findIndex (== ',') t of
       Just i -> do
         let (key, value) = bimap strip (T.tail . strip) $ T.splitAt i t
-        pure $ DeploymentMetadata key value
+        pure $ DeploymentMetadatum key value
       Nothing ->
         error $
           "Malformed metadata key-value pair " <> T.unpack t
@@ -60,11 +61,11 @@ newtype Namespace = Namespace {unNamespace :: Text}
   deriving stock (Show)
 
 -- | Archive retention.
-newtype ArchiveRetention = ArchiveRetention {unArchiveRetention :: Int}
+newtype ArchiveRetention = ArchiveRetention {unArchiveRetention :: NominalDiffTime}
   deriving stock (Show)
 
 -- | Timeout.
-newtype Timeout = Timeout {unTimeout :: Int}
+newtype Timeout = Timeout {unTimeout :: CalendarDiffTime}
   deriving stock (Show)
 
 -- | Path to a deployment control script.

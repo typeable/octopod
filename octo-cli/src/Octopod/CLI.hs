@@ -2,9 +2,9 @@
 
 module Octopod.CLI (runOcto) where
 
-import Chronos
 import Common.Types
 import Common.Utils (dfiName)
+import Control.Exception
 import Control.Lens hiding (List)
 import Control.Monad
 import Control.Monad.IO.Class
@@ -14,11 +14,14 @@ import qualified Data.ByteString.Lazy.Char8 as LBSC
 import Data.Coerce
 import Data.Generics.Labels ()
 import Data.Generics.Product
+import qualified Data.Map.Ordered.Strict as OM
+import Data.Maybe
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text.Lens
+import Data.Time
 import GHC.IO.Encoding
 import Network.HTTP.Client.TLS
 import Octopod.CLI.Args
@@ -45,6 +48,9 @@ import Text.Layout.Table
 import Text.Layout.Table.Extras ()
 import Prelude as P
 
+dieT :: MonadIO m => Text -> m a
+dieT = liftIO . die . T.unpack
+
 -- | Runs the octo CLI.
 runOcto :: IO ()
 runOcto = do
@@ -58,27 +64,17 @@ runOcto = do
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      Create tName tTag tSetAp tSetDep tSetPAp tSetPDep -> do
-        setApp <- liftIO $ parseSetApplicationOverrides Public tSetAp
-        setDep <- liftIO $ parseSetDeploymentOverrides Public tSetDep
-        setPApp <- liftIO $ parseSetApplicationOverrides Private tSetPAp
-        setPDep <- liftIO $ parseSetDeploymentOverrides Private tSetPDep
-        let appOvs = setApp ++ setPApp
-            depOvs = setDep ++ setPDep
+      Create tName tTag tSetAp tSetDep -> do
+        appOvs <- either dieT pure $ parseSetOverrides tSetAp
+        depOvs <- either dieT pure $ parseSetOverrides tSetDep
         handleCreate auth $ Deployment (coerce tName) (coerce tTag) appOvs depOvs
       List -> handleList auth
       Archive tName -> handleArchive auth . coerce $ tName
-      Update tName tTag tSetAp tUnsAp tSetD tUnsD tSetPAp tSetPD -> do
-        setApp <- liftIO $ parseSetApplicationOverrides Public tSetAp
-        setDep <- liftIO $ parseSetDeploymentOverrides Public tSetD
-        unsetApp <- liftIO $ parseUnsetApplicationOverrides Public tUnsAp
-        unsetDep <- liftIO $ parseUnsetDeploymentOverrides Public tUnsD
-        setPApp <- liftIO $ parseSetApplicationOverrides Private tSetPAp
-        setPDep <- liftIO $ parseSetDeploymentOverrides Private tSetPD
-        let appOvs = setApp ++ setPApp
-            depOvs = setDep ++ setPDep
-            tName' = coerce tName
-            tTag' = coerce tTag
+      Update tName tTag tSetAp unsetApp tSetD unsetDep -> do
+        appOvs <- either dieT pure $ parseSetOverrides tSetAp
+        depOvs <- either dieT pure $ parseSetOverrides tSetD
+        let tName' = coerce tName
+            tTag' = coerce <$> tTag
         handleUpdate auth tName' tTag' appOvs unsetApp depOvs unsetDep
       Info tName ->
         handleInfo auth . coerce $ tName
@@ -130,25 +126,45 @@ handleArchive auth dName = do
 handleUpdate ::
   AuthContext AuthHeaderAuth ->
   DeploymentName ->
-  DeploymentTag ->
-  ApplicationOverrides ->
-  ApplicationOverrides ->
-  DeploymentOverrides ->
-  DeploymentOverrides ->
+  Maybe DeploymentTag ->
+  Overrides 'ApplicationLevel ->
+  [Text] ->
+  Overrides 'DeploymentLevel ->
+  [Text] ->
   ReaderT ClientEnv IO ()
-handleUpdate auth dName dTag dNewAppOvs dOldAppOvs dNewDepOvs dOldDepOvs = do
+handleUpdate auth dName dTag dNewAppOvs removedAppOvs dNewDepOvs removedDepOvs = do
   clientEnv <- ask
+  dep <- runClientM' (_fullInfoH auth dName) clientEnv
+  let removeAll :: Ord k => [k] -> OM.OMap k v -> Either k (OM.OMap k v)
+      removeAll [] m = Right m
+      removeAll (k : kk) m =
+        if k `OM.member` m
+          then removeAll kk $ OM.delete k m
+          else Left k
+      removeAllM :: MonadIO m => [Text] -> Overrides l -> m (Overrides l)
+      removeAllM ks (Overrides m) =
+        either
+          (\k -> dieT $ "Override " <> k <> " not present in deployment.")
+          (pure . Overrides)
+          $ removeAll ks m
+  appOverrides' <-
+    fmap (<> dNewAppOvs) $
+      removeAllM removedAppOvs $ dep ^. #deployment . #appOverrides
+  deploymentOverrides' <-
+    fmap (<> dNewDepOvs) $
+      removeAllM removedDepOvs $ dep ^. #deployment . #deploymentOverrides
   liftIO $ do
     let dUpdate =
           DeploymentUpdate
-            { newTag = dTag
-            , newAppOverrides = dNewAppOvs
-            , oldAppOverrides = dOldAppOvs
-            , newDeploymentOverrides = dNewDepOvs
-            , oldDeploymentOverrides = dOldDepOvs
+            { newTag = fromMaybe (dep ^. #deployment . #tag) dTag
+            , appOverrides = appOverrides'
+            , deploymentOverrides = deploymentOverrides'
             }
     response <- runClientM (updateH auth dName dUpdate) clientEnv
     handleResponse (const $ pure ()) response
+
+runClientM' :: MonadIO m => ClientM a -> ClientEnv -> m a
+runClientM' req env = liftIO $ runClientM req env >>= either (die . displayException) pure
 
 -- | Handles the 'info' subcommand.
 handleInfo :: AuthContext AuthHeaderAuth -> DeploymentName -> ReaderT ClientEnv IO ()
@@ -192,13 +208,13 @@ handleGetActionInfo auth aId l = do
     runClientM (getActionInfoH auth aId) clientEnv >>= \case
       Left err -> print err
       Right x -> case l of
-        Out -> T.putStrLn $ x ^. #stdout
-        Err -> T.putStrLn $ x ^. #stderr
+        Out -> T.putStrLn . unStdout $ x ^. #stdout
+        Err -> T.putStrLn . unStderr $ x ^. #stderr
         ErrOut -> do
           T.putStrLn "\t\tstdout:\n"
-          T.putStrLn $ x ^. #stdout
+          T.putStrLn . unStdout $ x ^. #stdout
           T.putStrLn "\t\tstderr:\n"
-          T.putStrLn $ x ^. #stderr
+          T.putStrLn . unStderr $ x ^. #stderr
 
 listH :: AuthContext AuthHeaderAuth -> ClientM [DeploymentFullInfo]
 createH :: AuthContext AuthHeaderAuth -> Deployment -> ClientM CommandResponse
@@ -260,19 +276,19 @@ decodeError body =
 
 -- | Pretty-prints the 'info' subcommand result.
 printInfo :: DeploymentInfo -> IO ()
-printInfo (DeploymentInfo (Deployment _ dTag dAppOvs dStOvs) dMeta dLogs) = do
+printInfo (DeploymentInfo (Deployment _ dTag dAppOvs dStOvs) (DeploymentMetadata dMeta) dLogs) = do
   T.putStrLn "Current settings:"
   T.putStrLn $ "tag: " <> coerce dTag
   T.putStrLn $
     "application overrides: "
-      <> (formatOverrides $ coerce <$> dAppOvs)
+      <> formatOverrides dAppOvs
   T.putStrLn $
     "deployment overrides: "
-      <> (formatOverrides $ coerce <$> dStOvs)
+      <> formatOverrides dStOvs
   T.putStrLn $ "metadata: "
   forM_ dMeta $ \m ->
     T.putStrLn $
-      "  " <> deploymentMetadataKey m <> ": " <> deploymentMetadataValue m
+      "  " <> m ^. #name <> ": " <> m ^. #link
   T.putStrLn ""
   T.putStrLn "Last logs:"
   ppDeploymentLogs dLogs
@@ -308,21 +324,13 @@ ppDeploymentLogRow dLog =
   colsAllG
     top
     [
-      [ encode_YmdHMS
-          SubsecondPrecisionAuto
-          w3c
-          ( timeToDatetime . Time . fromIntegral $
-              dLog ^. field @"createdAt" * 10 ^ (9 :: Int)
-          )
+      [ T.pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S")) $
+          dLog ^. field @"createdAt"
       ]
     , [dLog ^. field @"actionId" . to unActionId . re _Show . packed]
-    , [dLog ^. field @"action" . coerced]
+    , [dLog ^. field @"action" . to actionToText]
     , [dLog ^. field @"deploymentTag" . coerced]
-    , dLog
-        ^. field @"deploymentAppOverrides"
-          . to (fmap $ formatOverride . coerce)
-    , dLog
-        ^. field @"deploymentDepOverrides"
-          . to (fmap $ formatOverride . coerce)
+    , dLog ^. field @"deploymentAppOverrides" . to formatOverrides'
+    , dLog ^. field @"deploymentDepOverrides" . to formatOverrides'
     , [dLog ^. field @"exitCode" . re _Show . packed]
     ]

@@ -8,25 +8,29 @@
 --frontend modules.
 module Frontend.Utils where
 
+import Common.Types as CT
 import Control.Lens
 import Control.Monad
+import Control.Monad.Reader
+import Data.Functor
 import Data.Generics.Labels ()
+import qualified Data.List as L
 import Data.Map (Map)
+import qualified Data.Map as M
+import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromMaybe)
+import Data.Monoid
 import Data.Proxy (Proxy (..))
-import Data.Text as T (Text, pack)
+import Data.Text as T (Text, null, pack)
 import Data.Time
 import Data.Time.Clock.POSIX
+import Frontend.GHCJS
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
-
-import Common.Types as CT
-import Control.Monad.Reader
-import Frontend.GHCJS
 
 -- | Wrapper for @Maybe DOM.Element@. It's used by 'elementClick'.
 newtype ClickedElement = ClickedElement {unClickedElement :: Maybe DOM.Element}
@@ -374,18 +378,13 @@ elDynAttrWithModifyConfig' f elementTag attrs child = do
   pure result
 
 -- | Formats posix seconds to date in iso8601.
-formatPosixToDate :: Int -> Text
-formatPosixToDate =
-  pack
-    . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
-    . intToUTCTime
+formatPosixToDate :: FormatTime t => t -> Text
+formatPosixToDate = pack . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
 
 -- | Formats posix seconds to date in iso8601 with time.
-formatPosixToDateTime :: Int -> Text
+formatPosixToDateTime :: FormatTime t => t -> Text
 formatPosixToDateTime =
-  pack
-    . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
-    . intToUTCTime
+  pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S"))
 
 -- | Widget displaying the current deployment status.
 statusWidget :: MonadWidget t m => Dynamic t PreciseDeploymentStatus -> m ()
@@ -487,9 +486,9 @@ errorCommonWidget =
 overridesWidget ::
   MonadWidget t m =>
   -- | List of overrides.
-  Overrides ->
+  Overrides l ->
   m ()
-overridesWidget envs = divClass "listing listing--for-text" $ do
+overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for-text" $ do
   let visible = take 3 envs
       envLength = length envs
   listing visible
@@ -512,10 +511,12 @@ overridesWidget envs = divClass "listing listing--for-text" $ do
     blank
   where
     listing envs' = do
-      forM_ envs' $ \(Override var val _) ->
+      forM_ envs' $ \(var, val) ->
         divClass "listing__item" $ do
           el "b" $ text $ var <> ": "
-          text val
+          case val of
+            ValueAdded v -> text v
+            ValueDeleted -> el "i" $ text "<deleted>"
 
 -- | @if-then-else@ helper for cases when bool value is wrapped in 'Dynamic'.
 ifThenElseDyn ::
@@ -572,3 +573,87 @@ kubeDashboardUrl deploymentInfo = do
   template <- asks kubernetesDashboardUrlTemplate
   let name = unDeploymentName . view (#deployment . #name) <$> deploymentInfo
   return $ name <&> (\n -> (<> n) <$> template)
+
+-- | Widget with override fields. This widget supports adding and
+-- removing key-value pairs.
+envVarsInput ::
+  forall l t m.
+  MonadWidget t m =>
+  -- | Overrides header.
+  Text ->
+  -- | Current deployment overrides.
+  Overrides l ->
+  -- | Updated deployment overrides.
+  m (Dynamic t (Overrides l))
+envVarsInput overridesHeader (Overrides evs) = do
+  elClass "section" "deployment__section" $ do
+    elClass "h3" "deployment__sub-heading" $ text overridesHeader
+    elClass "div" "deployment__widget" $
+      elClass "div" "overrides" $ mdo
+        let initEnvs =
+              L.foldl'
+                ( \m -> \case
+                    (k, ValueAdded v) -> fst $ insertUniq (k, v) m
+                    (_, ValueDeleted) -> m
+                )
+                emptyUniqKeyMap
+                . OM.assocs
+                $ evs
+            toOverrides :: [Override] -> Overrides l
+            toOverrides = Overrides . OM.fromList . (fmap . fmap) ValueAdded
+            emptyVar = ("", "")
+            addEv = clickEv $> Endo (fst . insertUniq emptyVar)
+        envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
+        (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
+        let addingIsEnabled = all ((not . T.null) . fst) . elemsUniq <$> envsDyn
+        clickEv <-
+          buttonClassEnabled'
+            "overrides__add dash dash--add"
+            "Add an override"
+            addingIsEnabled
+            "dash--disabled"
+        pure $ toOverrides . elemsUniq <$> envsDyn
+
+-- | Widget for entering a key-value pair. The updated overrides list is
+-- written to the 'EventWriter'.
+envVarInput ::
+  (EventWriter t (Endo (UniqKeyMap Override)) m, MonadWidget t m) =>
+  -- | Index of variable in overrides list.
+  Int ->
+  -- | Current variable key and value.
+  Dynamic t Override ->
+  m ()
+envVarInput i epDyn = do
+  ep <- sample $ current epDyn
+  divClass "overrides__item" $ do
+    (keyDyn, _) <-
+      octopodTextInput' "overrides__key" "key" (Just $ fst ep) never
+    (valDyn, _) <-
+      octopodTextInput' "overrides__value" "value" (Just $ snd ep) never
+    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
+    let envEv = updated $ zipDynWith (,) keyDyn valDyn
+        deleteEv = Endo (deleteUniq i) <$ closeEv
+        updEv = Endo . updateUniq i . const <$> envEv
+    tellEvent $ leftmost [deleteEv, updEv]
+
+data UniqKeyMap v = UniqKeyMap (Map Int v) Int
+
+uniqMap :: UniqKeyMap v -> Map Int v
+uniqMap (UniqKeyMap m _) = m
+
+insertUniq :: v -> UniqKeyMap v -> (UniqKeyMap v, Int)
+insertUniq v (UniqKeyMap m x) = (UniqKeyMap (M.insert x v m) (x + 1), x)
+
+deleteUniq :: Int -> UniqKeyMap v -> UniqKeyMap v
+deleteUniq k (UniqKeyMap m x) = UniqKeyMap (M.delete k m) x
+
+updateUniq :: Int -> (v -> v) -> UniqKeyMap v -> UniqKeyMap v
+updateUniq k f (UniqKeyMap m x) = UniqKeyMap (M.adjust f k m) x
+
+elemsUniq :: UniqKeyMap v -> [v]
+elemsUniq (UniqKeyMap m _) = M.elems m
+
+emptyUniqKeyMap :: UniqKeyMap v
+emptyUniqKeyMap = UniqKeyMap mempty 0
+
+type Override = (Text, Text)

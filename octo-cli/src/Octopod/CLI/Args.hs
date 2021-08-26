@@ -20,10 +20,6 @@ data Args
         setAppOverrides :: [Text]
       , -- | deployment-level overrides to set
         setDeploymentOverrides :: [Text]
-      , -- | application-level private overrides to set
-        setAppPrivateOverrides :: [Text]
-      , -- | deployment-level private overrides to set
-        setDeploymentPrivateOverrides :: [Text]
       }
   | List
   | Archive
@@ -34,7 +30,7 @@ data Args
       { -- | deployment name
         name :: Text
       , -- | deployment tag
-        tag :: Text
+        newTag :: Maybe Text
       , -- | application-level overrides to set
         setAppOverrides :: [Text]
       , -- | application-level overrides to unset
@@ -43,10 +39,6 @@ data Args
         setDeploymentOverrides :: [Text]
       , -- | deployment-level overrides to unset
         unsetDeploymentOverrides :: [Text]
-      , -- | application-level private overrides to set
-        setAppPrivateOverrides :: [Text]
-      , -- | deployment-level private overrides to set
-        setDeploymentPrivateOverrides :: [Text]
       }
   | Info
       { -- | deployment name
@@ -119,22 +111,6 @@ createArgs =
               <> help "set deployment level override"
           )
       )
-    <*> many
-      ( strOption
-          ( long "set-app-env-private-override"
-              <> short 'a'
-              <> help "set application level private override"
-              <> internal
-          )
-      )
-    <*> many
-      ( strOption
-          ( long "set-deployment-private-override"
-              <> short 's'
-              <> help "set deployment level private override"
-              <> internal
-          )
-      )
 
 -- | Parses arguments of 'list' subcommand.
 listArgs :: Parser Args
@@ -152,7 +128,7 @@ updateArgs :: Parser Args
 updateArgs =
   Update
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-    <*> strOption (long "tag" <> short 't' <> help "deployment tag")
+    <*> optional (strOption (long "tag" <> short 't' <> help "deployment tag"))
     <*> many
       ( strOption
           ( long "set-app-env-override"
@@ -179,22 +155,6 @@ updateArgs =
           ( long "unset-deployment-override"
               <> short 'O'
               <> help "unset a deployment level override"
-          )
-      )
-    <*> many
-      ( strOption
-          ( long "set-app-env-private-override"
-              <> short 'a'
-              <> help "set application level private override"
-              <> internal
-          )
-      )
-    <*> many
-      ( strOption
-          ( long "set-deployment-private-override"
-              <> short 's'
-              <> help "set deployment level private override"
-              <> internal
           )
       )
 

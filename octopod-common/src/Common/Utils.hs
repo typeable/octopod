@@ -36,7 +36,7 @@ dfiName ::
   (DeploymentName -> f DeploymentName) ->
   DeploymentFullInfo ->
   f DeploymentFullInfo
-dfiName = field @"deployment" . field @"name"
+dfiName = field @"deployment" . field' @"name"
 
 -- | Checks that deployment status is pending.
 isPending :: DeploymentStatus -> Bool

@@ -7,55 +7,87 @@
 -- This module contains common types between the backend and the frontend.
 module Common.Types where
 
-import Data.Bifunctor
-import Data.Coerce
-import Data.String
-import Data.Text as T hiding (filter)
+import Control.Lens
+import Data.Aeson hiding (Result)
+import Data.Generics.Labels ()
+import Data.Int
+import Data.Map.Ordered.Strict (OMap, (<>|))
+import qualified Data.Map.Ordered.Strict as OM
+import Data.Map.Ordered.Strict.Extra ()
+import Data.Maybe
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time
 import Data.Traversable
+import Deriving.Aeson
 import Deriving.Aeson.Stock
 import Web.HttpApiData
 
--- | Deployment override.
-data Override = Override
-  { overrideKey :: Text
-  , overrideValue :: Text
-  , overrideVisibility :: OverrideVisibility
+data OverrideLevel = ApplicationLevel | DeploymentLevel
+
+class KnownOverrideLevel (l :: OverrideLevel) where
+  knownOverrideLevel :: OverrideLevel
+
+instance KnownOverrideLevel 'ApplicationLevel where
+  knownOverrideLevel = ApplicationLevel
+
+instance KnownOverrideLevel 'DeploymentLevel where
+  knownOverrideLevel = DeploymentLevel
+
+data OverrideValue = ValueAdded Text | ValueDeleted
+  deriving (ToJSON, FromJSON) via Snake OverrideValue
+  deriving stock (Eq, Ord, Show, Generic)
+
+newtype DefaultConfig (l :: OverrideLevel) = DefaultConfig (OMap Text Text)
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+
+newtype Config (l :: OverrideLevel) = Config {unConfig :: OMap Text Text}
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+
+data FullDefaultConfig = FullDefaultConfig
+  { appDefaultConfig :: DefaultConfig 'ApplicationLevel
+  , depDefaultConfig :: DefaultConfig 'DeploymentLevel
   }
-  deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake Override
+  deriving stock (Show, Ord, Eq, Generic)
+  deriving (ToJSON, FromJSON) via Snake FullDefaultConfig
 
-type Overrides = [Override]
+data FullConfig = FullConfig
+  { appConfig :: Config 'ApplicationLevel
+  , depConfig :: Config 'DeploymentLevel
+  }
+  deriving stock (Show, Ord, Eq, Generic)
+  deriving (ToJSON, FromJSON) via Snake FullConfig
 
--- | Deployment override scope.
-data OverrideScope
-  = ApplicationScope
-  | DeploymentScope
-  deriving stock (Generic, Show, Read, Eq)
-  deriving (FromJSON, ToJSON) via Snake OverrideScope
+applyOverrides :: Overrides l -> DefaultConfig l -> Config l
+applyOverrides (Overrides oo) (DefaultConfig dd) =
+  Config . extract $ oo <>| (ValueAdded <$> dd)
+  where
+    extract :: OMap Text OverrideValue -> OMap Text Text
+    extract =
+      fmap
+        ( \case
+            ValueAdded v -> v
+            ValueDeleted -> error "invariant"
+        )
+        . OM.filter
+          ( \_ -> \case
+              ValueAdded _ -> True
+              ValueDeleted -> False
+          )
 
--- | Deployment override visibility.
-data OverrideVisibility
-  = Private
-  | Public
-  deriving stock (Generic, Show, Read, Eq)
-  deriving (FromJSON, ToJSON) via Snake OverrideVisibility
+newtype Overrides (l :: OverrideLevel) = Overrides {unOverrides :: OMap Text OverrideValue}
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
--- | Deployment application-level override.
-newtype ApplicationOverride = ApplicationOverride {unApplicationOverride :: Override}
-  deriving newtype (Show, Eq, FromJSON, ToJSON)
+ov :: Text -> OverrideValue -> Overrides l
+ov k v = Overrides $ OM.singleton (k, v)
 
--- | Deployment application-level overrides.
-type ApplicationOverrides = [ApplicationOverride]
+instance Semigroup (Overrides l) where
+  (Overrides lhs) <> (Overrides rhs) = Overrides $ rhs <>| lhs
 
--- | Deployment-level override.
-newtype DeploymentOverride = DeploymentOverride
-  {unDeploymentOverride :: Override}
-  deriving newtype (Show, Eq, FromJSON, ToJSON)
+instance Monoid (Overrides l) where
+  mempty = Overrides OM.empty
 
--- | Deployment-level overrides.
-type DeploymentOverrides = [DeploymentOverride]
-
-newtype DeploymentId = DeploymentId {unDeploymentId :: Int}
+newtype DeploymentId = DeploymentId {unDeploymentId :: Int64}
   deriving stock (Show)
 
 newtype DeploymentName = DeploymentName {unDeploymentName :: Text}
@@ -66,30 +98,47 @@ newtype DeploymentTag = DeploymentTag {unDeploymentTag :: Text}
   deriving newtype
     (Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
-newtype Action = Action {unAction :: Text}
-  deriving newtype (Show, FromJSON, ToJSON, IsString)
+data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction
+  deriving stock (Show, Read, Eq, Ord, Generic)
+  deriving (FromJSON, ToJSON) via Snake Action
+
+actionText :: [(Action, Text)]
+actionText =
+  [ (RestoreAction, "restore")
+  , (ArchiveAction, "archive")
+  , (UpdateAction, "update")
+  , (CreateAction, "create")
+  ]
+
+actionToText :: Action -> Text
+actionToText k = fromMaybe (error $ "forgot case: " <> show k) . Prelude.lookup k $ actionText
 
 newtype ArchivedFlag = ArchivedFlag {unArchivedFlag :: Bool}
   deriving newtype (Show, FromJSON, ToJSON)
 
-newtype Duration = Duration {unDuration :: Int}
-  deriving newtype (Show, FromJSON, ToJSON)
+newtype Duration = Duration {unDuration :: CalendarDiffTime}
+  deriving newtype (Show, Eq, FromJSON, ToJSON, FormatTime)
 
-newtype Timestamp = Timestamp {unTimestamp :: Int}
-  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON)
+newtype Timestamp = Timestamp {unTimestamp :: CalendarDiffTime}
+  deriving newtype (Show, Eq, FromJSON, ToJSON)
 
 newtype ProjectName = ProjectName {uProjectName :: Text}
   deriving newtype (Show, FromJSON, ToJSON)
 
-deploymentStatusText :: DeploymentStatus -> Text
-deploymentStatusText Running = "Running"
-deploymentStatusText (Failure GenericFailure) = "GenericFailure"
-deploymentStatusText (Failure TagMismatch) = "TagMismatch"
-deploymentStatusText (Failure PartialAvailability) = "PartialAvailability"
-deploymentStatusText CreatePending = "CreatePending"
-deploymentStatusText UpdatePending = "UpdatePending"
-deploymentStatusText ArchivePending = "ArchivePending"
-deploymentStatusText Archived = "Archived"
+deploymentStatusText :: [(DeploymentStatus, Text)]
+deploymentStatusText =
+  [ (Running, "Running")
+  , (Failure GenericFailure, "GenericFailure")
+  , (Failure TagMismatch, "TagMismatch")
+  , (Failure PartialAvailability, "PartialAvailability")
+  , (CreatePending, "CreatePending")
+  , (UpdatePending, "UpdatePending")
+  , (ArchivePending, "ArchivePending")
+  , (Archived, "Archived")
+  ]
+
+deploymentStatusToText :: DeploymentStatus -> Text
+deploymentStatusToText k = fromMaybe (error $ "forgot case: " <> show k) . Prelude.lookup k $ deploymentStatusText
 
 data DeploymentStatus
   = Running
@@ -124,8 +173,8 @@ isArchivedStatus = (`elem` archivedStatuses)
 data Deployment = Deployment
   { name :: DeploymentName
   , tag :: DeploymentTag
-  , appOverrides :: ApplicationOverrides
-  , deploymentOverrides :: DeploymentOverrides
+  , appOverrides :: Overrides 'ApplicationLevel
+  , deploymentOverrides :: Overrides 'DeploymentLevel
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake Deployment
@@ -134,27 +183,30 @@ data DeploymentLog = DeploymentLog
   { actionId :: ActionId
   , action :: Action
   , deploymentTag :: DeploymentTag
-  , deploymentAppOverrides :: ApplicationOverrides
-  , deploymentDepOverrides :: DeploymentOverrides
-  , exitCode :: Int
+  , deploymentAppOverrides :: Overrides 'ApplicationLevel
+  , deploymentDepOverrides :: Overrides 'DeploymentLevel
+  , exitCode :: Int64
   , duration :: Duration
-  , createdAt :: Int
-  }
-  deriving stock (Generic, Show)
-  deriving (FromJSON, ToJSON) via Snake DeploymentLog
-
-data DeploymentMetadata = DeploymentMetadata
-  { -- | The name of the link
-    deploymentMetadataKey :: Text
-  , -- | The URL
-    deploymentMetadataValue :: Text
+  , createdAt :: UTCTime
   }
   deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake DeploymentMetadata
+  deriving (ToJSON, FromJSON) via Snake DeploymentLog
+
+newtype DeploymentMetadata = DeploymentMetadata {unDeploymentMetadata :: [DeploymentMetadatum]}
+  deriving newtype (Eq, Show, Ord, FromJSON, ToJSON)
+
+data DeploymentMetadatum = DeploymentMetadatum
+  { -- | The name of the link
+    name :: Text
+  , -- | The URL
+    link :: Text
+  }
+  deriving stock (Generic, Show, Eq, Ord)
+  deriving (FromJSON, ToJSON) via Snake DeploymentMetadatum
 
 data DeploymentInfo = DeploymentInfo
   { deployment :: Deployment
-  , metadata :: [DeploymentMetadata]
+  , metadata :: DeploymentMetadata
   , logs :: [DeploymentLog]
   }
   deriving stock (Generic, Show)
@@ -163,12 +215,20 @@ data DeploymentInfo = DeploymentInfo
 data DeploymentFullInfo = DeploymentFullInfo
   { deployment :: Deployment
   , status :: PreciseDeploymentStatus
-  , metadata :: [DeploymentMetadata]
-  , createdAt :: Int
-  , updatedAt :: Int
+  , metadata :: DeploymentMetadata
+  , createdAt :: UTCTime
+  , updatedAt :: UTCTime
+  , deploymentDefaultConfig :: FullDefaultConfig
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
+
+getDeploymentConfig :: DeploymentFullInfo -> FullConfig
+getDeploymentConfig d =
+  FullConfig
+    { appConfig = applyOverrides (d ^. #deployment . #appOverrides) (d ^. #deploymentDefaultConfig . #appDefaultConfig)
+    , depConfig = applyOverrides (d ^. #deployment . #deploymentOverrides) (d ^. #deploymentDefaultConfig . #depDefaultConfig)
+    }
 
 isDeploymentArchived :: DeploymentFullInfo -> Bool
 isDeploymentArchived DeploymentFullInfo {status = s} = case s of
@@ -179,26 +239,11 @@ isDeploymentArchived DeploymentFullInfo {status = s} = case s of
 
 data DeploymentUpdate = DeploymentUpdate
   { newTag :: DeploymentTag
-  , newAppOverrides :: ApplicationOverrides
-  , oldAppOverrides :: ApplicationOverrides
-  , newDeploymentOverrides :: DeploymentOverrides
-  , oldDeploymentOverrides :: DeploymentOverrides
+  , appOverrides :: Overrides 'ApplicationLevel
+  , deploymentOverrides :: Overrides 'DeploymentLevel
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
-
-applyDeploymentUpdate :: DeploymentUpdate -> Deployment -> Deployment
-applyDeploymentUpdate du d =
-  Deployment
-    { name = name d
-    , tag = newTag du
-    , appOverrides =
-        filter (`notElem` oldAppOverrides du) (appOverrides d)
-          <> newAppOverrides du
-    , deploymentOverrides =
-        filter (`notElem` oldDeploymentOverrides du) (deploymentOverrides d)
-          <> newDeploymentOverrides du
-    }
 
 data CurrentStatus
   = Ok
@@ -225,7 +270,7 @@ data WSEvent = FrontendPleaseUpdateEverything
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake WSEvent
 
-newtype ActionId = ActionId {unActionId :: Int}
+newtype ActionId = ActionId {unActionId :: Int64}
   deriving newtype
     (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
 
@@ -238,74 +283,36 @@ newtype Stderr = Stderr {unStderr :: Text}
   deriving (FromJSON, ToJSON) via Snake Stderr
 
 data ActionInfo = ActionInfo
-  { stdout :: Text
-  , stderr :: Text
+  { stdout :: Stdout
+  , stderr :: Stderr
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake ActionInfo
 
--- | Parses setting application-level overrides.
-parseSetApplicationOverrides ::
-  OverrideVisibility ->
-  [Text] ->
-  IO [ApplicationOverride]
-parseSetApplicationOverrides visibility texts =
-  coerce <$> parseSetOverrides visibility texts
-
--- | Parses setting deployment-level overrides.
-parseSetDeploymentOverrides ::
-  OverrideVisibility ->
-  [Text] ->
-  IO [DeploymentOverride]
-parseSetDeploymentOverrides visibility texts =
-  coerce <$> parseSetOverrides visibility texts
-
 -- | Parses setting overrides.
-parseSetOverrides :: OverrideVisibility -> [Text] -> IO [Override]
-parseSetOverrides visibility texts =
-  for texts $ \t ->
-    case T.findIndex (== '=') t of
-      Just i -> do
-        let (key, value) = bimap strip (T.tail . strip) $ T.splitAt i t
-        pure $ Override key value visibility
-      Nothing ->
-        error $
-          "Malformed override key-value pair " <> T.unpack t
-            <> ", should be similar to FOO=bar"
+parseSetOverrides :: [Text] -> Either Text (Overrides l)
+parseSetOverrides texts = do
+  pairs' <- for texts $ \text -> case parseSingleOverride text of
+    Just x -> Right x
+    Nothing ->
+      Left $ "Malformed override key-value pair " <> text <> ", should be similar to FOO=bar"
+  return . Overrides $ OM.fromList pairs'
+  where
+    parseSingleOverride :: Text -> Maybe (Text, OverrideValue)
+    parseSingleOverride t
+      | Just i <- T.findIndex (== '=') t =
+        let (key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
+         in Just (key, ValueAdded value)
+    parseSingleOverride _ = Nothing
 
--- | Parses unsetting application-level overrides.
-parseUnsetApplicationOverrides ::
-  OverrideVisibility ->
-  [Text] ->
-  IO [ApplicationOverride]
-parseUnsetApplicationOverrides visibility texts =
-  coerce <$> parseUnsetOverrides visibility texts
+parseUnsetOverrides :: [Text] -> Overrides l
+parseUnsetOverrides = Overrides . OM.fromList . fmap (,ValueDeleted)
 
--- | Parses unsetting deployment-level overrides.
-parseUnsetDeploymentOverrides ::
-  OverrideVisibility ->
-  [Text] ->
-  IO [DeploymentOverride]
-parseUnsetDeploymentOverrides visibility texts =
-  coerce <$> parseUnsetOverrides visibility texts
+formatOverrides :: Overrides l -> Text
+formatOverrides = T.unlines . formatOverrides'
 
--- | Parses unsetting overrides.
-parseUnsetOverrides :: OverrideVisibility -> [Text] -> IO [Override]
-parseUnsetOverrides visibility texts =
-  for texts $ \key ->
-    pure $ Override key "" visibility
-
--- | Creates pretty-printed text from override.
-formatOverride :: Override -> Text
-formatOverride o@(Override _ _ vis) =
-  overrideToArg o <> case vis of
-    Private -> " (" <> pack (show vis) <> ")"
-    Public -> mempty
-
--- | Creates pretty-printed texts from overrides.
-formatOverrides :: Overrides -> Text
-formatOverrides = T.unlines . fmap formatOverride
-
--- | Creates a CLI argument from an override.
-overrideToArg :: Override -> Text
-overrideToArg (Override k v _) = k <> "=" <> v
+formatOverrides' :: Overrides l -> [Text]
+formatOverrides' (Overrides m) = fmap (\(k, v) -> k <> "=" <> showValue v) . OM.assocs $ m
+  where
+    showValue (ValueAdded v) = v
+    showValue ValueDeleted = "<removed>"

@@ -18,6 +18,7 @@ library
   exposed-modules:     Common.Types
                      , Common.Utils
                      , Common.Validation
+                     , Data.Map.Ordered.Strict.Extra
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -35,6 +36,16 @@ library
                      , TypeApplications
                      , TypeOperators
                      , ViewPatterns
+                     , DeriveAnyClass
+                     , OverloadedLabels
+                     , StandaloneDeriving
+                     , TypeSynonymInstances
+                     , FlexibleInstances
+                     , DataKinds
+                     , KindSignatures
+                     , EmptyDataDeriving
+                     , TupleSections
+                     , AllowAmbiguousTypes
   build-depends:       base
                      , aeson
                      , bytestring
@@ -43,6 +54,9 @@ library
                      , http-api-data
                      , lens
                      , text
+                     , containers
+                     , time
+                     , ordered-containers
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:
@@ -56,3 +70,4 @@ library
     -Wno-missing-local-signatures
     -Wno-partial-fields
     -Wno-unsafe
+    -Wno-missed-specialisations
