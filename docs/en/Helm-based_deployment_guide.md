@@ -38,7 +38,7 @@ So here you have it, your first Octopod deployment!
 
 ## Going further
 
-Right now you can be wondering, how did Octopod take wordpress from bitnami repository when we haven't filled any repo information whatsoever? This is because we've set this up on a chart level [here](../../charts/octopod/values.yaml#L90)
+Right now you may be wondering, how did Octopod take wordpress from bitnami repository when we haven't filled any repo information whatsoever? This is because we've set this up on a chart level [here](../../charts/octopod/values.yaml#L90)
 You can override all this using deployment overrides. Let's dive right in!
 First move our wordpress deployment to archive
 
@@ -64,3 +64,5 @@ Deployment Overrides:
 `chart_version: 0.5.1`
 
 As in the previous example we took App Overrides from [chart documentation](../../charts/octopod/README.md#Parameters), but Deployment Overrides are passed as configuration for control scripts. To have more understanding about these paramters you can check [this docs](../../helm-control-scripts/README.md)
+
+Now you have Octopod inside Octopod! Now you only need to install your own helm chart!

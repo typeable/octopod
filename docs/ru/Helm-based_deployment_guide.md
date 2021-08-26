@@ -1,165 +1,75 @@
-# Helm-based deployment guide
+# Установка Helm чартов с помощью Octopod
 
-## Подгодовка
+В этой инструкции вы узнаете как установить [чарт wordpress](https://github.com/bitnami/charts/tree/master/bitnami/wordpress) от bitnami с помощью Octopod.
 
-Предполагается, что у вас в системе уже установлен Docker,
-а также Вы установили _Octopod_. Если Вы _Octopod_ не установили, то пожалуйста воспользуйтесь [инструкцией по установке _Octopod_](Octopod_deployment_with_K8S.md).
-При установке _Octopod_ потребуется указать название образа с [control scripts](Control_scripts.md):
-```bash
---set "global.utils_image_prefix=typeable" \
---set "global.utils_image=octopod-helm-example" \
---set "global.utils_image_tag=1.0" \
-```
+## Ваш первый Deployment
 
-В итоге должно получиться что-то вроде:
+Прежде чем проолжить убедитесь, что уже установили Octopod, воспользовавшись нашей [инструкцией](Octopod_deployment_guide.md).
+Обратите внимание, что в этой инструкции мы предполагаем, что вы установили Octopod локально.
 
-```bash
-helm upgrade octopod ./octopod \
-	--install \
-	--namespace octopod \
-	--set "global.deploy_checksum=$sha256_sum" \
-	--set "global.image_prefix=typeable"  \
-	--set "global.image_tag=1.0" \
-	--set "global.utils_image_prefix=typeable" \
-	--set "global.utils_image=octopod-helm-example" \
-	--set "global.utils_image_tag=1.1" \
-	--set "global.acme_registration_email=certbot@example.com" \
-	--set "global.auth_url=https://oauth.exmaple.com/oauth2/auth" \
-	--set "global.auth_signin=https://oauth.exmaple.com/oauth2/start?rd=/redirect/$http_host$request_uri" \
-	--set "project_name=MyProject" \
-	--set "domain=octopod.example.com" \
-	--set "app_domain=octopod-app.example.com" \
-	--set "power_app_domain=octopod-power-app.example.com" \
-	--set "ws_domain=octopod-ws.example.com" \
-	--set "base_domain=example.com" \
-	--set "status_update_timeout=600" \
-	--wait \
-	--timeout 600 \
-	--debug
-```
+Открыв Octopod в вашем браузере вы увидите следующее:
 
-Для того чтобы развернуть приложение с помощью _Octopod_ потребуется само приложение и набор [control scripts](Control_scripts.md).
-Разворачивать можно через _Web UI_ или _octo CLI_. В этом примере мы будем использовать только _octo CLI_.
-Также потребуется Docker для запуска контейнера с _octo CLI_.
-Перед использованием _octo CLI_ необходимо настроить доступ к _Octopod_, пожалуйста воспользуйтесь [руководством пользователя _octo CLI_](Octo_user_guide.md).
+![](../images/octopod_blank.png)
 
-В качестве примера мы будем использовать простое веб приложение, которое обслуживает единственный endpoint `/`.
-По запросу на `/` будет возвращаться список переменных окружения, имена которых начинаются с `APP_ENV`, в HTML разметке.
-С исходным кодом приложения можно ознакомиться, перейдя по ссылке [web-app](../../examples/web-app).
-Это приложение было упаковано в докер образ и отправлено в регистри:
-```bash
-docker build -f docker/Dockerfile -t typeable/octopod-web-app-example:v1 .
-docker push typeable/octopod-web-app-example:v1
-```
+Нажмите на кнопку New Deployment
 
-Также мы будем производить обновление приложения до более новой версии.
-В новой версии изменена HTML разметка: каждая переменная окружения выводится не в отдельном `div`, а в виде элемента списка `li`.
-С исходным кодом обновленного приложения можно ознакомиться, перейдя по ссылке [web-app-v2](../../examples/web-app-v2).
-Это приложение было упаковано в докер образ и отправлено в регистри:
-```bash
-docker build -f docker/Dockerfile -t typeable/octopod-web-app-example:v2 .
-docker push typeable/octopod-web-app-example:v2
-```
+![](../images/octopod_deployment_blank.png)
 
-Для работы веб приложению нужен 1 TLS сертификат для каждого развертывания. [_Cert Manager_][cert-manager] создает сертификаты через [_Let’s Encrypt_][lets-encrypt].
-У [_Let’s Encrypt_][lets-encrypt] есть лимиты на создание сертификатов [_Let’s Encrypt Rate Limits_][lets-encrypt-rate-limits].
-При достижении лимита `too many registrations for this IP` может помочь перемещение Pod [_Cert Manager_][cert-manager] на другую ноду.
+Тут вы можете заполнить все параметры для вашего Deployment'. Давайте же их заполним!
 
-Набор [control scripts](Control_scripts.md) будет использовать helm v2.x, kubectl, kubedog для управления и проверки статуса деплойментов.
-С исходным кодом [control scripts](Control_scripts.md) можно ознакомиться, перейдя по ссылке [helm-based-control-scripts](../../examples/helm-based-control-scripts).
-Набор [control scripts](Control_scripts.md) был упакован в докер образ и отправлен в регистри:
+![](../images/octopod_deployment_filled.png)
 
-```bash
-docker build -f docker/Dockerfile -t typeable/octopod-helm-example:1.0 .
-docker push typeable/octopod-helm-example:1.0
-```
-**Примечание:**
-В нашем примере используется Stateless приложение упакованное в один chart.
-Так что для создания и обновления необходимо выполнить один набор команд (`helm upgrade --install ...`).
-Поэтому [control scripts](Control_scripts.md) реализован только `create`, и он же используется вместо `update`.
-В случае более сложного приложения упакованного в несколько chart-ов, возможно потребуется выполнить различный набор команд,
-это потребует реализации различных `create` и `update` скриптов.
+Name ― мы выбрали `wordpress`, но вы можете выбрать любое другое имя.
 
-## Создание нового deployment
+Tag ― `5.8.0`. Мы взяли его из [параметров чарта](https://github.com/bitnami/charts/blob/master/bitnami/wordpress/Chart.yaml#L4)
 
-Для создания достаточно выполнить
-```bash
-octo create -n hello-octopod -t v1 -e APP_ENV_KEY1=VALUE1
-```
+App Overrides:
+`ingress.enabled: true`
+`ingress.hostname: wordpress.lvh.me`
 
-- `-n hello-octopod` ― название deployment.
-- `-t v1` ― тег deployment.
-- `-e APP_ENV_KEY1=VALUE1` ― переменная окружения уровня приложения.
+Эти параметры мы взяли из [документации чарта](https://github.com/bitnami/charts/tree/master/bitnami/wordpress#traffic-exposure-parameters). Вы можете поставить любые параметры указанные там.
 
-Эта команда вызовет `create` из [control scripts](Control_scripts.md), a `create` вызовет `helm`.
-Спустя некоторое время Вы увидите созданный _Pod_ нового deployment
-```
-$ kubectl get pods -n deployment
-NAME                              READY   STATUS    RESTARTS   AGE
-app-hello-octopod-8965856-qbwvq   1/1     Running   0          15s
-```
+После того, как вы всё заполнили, нажмите на кнопку Save и дождитесь пока Deployment перейдёт в состояние Running.
 
-Если откроете в браузере `http://hello-octopod.<домен, указанный при развертывании Octopod>` Вы увидите
+![](../images/octopod_deployment_filled.png)
 
-![После создания](../images/hello-octopod-1.png)
+Теперь вы можете нажать на ссылку `wordpress` в столбце Links и будете переаправлены на ваш инстанс wordpress.
 
-## Добавление новой переменной окружения уровня приложения
+![](../images/wordpress_blank.png)
 
-Для добавления новой переменной уровня приложения достаточно выполнить
-```bash
-octo update -n hello-octopod -t v1 -e APP_ENV_KEY2=VALUE2
-```
+Поздравляю, вы создали свой первый Deployment в Octopod!
 
-- `-n hello-octopod` ― название deployment.
-- `-t v1` ― тег deployment.
-- `-e APP_ENV_KEY2=VALUE2` ― переменная окружения уровня приложения.
+## Идём дальше
 
-Эта команда вызовет `create` из [control scripts](Control_scripts.md), `create` вызовет `helm` (Смотри примечание раздела _Подготовка_).
-Спустя несколько секунд, если откроете в браузере `http://hello-octopod.<домен указанный при развертывании Octopod>` Вы увидите новую переменную окружения уровня приложения:
+Сейчас у вас скорее всего возник вопрос как Octopod установил чарт из репозитория bitnami, хотя мы не указывали вооюзе никаких параметров для их репозитория? Всё потому, что мы установили эти настройки на уровне чарта [тут](../../charts/octopod/values.yaml#L90).
+Но вы можете переопределить все эти параметры. Давайте же приступим!
 
-![После установки новой переменной окружения уровня приложения](../images/hello-octopod-2.png)
+Сначала отправим уже ненужный Deployment с wordpress в архив.
 
-## Обновление версии приложения
+![](../images/octopod_archive.png)
 
-Для обновления приложения до новой версии достаточно выполнить
-```bash
-octo update -n hello-octopod -t v2
-```
+И создадим ещё один новый Deployment, но теперь уже с другим списком Overrides.
 
-- `-n hello-octopod` ― название deployment.
-- `-t v2` ― тег deployment.
+![](../images/octopod_in_octopod_deployment.png)
 
-Эта команда вызовет `create` из [control scripts](Control_scripts.md), `create` вызовет `helm` (Смотри примечание раздела _Подготовка_).
-Спустя несколько секунд, если откроете в браузере `http://hello-octopod.<домен указанный при развертывании Octopod>` Вы увидите обновленную HTML разметку:
+Name: octopod-internal
 
-![После создания](../images/hello-octopod-3.png)
+Tag: 1.3.1
 
-## Увеличение количества реплик через установку переменной окружения уровня deployment
+App Overrides:
 
-Для добавления новой переменной достаточно выполнить
-```bash
-octo update -n hello-octopod -t v2 -o replicas=3
-```
+`octopod.baseDomain: octopod-internal.lvh.me`
+`ingress.tls.enabled: false`
 
-- `-n hello-octopod` ― название deployment.
-- `-t v1` ― тег deployment.
-- `-o replicas=3` ― переменная окружения уровня deployment.
+Deployment Overrides:
 
-Эта команда вызовет `create` из [control scripts](Control_scripts.md), `create` вызовет `helm` (Смотри примечание раздела _Подготовка_).
+`chart_name: octopod`
+`chart_repo_name: typeable`
+`chart_repo_url: https://typeable.github.io/octopod/`
+`chart_version: 0.5.1`
 
-Спустя некоторое время Вы увидите, что количество _Pod_-ов стало 3
-```bash
-$ kubectl get pods -n deployment
-NAME                              READY   STATUS    RESTARTS   AGE
-app-hello-octopod-8965856-qbwvq   1/1     Running   0          97m
-app-hello-octopod-8965856-v585c   1/1     Running   0          15s
-app-hello-octopod-8965856-v88md   1/1     Running   0          15s
-```
+Точно так же как и в предыдущем примере все параметры мы взяли из [документации чарта](../../charts/octopod/README.md#Parameters), но Deployment Overrides это параметры для скриптов управления. Чтобы узнать больше про скрипты ознакомьтесь с [этой документацией](../../helm-control-scripts/README.md).
 
-Если откроете в браузере `http://hello-octopod.<домен указанный при развертывании Octopod>`, Вы увидите, что приложение продолжает обсуживать запросы:
+Теперь у вас есть Octopod в Octopod'е! Осталось только установить свой helm чарт.
 
-![После обновления переменной окружения уровня deployment](../images/hello-octopod-3.png)
 
-[cert-manager]: https://cert-manager.io/docs
-[lets-encrypt]: https://letsencrypt.org
-[lets-encrypt-rate-limits]: https://letsencrypt.org/docs/rate-limits

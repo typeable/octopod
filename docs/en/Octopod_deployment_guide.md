@@ -32,3 +32,7 @@ Before running the script make sure that you have following tools installed:
 After all tools installed you can just run `./octopod_local_install.sh`
 Script will expose octopod ui at `octopod.lvh.me`.
 `lvh.me` it's a special domain name which always resolves to `127.0.0.1`
+
+## What next?
+
+Now you may want to check how to [install helm charts](Helm-based_deployment_guide.md) with Octopod.
