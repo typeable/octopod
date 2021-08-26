@@ -26,15 +26,16 @@ _Web UI_ users have the _user_ role.
 
 _octo CLI_ users have the _admin_ role.
 
-There is currently no way to give someone access to _octo CLI_ without giving them the _admin_ role since authentication is done through SSL certificates instead of through OAuth.
+There is currently no way to give someone access to _octo CLI_ without giving them the _admin_ role since authentication is not done through OAuth.
 
 ## Kubernetes role-based access control
 
 _Octopod Server_ is deployed in the `octopod` _Kubernetes_ namespace. Deployments are deployed in the `deployments` namespace.
 _Octopod Server_ uses the `octopod` [_Service Account_][kubernetes-service-account].
 
-Octopod needs a sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extended.
-[RBAC][kubernetes-rbac] rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/octopod/templates/rbac.yaml)
+Octopod needs sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extensive.
+
+[RBAC][kubernetes-rbac] rules to describe permissions needed are added automatically by [the Octopod Helm Chart](../../charts/octopod/templates/rbac.yaml).
 
 ## Web UI authentication
 
