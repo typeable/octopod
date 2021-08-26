@@ -25,6 +25,7 @@ Tag - `5.8.0`. We took the tag name from [chart parameters](https://github.com/b
 App Overrides:
 `ingress.enabled: true`
 `ingress.hostname: wordpress.lvh.me`
+
 We took these overrides from [chart documentation](https://github.com/bitnami/charts/tree/master/bitnami/wordpress#traffic-exposure-parameters). Basically you can tweak any parameters from there.
 
 When you have it all filled up. Click Save button and wait until deployment will get to a running state.
@@ -37,7 +38,7 @@ So here you have it, your first Octopod deployment!
 
 ## Going further
 
-Right now you can be wondering how did Octopod took wordpress from bitnami repository when we haven't filled any repo information whatsoever. This is because we've set this up on a chart level [here](../../charts/octopod/values.yaml#L90)
+Right now you can be wondering, how did Octopod take wordpress from bitnami repository when we haven't filled any repo information whatsoever? This is because we've set this up on a chart level [here](../../charts/octopod/values.yaml#L90)
 You can override all this using deployment overrides. Let's dive right in!
 First move our wordpress deployment to archive
 
