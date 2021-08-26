@@ -11,7 +11,7 @@ $ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.co
 
 ## Introduction
 
-This chart bootstraps an Octopod deployment on a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
+This chart bootstraps an Octopod deployment in a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
 ## Prerequisites
 
@@ -22,15 +22,17 @@ This chart bootstraps an Octopod deployment on a [Kubernetes](http://kubernetes.
 
 ## Installing the Chart
 This chart will not create or delete any namespaces for you.
+
 You'll need to create 2 namespaces before installing:
-First in which octopod will be installed
-```console
-$ kubectl create namespace octopod
-```
-Second in which Octopod will deploy all it's deployments (configured in octopod.deploymentNamespace)
-```console
-$ kubectl create namespace octopod-deployments
-```
+
+1. A namespace in which Octopod itself will be installed:
+   ```console
+   $ kubectl create namespace octopod
+   ```
+2. A namespace in which Octopod will deploy all your deployments (configured in `octopod.deploymentNamespace`):
+   ```console
+   $ kubectl create namespace octopod-deployments
+   ```
   
 To install the chart with the release name `my-release` execute:
 
