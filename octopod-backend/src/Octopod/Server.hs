@@ -300,7 +300,7 @@ defaultApplicationKeysH cfg = do
   (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
   pure $ T.lines out
 
-defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'DeploymentLevel)
+defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'ApplicationLevel)
 defaultApplicationOverridesH cfg = do
   (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
   pure $ decodeCSVDefaultConfig out

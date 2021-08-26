@@ -35,6 +35,7 @@ import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
+import Reflex.Network
 import Servant.Common.Req
 import Servant.Reflex.Extra
 
@@ -601,13 +602,15 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
   let holdDCfg n dDCfg ovs =
-        fmap join . widgetHold (pure . pure $ Nothing) $
-          dDCfg <&> \dCfg ->
-            fmap (Just . (dCfg,)) <$> envVarsInput n dCfg ovs
+        let loading = text "Loading..."
+         in fmap join . widgetHold (loading $> pure Nothing) $
+              dDCfg <&> \dCfg ->
+                fmap (Just . (dCfg,)) <$> envVarsInput n dCfg ovs
   deploymentCfgDyn <- holdDCfg "Deployment overrides" defDep defDepOv
-  let readyDeploymentCfgEv = fmap snd . catMaybes $ updated deploymentCfgDyn
-  readyDeploymentCfgDyn <- holdDyn (error "invariant") readyDeploymentCfgEv
-  appDep <- defaultApplicationOverrides (Right <$> readyDeploymentCfgDyn) (readyDeploymentCfgEv $> ()) >>= hReq
+  readyDeploymentCfgDebounced <- debounce 0.5 . fmap snd . catMaybes $ updated deploymentCfgDyn
+  appDep <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
+    pb' <- getPostBuild
+    defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq
   appplicationCfgDyn <- holdDCfg "App overrides" appDep defAppOv
   validDyn <- holdDyn True $ updated tOkEv
   pure $
@@ -633,6 +636,9 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
           badTagText = "Tag should not be empty"
           badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
        in leftmost [tagErrEv, badNameEv]
+
+waitForValue :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
+waitForValue ev f = fmap switchDyn $ networkHold (pure never) $ f <$> ev
 
 type RequestErrorHandler t m = forall tag a. Event t (ReqResult tag a) -> m (Event t a)
 
