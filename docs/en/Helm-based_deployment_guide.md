@@ -18,9 +18,9 @@ Here you can fill your deployment parameters. Let's have it filled up!
 
 ![](../images/octopod_deployment_filled.png)
 
-Name - we've chosen `wordpress`, but you can choose whatever name you like.
+Name ― we've chosen `wordpress`, but you can choose whatever name you like.
 
-Tag - `5.8.0`. We took the tag name from [chart parameters](https://github.com/bitnami/charts/blob/master/bitnami/wordpress/Chart.yaml#L4)
+Tag ― `5.8.0`. We took the tag name from [chart parameters](https://github.com/bitnami/charts/blob/master/bitnami/wordpress/Chart.yaml#L4)
 
 App Overrides:
 `ingress.enabled: true`
@@ -63,4 +63,4 @@ Deployment Overrides:
 `chart_repo_url: https://typeable.github.io/octopod/`
 `chart_version: 0.5.1`
 
-As in the previous example we took App Overrides from [chart documentation](../../charts/octopod#parameters), but Deployment Overrides are passed as configuration for control scripts. To have more understanding about these paramters you can check [this docs](../../helm-control-scripts/README.md)
+As in the previous example we took App Overrides from [chart documentation](../../charts/octopod/README.md#Parameters), but Deployment Overrides are passed as configuration for control scripts. To have more understanding about these paramters you can check [this docs](../../helm-control-scripts/README.md)

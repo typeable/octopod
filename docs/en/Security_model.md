@@ -5,7 +5,6 @@
 
 - [Octopod roles](#octopod-roles)
 - [Kubernetes role-based access control](#kubernetes-role-based-access-control)
-  - [Privileges to delete certificates](#privileges-to-delete-certificates)
   - [Privileges to delete _Persistent Volumes Claims_](#privileges-to-delete-persistent-volumes-claims)
 - [Web UI authentication](#web-ui-authentication)
 - [Web UI OAuth](#web-ui-oauth)
@@ -36,11 +35,11 @@ _Octopod Server_ is deployed in the `octopod` _Kubernetes_ namespace. Deployment
 _Octopod Server_ uses the `octopod` [_Service Account_][kubernetes-service-account].
 
 Octopod needs a sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extended.
-RBAC rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/helm3/octopod/templates/rbac.yaml)
+RBAC rules to describe permissions needed are added automatically by the octopod helm chart and can be viewed [here](../../charts/octopod/templates/rbac.yaml)
 
 ## Web UI authentication
 
-Authentication between the _Web UI_ and _Octopod Server_ is done through _Basic Auth_. The _Bearer token_ is read by the _Web UI_ after the page is loaded as part of [the config](../../charts/octopod/templates/octopod-nginx-configmap.yaml#L15-L20). By default, everything, including the config, can be accessed without any authentication. For ways of mitigating this please see the next section.
+Authentication between the _Web UI_ and _Octopod Server_ is done through _Basic Auth_. The _Bearer token_ is read by the _Web UI_ after the page is loaded as part of [the config](../../charts/octopod/templates/nginx-configmap.yaml#L23-L33). By default, everything, including the config, can be accessed without any authentication. For ways of mitigating this please see the next section.
 
 ## Web UI OAuth
 
@@ -48,7 +47,7 @@ The [_Web UI_](Technical_architecture.md#-web-ui) on its own does not have any a
 
 ## octo CLI authentication
 
-Authentication between _octo CLI_ and _Octopod Server_ is done through special token which is generated automatically or specified by user in `octopod.cliAuthSecret` parameter, as described [here](../../charts/helm3/octopod#parameters)
+Authentication between _octo CLI_ and _Octopod Server_ is done through special token which is generated automatically or specified by user in `octopod.cliAuthSecret` parameter, as described [here](../../charts/octopod/README.md#Parameters)
 
 [kubernetes-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account
 [kubernetes-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac
