@@ -1,0 +1,8 @@
+Thank you for installing Octopod!
+You can access the Web UI here: {{ include "httpScheme" . }}://{{ include "uiIngressHost" . }}
+To access Octopod via octo CLI you can use this URL: {{ include "httpScheme" . }}://{{ include "powerAppIngressHost" . }}
+To get your CLI secret you need to execute this command:
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "octopodCliAuthSecretName" . }} -o jsonpath='{.data.cli-secret}' | base64 -d
+{{ if and (not .Values.octopod.cliAuthSecret) (not .Values.vault.enabled) .Release.IsUpgrade }}
+{{ fail "To upgrade you need to set the octopod.cliAuthSecret variable with your current secret" }}
+{{- end }}

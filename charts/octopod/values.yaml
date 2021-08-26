@@ -1,38 +1,119 @@
-global:
-  image_prefix:
-  image: octopod
-  octo_image: octo
-  image_tag:
-  utils_image_prefix:
-  utils_image:
-  utils_image_tag:
+# Default values for octopod.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
 
-namespace: octopod
-target_namespace: deployment
-nodeselector: stand
-service_account: octopod
-port: 4443
-ui_port: 4000
-ws_port: 4020
-dbname: octopod
-seed: false
-migrations: true
-replicas: 1
-domain: octopod.stage.example.com
-app_domain: octopod-app.stage.example.com
-ws_domain: octopod-ws.stage.example.com
-power_app_domain: octopod-power-app.stage.example.com
-base_domain: stage.example.com
-project_name: Octopod
-status_update_timeout: 600
-acme_registration_email:
-basic_auth_token:
-connections:
-  pg_instance: octopod:octopod@octopod-infra-postgres-0.octopod-infra-postgres.octopod:5432
-pg_host: octopod-infra-postgres-0.octopod-infra-postgres.octopod
-requests:
-  cpu: 200m
-  memory: 256Mi
-limits:
-  cpu: 200m
-  memory: 512Mi
+replicaCount: 1
+
+image:
+  repository: typeable/octopod
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+rbac:
+  create: true
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: 
+  runAsUser: 1000
+  runAsGroup: 1000
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+
+service:
+  type: ClusterIP
+  ports:
+    powerApp: 4443
+    ui: 80
+    app: 4000
+    ws: 4020
+
+ingress:
+  enabled: true
+  ingressClass: nginx
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt
+  powerApp:
+    annotations: {}
+  ui:
+    annotations: {}
+  app:
+    annotations: {}
+  ws:
+    annotations: {}
+
+resources: 
+  limits:
+    cpu: 200m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+octopod:
+  projectName: Octopod
+  deploymentNamespace: octopod-deployment
+  baseDomain: ""
+  statusUpdateTimeout: 600
+  archiveRetention: 1209600
+  migrations:
+    enabled: true
+  env:
+    HELM_BIN: "/utils/helm"
+    KUBECTL_BIN: "/utils/kubectl"
+    DEFAULTS: |
+     {
+      "chart_name": "wordpress",
+      "chart_repo_name": "bitnami",
+      "chart_repo_url": "https://charts.bitnami.com/bitnami",
+      "chart_version": "12.0.0",
+      "default_overrides": []
+     }
+  vaultEnv: {}
+controlScripts:
+  image:
+    repository: typeable/octopod-helm-control-scripts
+    pullPolicy: IfNotPresent
+    tag: 0.1.0
+sqitch:
+  image:
+    repository: typeable/sqitch
+    pullPolicy: IfNotPresent
+    tag: v2.0.0
+postgresql:
+  enabled: true
+  postgresqlUsername: octopod
+  postgresqlDatabase: octopod
+  image:
+    tag: 12.7.0-debian-10-r51
+vault:
+  enabled: false
+  clusterName: ""
+kubernetesDashboard:
+  enabled: false
+  url: ""

@@ -1,19 +1,23 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-config
-  namespace: {{ .Values.namespace }}
+  name: {{ include "octopod.fullname" . }}
+  labels:
+    {{- include "octopod.labels" . | nindent 4 }}
 data:
-  PROJECT_NAME: {{ .Values.project_name }}
-  BASE_DOMAIN: {{ .Values.base_domain }}
-  NAMESPACE: {{ .Values.target_namespace }}
-  STATUS_UPDATE_TIMEOUT: "{{ .Values.status_update_timeout }}"
-  ARCHIVE_RETENTION: "1209600"
-  CREATION_COMMAND: /utils/create
-  UPDATE_COMMAND: /utils/update
-  ARCHIVE_COMMAND: /utils/archive
-  CHECKING_COMMAND: /utils/check
-  CLEANUP_COMMAND: /utils/cleanup
-  ARCHIVE_CHECKING_COMMAND: /utils/archive_check
-  TAG_CHECKING_COMMAND: /utils/tag_check
-  INFO_COMMAND: /utils/info
+  PROJECT_NAME: {{ .Values.octopod.projectName | quote }}
+  BASE_DOMAIN: {{ .Values.octopod.baseDomain | quote }}
+  NAMESPACE: {{ .Values.octopod.deploymentNamespace | quote }}
+  STATUS_UPDATE_TIMEOUT: {{ .Values.octopod.statusUpdateTimeout | quote }}
+  ARCHIVE_RETENTION: {{ .Values.octopod.archiveRetention | quote }}
+  CREATION_COMMAND: {{ printf "%s/create" (include "controlScriptsPath" .) | quote }}
+  UPDATE_COMMAND: {{ printf "%s/update" (include "controlScriptsPath" .)  | quote }}
+  ARCHIVE_COMMAND: {{ printf "%s/archive" (include "controlScriptsPath" .)  | quote }}
+  CHECKING_COMMAND: {{ printf "%s/check" (include "controlScriptsPath" .)  | quote }}
+  CLEANUP_COMMAND: {{ printf "%s/cleanup" (include "controlScriptsPath" .)  | quote }}
+  ARCHIVE_CHECKING_COMMAND: {{ printf "%s/archive_check" (include "controlScriptsPath" .)  | quote }}
+  TAG_CHECKING_COMMAND: {{ printf "%s/tag_check" (include "controlScriptsPath" .)  | quote }}
+  INFO_COMMAND: {{ printf "%s/info" (include "controlScriptsPath" .)  | quote }}
+  {{- range $name, $value := .Values.octopod.env }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}
