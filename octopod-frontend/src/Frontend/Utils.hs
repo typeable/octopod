@@ -594,6 +594,7 @@ deploymentPopupBody ::
 deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
   defDep <- defaultDeploymentOverrides pb >>= hReq
+  depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
       tagErrEv = getTagError commandResponseEv tagDyn
@@ -601,17 +602,30 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
-  let holdDCfg n dDCfg ovs =
+  let holdDCfg dDCfg ovs =
         let loading = text "Loading..."
          in fmap join . widgetHold (loading $> pure Nothing) $
               dDCfg <&> \dCfg ->
-                fmap (Just . (dCfg,)) <$> envVarsInput n dCfg ovs
-  deploymentCfgDyn <- holdDCfg "Deployment overrides" defDep defDepOv
+                fmap (Just . (dCfg,)) <$> envVarsInput dCfg ovs
+      holdDKeys n keysDyn = do
+        let loading = text "Loading..."
+        popUpSection n $
+          widgetHold_ loading $
+            keysDyn <&> \keys -> el "ul" $
+              forM_ keys $ \key -> el "li" $ text key
+
+  deploymentCfgDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
+  holdDKeys "Deployment keys" depKeys
   readyDeploymentCfgDebounced <- debounce 0.5 . fmap snd . catMaybes $ updated deploymentCfgDyn
-  appDep <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
+  defApp <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
     pb' <- getPostBuild
     defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq
-  appplicationCfgDyn <- holdDCfg "App overrides" appDep defAppOv
+  appKeys <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
+    pb' <- getPostBuild
+    applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq
+  appplicationCfgDyn <- popUpSection "App overrides" $ holdDCfg defApp defAppOv
+  holdDKeys "App keys" appKeys
+
   validDyn <- holdDyn True $ updated tOkEv
   pure $
     validDyn >>= \case
@@ -676,37 +690,37 @@ errorHeader appErr = do
 envVarsInput ::
   forall l t m.
   MonadWidget t m =>
-  -- | Overrides header.
-  Text ->
   DefaultConfig l ->
   -- | Current deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
   m (Dynamic t (Config l))
-envVarsInput overridesHeader dCfg ovs = do
-  elClass "section" "deployment__section" $ do
-    elClass "h3" "deployment__sub-heading" $ text overridesHeader
-    elClass "div" "deployment__widget" $
-      elClass "div" "overrides" $ mdo
-        let (Config evs) = applyOverrides ovs dCfg
-            initEnvs =
-              L.foldl'
-                (\m (k, v) -> fst $ insertUniq (k, v) m)
-                emptyUniqKeyMap
-                . OM.assocs
-                $ evs
-            emptyVar = ("", "")
-            addEv = clickEv $> Endo (fst . insertUniq emptyVar)
-        envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
-        (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
-        let addingIsEnabled = all ((not . T.null) . fst) . elemsUniq <$> envsDyn
-        clickEv <-
-          buttonClassEnabled'
-            "overrides__add dash dash--add"
-            "Add an override"
-            addingIsEnabled
-            "dash--disabled"
-        pure $ Config . OM.fromList . elemsUniq <$> envsDyn
+envVarsInput dCfg ovs = mdo
+  let (Config evs) = applyOverrides ovs dCfg
+      initEnvs =
+        L.foldl'
+          (\m (k, v) -> fst $ insertUniq (k, v) m)
+          emptyUniqKeyMap
+          . OM.assocs
+          $ evs
+      emptyVar = ("", "")
+      addEv = clickEv $> Endo (fst . insertUniq emptyVar)
+  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
+  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
+  let addingIsEnabled = all ((not . T.null) . fst) . elemsUniq <$> envsDyn
+  clickEv <-
+    buttonClassEnabled'
+      "overrides__add dash dash--add"
+      "Add an override"
+      addingIsEnabled
+      "dash--disabled"
+  pure $ Config . OM.fromList . elemsUniq <$> envsDyn
+
+popUpSection :: DomBuilder t m => Text -> m a -> m a
+popUpSection n m = elClass "section" "deployment__section" $ do
+  elClass "h3" "deployment__sub-heading" $ text n
+  elClass "div" "deployment__widget" $
+    elClass "div" "overrides" m
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
