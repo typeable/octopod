@@ -30,10 +30,8 @@ import Common.Types
 import Data.Time
 
 -- | Parses deployment metadata.
-parseDeploymentMetadata :: Text -> IO DeploymentMetadata
-parseDeploymentMetadata text = case decode NoHeader $ BS.fromStrict $ T.encodeUtf8 text of
-  Left err -> error $ "Could not parse metadata: " <> err
-  Right rows -> pure $ DeploymentMetadata $ toList rows
+parseDeploymentMetadata :: Text -> Either String DeploymentMetadata
+parseDeploymentMetadata = fmap (DeploymentMetadata . toList) . decode NoHeader . BS.fromStrict . T.encodeUtf8
 
 -- | Server port.
 newtype ServerPort = ServerPort {unServerPort :: Int}

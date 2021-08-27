@@ -443,9 +443,9 @@ updateDeploymentInfo dName = do
   dc <- getDefaultConfig dName
   (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs dc dep
   case ec of
-    ExitSuccess -> do
-      dMeta <- liftBase $ parseDeploymentMetadata (unStdout out)
-      upsertDeploymentMetadatum dName dMeta
+    ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
+      Right dMeta -> upsertDeploymentMetadatum dName dMeta
+      Left err -> liftBase $ log $ "could not get deployment info, could not parse CSV: " <> T.pack err
     ExitFailure _ ->
       liftBase $
         log $
