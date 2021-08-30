@@ -593,7 +593,7 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  defDep <- defaultDeploymentOverrides pb >>= hReq
+  defDep <- defaultDeploymentOverrides pb >>= hReq >>= holdDynMaybe
   depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
@@ -602,11 +602,9 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
-  let holdDCfg dDCfg ovs =
-        let loading = text "Loading..."
-         in fmap join . widgetHold (loading $> pure Nothing) $
-              dDCfg <&> \dCfg ->
-                fmap (Just . (dCfg,)) <$> envVarsInput dCfg ovs
+  let holdDCfg dDCfg ovs = do
+        x <- dyn $ dDCfg <&> \dCfg -> envVarsInput dCfg ovs
+        (switchHold never . fmap updated) x >>= holdDyn ovs
       holdDKeys n keysDyn = do
         let loading = text "Loading..."
         popUpSection n $
@@ -614,16 +612,27 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
             keysDyn <&> \keys -> el "ul" $
               forM_ keys $ \key -> el "li" $ text key
 
-  deploymentCfgDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
+  deploymentOvsDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
   holdDKeys "Deployment keys" depKeys
-  readyDeploymentCfgDebounced <- debounce 0.5 . fmap snd . catMaybes $ updated deploymentCfgDyn
-  defApp <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
-    pb' <- getPostBuild
-    defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq
+  readyDeploymentCfgDebounced <- debounce 0.5 . catMaybes $
+    updated $ do
+      defDep >>= \case
+        Nothing -> pure Nothing
+        Just depDCfg -> do
+          depOv <- deploymentOvsDyn
+          pure $ Just $ applyOverrides depOv depDCfg
+  defApp <-
+    waitForValue
+      readyDeploymentCfgDebounced
+      ( \deploymentCfg -> do
+          pb' <- getPostBuild
+          defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq
+      )
+      >>= holdDynMaybe
   appKeys <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq
-  appplicationCfgDyn <- popUpSection "App overrides" $ holdDCfg defApp defAppOv
+  applicationOvsDyn <- popUpSection "App overrides" $ holdDCfg defApp defAppOv
   holdDKeys "App keys" appKeys
 
   validDyn <- holdDyn True $ updated tOkEv
@@ -631,17 +640,15 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
     validDyn >>= \case
       False -> pure Nothing
       True -> do
-        depCfgM <- deploymentCfgDyn
-        appCfgM <- appplicationCfgDyn
+        depCfg <- deploymentOvsDyn
+        appOvs <- applicationOvsDyn
         tag' <- DeploymentTag <$> tagDyn
-        pure $ do
-          (defDepCfg, depCfg) <- depCfgM
-          (defAppCfg, appCfg) <- appCfgM
-          pure $
+        pure $
+          Just $
             DeploymentUpdate
               { newTag = tag'
-              , appOverrides = extractOverrides defAppCfg appCfg
-              , deploymentOverrides = extractOverrides defDepCfg depCfg
+              , appOverrides = appOvs
+              , deploymentOverrides = depCfg
               }
   where
     getTagError crEv tagDyn =
@@ -690,31 +697,82 @@ errorHeader appErr = do
 envVarsInput ::
   forall l t m.
   MonadWidget t m =>
-  DefaultConfig l ->
+  Maybe (DefaultConfig l) ->
   -- | Current deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
-  m (Dynamic t (Config l))
-envVarsInput dCfg ovs = mdo
-  let (Config evs) = applyOverrides ovs dCfg
-      initEnvs =
-        L.foldl'
-          (\m (k, v) -> fst $ insertUniq (k, v) m)
-          emptyUniqKeyMap
-          . OM.assocs
-          $ evs
-      emptyVar = ("", "")
+  m (Dynamic t (Overrides l))
+envVarsInput dCfgM (Overrides ovsM) = mdo
+  let initEnvs = case dCfgM of
+        Just (DefaultConfig dCfg) ->
+          let custom =
+                uniqMapFromList
+                  . mapMaybe
+                    ( \(k, v) ->
+                        let k' = ConfigKey (if OM.member k dCfg then DefaultConfigKey else CustomConfigKey) k
+                         in case v of
+                              ValueAdded x -> Just (k', CustomValue x)
+                              ValueDeleted -> (k',) . DeletedValue . Just <$> OM.lookup k dCfg
+                    )
+                  . OM.assocs
+                  $ ovsM
+           in L.foldl'
+                ( \m (k, v) ->
+                    if OM.member k ovsM then m else fst $ insertUniq (ConfigKey DefaultConfigKey k, DefaultValue v) m
+                )
+                custom
+                (OM.assocs dCfg)
+        Nothing ->
+          uniqMapFromList
+            . fmap
+              ( \(k, v) ->
+                  let k' = ConfigKey CustomConfigKey k
+                   in case v of
+                        ValueAdded x -> (k', CustomValue x)
+                        ValueDeleted -> (k', DeletedValue Nothing)
+              )
+            . OM.assocs
+            $ ovsM
+  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv']
+  let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
       addEv = clickEv $> Endo (fst . insertUniq emptyVar)
-  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
-  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
-  let addingIsEnabled = all ((not . T.null) . fst) . elemsUniq <$> envsDyn
+      updEv' = updEv <&> mconcat . fmap (\(k, v) -> Endo $ updateUniq k $ const v)
+  updEvsRaw <- networkView $ envsDyn <&> \envs -> runEventWriterT $ forM_ (M.toList . uniqMap $ envs) $ uncurry envVarInput
+  updEv <- switchHold never $ fmap snd updEvsRaw
+  let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
+  let ovsRes =
+        Overrides
+          . OM.fromList
+          . mapMaybe
+            ( \case
+                (ConfigKey CustomConfigKey k, getConfigValue -> v) -> Just (k, v)
+                (ConfigKey _ k, CustomValue v) -> Just (k, ValueAdded v)
+                (ConfigKey _ k, DeletedValue _) -> Just (k, ValueDeleted)
+                _ -> Nothing
+            )
+          . elemsUniq
+          <$> envsDyn
   clickEv <-
     buttonClassEnabled'
       "overrides__add dash dash--add"
       "Add an override"
       addingIsEnabled
       "dash--disabled"
-  pure $ Config . OM.fromList . elemsUniq <$> envsDyn
+  pure $ ovsRes
+
+data ConfigKey = ConfigKey ConfigKeyType Text
+
+data ConfigKeyType = CustomConfigKey | DefaultConfigKey
+
+data ConfigValue
+  = CustomValue Text
+  | DefaultValue Text
+  | DeletedValue (Maybe Text)
+
+getConfigValue :: ConfigValue -> OverrideValue
+getConfigValue (CustomValue x) = ValueAdded x
+getConfigValue (DefaultValue x) = ValueAdded x
+getConfigValue (DeletedValue _) = ValueDeleted
 
 popUpSection :: DomBuilder t m => Text -> m a -> m a
 popUpSection n m = elClass "section" "deployment__section" $ do
@@ -725,24 +783,38 @@ popUpSection n m = elClass "section" "deployment__section" $ do
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
-  (EventWriter t (Endo (UniqKeyMap (Text, Text))) m, MonadWidget t m) =>
+  (EventWriter t [(Int, (ConfigKey, ConfigValue))] m, MonadWidget t m) =>
   -- | Index of variable in overrides list.
   Int ->
   -- | Current variable key and value.
-  Dynamic t (Text, Text) ->
+  (ConfigKey, ConfigValue) ->
   m ()
-envVarInput i epDyn = do
-  ep <- sample $ current epDyn
+envVarInput i (ConfigKey keyType k, v') = do
+  let (v, rewrapValue) = case v' of
+        CustomValue x -> (x, CustomValue)
+        DefaultValue x -> (x, DefaultValue)
+        DeletedValue (Just x) -> (x, DeletedValue . Just)
+        DeletedValue Nothing -> ("<loading deleted>", const $ DeletedValue Nothing)
+
   divClass "overrides__item" $ do
-    (keyDyn, _) <-
-      octopodTextInput' "overrides__key" "key" (Just $ fst ep) never
-    (valDyn, _) <-
-      octopodTextInput' "overrides__value" "value" (Just $ snd ep) never
+    (keyTextDyn, _) <-
+      octopodTextInput' "overrides__key" "key" (Just k) never
+    keyDyn <- mapHeadTailDyn (ConfigKey keyType) (ConfigKey CustomConfigKey) keyTextDyn
+    (valTextDyn, _) <-
+      octopodTextInput' "overrides__value" "value" (Just v) never
+    valDyn <- mapHeadTailDyn rewrapValue CustomValue valTextDyn
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let envEv = updated $ zipDynWith (,) keyDyn valDyn
-        deleteEv = Endo (deleteUniq i) <$ closeEv
-        updEv = Endo . updateUniq i . const <$> envEv
-    tellEvent $ leftmost [deleteEv, updEv]
+        deleteEv =
+          closeEv >>=* \() -> do
+            key <- sample . current $ keyDyn
+            pure $ Just (key, DeletedValue Nothing)
+        updEv = envEv
+    tellEvent . fmap (pure . (i,)) $ leftmost [deleteEv, updEv]
+
+infixl 1 >>=*
+(>>=*) :: Reflex t => Event t a -> (a -> PushM t (Maybe b)) -> Event t b
+(>>=*) = flip push
 
 data UniqKeyMap v = UniqKeyMap (Map Int v) Int
 
@@ -764,5 +836,18 @@ elemsUniq (UniqKeyMap m _) = M.elems m
 emptyUniqKeyMap :: UniqKeyMap v
 emptyUniqKeyMap = UniqKeyMap mempty 0
 
+uniqMapFromList :: [v] -> UniqKeyMap v
+uniqMapFromList = L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap
+
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
+
+mapHeadTailDyn ::
+  (MonadSample t m, MonadHold t m, Reflex t) =>
+  (a -> b) ->
+  (a -> b) ->
+  Dynamic t a ->
+  m (Dynamic t b)
+mapHeadTailDyn h t d = do
+  x <- sample . current $ d
+  holdDyn (h x) $ fmap t (updated d)
