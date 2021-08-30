@@ -24,6 +24,7 @@ library
   default-extensions:  BlockArguments
                      , ConstraintKinds
                      , DataKinds
+                     , DeriveAnyClass
                      , DeriveFunctor
                      , DeriveGeneric
                      , DerivingVia
@@ -48,6 +49,7 @@ library
                      , AllowAmbiguousTypes
   build-depends:       base
                      , aeson
+                     , cassava
                      , bytestring
                      , deriving-aeson
                      , generic-lens
