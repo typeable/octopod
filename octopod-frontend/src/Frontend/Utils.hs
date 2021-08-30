@@ -426,7 +426,7 @@ octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
     elClass "div" "deployment__widget" $
-      octopodTextInput' clss placeholder val errEv
+      octopodTextInput' clss placeholder (pure . fromMaybe "" $ val) errEv
 
 -- | The only text input field that is used in project forms. This input
 -- provides automatic error message hiding after user starts typing.
@@ -437,11 +437,12 @@ octopodTextInput' ::
   -- | Placeholder for input field.
   Text ->
   -- | Possible init value.
-  Maybe Text ->
+  (Dynamic t Text) ->
   -- | Event carrying the error message.
   Event t Text ->
   m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' clss placeholder val errEv = mdo
+octopodTextInput' clss placeholder inValDyn' errEv = mdo
+  inValDyn <- holdUniqDyn inValDyn'
   let inpClass = " input"
       inpErrClass = " input input--error"
   isValid <-
@@ -456,6 +457,7 @@ octopodTextInput' clss placeholder val errEv = mdo
         [ (clss <> inpErrClass) <$ errEv
         , (clss <> inpClass) <$ updated valDyn
         ]
+  inVal <- sample . current $ inValDyn
   valDyn <- elDynClass "div" classDyn $ do
     inp <-
       inputElement $
@@ -465,7 +467,8 @@ octopodTextInput' clss placeholder val errEv = mdo
                   <> "class" =: "input__widget"
                   <> "placeholder" =: placeholder
                )
-          & inputElementConfig_initialValue .~ fromMaybe "" val
+          & inputElementConfig_setValue .~ updated inValDyn
+          & inputElementConfig_initialValue .~ inVal
     widgetHold_ blank $
       leftmost
         [ divClass "input__output" . text <$> errEv
@@ -737,8 +740,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
   let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
       addEv = clickEv $> Endo (fst . insertUniq emptyVar)
       updEv' = updEv <&> mconcat . fmap (\(k, v) -> Endo $ updateUniq k $ const v)
-  updEvsRaw <- networkView $ envsDyn <&> \envs -> runEventWriterT $ forM_ (M.toList . uniqMap $ envs) $ uncurry envVarInput
-  updEv <- switchHold never $ fmap snd updEvsRaw
+  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
   let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   let ovsRes =
         Overrides
@@ -787,21 +789,32 @@ envVarInput ::
   -- | Index of variable in overrides list.
   Int ->
   -- | Current variable key and value.
-  (ConfigKey, ConfigValue) ->
+  Dynamic t (ConfigKey, ConfigValue) ->
   m ()
-envVarInput i (ConfigKey keyType k, v') = do
-  let (v, rewrapValue) = case v' of
-        CustomValue x -> (x, CustomValue)
-        DefaultValue x -> (x, DefaultValue)
-        DeletedValue (Just x) -> (x, DeletedValue . Just)
-        DeletedValue Nothing -> ("<loading deleted>", const $ DeletedValue Nothing)
+envVarInput i val = do
+  let v =
+        val <&> snd <&> \case
+          CustomValue x -> x
+          DefaultValue x -> x
+          DeletedValue (Just x) -> x
+          DeletedValue Nothing -> "<loading deleted>"
+
+      k = val <&> \(ConfigKey _ x, _) -> x
+  rewrapValue <-
+    sample . current $
+      val <&> snd <&> \case
+        CustomValue _ -> CustomValue
+        DefaultValue _ -> DefaultValue
+        DeletedValue (Just _) -> DeletedValue . Just
+        DeletedValue Nothing -> const $ DeletedValue Nothing
+  keyType <- sample . current $ val <&> \(ConfigKey x _, _) -> x
 
   divClass "overrides__item" $ do
     (keyTextDyn, _) <-
-      octopodTextInput' "overrides__key" "key" (Just k) never
+      octopodTextInput' "overrides__key" "key" k never
     keyDyn <- mapHeadTailDyn (ConfigKey keyType) (ConfigKey CustomConfigKey) keyTextDyn
     (valTextDyn, _) <-
-      octopodTextInput' "overrides__value" "value" (Just v) never
+      octopodTextInput' "overrides__value" "value" v never
     valDyn <- mapHeadTailDyn rewrapValue CustomValue valTextDyn
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     let envEv = updated $ zipDynWith (,) keyDyn valDyn
