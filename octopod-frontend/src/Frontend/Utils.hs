@@ -12,6 +12,7 @@ import Common.Types as CT
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
+import Data.Align
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
@@ -23,6 +24,7 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Proxy (Proxy (..))
 import Data.Text as T (Text, intercalate, null, pack)
+import Data.These
 import Data.Time
 import Data.Time.Clock.POSIX
 import Data.Unique
@@ -443,6 +445,14 @@ octopodTextInput' ::
   m (Dynamic t Text, Dynamic t Bool)
 octopodTextInput' clss placeholder inValDyn' errEv = mdo
   inValDyn <- holdUniqDyn inValDyn'
+  let inValEv =
+        align (updated inValDyn) (updated valDyn)
+          & fmapMaybe
+            ( \case
+                This x -> Just x
+                These inV currV | inV /= currV -> Just inV
+                _ -> Nothing
+            )
   let inpClass = " input"
       inpErrClass = " input input--error"
   isValid <-
@@ -467,7 +477,7 @@ octopodTextInput' clss placeholder inValDyn' errEv = mdo
                   <> "class" =: "input__widget"
                   <> "placeholder" =: placeholder
                )
-          & inputElementConfig_setValue .~ updated inValDyn
+          & inputElementConfig_setValue .~ inValEv
           & inputElementConfig_initialValue .~ inVal
     widgetHold_ blank $
       leftmost
