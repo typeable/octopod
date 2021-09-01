@@ -38,6 +38,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
 import Data.Align
+import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
@@ -670,7 +671,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
   envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
   let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
       addEv = clickEv $> Endo (fst . insertUniq emptyVar)
-  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) (envVarInput lookupDef)
+  updEv <- switchDyn . fmap F.fold <$> listWithKey (uniqMap <$> envsDyn) (envVarInput lookupDef)
   let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   let ovsRes =
         Overrides
@@ -718,14 +719,14 @@ popUpSection n m = elClass "section" "deployment__section" $ do
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
-  (EventWriter t (Endo (UniqKeyMap (ConfigKey, ConfigValue))) m, MonadWidget t m) =>
+  (MonadWidget t m) =>
   -- | Default value from default config
   (Text -> Maybe (Maybe Text)) ->
   -- | Index of variable in overrides list.
   Int ->
   -- | Current variable key and value.
   Dynamic t (ConfigKey, ConfigValue) ->
-  m ()
+  m (Event t (Endo (UniqKeyMap (ConfigKey, ConfigValue))))
 envVarInput lookupDef i val = do
   let v =
         val <&> snd <&> \case
@@ -760,7 +761,7 @@ envVarInput lookupDef i val = do
               Nothing -> deleteUniq i
               Just v' -> updateUniq i $ const (key, DeletedValue v')
         updEv = Endo . updateUniq i . const <$> envEv
-    tellEvent $ leftmost [deleteEv, updEv]
+    pure $ leftmost [deleteEv, updEv]
 
 infixl 1 >>=*
 (>>=*) :: Reflex t => Event t a -> (a -> PushM t (Maybe b)) -> Event t b
