@@ -595,6 +595,7 @@ kubeDashboardUrl deploymentInfo = do
   return $ name <&> (\n -> (<> n) <$> template)
 
 deploymentPopupBody ::
+  forall t m tag.
   MonadWidget t m =>
   RequestErrorHandler t m ->
   Maybe DeploymentTag ->
@@ -615,15 +616,20 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
-  let holdDCfg dDCfg ovs = do
-        x <- dyn $ dDCfg <&> \dCfg -> envVarsInput dCfg ovs
-        (switchHold never . fmap updated) x >>= holdDyn ovs
+  let holdDCfg :: Dynamic t (Maybe (DefaultConfig l)) -> Overrides l -> m (Dynamic t (Overrides l))
+      holdDCfg dCfgDyn ovs = mdo
+        ovsDyn <- holdDyn ovs ovsEv
+        x <- attachDyn (current ovsDyn) dCfgDyn
+        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput dCfg ovs') >>= switchHold never
+        pure ovsDyn
       holdDKeys n keysDyn = do
         let loading = loadingCommonWidget
         popUpSection n $
           widgetHold_ loading $
-            keysDyn <&> mapM_ \keys -> el "ul" $
-              forM_ keys $ \key -> el "li" $ text key
+            keysDyn <&> \case
+              Just keys -> el "ul" $
+                forM_ keys $ \key -> el "li" $ text key
+              Nothing -> loading
 
   deploymentOvsDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
   holdDKeys "Deployment keys" (Just <$> depKeys)
@@ -714,7 +720,7 @@ envVarsInput ::
   -- | Current deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
-  m (Dynamic t (Overrides l))
+  m (Event t (Overrides l))
 envVarsInput dCfgM (Overrides ovsM) = mdo
   let initEnvs = case dCfgM of
         Just (DefaultConfig dCfg) ->
@@ -773,7 +779,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
       "Add an override"
       addingIsEnabled
       "dash--disabled"
-  pure $ ovsRes
+  pure $ updated ovsRes
 
 data ConfigKey = ConfigKey ConfigKeyType Text
 
@@ -882,3 +888,9 @@ immediateNothing :: (PostBuild t m) => Event t a -> m (Event t (Maybe a))
 immediateNothing ev = do
   pb <- getPostBuild
   pure $ leftmost [pb $> Nothing, fmapCheap Just ev]
+
+attachDyn :: (Reflex t, MonadHold t m) => Behavior t a -> Dynamic t b -> m (Dynamic t (a, b))
+attachDyn b d = do
+  currD <- sample . current $ d
+  currB <- sample b
+  holdDyn (currB, currD) (attach b $ updated d)
