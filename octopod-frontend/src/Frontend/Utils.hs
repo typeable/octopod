@@ -1,12 +1,37 @@
-{-# OPTIONS_GHC -Wno-missing-export-lists #-}
-
 -- |
 --Module      : Frontend.Utils
 --Description : Client utils and helpers.
 --
 --This module contains common types, functions and operators that are used by
 --frontend modules.
-module Frontend.Utils where
+module Frontend.Utils
+  ( sidebar,
+    buttonClass,
+    buttonClassEnabled,
+    wrapRequestErrors,
+    octopodTextInput,
+    deploymentPopupBody,
+    ClickedElement (..),
+    pageNotification,
+    aButtonClassEnabled,
+    buttonClassEnabled',
+    kubeDashboardUrl,
+    loadingCommonWidget,
+    errorCommonWidget,
+    aButtonDynClass',
+    formatPosixToDate,
+    overridesWidget,
+    aButtonClass',
+    statusWidget,
+    elementClick,
+    showT,
+    DeploymentPageNotification (..),
+    formatPosixToDateTime,
+    dropdownWidget,
+    dropdownWidget',
+    buttonDynClass,
+  )
+where
 
 import Common.Types as CT
 import Control.Lens
@@ -22,11 +47,9 @@ import qualified Data.Map as M
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromMaybe)
 import Data.Monoid
-import Data.Proxy (Proxy (..))
 import Data.Text as T (Text, intercalate, null, pack)
 import Data.These
 import Data.Time
-import Data.Time.Clock.POSIX
 import Data.Unique
 import Data.Witherable
 import Frontend.API
@@ -216,22 +239,6 @@ buttonClassEnabled' cl lbl dDyn disClass = do
   return $ domEvent Click bEl
 
 -- | Version of 'buttonClass' for links that should look like buttons.
-aButtonClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  m (Event t ())
-aButtonClass cl lbl = do
-  (bEl, _) <-
-    elDynAttr'
-      "a"
-      (constDyn $ "class" =: cl)
-      $ text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonClass' for links that should look like buttons.
 aButtonClass' ::
   (DomBuilder t m, PostBuild t m) =>
   -- | Classes.
@@ -247,22 +254,6 @@ aButtonClass' cl lbl eAttrs = do
       "a"
       (fmap (<> ("class" =: cl)) eAttrs)
       $ text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonDynClass' for links that should look like
--- buttons.
-aButtonDynClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Dynamic t Text ->
-  -- | Label text.
-  Dynamic t Text ->
-  m (Event t ())
-aButtonDynClass clDyn lblDyn = do
-  let attrDyn = ffor clDyn $ \cl -> "class" =: cl
-  (bEl, _) <-
-    elDynAttr' "a" attrDyn $
-      dynText lblDyn
   return $ domEvent Click bEl
 
 -- | Version of 'buttonDynClass' for links that should look like
@@ -305,86 +296,6 @@ aButtonClassEnabled cl lbl dDyn = do
     elDynAttr' "a" attrDyn $
       text lbl
   return $ domEvent Click bEl
-
--- | Converter from posix seconds to `UTCTime`.
-intToUTCTime :: Int -> UTCTime
-intToUTCTime = posixSecondsToUTCTime . realToFrac
-
--- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
---
--- Like 'elDynAttr'' but configures "prevent default" on the given event.
-elDynAttrWithPreventDefaultEvent' ::
-  forall a en m t.
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Event on the element to configure with 'preventDefault'
-  EventName en ->
-  -- | Element tag
-  Text ->
-  -- | Element attributes
-  Dynamic t (Map Text Text) ->
-  -- | Child of element
-  m a ->
-  -- | An element and the result of the child
-  m (R.Element EventResult (DomBuilderSpace m) t, a)
-elDynAttrWithPreventDefaultEvent' ev =
-  elDynAttrWithModifyConfig'
-    ( \elCfg ->
-        elCfg & elementConfig_eventSpec
-          %~ addEventSpecFlags
-            (Proxy :: Proxy (DomBuilderSpace m))
-            ev
-            (const preventDefault)
-    )
-
--- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
---
--- Like 'elDynAttr'' but configures "stop propagation" on the given event.
-elDynAttrWithStopPropagationEvent' ::
-  forall a en m t.
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Event on the element to configure with 'preventDefault'
-  EventName en ->
-  -- | Element tag
-  Text ->
-  -- | Element attributes
-  Dynamic t (Map Text Text) ->
-  -- | Child of element
-  m a ->
-  -- | An element and the result of the child
-  m (R.Element EventResult (DomBuilderSpace m) t, a)
-elDynAttrWithStopPropagationEvent' ev =
-  elDynAttrWithModifyConfig'
-    ( \elCfg ->
-        elCfg & elementConfig_eventSpec
-          %~ addEventSpecFlags
-            (Proxy :: Proxy (DomBuilderSpace m))
-            ev
-            (const stopPropagation)
-    )
-
--- | Taken from <https://gist.github.com/3noch/134b1ee7fa48c347be9d164c3fac4ef7>
---
--- Like 'elDynAttr'' but allows you to modify the element configuration.
---
--- Special thanks to @luigy:
--- <https://gist.github.com/luigy/b49ce04de8462e594c9c2b5b455ae5a5#file-foo-hs>
-elDynAttrWithModifyConfig' ::
-  (DomBuilder t m, PostBuild t m) =>
-  ( ElementConfig EventResult t (DomBuilderSpace m) ->
-    ElementConfig EventResult t (DomBuilderSpace m)
-  ) ->
-  Text ->
-  Dynamic t (Map Text Text) ->
-  m a ->
-  m (R.Element EventResult (DomBuilderSpace m) t, a)
-elDynAttrWithModifyConfig' f elementTag attrs child = do
-  modifyAttrs <- dynamicAttributesToModifyAttributes attrs
-  let cfg =
-        def & modifyAttributes .~ fmapCheap mapKeysToAttributeName modifyAttrs
-  result <- R.element elementTag (f cfg) child
-  postBuild <- getPostBuild
-  notReadyUntil postBuild
-  pure result
 
 -- | Formats posix seconds to date in iso8601.
 formatPosixToDate :: FormatTime t => t -> Text
@@ -526,7 +437,7 @@ overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for
             "listing__more expander"
         btnTextDyn =
           ifThenElseDyn showDyn "Hide" $
-            "Show all (" <> (showT $ envLength) <> ")"
+            "Show all (" <> showT envLength <> ")"
     toggleEv <- buttonDynClass btnClassDyn btnTextDyn
     blank
   where
