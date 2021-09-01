@@ -717,12 +717,12 @@ envVarsInput ::
   forall l t m.
   MonadWidget t m =>
   Maybe (DefaultConfig l) ->
-  -- | Current deployment overrides.
+  -- | Initial deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
   m (Event t (Overrides l))
 envVarsInput dCfgM (Overrides ovsM) = mdo
-  let initEnvs = case dCfgM of
+  let (initEnvs, lookupDef :: Text -> Maybe (Maybe Text)) = case dCfgM of
         Just (DefaultConfig dCfg) ->
           let custom =
                 uniqMapFromList
@@ -735,28 +735,31 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
                     )
                   . OM.assocs
                   $ ovsM
-           in L.foldl'
-                ( \m (k, v) ->
-                    if OM.member k ovsM then m else fst $ insertUniq (ConfigKey DefaultConfigKey k, DefaultValue v) m
-                )
-                custom
-                (OM.assocs dCfg)
-        Nothing ->
-          uniqMapFromList
-            . fmap
-              ( \(k, v) ->
-                  let k' = ConfigKey CustomConfigKey k
-                   in case v of
-                        ValueAdded x -> (k', CustomValue x)
-                        ValueDeleted -> (k', DeletedValue Nothing)
+           in ( L.foldl'
+                  ( \m (k, v) ->
+                      if OM.member k ovsM then m else fst $ insertUniq (ConfigKey DefaultConfigKey k, DefaultValue v) m
+                  )
+                  custom
+                  (OM.assocs dCfg)
+              , \k -> Just <$> OM.lookup k dCfg
               )
-            . OM.assocs
-            $ ovsM
-  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv']
+        Nothing ->
+          ( uniqMapFromList
+              . fmap
+                ( \(k, v) ->
+                    let k' = ConfigKey CustomConfigKey k
+                     in case v of
+                          ValueAdded x -> (k', CustomValue x)
+                          ValueDeleted -> (k', DeletedValue Nothing)
+                )
+              . OM.assocs
+              $ ovsM
+          , const (Just Nothing)
+          )
+  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
   let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
       addEv = clickEv $> Endo (fst . insertUniq emptyVar)
-      updEv' = updEv <&> mconcat . fmap (\(k, v) -> Endo $ updateUniq k $ const v)
-  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) envVarInput
+  (_, updEv) <- runEventWriterT $ listWithKey (uniqMap <$> envsDyn) (envVarInput lookupDef)
   let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   let ovsRes =
         Overrides
@@ -804,13 +807,15 @@ popUpSection n m = elClass "section" "deployment__section" $ do
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
-  (EventWriter t [(Int, (ConfigKey, ConfigValue))] m, MonadWidget t m) =>
+  (EventWriter t (Endo (UniqKeyMap (ConfigKey, ConfigValue))) m, MonadWidget t m) =>
+  -- | Default value from default config
+  (Text -> Maybe (Maybe Text)) ->
   -- | Index of variable in overrides list.
   Int ->
   -- | Current variable key and value.
   Dynamic t (ConfigKey, ConfigValue) ->
   m ()
-envVarInput i val = do
+envVarInput lookupDef i val = do
   let v =
         val <&> snd <&> \case
           CustomValue x -> x
@@ -839,10 +844,12 @@ envVarInput i val = do
     let envEv = updated $ zipDynWith (,) keyDyn valDyn
         deleteEv =
           closeEv >>=* \() -> do
-            key <- sample . current $ keyDyn
-            pure $ Just (key, DeletedValue Nothing)
-        updEv = envEv
-    tellEvent . fmap (pure . (i,)) $ leftmost [deleteEv, updEv]
+            key@(ConfigKey _ k') <- sample . current $ keyDyn
+            pure . Just . Endo $ case lookupDef k' of
+              Nothing -> deleteUniq i
+              Just v' -> updateUniq i $ const (key, DeletedValue v')
+        updEv = Endo . updateUniq i . const <$> envEv
+    tellEvent $ leftmost [deleteEv, updEv]
 
 infixl 1 >>=*
 (>>=*) :: Reflex t => Event t a -> (a -> PushM t (Maybe b)) -> Event t b
