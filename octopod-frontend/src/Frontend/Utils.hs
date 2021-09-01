@@ -619,7 +619,7 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
         x <- dyn $ dDCfg <&> \dCfg -> envVarsInput dCfg ovs
         (switchHold never . fmap updated) x >>= holdDyn ovs
       holdDKeys n keysDyn = do
-        let loading = text "Loading..."
+        let loading = loadingCommonWidget
         popUpSection n $
           widgetHold_ loading $
             keysDyn <&> mapM_ \keys -> el "ul" $
@@ -766,7 +766,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
           <$> envsDyn
   case dCfgM of
     Just _ -> pure ()
-    Nothing -> divClass "overrides__item" $ text "LOADING..."
+    Nothing -> loadingCommonWidget
   clickEv <-
     buttonClassEnabled'
       "overrides__add dash dash--add"
