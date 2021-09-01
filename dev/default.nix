@@ -103,6 +103,8 @@ in
       infoScript = pkgs.writeScript "info.sh" ''
         #!${pkgs.bash}/bin/bash
 
+        sleep 1
+
         echo "key,value"
         echo "key2,value2"
 
