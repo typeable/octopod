@@ -612,11 +612,11 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
         let loading = text "Loading..."
         popUpSection n $
           widgetHold_ loading $
-            keysDyn <&> \keys -> el "ul" $
+            keysDyn <&> mapM_ \keys -> el "ul" $
               forM_ keys $ \key -> el "li" $ text key
 
   deploymentOvsDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
-  holdDKeys "Deployment keys" depKeys
+  holdDKeys "Deployment keys" (Just <$> depKeys)
   readyDeploymentCfgDebounced <- debounce 0.5 . catMaybes $
     updated $ do
       defDep >>= \case
@@ -625,16 +625,16 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
           depOv <- deploymentOvsDyn
           pure $ Just $ applyOverrides depOv depDCfg
   defApp <-
-    waitForValue
+    waitForValuePromptly
       readyDeploymentCfgDebounced
       ( \deploymentCfg -> do
           pb' <- getPostBuild
-          defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq
+          defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
       )
-      >>= holdDynMaybe
-  appKeys <- waitForValue readyDeploymentCfgDebounced $ \deploymentCfg -> do
+      >>= holdDyn Nothing
+  appKeys <- waitForValuePromptly readyDeploymentCfgDebounced $ \deploymentCfg -> do
     pb' <- getPostBuild
-    applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq
+    applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
   applicationOvsDyn <- popUpSection "App overrides" $ holdDCfg defApp defAppOv
   holdDKeys "App keys" appKeys
 
@@ -661,8 +661,8 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
           badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
        in leftmost [tagErrEv, badNameEv]
 
-waitForValue :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
-waitForValue ev f = fmap switchDyn $ networkHold (pure never) $ f <$> ev
+waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
+waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev
 
 type RequestErrorHandler t m = forall tag a. Event t (ReqResult tag a) -> m (Event t a)
 
@@ -754,6 +754,9 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
             )
           . elemsUniq
           <$> envsDyn
+  case dCfgM of
+    Just _ -> pure ()
+    Nothing -> divClass "overrides__item" $ text "LOADING..."
   clickEv <-
     buttonClassEnabled'
       "overrides__add dash dash--add"
@@ -864,3 +867,8 @@ mapHeadTailDyn ::
 mapHeadTailDyn h t d = do
   x <- sample . current $ d
   holdDyn (h x) $ fmap t (updated d)
+
+immediateNothing :: (PostBuild t m) => Event t a -> m (Event t (Maybe a))
+immediateNothing ev = do
+  pb <- getPostBuild
+  pure $ leftmost [pb $> Nothing, fmapCheap Just ev]
