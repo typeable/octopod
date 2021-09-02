@@ -2,9 +2,10 @@
 , octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , migrations ? ../migrations
 , system ? builtins.currentSystem
-, hsPkgs ? import ./.. { inherit system; }
+, hsPkgs ? import ./.. { inherit system prod; }
 , pkgs ? hsPkgs.pkgs
 , pkgsSrc ? hsPkgs.pkgsSrc
+, prod ? true
 }:
 let
   octo-cli = hsPkgs.octo-cli.components.exes.octo;
