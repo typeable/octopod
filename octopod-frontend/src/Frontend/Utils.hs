@@ -635,7 +635,7 @@ envVarsInput ::
   -- | Updated deployment overrides.
   m (Event t (Overrides l))
 envVarsInput dCfgM (Overrides ovsM) = mdo
-  let (initEnvs, lookupDef :: Text -> Maybe (Maybe Text)) = case dCfgM of
+  let (initEnvs, lookupDef :: Maybe (Text -> Maybe Text)) = case dCfgM of
         Just (DefaultConfig dCfg) ->
           let custom =
                 uniqMapFromList
@@ -654,7 +654,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
                   )
                   custom
                   (OM.assocs dCfg)
-              , \k -> Just <$> OM.lookup k dCfg
+              , Just $ \k -> OM.lookup k dCfg
               )
         Nothing ->
           ( uniqMapFromList
@@ -667,12 +667,16 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
                 )
               . OM.assocs
               $ ovsM
-          , const (Just Nothing)
+          , Nothing
           )
   envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
   let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
       addEv = clickEv $> Endo (fst . insertUniqEnd emptyVar)
-  updEv <- switchDyn . fmap F.fold <$> listWithKey (uniqMap <$> envsDyn) (envVarInput lookupDef)
+  updEv <-
+    switchDyn . fmap F.fold
+      <$> listWithKey
+        (uniqMap <$> envsDyn)
+        (\i x -> fmap (performUserOverrideAction lookupDef i) <$> envVarInput x)
   let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   let ovsRes =
         Overrides
@@ -721,65 +725,58 @@ popUpSection n m = elClass "section" "deployment__section" $ do
 -- written to the 'EventWriter'.
 envVarInput ::
   (MonadWidget t m) =>
-  -- | Default value from default config
-  (Text -> Maybe (Maybe Text)) ->
-  -- | Index of variable in overrides list.
-  Int ->
   -- | Current variable key and value.
   Dynamic t (ConfigKey, ConfigValue) ->
-  m (Event t (Endo (UniqKeyMap (ConfigKey, ConfigValue))))
-envVarInput lookupDef i val = do
+  m (Event t UserOverrideAction)
+envVarInput val = do
   let v =
         val <&> snd <&> \case
           CustomValue x -> x
           DefaultValue x -> x
           DeletedValue (Just x) -> x
           DeletedValue Nothing -> "<loading deleted>"
-
       k = val <&> \(ConfigKey _ x, _) -> x
-  rewrapValue <-
-    sample . current $
-      val <&> snd <&> \case
-        CustomValue _ -> CustomValue
-        DefaultValue _ -> DefaultValue
-        DeletedValue (Just _) -> DeletedValue . Just
-        DeletedValue Nothing -> const $ DeletedValue Nothing
-  keyType <- sample . current $ val <&> \(ConfigKey x _, _) -> x
 
   divClass "overrides__item" $ do
     (keyTextDyn, _) <-
       octopodTextInput' "overrides__key" "key" k never
-    keyDyn <- mapHeadTailDyn (ConfigKey keyType) (ConfigKey CustomConfigKey) keyTextDyn
+    keyEv <- tailE $ updated keyTextDyn
     (valTextDyn, _) <-
       octopodTextInput' "overrides__value" "value" v never
-    valDyn <- mapHeadTailDyn rewrapValue CustomValue valTextDyn
+    valEv <- tailE $ updated valTextDyn
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    let envEv = updated $ zipDynWith (,) keyDyn valDyn
-        deleteEv =
-          closeEv >>=* \() -> do
-            key@(ConfigKey _ k') <- sample . current $ keyDyn
-            pure . Just . Endo $ case lookupDef k' of
-              Nothing -> deleteUniq i
-              Just v' -> updateUniq i $ const (key, DeletedValue v')
-        updEv = Endo . updateUniq i . const <$> envEv
-    pure $ leftmost [deleteEv, updEv]
+    pure $ leftmost [UpdateKey <$> keyEv, UpdateValue <$> valEv, closeEv $> DeleteOverride]
 
-infixl 1 >>=*
-(>>=*) :: Reflex t => Event t a -> (a -> PushM t (Maybe b)) -> Event t b
-(>>=*) = flip push
+data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
+
+performUserOverrideAction ::
+  Maybe (Text -> Maybe Text) ->
+  Int ->
+  UserOverrideAction ->
+  Endo (UniqKeyMap (ConfigKey, ConfigValue))
+performUserOverrideAction f i (UpdateValue v) = Endo $
+  updateUniq i $ \(k@(ConfigKey _ kt), _) ->
+    ( k
+    , case f >>= ($ kt) of
+        Just v' | v == v' -> DefaultValue v
+        _ -> CustomValue v
+    )
+performUserOverrideAction f i (UpdateKey k) = Endo $ updateUniq i $ \(_, v) -> (ConfigKey t k, v)
+  where
+    t = case f >>= ($ k) of
+      Nothing -> CustomConfigKey
+      Just _ -> DefaultConfigKey
+performUserOverrideAction f i DeleteOverride = Endo $ \m ->
+  case f of
+    Nothing -> updateUniq i (\(k, _) -> (k, DeletedValue Nothing)) m
+    Just f' -> case lookupUniq i m of
+      Nothing -> m
+      Just (ConfigKey _ k, _) -> case f' k of
+        Nothing -> deleteUniq i m
+        Just v -> updateUniq i (const $ (ConfigKey DefaultConfigKey k, DeletedValue (Just v))) m
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
-
-mapHeadTailDyn ::
-  (MonadSample t m, MonadHold t m, Reflex t) =>
-  (a -> b) ->
-  (a -> b) ->
-  Dynamic t a ->
-  m (Dynamic t b)
-mapHeadTailDyn h t d = do
-  x <- sample . current $ d
-  holdDyn (h x) $ fmap t (updated d)
 
 immediateNothing :: (PostBuild t m) => Event t a -> m (Event t (Maybe a))
 immediateNothing ev = do

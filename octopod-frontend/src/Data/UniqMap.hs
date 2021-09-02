@@ -8,13 +8,18 @@ module Data.UniqMap
     elemsUniq,
     emptyUniqKeyMap,
     uniqMapFromList,
+    lookupUniq,
   )
 where
 
 import qualified Data.List as L
-import Data.Map.Strict
+import Data.Map.Strict as M
 
 data UniqKeyMap v = UniqKeyMap !(Map Int v) !Int !Int
+
+lookupUniq :: Int -> UniqKeyMap v -> Maybe v
+lookupUniq k (UniqKeyMap m _ _) = M.lookup k m
+{-# INLINE lookupUniq #-}
 
 uniqMap :: UniqKeyMap v -> Map Int v
 uniqMap (UniqKeyMap m _ _) = m
