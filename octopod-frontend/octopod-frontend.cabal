@@ -39,6 +39,7 @@ executable frontend
                      , Page.Elements.Links
                      , Reflex.MultiEventWriter.Class
                      , Data.Text.Search
+                     , Data.UniqMap
   ghc-options:
     -Weverything
     -Wno-implicit-prelude

@@ -51,6 +51,7 @@ import Data.Monoid
 import Data.Text as T (Text, intercalate, null, pack)
 import Data.These
 import Data.Time
+import Data.UniqMap
 import Data.Unique
 import Data.Witherable
 import Frontend.API
@@ -649,7 +650,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
                   $ ovsM
            in ( L.foldl'
                   ( \m (k, v) ->
-                      if OM.member k ovsM then m else fst $ insertUniq (ConfigKey DefaultConfigKey k, DefaultValue v) m
+                      if OM.member k ovsM then m else fst $ insertUniqEnd (ConfigKey DefaultConfigKey k, DefaultValue v) m
                   )
                   custom
                   (OM.assocs dCfg)
@@ -670,7 +671,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
           )
   envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
   let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
-      addEv = clickEv $> Endo (fst . insertUniq emptyVar)
+      addEv = clickEv $> Endo (fst . insertUniqEnd emptyVar)
   updEv <- switchDyn . fmap F.fold <$> listWithKey (uniqMap <$> envsDyn) (envVarInput lookupDef)
   let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   let ovsRes =
@@ -766,29 +767,6 @@ envVarInput lookupDef i val = do
 infixl 1 >>=*
 (>>=*) :: Reflex t => Event t a -> (a -> PushM t (Maybe b)) -> Event t b
 (>>=*) = flip push
-
-data UniqKeyMap v = UniqKeyMap (Map Int v) Int
-
-uniqMap :: UniqKeyMap v -> Map Int v
-uniqMap (UniqKeyMap m _) = m
-
-insertUniq :: v -> UniqKeyMap v -> (UniqKeyMap v, Int)
-insertUniq v (UniqKeyMap m x) = (UniqKeyMap (M.insert x v m) (x + 1), x)
-
-deleteUniq :: Int -> UniqKeyMap v -> UniqKeyMap v
-deleteUniq k (UniqKeyMap m x) = UniqKeyMap (M.delete k m) x
-
-updateUniq :: Int -> (v -> v) -> UniqKeyMap v -> UniqKeyMap v
-updateUniq k f (UniqKeyMap m x) = UniqKeyMap (M.adjust f k m) x
-
-elemsUniq :: UniqKeyMap v -> [v]
-elemsUniq (UniqKeyMap m _) = M.elems m
-
-emptyUniqKeyMap :: UniqKeyMap v
-emptyUniqKeyMap = UniqKeyMap mempty 0
-
-uniqMapFromList :: [v] -> UniqKeyMap v
-uniqMapFromList = L.foldl' (\m v -> fst $ insertUniq v m) emptyUniqKeyMap
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
