@@ -8,7 +8,9 @@
 }:
 let
   octopod-css = import ./octopod-css { inherit pkgsSrc; };
-  removeOptimizationFlags = x: if prod then x else x // { ghcOptions = [ "-O0" ]; };
+  addLocalOptions = x:
+    if prod then x // { ghcOptions = [ "-Werror" ]; }
+    else x // { ghcOptions = [ "-O0" ]; };
 
   hsPkgs = pkgs.haskell-nix.cabalProject {
     src = nix-filter {
@@ -30,11 +32,11 @@ let
         dontStrip = false;
         dontPatchELF = false;
         enableDeadCodeElimination = true;
-        packages.octopod-backend = removeOptimizationFlags { src = ./octopod-backend; };
-        packages.octo-cli = removeOptimizationFlags { src = ./octo-cli; };
-        packages.octopod-api = removeOptimizationFlags { src = ./octopod-api; };
-        packages.octopod-frontend = removeOptimizationFlags { src = ./octopod-frontend; };
-        packages.octopod-common = removeOptimizationFlags { src = ./octopod-common; };
+        packages.octopod-backend = addLocalOptions { src = ./octopod-backend; };
+        packages.octo-cli = addLocalOptions { src = ./octo-cli; };
+        packages.octopod-api = addLocalOptions { src = ./octopod-api; };
+        packages.octopod-frontend = addLocalOptions { src = ./octopod-frontend; };
+        packages.octopod-common = addLocalOptions { src = ./octopod-common; };
       }
     ];
 
