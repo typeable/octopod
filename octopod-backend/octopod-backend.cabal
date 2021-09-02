@@ -75,7 +75,6 @@ library
     , bytestring
     , cassava
     , conduit
-    , deriving-aeson
     , octopod-common
     , fast-logger
     , generic-lens
@@ -98,7 +97,6 @@ library
     , typed-process
     , unix
     , warp
-    , x509
     , containers
     , monad-control
     , lifted-base

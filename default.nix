@@ -4,9 +4,13 @@
 , pkgs ? pkgsSrc (haskellNix.nixpkgsArgs // { inherit system; })
 , nix-filter ? import sources.nix-filter
 , system ? builtins.currentSystem
+, prod ? false
 }:
 let
   octopod-css = import ./octopod-css { inherit pkgsSrc; };
+  addLocalOptions = x:
+    if prod then x // { ghcOptions = [ "-Werror" ]; }
+    else x // { ghcOptions = [ "-O0" ]; };
 
   hsPkgs = pkgs.haskell-nix.cabalProject {
     src = nix-filter {
@@ -24,14 +28,15 @@ let
 
     modules = [
       {
+        ghcOptions = [ "-O2" ];
         dontStrip = false;
         dontPatchELF = false;
         enableDeadCodeElimination = true;
-        packages.octopod-backend.src = ./octopod-backend;
-        packages.octo-cli.src = ./octo-cli;
-        packages.octopod-api.src = ./octopod-api;
-        packages.octopod-frontend.src = ./octopod-frontend;
-        packages.octopod-common.src = ./octopod-common;
+        packages.octopod-backend = addLocalOptions { src = ./octopod-backend; };
+        packages.octo-cli = addLocalOptions { src = ./octo-cli; };
+        packages.octopod-api = addLocalOptions { src = ./octopod-api; };
+        packages.octopod-frontend = addLocalOptions { src = ./octopod-frontend; };
+        packages.octopod-common = addLocalOptions { src = ./octopod-common; };
       }
     ];
 
