@@ -18,11 +18,15 @@ let
     in
     pkgs.runCommand "octopod-frontend-ugly"
       { } ''
+      shopt -s globstar
       mkdir $out
       cp -av ${frontend}/* $out
       rm $out/all.js
 
+      chmod +w -R $out
+
       ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/all.js --externs ${frontend}/all.js.externs --js_output_file $out/all.js
+      ${pkgs.zopfli}/bin/zopfli $out/**/*.{js,css,json,html}
     '';
 
   octopod-server-container = pkgs.dockerTools.buildImage {
