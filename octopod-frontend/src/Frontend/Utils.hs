@@ -54,6 +54,7 @@ import Data.Time
 import Data.UniqMap
 import Data.Unique
 import Data.Witherable
+import Data.WorkingOverrides
 import Frontend.API
 import Frontend.GHCJS
 import GHCJS.DOM
@@ -634,63 +635,16 @@ envVarsInput ::
   Overrides l ->
   -- | Updated deployment overrides.
   m (Event t (Overrides l))
-envVarsInput dCfgM (Overrides ovsM) = mdo
-  let (initEnvs, lookupDef :: Maybe (Text -> Maybe Text)) = case dCfgM of
-        Just (DefaultConfig dCfg) ->
-          let custom =
-                uniqMapFromList
-                  . mapMaybe
-                    ( \(k, v) ->
-                        let k' = ConfigKey (if OM.member k dCfg then DefaultConfigKey else CustomConfigKey) k
-                         in case v of
-                              ValueAdded x -> Just (k', CustomValue x)
-                              ValueDeleted -> (k',) . DeletedValue . Just <$> OM.lookup k dCfg
-                    )
-                  . OM.assocs
-                  $ ovsM
-           in ( L.foldl'
-                  ( \m (k, v) ->
-                      if OM.member k ovsM then m else fst $ insertUniqEnd (ConfigKey DefaultConfigKey k, DefaultValue v) m
-                  )
-                  custom
-                  (OM.assocs dCfg)
-              , Just $ \k -> OM.lookup k dCfg
-              )
-        Nothing ->
-          ( uniqMapFromList
-              . fmap
-                ( \(k, v) ->
-                    let k' = ConfigKey CustomConfigKey k
-                     in case v of
-                          ValueAdded x -> (k', CustomValue x)
-                          ValueDeleted -> (k', DeletedValue Nothing)
-                )
-              . OM.assocs
-              $ ovsM
-          , Nothing
-          )
-  envsDyn <- foldDyn appEndo initEnvs $ leftmost [addEv, updEv]
-  let emptyVar = (ConfigKey CustomConfigKey "", CustomValue "")
-      addEv = clickEv $> Endo (fst . insertUniqEnd emptyVar)
+envVarsInput dCfg ovs = mdo
+  envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
+  let addEv = clickEv $> Endo (fst . insertUniqEnd newWorkingOverride)
   updEv <-
     switchDyn . fmap F.fold
       <$> listWithKey
         (uniqMap <$> envsDyn)
-        (\i x -> fmap (performUserOverrideAction lookupDef i) <$> envVarInput x)
-  let addingIsEnabled = all (\(ConfigKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
-  let ovsRes =
-        Overrides
-          . OM.fromList
-          . mapMaybe
-            ( \case
-                (ConfigKey CustomConfigKey k, getConfigValue -> v) -> Just (k, v)
-                (ConfigKey _ k, CustomValue v) -> Just (k, ValueAdded v)
-                (ConfigKey _ k, DeletedValue _) -> Just (k, ValueDeleted)
-                _ -> Nothing
-            )
-          . elemsUniq
-          <$> envsDyn
-  case dCfgM of
+        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput x)
+  let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
+  case dCfg of
     Just _ -> pure ()
     Nothing -> loadingCommonWidget
   clickEv <-
@@ -699,21 +653,7 @@ envVarsInput dCfgM (Overrides ovsM) = mdo
       "Add an override"
       addingIsEnabled
       "dash--disabled"
-  pure $ updated ovsRes
-
-data ConfigKey = ConfigKey ConfigKeyType Text
-
-data ConfigKeyType = CustomConfigKey | DefaultConfigKey
-
-data ConfigValue
-  = CustomValue Text
-  | DefaultValue Text
-  | DeletedValue (Maybe Text)
-
-getConfigValue :: ConfigValue -> OverrideValue
-getConfigValue (CustomValue x) = ValueAdded x
-getConfigValue (DefaultValue x) = ValueAdded x
-getConfigValue (DeletedValue _) = ValueDeleted
+  pure . updated $ destructWorkingOverrides <$> envsDyn
 
 popUpSection :: DomBuilder t m => Text -> m a -> m a
 popUpSection n m = elClass "section" "deployment__section" $ do
@@ -726,16 +666,16 @@ popUpSection n m = elClass "section" "deployment__section" $ do
 envVarInput ::
   (MonadWidget t m) =>
   -- | Current variable key and value.
-  Dynamic t (ConfigKey, ConfigValue) ->
+  Dynamic t WorkingOverride ->
   m (Event t UserOverrideAction)
 envVarInput val = do
   let v =
         val <&> snd <&> \case
-          CustomValue x -> x
-          DefaultValue x -> x
-          DeletedValue (Just x) -> x
-          DeletedValue Nothing -> "<loading deleted>"
-      k = val <&> \(ConfigKey _ x, _) -> x
+          WorkingCustomValue x -> x
+          WorkingDefaultValue x -> x
+          WorkingDeletedValue (Just x) -> x
+          WorkingDeletedValue Nothing -> "<loading deleted>"
+      k = val <&> \(WorkingOverrideKey _ x, _) -> x
 
   divClass "overrides__item" $ do
     (keyTextDyn, _) <-
@@ -753,27 +693,27 @@ performUserOverrideAction ::
   Maybe (Text -> Maybe Text) ->
   Int ->
   UserOverrideAction ->
-  Endo (UniqKeyMap (ConfigKey, ConfigValue))
+  Endo WorkingOverrides
 performUserOverrideAction f i (UpdateValue v) = Endo $
-  updateUniq i $ \(k@(ConfigKey _ kt), _) ->
+  updateUniq i $ \(k@(WorkingOverrideKey _ kt), _) ->
     ( k
     , case f >>= ($ kt) of
-        Just v' | v == v' -> DefaultValue v
-        _ -> CustomValue v
+        Just v' | v == v' -> WorkingDefaultValue v
+        _ -> WorkingCustomValue v
     )
-performUserOverrideAction f i (UpdateKey k) = Endo $ updateUniq i $ \(_, v) -> (ConfigKey t k, v)
+performUserOverrideAction f i (UpdateKey k) = Endo $ updateUniq i $ \(_, v) -> (WorkingOverrideKey t k, v)
   where
     t = case f >>= ($ k) of
-      Nothing -> CustomConfigKey
-      Just _ -> DefaultConfigKey
+      Nothing -> CustomWorkingOverrideKey
+      Just _ -> DefaultWorkingOverrideKey
 performUserOverrideAction f i DeleteOverride = Endo $ \m ->
   case f of
-    Nothing -> updateUniq i (\(k, _) -> (k, DeletedValue Nothing)) m
+    Nothing -> updateUniq i (\(k, _) -> (k, WorkingDeletedValue Nothing)) m
     Just f' -> case lookupUniq i m of
       Nothing -> m
-      Just (ConfigKey _ k, _) -> case f' k of
+      Just (WorkingOverrideKey _ k, _) -> case f' k of
         Nothing -> deleteUniq i m
-        Just v -> updateUniq i (const $ (ConfigKey DefaultConfigKey k, DeletedValue (Just v))) m
+        Just v -> updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (Just v))) m
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev

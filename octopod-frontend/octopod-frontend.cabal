@@ -40,6 +40,7 @@ executable frontend
                      , Reflex.MultiEventWriter.Class
                      , Data.Text.Search
                      , Data.UniqMap
+                     , Data.WorkingOverrides
   ghc-options:
     -Weverything
     -Wno-implicit-prelude

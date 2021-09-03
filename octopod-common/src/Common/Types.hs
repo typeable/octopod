@@ -42,6 +42,9 @@ data OverrideValue = ValueAdded Text | ValueDeleted
 newtype DefaultConfig (l :: OverrideLevel) = DefaultConfig (OMap Text Text)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
+lookupDefaultConfig :: DefaultConfig l -> Text -> Maybe Text
+lookupDefaultConfig (DefaultConfig m) k = OM.lookup k m
+
 newtype Config (l :: OverrideLevel) = Config {unConfig :: OMap Text Text}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
