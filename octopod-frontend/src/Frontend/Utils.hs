@@ -637,7 +637,13 @@ envVarsInput ::
   m (Event t (Overrides l))
 envVarsInput dCfg ovs = mdo
   envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
-  let addEv = clickEv $> Endo (fst . insertUniqEnd newWorkingOverride)
+  let addEv = clickEv $> Endo (fst . insertUniqStart newWorkingOverride)
+  clickEv <-
+    buttonClassEnabled'
+      "overrides__add dash dash--add"
+      "Add an override"
+      addingIsEnabled
+      "dash--disabled"
   updEv <-
     switchDyn . fmap F.fold
       <$> listWithKey
@@ -647,12 +653,6 @@ envVarsInput dCfg ovs = mdo
   case dCfg of
     Just _ -> pure ()
     Nothing -> loadingCommonWidget
-  clickEv <-
-    buttonClassEnabled'
-      "overrides__add dash dash--add"
-      "Add an override"
-      addingIsEnabled
-      "dash--disabled"
   pure . updated $ destructWorkingOverrides <$> envsDyn
 
 popUpSection :: DomBuilder t m => Text -> m a -> m a
