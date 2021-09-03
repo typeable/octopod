@@ -680,12 +680,15 @@ envVarInput val = do
   divClass "overrides__item" $ do
     (keyTextDyn, _) <-
       octopodTextInput' "overrides__key" "key" k never
-    keyEv <- tailE $ updated keyTextDyn
     (valTextDyn, _) <-
       octopodTextInput' "overrides__value" "value" v never
-    valEv <- tailE $ updated valTextDyn
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    pure $ leftmost [UpdateKey <$> keyEv, UpdateValue <$> valEv, closeEv $> DeleteOverride]
+    pure $
+      leftmost
+        [ UpdateKey <$> updated keyTextDyn
+        , UpdateValue <$> updated valTextDyn
+        , closeEv $> DeleteOverride
+        ]
 
 data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
 

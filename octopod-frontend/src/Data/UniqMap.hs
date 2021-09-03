@@ -16,6 +16,7 @@ import qualified Data.List as L
 import Data.Map.Strict as M
 
 data UniqKeyMap v = UniqKeyMap !(Map Int v) !Int !Int
+  deriving stock (Show)
 
 lookupUniq :: Int -> UniqKeyMap v -> Maybe v
 lookupUniq k (UniqKeyMap m _ _) = M.lookup k m

@@ -22,13 +22,16 @@ type WorkingOverrides = UniqKeyMap WorkingOverride
 type WorkingOverride = (WorkingOverrideKey, WorkingOverrideValue)
 
 data WorkingOverrideKey = WorkingOverrideKey !WorkingOverrideKeyType !Text
+  deriving stock (Show)
 
 data WorkingOverrideKeyType = CustomWorkingOverrideKey | DefaultWorkingOverrideKey
+  deriving stock (Show)
 
 data WorkingOverrideValue
   = WorkingCustomValue !Text
   | WorkingDefaultValue !Text
   | WorkingDeletedValue !(Maybe Text)
+  deriving stock (Show)
 
 destructWorkingOverrides :: WorkingOverrides -> Overrides l
 destructWorkingOverrides =
