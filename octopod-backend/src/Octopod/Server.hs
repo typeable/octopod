@@ -19,12 +19,12 @@ import Control.Monad.Trans.Control
 import Control.Octopod.DeploymentLock
 import Crypto.JOSE hiding (Context)
 import Data.Aeson (Value (..), encode, toJSON)
-import qualified Data.Bifunctor as Bi
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
+import qualified Data.Csv as C
 import Data.Foldable
 import Data.Functor
 import Data.Generics.Labels ()
@@ -39,6 +39,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Traversable
+import qualified Data.Vector as V
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
 import Hasql.Statement
@@ -279,11 +280,14 @@ server =
     :<|> pingH
     :<|> projectNameH
 
-decodeCSVDefaultConfig :: Text -> DefaultConfig l
-decodeCSVDefaultConfig = DefaultConfig . OM.fromList . splitOnComma
-  where
-    splitOnComma :: Text -> [(Text, Text)]
-    splitOnComma = fmap (Bi.second T.tail . T.breakOn ",") . T.lines
+decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
+decodeCSVDefaultConfig bs = do
+  x <- C.decode C.NoHeader bs
+  pure $ DefaultConfig . OM.fromList . V.toList $ x
+
+either500S :: MonadError ServerError m => Either String x -> m x
+either500S (Right x) = pure x
+either500S (Left err) = throwError err500 {errBody = BSLC.pack err}
 
 defaultDeploymentKeysH :: AppM [Text]
 defaultDeploymentKeysH = do
@@ -293,7 +297,7 @@ defaultDeploymentKeysH = do
 defaultDeploymentOverridesH :: AppM (DefaultConfig 'DeploymentLevel)
 defaultDeploymentOverridesH = do
   (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
-  pure $ decodeCSVDefaultConfig out
+  either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
 
 defaultApplicationKeysH :: Config 'DeploymentLevel -> AppM [Text]
 defaultApplicationKeysH cfg = do
@@ -303,7 +307,7 @@ defaultApplicationKeysH cfg = do
 defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'ApplicationLevel)
 defaultApplicationOverridesH cfg = do
   (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
-  pure $ decodeCSVDefaultConfig out
+  either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
 
 -- | Application with the octo CLI API.
 powerApp :: AuthHeader -> AppState -> IO Application
