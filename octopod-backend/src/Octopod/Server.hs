@@ -114,6 +114,7 @@ data AppState = AppState
   , deploymentOverrideKeysCommand :: Command
   , applicationOverridesCommand :: Command
   , applicationOverrideKeysCommand :: Command
+  , unarchiveCommand :: Command
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: LockedDeployments
@@ -171,6 +172,7 @@ runOctopodServer = do
   dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
   aOverridesCmd <- Command . pack <$> getEnvOrDie "APPLICATION_OVERRIDES_COMMAND"
   aKeysCmd <- Command . pack <$> getEnvOrDie "APPLICATION_KEYS_COMMAND"
+  unarchiveCmd <- Command . pack <$> getEnvOrDie "UNARCHIVE_COMMAND"
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
   notificationCmd <-
     (fmap . fmap) (Command . pack) $
@@ -212,6 +214,7 @@ runOctopodServer = do
           dKeysCmd
           aOverridesCmd
           aKeysCmd
+          unarchiveCmd
           lockedDs
       app' = app appSt
       wsApp' = wsApp channel
@@ -573,7 +576,7 @@ transitionStatus :: DeploymentStatusTransition -> DeploymentStatus
 transitionStatus TransitionArchived {} = Archived
 transitionStatus TransitionCreate {} = Running
 transitionStatus TransitionUpdate {} = Running
-transitionStatus TransitionRestore {} = Running
+transitionStatus TransitionRestore {} = CreatePending
 transitionStatus TransitionArchivePending {} = ArchivePending
 transitionStatus TransitionUpdatePending {} = UpdatePending
 transitionStatus TransitionCreatePending {} = CreatePending
@@ -984,11 +987,12 @@ restoreH dName = do
   runDeploymentBgWorker (Just CreatePending) dName (pure ()) $ \() -> do
     dep' <- getDeploymentS dName
     updateDeploymentInfo dName
-    (ec, out, err) <- createDeployment $ dep' ^. #deployment
+    dCfg <- getDefaultConfig dName
+    (ec, out, err) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs dCfg (dep' ^. #deployment)
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
-      TransitionCreatePending
+      TransitionRestore
         StatusTransitionProcessOutput
           { exitCode = ec
           , duration = elTime

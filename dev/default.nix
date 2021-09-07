@@ -144,6 +144,7 @@ in
         export DEPLOYMENT_KEYS_COMMAND=${infoScript}
         export APPLICATION_OVERRIDES_COMMAND=${infoScript}
         export APPLICATION_KEYS_COMMAND=${infoScript}
+        export UNARCHIVE_COMMAND=${writeScript}
         export POWER_AUTHORIZATION_HEADER="123"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \

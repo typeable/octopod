@@ -5,6 +5,7 @@
 --This module contains control script utils.
 module Octopod.Server.ControlScriptUtils
   ( infoCommandArgs,
+    unarchiveCommandArgs,
     notificationCommandArgs,
     runCommand,
     runCommandWithoutPipes,
@@ -78,6 +79,9 @@ type GenericDeploymentCommandArgsNoConfig m r =
   , HasType Domain r
   ) =>
   m ControlScriptArgs
+
+unarchiveCommandArgs :: GenericDeploymentCommandArgs m r
+unarchiveCommandArgs = genericDeploymentCommandArgs
 
 genericDeploymentCommandArgsNoConfig :: GenericDeploymentCommandArgsNoConfig m r
 genericDeploymentCommandArgsNoConfig = do
