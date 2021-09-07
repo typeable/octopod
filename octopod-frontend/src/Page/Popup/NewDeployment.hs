@@ -5,21 +5,22 @@
 --This module contains the definition of \"new deployment\" sidebar.
 module Page.Popup.NewDeployment (newDeploymentPopup) where
 
-import Control.Lens (preview, _1, _2)
+import Control.Lens
 import Control.Monad
 import Data.Functor
 import Data.Generics.Sum
 import Data.Monoid
-import Data.Text as T (Text, intercalate)
+import qualified Data.Text as T
 import Reflex.Dom as R
 import Prelude as P
 
 import Common.Types
 import Common.Validation (isNameValid)
+import Data.Maybe
 import Frontend.API
 import Frontend.Utils
+import Reflex.Network
 import Servant.Reflex
-import Servant.Reflex.Extra
 
 -- | The root function for \"new deployment\" sidebar.
 newDeploymentPopup ::
@@ -34,8 +35,14 @@ newDeploymentPopup showEv hideEv = void $
     const $ mdo
       divClass "popup__body" $ mdo
         (closeEv', saveEv) <- newDeploymentPopupHeader enabledDyn
-        (deploymentDyn, validDyn) <- newDeploymentPopupBody respEv
-        respEv <- createEndpoint (Right <$> deploymentDyn) saveEv
+        deploymentMDyn <- newDeploymentPopupBody respEv
+        respEv <-
+          holdDyn (pure never) >=> networkView >=> switchHold never $
+            tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
+              pb <- getPostBuild
+              createEndpoint
+                (pure $ Right dep)
+                pb
         sentDyn <-
           holdDyn False $
             leftmost
@@ -45,7 +52,7 @@ newDeploymentPopup showEv hideEv = void $
         let successEv =
               fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
             closeEv = leftmost [closeEv', successEv]
-            enabledDyn = zipDynWith (&&) (not <$> sentDyn) validDyn
+            enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
         pure (never, closeEv)
 
 -- | The header of sidebar contains control buttons: \"Save\" and \"Close\".
@@ -71,27 +78,24 @@ newDeploymentPopupBody ::
   -- | Request failure event.
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns new deployment and validation states.
-  m (Dynamic t Deployment, Dynamic t Bool)
+  m (Dynamic t (Maybe Deployment))
 newDeploymentPopupBody errEv = divClass "popup__content" $
-  divClass "deployment" $ mdo
-    let commandResponseEv = fmapMaybe commandResponse errEv
-        appErrEv = R.difference (fmapMaybe reqErrorBody errEv) commandResponseEv
-        nameErrEv = getNameError commandResponseEv nameDyn
-        tagErrEv = getTagError commandResponseEv tagDyn
-    errorHeader appErrEv
-    (nameDyn, nOkDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
-    (tagDyn, tOkDyn) <- octopodTextInput "tag" "Tag" "Tag" Nothing tagErrEv
-    appVarsDyn <- envVarsInput "App overrides" mempty
-    deploymentVarsDyn <- envVarsInput "Deployment overrides" mempty
-    validDyn <- holdDyn False $ updated $ zipDynWith (&&) nOkDyn tOkDyn
-    pure
-      ( Deployment
-          <$> (DeploymentName <$> nameDyn)
-          <*> (DeploymentTag <$> tagDyn)
-          <*> appVarsDyn
-          <*> deploymentVarsDyn
-      , validDyn
-      )
+  divClass "deployment" $
+    wrapRequestErrors $ \hReq -> mdo
+      let commandResponseEv = fmapMaybe commandResponse errEv
+          nameErrEv = getNameError commandResponseEv nameDyn
+      (nameDyn, validNameDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
+      depDyn <- deploymentPopupBody hReq Nothing mempty mempty errEv
+      let dep = do
+            depDyn >>= \case
+              Nothing -> pure Nothing
+              Just du' -> do
+                name <- DeploymentName <$> nameDyn
+                pure . Just $ Deployment name (du' ^. #newTag) (du' ^. #appOverrides) (du' ^. #deploymentOverrides)
+      pure $ do
+        validNameDyn >>= \case
+          False -> pure Nothing
+          True -> dep
   where
     getNameError crEv nameDyn =
       let nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1)) crEv
@@ -102,22 +106,3 @@ newDeploymentPopupBody errEv = divClass "popup__content" $
           badNameEv = badNameText <$ (ffilter not $ updated isNameValidDyn)
           nameErrEv = ffilter (/= "") $ T.intercalate ". " <$> nameErrEv'
        in leftmost [nameErrEv, badNameEv]
-    getTagError crEv tagDyn =
-      let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
-          tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
-          badTagText = "Tag should not be empty"
-          badNameEv = badTagText <$ (ffilter (== "") $ updated tagDyn)
-       in leftmost [tagErrEv, badNameEv]
-
--- | The widget used to display errors.
-errorHeader ::
-  MonadWidget t m =>
-  -- | Message text.
-  Event t Text ->
-  m ()
-errorHeader appErrEv = do
-  widgetHold_ blank $
-    appErrEv <&> \appErr -> do
-      divClass "deployment__output notification notification--danger" $ do
-        el "b" $ text "App error: "
-        text appErr

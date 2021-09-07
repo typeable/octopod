@@ -103,6 +103,8 @@ in
       infoScript = pkgs.writeScript "info.sh" ''
         #!${pkgs.bash}/bin/bash
 
+        sleep 1
+
         echo "key,value"
         echo "key2,value2"
 
@@ -138,6 +140,10 @@ in
         export TAG_CHECKING_COMMAND=${echoScript}
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
+        export DEPLOYMENT_OVERRIDES_COMMAND=${infoScript}
+        export DEPLOYMENT_KEYS_COMMAND=${infoScript}
+        export APPLICATION_OVERRIDES_COMMAND=${infoScript}
+        export APPLICATION_KEYS_COMMAND=${infoScript}
         export POWER_AUTHORIZATION_HEADER="123"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \

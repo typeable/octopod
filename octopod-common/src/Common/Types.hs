@@ -42,6 +42,9 @@ data OverrideValue = ValueAdded Text | ValueDeleted
 newtype DefaultConfig (l :: OverrideLevel) = DefaultConfig (OMap Text Text)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
+lookupDefaultConfig :: DefaultConfig l -> Text -> Maybe Text
+lookupDefaultConfig (DefaultConfig m) k = OM.lookup k m
+
 newtype Config (l :: OverrideLevel) = Config {unConfig :: OMap Text Text}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
@@ -78,6 +81,27 @@ applyOverrides (Overrides oo) (DefaultConfig dd) =
 
 newtype Overrides (l :: OverrideLevel) = Overrides {unOverrides :: OMap Text OverrideValue}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+
+extractOverrides :: DefaultConfig l -> Config l -> Overrides l
+extractOverrides (DefaultConfig dCfg) (Config cfg) =
+  Overrides . OM.fromList $ removed <> present
+  where
+    present :: [(Text, OverrideValue)]
+    present = mapMaybe processPresent . OM.assocs $ cfg
+
+    processPresent :: (Text, Text) -> Maybe (Text, OverrideValue)
+    processPresent (k, v) = case OM.lookup k dCfg of
+      Just v' | v == v' -> Nothing
+      _ -> Just (k, ValueAdded v)
+
+    processRemoved :: (Text, Text) -> Maybe (Text, OverrideValue)
+    processRemoved (k, _) =
+      if OM.member k cfg
+        then Nothing
+        else Just (k, ValueDeleted)
+
+    removed :: [(Text, OverrideValue)]
+    removed = mapMaybe processRemoved . OM.assocs $ dCfg
 
 ov :: Text -> OverrideValue -> Overrides l
 ov k v = Overrides $ OM.singleton (k, v)
