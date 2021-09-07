@@ -42,7 +42,6 @@ import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
-import qualified Data.List as L
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Map.Ordered.Strict as OM
@@ -342,12 +341,14 @@ octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
     elClass "div" "deployment__widget" $
-      octopodTextInput' clss placeholder (pure . fromMaybe "" $ val) errEv
+      octopodTextInput' (pure False) clss placeholder (pure . fromMaybe "" $ val) errEv
 
 -- | The only text input field that is used in project forms. This input
 -- provides automatic error message hiding after user starts typing.
 octopodTextInput' ::
   MonadWidget t m =>
+  -- | Disabled?
+  Dynamic t Bool ->
   -- | Input field classes.
   Text ->
   -- | Placeholder for input field.
@@ -357,7 +358,7 @@ octopodTextInput' ::
   -- | Event carrying the error message.
   Event t Text ->
   m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' clss placeholder inValDyn' errEv = mdo
+octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
   inValDyn <- holdUniqDyn inValDyn'
   let inValEv =
         align (updated inValDyn) (updated valDyn)
@@ -382,6 +383,7 @@ octopodTextInput' clss placeholder inValDyn' errEv = mdo
         , (clss <> inpClass) <$ updated valDyn
         ]
   inVal <- sample . current $ inValDyn
+  disabled <- sample . current $ disabledDyn
   valDyn <- elDynClass "div" classDyn $ do
     inp <-
       inputElement $
@@ -393,6 +395,16 @@ octopodTextInput' clss placeholder inValDyn' errEv = mdo
                )
           & inputElementConfig_setValue .~ inValEv
           & inputElementConfig_initialValue .~ inVal
+          & inputElementConfig_elementConfig . elementConfig_initialAttributes
+            %~ (if disabled then M.insert "disabled" "disabled" else id)
+          & inputElementConfig_elementConfig . elementConfig_modifyAttributes
+            <>~ updated
+              ( do
+                  disabled' <- disabledDyn
+                  pure $
+                    M.singleton "disabled" $
+                      if disabled' then Just "disabled" else Nothing
+              )
     widgetHold_ blank $
       leftmost
         [ divClass "input__output" . text <$> errEv
@@ -676,12 +688,13 @@ envVarInput val = do
           WorkingDeletedValue (Just x) -> x
           WorkingDeletedValue Nothing -> "<loading deleted>"
       k = val <&> \(WorkingOverrideKey _ x, _) -> x
+      disabledKey = val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
 
   divClass "overrides__item" $ do
     (keyTextDyn, _) <-
-      octopodTextInput' "overrides__key" "key" k never
+      octopodTextInput' disabledKey "overrides__key" "key" k never
     (valTextDyn, _) <-
-      octopodTextInput' "overrides__value" "value" v never
+      octopodTextInput' (pure False) "overrides__value" "value" v never
     closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
     pure $
       leftmost

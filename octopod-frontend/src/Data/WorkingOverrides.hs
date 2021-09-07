@@ -25,7 +25,7 @@ data WorkingOverrideKey = WorkingOverrideKey !WorkingOverrideKeyType !Text
   deriving stock (Show)
 
 data WorkingOverrideKeyType = CustomWorkingOverrideKey | DefaultWorkingOverrideKey
-  deriving stock (Show)
+  deriving stock (Show, Eq)
 
 data WorkingOverrideValue
   = WorkingCustomValue !Text
