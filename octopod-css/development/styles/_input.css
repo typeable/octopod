@@ -18,6 +18,8 @@
         color: rgba(0, 0, 0, 0.87);
     }
 
+
+
     .input__widget:hover {
         box-shadow: inset 0 -1px #326EE6;
     }
@@ -71,12 +73,16 @@
         background-position: left center;
     }
 
-
 .input--error {
 
 }
     .input--error .input__widget {
-        box-shadow: inset 0 -2px var(--red);
+        color: var(--red);
+        box-shadow: inset 0 -1px var(--red);
+    }
+
+    .input--error .input__widget::placeholder {
+        color: rgba(212, 42, 42, .5)
     }
 
     .input__output {
@@ -88,4 +94,48 @@
 
     .input__output + .input__output {
         margin-top: 3px;
+    }
+
+
+
+.input--default {
+
+}
+
+    .input--default .input__widget {
+        font-weight: 300;
+        font-style: italic;
+    }
+
+
+.input--deleted {
+
+}
+
+    .input--deleted .input__widget {
+        font-weight: 300;
+        font-style: italic;
+        text-decoration-line: line-through;
+        opacity: .2;
+    }
+
+    .input--deleted .input__widget:hover {
+        box-shadow: inset 0 -1px #B0B0B0;
+    }
+
+
+.input--disable {
+
+}
+
+    .input--disable .input__widget {
+        color: #B0B0B0;
+    }
+
+    .input--disable .input__widget::placeholder {
+        color: #B0B0B0;
+    }
+
+    .input--disable .input__widget:hover {
+        box-shadow: inset 0 -1px #B0B0B0;
     }

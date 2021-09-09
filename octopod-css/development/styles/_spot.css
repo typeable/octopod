@@ -23,3 +23,14 @@
 .spot--cancel:hover {
     opacity: 1;
 }
+
+.spot--undo {
+    opacity: 1;
+    background-image: url("../vectors/spot-undo.svg");
+}
+
+.spot--loader {
+    opacity: 1;
+    background-image: url("../vectors/spot-loader.svg");
+    animation: loading 2.2s linear infinite;
+}

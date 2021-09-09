@@ -100,6 +100,33 @@
     background-repeat: no-repeat;
 }
 
+.button--save-loading {
+    position: relative;
+    padding-left: 40px;
+    color: rgba(255,255,255,.6);
+    cursor: default;
+}
+
+.button--save-loading:hover {
+    background-color: var(--primary);
+}
+
+.button--save-loading::before {
+    content: '';
+    position: absolute;
+    display: block;
+    width: 24px;
+    height: 24px;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    background-image: url("../vectors/button-loader.svg");
+    background-repeat: no-repeat;
+    animation: loading 2.2s linear infinite;
+}
+
+
 .button--logs {
     padding-left: 40px;
     background-image: url("../vectors/common-use-logs.svg");
