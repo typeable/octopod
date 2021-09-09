@@ -190,32 +190,34 @@ runOctopodServer = do
   lockedDs <- initLockedDeployments
   let appSt =
         AppState
-          dbPool'
-          logger'
-          channel
-          bgWorkersC
-          gracefulShutdownAct
-          shutdownS
-          projName
-          domain
-          ns
-          archRetention
-          stUpdateTimeout
-          creationCmd
-          updateCmd
-          archiveCmd
-          checkingCmd
-          cleanupCmd
-          archiveCheckingCmd
-          tagCheckingCmd
-          infoCmd
-          notificationCmd
-          dOverridesCmd
-          dKeysCmd
-          aOverridesCmd
-          aKeysCmd
-          unarchiveCmd
-          lockedDs
+          { dbPool = dbPool'
+          , logger = logger'
+          , eventSink = channel
+          , bgWorkersCounter = bgWorkersC
+          , gracefulShutdownActivated = gracefulShutdownAct
+          , shutdownSem = shutdownS
+          , projectName = projName
+          , baseDomain = domain
+          , namespace = ns
+          , archiveRetention = archRetention
+          , statusUpdateTimeout = stUpdateTimeout
+          , creationCommand = creationCmd
+          , updateCommand = updateCmd
+          , archiveCommand = archiveCmd
+          , checkingCommand = checkingCmd
+          , cleanupCommand = cleanupCmd
+          , archiveCheckingCommand = archiveCheckingCmd
+          , tagCheckingCommand = tagCheckingCmd
+          , infoCommand = infoCmd
+          , notificationCommand = notificationCmd
+          , deploymentOverridesCommand = dOverridesCmd
+          , deploymentOverrideKeysCommand = dKeysCmd
+          , applicationOverridesCommand = aOverridesCmd
+          , applicationOverrideKeysCommand = aKeysCmd
+          , unarchiveCommand = unarchiveCmd
+          , lockedDeployments = lockedDs
+          }
+
       app' = app appSt
       wsApp' = wsApp channel
       serverPort = octopodPort opts
