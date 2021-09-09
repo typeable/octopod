@@ -55,6 +55,7 @@ library
                      , QuantifiedConstraints
                      , DeriveAnyClass
                      , ViewPatterns
+                     , TupleSections
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args
@@ -66,6 +67,7 @@ library
       Control.Octopod.DeploymentLock
       Octopod.PowerAPI.Auth.Server
       Octopod.Schema
+      Control.CacheMap
   hs-source-dirs:
       src
   build-depends:
