@@ -2,6 +2,8 @@ module Octopod.Server (runOctopodServer) where
 
 import Common.Validation
 import Control.Applicative
+import Control.CacheMap (CacheMap)
+import qualified Control.CacheMap as CM
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race_)
 import qualified Control.Concurrent.Lifted as L
@@ -118,6 +120,10 @@ data AppState = AppState
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: LockedDeployments
+  , depOverridesCache :: CacheMap AppM () (DefaultConfig 'DeploymentLevel)
+  , depOverrideKeysCache :: CacheMap AppM () [Text]
+  , appOverridesCache :: CacheMap AppM (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
+  , appOverrideKeysCache :: CacheMap AppM (Config 'DeploymentLevel) [Text]
   }
   deriving stock (Generic)
 
@@ -174,11 +180,36 @@ runOctopodServer = do
   aKeysCmd <- Command . pack <$> getEnvOrDie "APPLICATION_KEYS_COMMAND"
   unarchiveCmd <- Command . pack <$> getEnvOrDie "UNARCHIVE_COMMAND"
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
+  invalidationTime <- fromInteger . maybe (60 * 60 * 24) read <$> lookupEnv "CACHE_INVALIDATION_TIME"
+  updateTime <- fromInteger . maybe (60 * 10) read <$> lookupEnv "CACHE_UPDATE_TIME"
+  let cacheMap :: forall a x. (x -> AppM a) -> IO (CacheMap AppM x a)
+      cacheMap = CM.initCacheMap invalidationTime updateTime
+      decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
+      decodeCSVDefaultConfig bs = do
+        x <- C.decode C.NoHeader bs
+        pure $ DefaultConfig . OM.fromList . V.toList $ x
+      either500S :: (MonadError ServerError m, MonadBase IO m) => Either String x -> m x
+      either500S (Right x) = pure x
+      either500S (Left err) = do
+        liftBase . logWarning logger' . T.pack $ err
+        throwError err500 {errBody = BSLC.pack err}
   notificationCmd <-
     (fmap . fmap) (Command . pack) $
       lookupEnv "NOTIFICATION_COMMAND" <&> \case
         Just "" -> Nothing
         x -> x
+  depOverrideKeysCache' <- cacheMap $ \() -> do
+    (_, Stdout out, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
+    pure $ T.lines out
+  depOverridesCache' <- cacheMap $ \() -> do
+    (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
+    either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
+  appOverrideKeysCache' <- cacheMap $ \cfg -> do
+    (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
+    pure $ T.lines out
+  appOverridesCache' <- cacheMap $ \cfg -> do
+    (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
+    either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
   dbPool' <-
     createPool
       (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
@@ -216,6 +247,10 @@ runOctopodServer = do
           , applicationOverrideKeysCommand = aKeysCmd
           , unarchiveCommand = unarchiveCmd
           , lockedDeployments = lockedDs
+          , depOverridesCache = depOverridesCache'
+          , depOverrideKeysCache = depOverrideKeysCache'
+          , appOverridesCache = appOverridesCache'
+          , appOverrideKeysCache = appOverrideKeysCache'
           }
 
       app' = app appSt
@@ -285,34 +320,22 @@ server =
     :<|> pingH
     :<|> projectNameH
 
-decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
-decodeCSVDefaultConfig bs = do
-  x <- C.decode C.NoHeader bs
-  pure $ DefaultConfig . OM.fromList . V.toList $ x
-
-either500S :: MonadError ServerError m => Either String x -> m x
-either500S (Right x) = pure x
-either500S (Left err) = throwError err500 {errBody = BSLC.pack err}
+lookupCache :: Ord x => (AppState -> CacheMap AppM x y) -> x -> AppM y
+lookupCache f x = do
+  cm <- asks f
+  CM.lookupBlocking cm x
 
 defaultDeploymentKeysH :: AppM [Text]
-defaultDeploymentKeysH = do
-  (_, Stdout out, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
-  pure $ T.lines out
+defaultDeploymentKeysH = lookupCache depOverrideKeysCache ()
 
 defaultDeploymentOverridesH :: AppM (DefaultConfig 'DeploymentLevel)
-defaultDeploymentOverridesH = do
-  (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
-  either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
+defaultDeploymentOverridesH = lookupCache depOverridesCache ()
 
 defaultApplicationKeysH :: Config 'DeploymentLevel -> AppM [Text]
-defaultApplicationKeysH cfg = do
-  (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
-  pure $ T.lines out
+defaultApplicationKeysH = lookupCache appOverrideKeysCache
 
 defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'ApplicationLevel)
-defaultApplicationOverridesH cfg = do
-  (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
-  either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
+defaultApplicationOverridesH = lookupCache appOverridesCache
 
 -- | Application with the octo CLI API.
 powerApp :: AuthHeader -> AppState -> IO Application

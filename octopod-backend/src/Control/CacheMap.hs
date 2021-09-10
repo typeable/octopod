@@ -71,6 +71,11 @@ lookupBlocking (CacheMap mRef createValue update) k = do
     void $
       fork $ do
         v' <- createValue k
-        void $ swapMVar vM v'
+        replaceMVar vM v'
 
   readMVar vM
+
+replaceMVar :: MonadBase IO m => MVar a -> a -> m ()
+replaceMVar mv x = do
+  void $ tryTakeMVar mv
+  putMVar mv x
