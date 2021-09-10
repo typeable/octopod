@@ -82,7 +82,7 @@
     }
 
     .input--error .input__widget::placeholder {
-        color: rgba(212, 42, 42, .5)
+        color: rgba(212, 42, 42, 0.5);
     }
 
     .input__output {
@@ -116,7 +116,7 @@
         font-weight: 300;
         font-style: italic;
         text-decoration-line: line-through;
-        opacity: .2;
+        opacity: 0.2;
     }
 
     .input--deleted .input__widget:hover {
