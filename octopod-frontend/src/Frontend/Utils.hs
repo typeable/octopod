@@ -30,6 +30,11 @@ module Frontend.Utils
     dropdownWidget,
     dropdownWidget',
     buttonDynClass,
+    deploymentConfigProgressiveComponents,
+    deploymentConfigProgressive,
+    holdClearingWith,
+    unitEv,
+    deploymentSection,
   )
 where
 
@@ -533,7 +538,9 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  defDep <- defaultDeploymentOverrides pb >>= hReq >>= holdDynMaybe
+  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDyn
+  defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
+  defDep <- holdDynMaybe defDepEv
   depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
@@ -546,38 +553,23 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
       holdDCfg dCfgDyn ovs = mdo
         ovsDyn <- holdDyn ovs ovsEv
         x <- attachDyn (current ovsDyn) dCfgDyn
-        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput dCfg ovs') >>= switchHold never
+        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput dCfg ovs') >>= switchHold never >>= debounce 0.5
         pure ovsDyn
       holdDKeys n keysDyn = do
         let loading = loadingCommonWidget
-        popUpSection n $
+        deploymentSection n $
           widgetHold_ loading $
             keysDyn <&> \case
               Just keys -> el "ul" $
                 forM_ keys $ \key -> el "li" $ text key
               Nothing -> loading
 
-  deploymentOvsDyn <- popUpSection "Deployment overrides" $ holdDCfg defDep defDepOv
+  deploymentOvsDyn <- deploymentSection "Deployment overrides" $ holdDCfg defDep defDepOv
   holdDKeys "Deployment keys" (Just <$> depKeys)
-  readyDeploymentCfgDebounced <- debounce 0.5 . catMaybes $
-    updated $ do
-      defDep >>= \case
-        Nothing -> pure Nothing
-        Just depDCfg -> do
-          depOv <- deploymentOvsDyn
-          pure $ Just $ applyOverrides depOv depDCfg
-  defApp <-
-    waitForValuePromptly
-      readyDeploymentCfgDebounced
-      ( \deploymentCfg -> do
-          pb' <- getPostBuild
-          defaultApplicationOverrides (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
-      )
-      >>= holdDyn Nothing
-  appKeys <- waitForValuePromptly readyDeploymentCfgDebounced $ \deploymentCfg -> do
+  appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
-  applicationOvsDyn <- popUpSection "App overrides" $ holdDCfg defApp defAppOv
+  applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg defAppM defAppOv
   holdDKeys "App keys" appKeys
 
   validDyn <- holdDyn True $ updated tOkEv
@@ -602,6 +594,54 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
           badTagText = "Tag should not be empty"
           badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
        in leftmost [tagErrEv, badNameEv]
+
+deploymentConfigProgressiveComponents ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Dynamic t (Overrides 'DeploymentLevel) ->
+  m
+    ( Event t (DefaultConfig 'DeploymentLevel)
+    , Event t (DefaultConfig 'ApplicationLevel)
+    , Event t (Config 'DeploymentLevel)
+    )
+deploymentConfigProgressiveComponents hReq depOvsDyn = do
+  pb <- getPostBuild
+  defDepEv <- defaultDeploymentOverrides pb >>= hReq
+  defDepMDyn <- holdDynMaybe defDepEv
+  let depCfgEv = catMaybes . updated $ do
+        defDepM <- defDepMDyn
+        depOvs <- depOvsDyn
+        pure $ defDepM <&> applyOverrides depOvs
+  defAppEv <-
+    fmap switchDyn $
+      networkHold (pure never) $
+        depCfgEv <&> \depCfg -> do
+          pb' <- getPostBuild
+          defaultApplicationOverrides (pure $ Right depCfg) pb' >>= hReq
+  pure (defDepEv, defAppEv, depCfgEv)
+
+deploymentConfigProgressive ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Dynamic t (Overrides 'DeploymentLevel) ->
+  Dynamic t (Overrides 'ApplicationLevel) ->
+  m (Event t FullConfig)
+deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
+  (_, defAppEv, depCfgEv) <- deploymentConfigProgressiveComponents hReq depOvsDyn
+  defAppMDyn <- holdDynMaybe defAppEv
+  depCfgMDyn <- holdDynMaybe depCfgEv
+  pure . catMaybes . updated $ do
+    defAppM <- defAppMDyn
+    appOvs <- appOvsDyn
+    depCfgM <- depCfgMDyn
+    pure $ do
+      defApp <- defAppM
+      depCfg <- depCfgM
+      pure
+        FullConfig
+          { appConfig = applyOverrides appOvs defApp
+          , depConfig = depCfg
+          }
 
 waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
 waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev
@@ -667,11 +707,10 @@ envVarsInput dCfg ovs = mdo
     Nothing -> loadingCommonWidget
   pure . updated $ destructWorkingOverrides <$> envsDyn
 
-popUpSection :: DomBuilder t m => Text -> m a -> m a
-popUpSection n m = elClass "section" "deployment__section" $ do
+deploymentSection :: DomBuilder t m => Text -> m a -> m a
+deploymentSection n m = elClass "section" "deployment__section" $ do
   elClass "h3" "deployment__sub-heading" $ text n
-  elClass "div" "deployment__widget" $
-    elClass "div" "overrides" m
+  elClass "div" "deployment__widget" m
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
@@ -744,3 +783,10 @@ attachDyn b d = do
   currD <- sample . current $ d
   currB <- sample b
   holdDyn (currB, currD) (attach b $ updated d)
+
+holdClearingWith :: (Reflex t, MonadHold t m) => Event t a -> Event t () -> m (Dynamic t (Maybe a))
+holdClearingWith aEv clear =
+  holdDyn Nothing $ leftmost [fmapCheap Just aEv, fmapCheap (const Nothing) clear]
+
+unitEv :: Reflex t => Dynamic t a -> Event t ()
+unitEv = fmapCheap (const ()) . updated

@@ -72,6 +72,12 @@ import Prelude hiding (lines, log, unlines, unwords)
 
 type AppM = ReaderT AppState Handler
 
+type AppMConstraints m = (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m)
+
+-- | This is a polymorphic monad wrapper with the main constraints from 'AppM'.
+-- Currently used only for CacheMap values.
+newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
+
 -- | Octopod Server state definition.
 data AppState = AppState
   { -- | postgres pool
@@ -120,10 +126,10 @@ data AppState = AppState
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: LockedDeployments
-  , depOverridesCache :: CacheMap AppM () (DefaultConfig 'DeploymentLevel)
-  , depOverrideKeysCache :: CacheMap AppM () [Text]
-  , appOverridesCache :: CacheMap AppM (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
-  , appOverrideKeysCache :: CacheMap AppM (Config 'DeploymentLevel) [Text]
+  , depOverridesCache :: CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel)
+  , depOverrideKeysCache :: CacheMap ServerError AppM' () [Text]
+  , appOverridesCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
+  , appOverrideKeysCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text]
   }
   deriving stock (Generic)
 
@@ -182,8 +188,8 @@ runOctopodServer = do
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
   invalidationTime <- fromInteger . maybe (60 * 60 * 24) read <$> lookupEnv "CACHE_INVALIDATION_TIME"
   updateTime <- fromInteger . maybe (60 * 10) read <$> lookupEnv "CACHE_UPDATE_TIME"
-  let cacheMap :: forall a x. (x -> AppM a) -> IO (CacheMap AppM x a)
-      cacheMap = CM.initCacheMap invalidationTime updateTime
+  let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppM' x a)
+      cacheMap f = CM.initCacheMap invalidationTime updateTime $ \x -> AppM' $ f x
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
@@ -320,21 +326,21 @@ server =
     :<|> pingH
     :<|> projectNameH
 
-lookupCache :: Ord x => (AppState -> CacheMap AppM x y) -> x -> AppM y
+lookupCache :: (Ord x, AppMConstraints m) => (AppState -> CacheMap ServerError AppM' x y) -> x -> m y
 lookupCache f x = do
   cm <- asks f
-  CM.lookupBlocking cm x
+  CM.lookupBlocking (CM.ntCacheMap runAppM' cm) x
 
-defaultDeploymentKeysH :: AppM [Text]
+defaultDeploymentKeysH :: AppMConstraints m => m [Text]
 defaultDeploymentKeysH = lookupCache depOverrideKeysCache ()
 
-defaultDeploymentOverridesH :: AppM (DefaultConfig 'DeploymentLevel)
+defaultDeploymentOverridesH :: AppMConstraints m => m (DefaultConfig 'DeploymentLevel)
 defaultDeploymentOverridesH = lookupCache depOverridesCache ()
 
-defaultApplicationKeysH :: Config 'DeploymentLevel -> AppM [Text]
+defaultApplicationKeysH :: AppMConstraints m => Config 'DeploymentLevel -> m [Text]
 defaultApplicationKeysH = lookupCache appOverrideKeysCache
 
-defaultApplicationOverridesH :: Config 'DeploymentLevel -> AppM (DefaultConfig 'ApplicationLevel)
+defaultApplicationOverridesH :: AppMConstraints m => Config 'DeploymentLevel -> m (DefaultConfig 'ApplicationLevel)
 defaultApplicationOverridesH = lookupCache appOverridesCache
 
 -- | Application with the octo CLI API.
@@ -515,8 +521,8 @@ updateDeploymentInfo ::
 updateDeploymentInfo dName = do
   log <- asks (logWarning . logger)
   DeploymentFullInfo {deployment = dep} <- getDeploymentS dName
-  dc <- getDefaultConfig dName
-  (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs dc dep
+  cfg <- getDeploymentConfig dep
+  (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
@@ -530,22 +536,24 @@ updateDeploymentInfo dName = do
             <> "stderr: "
             <> coerce err
 
-getDefaultConfig :: Monad m => DeploymentName -> m FullDefaultConfig
-getDefaultConfig _ =
+getDeploymentConfig :: AppMConstraints m => Deployment -> m FullConfig
+getDeploymentConfig dep = do
+  depCfg <- applyOverrides (dep ^. #deploymentOverrides) <$> defaultDeploymentOverridesH
+  appCfg <- applyOverrides (dep ^. #appOverrides) <$> defaultApplicationOverridesH depCfg
   pure
-    FullDefaultConfig
-      { appDefaultConfig = DefaultConfig OM.empty
-      , depDefaultConfig = DefaultConfig OM.empty
+    FullConfig
+      { appConfig = appCfg
+      , depConfig = depCfg
       }
 
 -- | Helper to create a new deployment.
 createDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   Deployment ->
   m (ExitCode, Stdout, Stderr)
 createDeployment dep = do
   st <- ask
-  dCfg <- getDefaultConfig $ dep ^. #name
+  cfg <- getDeploymentConfig dep
   let log :: Text -> IO ()
       log = logInfo (logger st)
       args =
@@ -561,7 +569,7 @@ createDeployment dep = do
           , "--tag"
           , T.unpack . coerce $ dep ^. #tag
           ]
-          <> fullConfigArgs dCfg dep
+          <> fullConfigArgs cfg
   (ec, out, err) <- runCommandArgs creationCommand args
   liftBase . log $ "deployment created, deployment: " <> (pack . show $ dep)
   pure (ec, out, err)
@@ -832,7 +840,7 @@ updateH dName dUpdate = do
 
     updateDeploymentInfo dName
     liftBase $ sendReloadEvent st
-    dCfg <- getDefaultConfig dName
+    cfg <- getDeploymentConfig dep
     let args =
           ControlScriptArgs
             [ "--project-name"
@@ -846,7 +854,7 @@ updateH dName dUpdate = do
             , "--tag"
             , T.unpack . coerce $ dep ^. #tag
             ]
-            <> fullConfigArgs dCfg dep
+            <> fullConfigArgs cfg
     (ec, out, err) <- runCommandArgs updateCommand args
     liftBase . log $
       "deployment updated, name: "
@@ -909,9 +917,9 @@ projectNameH = asks projectName
 -- | Handles the 'status' request.
 statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
-  dep <- getDeploymentS dName
-  dCfg <- getDefaultConfig dName
-  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs dCfg (dep ^. #deployment)
+  (view #deployment -> dep) <- getDeploymentS dName
+  cfg <- getDeploymentConfig dep
+  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -1010,10 +1018,10 @@ restoreH dName = do
   failIfImageNotFound $ dep ^. #deployment
   failIfGracefulShutdownActivated
   runDeploymentBgWorker (Just CreatePending) dName (pure ()) $ \() -> do
-    dep' <- getDeploymentS dName
+    (view #deployment -> dep') <- getDeploymentS dName
     updateDeploymentInfo dName
-    dCfg <- getDefaultConfig dName
-    (ec, out, err) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs dCfg (dep' ^. #deployment)
+    cfg <- getDeploymentConfig dep'
+    (ec, out, err) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
@@ -1114,8 +1122,8 @@ upsertDeploymentMetadatum dName dMetadata =
 -- Returns 404 'Tag not found' response if the deployment tag doesn't exist.
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
-  dCfg <- getDefaultConfig $ dep ^. #name
-  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs dCfg dep
+  cfg <- getDeploymentConfig dep
+  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
@@ -1137,7 +1145,7 @@ sendReloadEvent state =
 
 -- | Returns time delta between 2 timestamps.
 elapsedTime :: UTCTime -> UTCTime -> Duration
-elapsedTime t1 t2 = Duration . calendarTimeTime $ t2 `diffUTCTime` t1
+elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
 
 -- | Runs the status updater.
 runStatusUpdater :: AppState -> IO ()
@@ -1149,7 +1157,10 @@ runStatusUpdater state = do
   forever $ do
     currentTime <- liftBase getCurrentTime
     let cutoff = addUTCTime (negate interval) currentTime
-    flip runReaderT state $ do
+        logLeft :: Either ServerError () -> IO ()
+        logLeft (Left err) = logErr . T.pack $ displayException err
+        logLeft (Right ()) = pure ()
+    (>>= logLeft) . runExceptT . flip runReaderT state $ do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
@@ -1164,9 +1175,9 @@ runStatusUpdater state = do
           _ -> do
             getSingleFullInfo dName >>= \case
               Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
-              Just dep -> do
-                dCfg <- getDefaultConfig dName
-                (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs dCfg (dep ^. #deployment)
+              Just (view #deployment -> dep) -> do
+                cfg <- getDeploymentConfig dep
+                (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
                 pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-
@@ -1312,7 +1323,6 @@ extractDeploymentFullInfo ::
 extractDeploymentFullInfo d = do
   let dName = d ^. #name
   locked <- isDeploymentLocked dName
-  dCfg <- getDefaultConfig dName
   pure
     DeploymentFullInfo
       { deployment = extractDeployment d
@@ -1323,5 +1333,4 @@ extractDeploymentFullInfo d = do
       , metadata = d ^. #metadata
       , createdAt = d ^. #createdAt
       , updatedAt = d ^. #updatedAt
-      , deploymentDefaultConfig = dCfg
       }

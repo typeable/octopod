@@ -48,12 +48,12 @@ type GenericDeploymentCommandArgs m r =
   , HasType ProjectName r
   , HasType Domain r
   ) =>
-  FullDefaultConfig ->
+  FullConfig ->
   Deployment ->
   m ControlScriptArgs
 
 genericDeploymentCommandArgs :: GenericDeploymentCommandArgs m r
-genericDeploymentCommandArgs dCfg dep = do
+genericDeploymentCommandArgs cfg dep = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -70,7 +70,7 @@ genericDeploymentCommandArgs dCfg dep = do
       , "--tag"
       , T.unpack . coerce $ tag dep
       ]
-      <> fullConfigArgs dCfg dep
+      <> fullConfigArgs cfg
 
 type GenericDeploymentCommandArgsNoConfig m r =
   ( MonadReader r m
@@ -223,10 +223,8 @@ runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
 runCommandWithoutPipes cmd args =
   withProcessWait (proc cmd args) waitExitCode
 
-fullConfigArgs :: FullDefaultConfig -> Deployment -> ControlScriptArgs
-fullConfigArgs defCfg dep =
-  overridesArgs (applyOverrides (dep ^. #appOverrides) (appDefaultConfig defCfg))
-    <> overridesArgs (applyOverrides (dep ^. #deploymentOverrides) (depDefaultConfig defCfg))
+fullConfigArgs :: FullConfig -> ControlScriptArgs
+fullConfigArgs cfg = overridesArgs (appConfig cfg) <> overridesArgs (depConfig cfg)
 
 overridesArgs :: forall l. KnownOverrideLevel l => Config l -> ControlScriptArgs
 overridesArgs (Config cc) =

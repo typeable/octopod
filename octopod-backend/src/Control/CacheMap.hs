@@ -2,23 +2,28 @@ module Control.CacheMap
   ( CacheMap,
     initCacheMap,
     lookupBlocking,
+    ntCacheMap,
   )
 where
 
 import Control.Concurrent.Lifted
+import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.Base
+import Control.Monad.Except
 import Control.Monad.Trans.Control
 import Data.Fixed
-import Data.IORef.Lifted
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.Time
 import System.Mem.Weak
 
-data CacheMap m k v = CacheMap !(InternalCacheMap k v) !(k -> m v) !NominalDiffTime
+data CacheMap e m k v = CacheMap !(InternalCacheMap e k v) !(k -> m v) !NominalDiffTime
 
-type InternalCacheMap k v = IORef (Map k (UTCTime, MVar v))
+type InternalCacheMap e k v = TVar (Map k (UTCTime, TMVar (Either e v)))
+
+ntCacheMap :: (forall x. m x -> n x) -> CacheMap e m k v -> CacheMap e n k v
+ntCacheMap f (CacheMap m g t) = CacheMap m (f <$> g) t
 
 initCacheMap ::
   -- | Time after which a value is considered invalid. Not exact.
@@ -28,17 +33,17 @@ initCacheMap ::
   -- old valid value in that case.)
   NominalDiffTime ->
   (k -> m v) ->
-  IO (CacheMap m k v)
+  IO (CacheMap e m k v)
 initCacheMap invalid update createValue = do
-  ref <- newIORef M.empty
-  wRef <- mkWeakIORef ref (pure ())
+  ref <- newTVarIO M.empty
+  wRef <- mkWeakTVar ref (pure ())
   void $ fork $ removeInvalidCaches invalid wRef
   pure $ CacheMap ref createValue update
 
 removeInvalidCaches ::
   -- | Time after which a value is considered invalid. Not exact.
   NominalDiffTime ->
-  Weak (InternalCacheMap k v) ->
+  Weak (InternalCacheMap e k v) ->
   IO ()
 removeInvalidCaches invalid wRef = do
   threadDelayMicro (realToFrac $ invalid / 10)
@@ -46,36 +51,43 @@ removeInvalidCaches invalid wRef = do
   deRefWeak wRef >>= \case
     Nothing -> pure ()
     Just ref -> do
-      atomicModifyIORef' ref $ \m -> (M.filter (\(t, _) -> t > cutoff) m, ())
+      atomically $ modifyTVar' ref $ M.filter (\(t, _) -> t > cutoff)
       removeInvalidCaches invalid wRef
   where
     threadDelayMicro :: Micro -> IO ()
     threadDelayMicro (MkFixed i) = threadDelay (fromInteger i)
 
-lookupBlocking :: Ord k => MonadBaseControl IO m => CacheMap m k v -> k -> m v
-lookupBlocking (CacheMap mRef createValue update) k = do
+lookupBlocking ::
+  (MonadBaseControl IO m, MonadError e m, Ord k) =>
+  CacheMap e m k v ->
+  k ->
+  m v
+lookupBlocking (CacheMap mTVar createValue update) k = do
   now <- liftBase getCurrentTime
-  blank <- newEmptyMVar
   (vM, recreate) <-
-    atomicModifyIORef'
-      mRef
-      ( \m -> case M.lookup k m of
-          Nothing -> (M.insert k (now, blank) m, (blank, True))
-          Just (timeCreated, vM)
-            | timeCreated < addUTCTime (negate update) now ->
-              (M.insert k (now, vM) m, (vM, True))
-          Just (_, vM) -> (m, (vM, False))
-      )
-
+    liftBase $
+      atomically $ do
+        m <- readTVar mTVar
+        case M.lookup k m of
+          Nothing -> do
+            blank <- newEmptyTMVar
+            writeTVar mTVar $ M.insert k (now, blank) m
+            pure (blank, True)
+          Just (timeCreated, vM) -> do
+            tryReadTMVar vM >>= \case
+              Just (Left _) -> do
+                void $ takeTMVar vM
+                pure (vM, True)
+              _ -> pure (vM, timeCreated < addUTCTime (negate update) now)
   when recreate $
     void $
       fork $ do
-        v' <- createValue k
-        replaceMVar vM v'
+        v' <- (Right <$> createValue k) `catchError` (pure . Left)
+        replaceTMVar vM v'
 
-  readMVar vM
+  (liftBase . atomically . readTMVar) vM >>= liftEither
 
-replaceMVar :: MonadBase IO m => MVar a -> a -> m ()
-replaceMVar mv x = do
-  void $ tryTakeMVar mv
-  putMVar mv x
+replaceTMVar :: MonadBase IO m => TMVar a -> a -> m ()
+replaceTMVar mv x = liftBase . atomically $ do
+  void $ tryTakeTMVar mv
+  putTMVar mv x

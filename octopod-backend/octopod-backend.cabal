@@ -56,6 +56,7 @@ library
                      , DeriveAnyClass
                      , ViewPatterns
                      , TupleSections
+                     , GADTs
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args

@@ -28,6 +28,7 @@ import Frontend.Utils
 import Page.ClassicPopup
 import Page.Elements.Links
 import Page.Popup.EditDeployment
+import Reflex.Network
 import Servant.Reflex.Extra
 
 -- | The root widget of a deployment page. It requests the deployment data.
@@ -178,56 +179,57 @@ deploymentBody ::
   -- | Deployment data.
   Dynamic t DeploymentFullInfo ->
   m ()
-deploymentBody updEv dfiDyn = deploymentBodyWrapper $ do
-  let nameDyn = dfiDyn <^.> dfiName
-      cfg = dfiDyn <&> getDeploymentConfig
-  divClass "deployment__summary" $ do
-    divClass "deployment__stat" $ do
-      elClass "b" "deployment__param" $ text "Status"
-      divClass "deployment__value" $ do
-        statusWidget $ dfiDyn <^.> field @"status"
-    divClass "deployment__stat" $ do
-      elClass "b" "deployment__param" $ text "Created"
-      divClass "deployment__value" $ do
-        let createdAtDyn = dfiDyn <^.> field @"createdAt"
-        dynText $ formatPosixToDate <$> createdAtDyn
-    divClass "deployment__stat" $ do
-      elClass "b" "deployment__param" $ text "Changed"
-      divClass "deployment__value" $ do
-        let createdAtDyn = dfiDyn <^.> field @"updatedAt"
-        dynText $ formatPosixToDate <$> createdAtDyn
-  elClass "section" "deployment__section" $ do
-    let tagDyn = dfiDyn <^.> field @"deployment" . field @"tag" . coerced
-    elClass "h3" "deployment__sub-heading" $ text "Tag"
-    divClass "deployment__widget" $ dynText tagDyn
-  elClass "section" "deployment__section" $ do
-    let urlsDyn = dfiDyn <^.> field @"metadata" . to unDeploymentMetadata
-    elClass "h3" "deployment__sub-heading" $ text "Links"
-    divClass "deployment__widget" $
-      divClass "listing" $
-        void $ simpleList urlsDyn renderMetadataLink
-  elClass "section" "deployment__section" $ do
-    let envsDyn = cfg <^.> #appConfig
-    allEnvsWidget "App overrides" envsDyn
-  elClass "section" "deployment__section" $ do
-    let envsDyn = cfg <^.> #depConfig
-    allEnvsWidget "Deployment overrides" envsDyn
-  elClass "section" "deployment__section" $ do
-    elClass "h3" "deployment__sub-heading" $ text "Actions"
-    divClass "deployment__widget" $
+deploymentBody updEv dfiDyn = deploymentBodyWrapper $
+  wrapRequestErrors $ \hReq -> do
+    let nameDyn = dfiDyn <^.> dfiName
+        depDyn = dfiDyn <^.> #deployment
+    cfgEv <- deploymentConfigProgressive hReq (depDyn <^.> #deploymentOverrides) (depDyn <^.> #appOverrides)
+    cfgMDyn <-
+      holdClearingWith cfgEv $
+        leftmost [unitEv $ depDyn <^.> #deploymentOverrides, unitEv $ depDyn <^.> #appOverrides]
+    divClass "deployment__summary" $ do
+      divClass "deployment__stat" $ do
+        elClass "b" "deployment__param" $ text "Status"
+        divClass "deployment__value" $ do
+          statusWidget $ dfiDyn <^.> field @"status"
+      divClass "deployment__stat" $ do
+        elClass "b" "deployment__param" $ text "Created"
+        divClass "deployment__value" $ do
+          let createdAtDyn = dfiDyn <^.> field @"createdAt"
+          dynText $ formatPosixToDate <$> createdAtDyn
+      divClass "deployment__stat" $ do
+        elClass "b" "deployment__param" $ text "Changed"
+        divClass "deployment__value" $ do
+          let createdAtDyn = dfiDyn <^.> field @"updatedAt"
+          dynText $ formatPosixToDate <$> createdAtDyn
+    deploymentSection "Tag" $ do
+      let tagDyn = dfiDyn <^.> field @"deployment" . field @"tag" . coerced
+      divClass "deployment__widget" $ dynText tagDyn
+    deploymentSection "Links" $ do
+      let urlsDyn = dfiDyn <^.> field @"metadata" . to unDeploymentMetadata
+      divClass "deployment__widget" $
+        divClass "listing" $
+          void $ simpleList urlsDyn renderMetadataLink
+    void $
+      networkView $
+        cfgMDyn <&> \cfgM -> do
+          let showVars :: Getting (Config l) FullConfig (Config l) -> _
+              showVars l = case cfgM of
+                Just cfg -> allEnvsWidget (pure $ cfg ^. l)
+                Nothing -> loadingCommonWidget
+          deploymentSection "App overrides" $ showVars #appConfig
+          deploymentSection "Deployment overrides" $ showVars #depConfig
+    deploymentSection "Actions" $
       divClass "table table--actions" $
         actionsTable updEv nameDyn
 
 -- | Widget that shows overrides list. It does not depend on their type.
 allEnvsWidget ::
   MonadWidget t m =>
-  -- | Widget header.
-  Text ->
   -- | Overrides list.
   Dynamic t (Config l) ->
   m ()
-allEnvsWidget headerText envsDyn = do
-  elClass "h3" "deployment__sub-heading" $ text headerText
+allEnvsWidget envsDyn =
   divClass "deployment__widget" $
     divClass "listing listing--for-text listing--larger" $
       void $
