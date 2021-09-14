@@ -63,7 +63,7 @@ library
       Octopod.Server
       Octopod.Server.Args
       Octopod.Server.ControlScriptUtils
-      Octopod.Server.Logger
+      Octopod.Server.Logging
       Octopod.Server.Posix
       Orphans
       Types
@@ -81,7 +81,7 @@ library
     , cassava
     , conduit
     , octopod-common
-    , fast-logger
+    , katip
     , generic-lens
     , http-api-data
     , lens

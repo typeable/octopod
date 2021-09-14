@@ -1,22 +1,31 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Octopod.Server.Posix (installShutdownHandler) where
 
+import Control.Monad.Trans.Control
 import Control.Monad
-import Control.Monad.Base (liftBase)
-import Data.Text
-import System.Log.FastLogger
+import Data.Aeson
+import Octopod.Server.Logging
 import System.Posix.Signals
 
-import Octopod.Server.Logger
+
+newtype SigContext = SigContext Signal
+
+instance ToObject SigContext where
+  toObject (SigContext signal) = "signal" .= show signal
+
+instance LogItem SigContext where
+  payloadKeys _ _ = AllKeys
 
 -- | Installs the given shutdown handler for the specified signals.
-installShutdownHandler ::
-  TimedFastLogger ->
-  [Signal] ->
-  IO () ->
-  IO [Handler]
-installShutdownHandler logger signals action =
-  forM signals $ \signal -> installHandler signal (handler signal) Nothing
+installShutdownHandler
+  :: (KatipContext m, MonadBaseControl IO m)
+  => [Signal]
+  -> m ()
+  -> m [Handler]
+installShutdownHandler signals action =
+  forM signals $ \signal -> liftBaseWith $ \run ->
+    installHandler signal (Catch $ void $ run $ handler signal) Nothing
   where
-    handler signal = Catch $ do
-      logInfo logger $ "Shutdown initiated by signal " <> (pack . show $ signal)
-      liftBase action
+    handler signal = katipAddNamespace "signal handler" $ katipAddContext (SigContext signal) $ do
+      $logTM InfoS "Shutdown initiated by signal"
+      action

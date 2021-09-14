@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Octopod.Server (runOctopodServer) where
 
 import Common.Validation
@@ -5,7 +6,7 @@ import Control.Applicative
 import Control.CacheMap (CacheMap)
 import qualified Control.CacheMap as CM
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (race_)
+import Control.Concurrent.Async (race)
 import qualified Control.Concurrent.Lifted as L
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
@@ -44,11 +45,13 @@ import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Traversable
 import qualified Data.Vector as V
+import GHC.Stack
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
 import Hasql.Statement
 import Hasql.Transaction
 import Hasql.Transaction.Sessions
+import Katip hiding (Namespace)
 import Network.Wai.Handler.Warp
 import Octopod.API
 import Octopod.PowerAPI
@@ -56,7 +59,7 @@ import Octopod.PowerAPI.Auth.Server
 import Octopod.Schema
 import Octopod.Server.Args
 import Octopod.Server.ControlScriptUtils
-import Octopod.Server.Logger
+import Octopod.Server.Logging
 import Octopod.Server.Posix
 import Options.Generic
 import Orphans ()
@@ -67,15 +70,14 @@ import Servant
 import Servant.Auth.Server
 import System.Environment (lookupEnv)
 import System.Exit
-import System.Log.FastLogger
 import System.Posix.Signals (sigTERM)
 import Text.Read (readMaybe)
 import Types
 import Prelude hiding (lines, log, unlines, unwords)
 
-type AppM = ReaderT AppState Handler
+type AppM = ReaderT AppState (KatipContextT Handler)
 
-type AppMConstraints m = (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m)
+type AppMConstraints m = (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m)
 
 -- | This is a polymorphic monad wrapper with the main constraints from 'AppM'.
 -- Currently used only for CacheMap values.
@@ -85,8 +87,6 @@ newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
 data AppState = AppState
   { -- | postgres pool
     dbPool :: !(Pool Connection)
-  , -- | logger
-    logger :: !TimedFastLogger
   , -- | channel for WS events for the frontend
     eventSink :: !(TChan WSEvent)
   , -- | background workers counter
@@ -162,14 +162,9 @@ runOctopodServer ::
   Text ->
   IO ()
 runOctopodServer sha = do
-  logger' <- newLogger
-  logInfo logger' "started"
   bgWorkersC <- newIORef 0
   gracefulShutdownAct <- newIORef False
   shutdownS <- newEmptyMVar
-  void $ do
-    let termHandler = terminationHandler bgWorkersC gracefulShutdownAct shutdownS
-    installShutdownHandler logger' [sigTERM] termHandler
   opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
       getEnvOrDie eName = lookupEnv eName ?! (eName <> " is not set")
@@ -202,10 +197,10 @@ runOctopodServer sha = do
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
         pure $ DefaultConfig . OM.fromList . V.toList $ x
-      either500S :: (MonadError ServerError m, MonadBase IO m) => Either String x -> m x
+      either500S :: (KatipContext m, MonadError ServerError m) => Either String x -> m x
       either500S (Right x) = pure x
       either500S (Left err) = do
-        liftBase . logWarning logger' . T.pack $ err
+        $logTM ErrorS $ logStr err
         throwError err500 {errBody = BSLC.pack err}
   notificationCmd <-
     (fmap . fmap) (Command . pack) $
@@ -224,19 +219,23 @@ runOctopodServer sha = do
   appOverridesCache' <- cacheMap $ \cfg -> do
     (_, Stdout out, _, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
-  dbPool' <-
-    createPool
-      (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
-      release
-      1
-      30
-      (unDBPoolSize $ octopodDBPoolSize opts)
-  channel <- liftIO . atomically $ newBroadcastTChan
-  lockedDs <- initLockedDeployments
-  let appSt =
+  runLog projName DebugS $ do
+    void $ do
+      let termHandler = terminationHandler bgWorkersC gracefulShutdownAct shutdownS
+      installShutdownHandler [sigTERM] termHandler
+    dbPool' <- liftBase $
+      createPool
+        (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
+        release
+        1
+        30
+        (unDBPoolSize $ octopodDBPoolSize opts)
+    channel <- liftBase . atomically $ newBroadcastTChan
+    lockedDs <- liftBase initLockedDeployments
+    let
+      appSt =
         AppState
           { dbPool = dbPool'
-          , logger = logger'
           , eventSink = channel
           , bgWorkersCounter = bgWorkersC
           , gracefulShutdownActivated = gracefulShutdownAct
@@ -267,24 +266,41 @@ runOctopodServer sha = do
           , gitSha = sha
           , controlScriptTimeout = scriptTimeout
           }
-
-      app' = app appSt
-      wsApp' = wsApp channel
       serverPort = octopodPort opts
-      uiServerPort = unServerPort $ octopodUIPort opts
       powerServerPort = unServerPort serverPort
+      uiServerPort = unServerPort $ octopodUIPort opts
       wsServerPort = unServerPort $ octopodWSPort opts
-  void . L.fork $ flip runReaderT appSt $ runArchiveCleanup archRetention
-  powerApp' <- powerApp powerAuthorizationHeader appSt
-  (run uiServerPort app')
-    `race_` (run powerServerPort powerApp')
-    `race_` (run wsServerPort wsApp')
-    `race_` (runStatusUpdater appSt)
-    `race_` (runShutdownHandler appSt)
+    (`runReaderT` appSt) $ do
+      runServer uiServerPort
+        `raceM_` runPowerServer powerServerPort powerAuthorizationHeader
+        `raceM_` runWsServer wsServerPort channel
+        `raceM_` runStatusUpdater
+        `raceM_` runShutdownHandler
+        `raceM_` runArchiveCleanup archRetention
+
+raceM_ :: MonadBaseControl IO m => m a -> m b -> m ()
+raceM_ a b = liftBaseWith $ \runInBase -> race (runInBase a) (runInBase b) >>= \case
+  Left x -> void $ restoreM x
+  Right y -> void $ restoreM y
+
+runHasQL ::
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
+  HasQL.Session a ->
+  m a
+runHasQL s = do
+  p <- asks dbPool
+  st <- liftBaseWith $ \runInBase -> do
+    withResource p $ \conn ->
+      HasQL.run s conn >>= \case
+        Right x -> runInBase $ pure x
+        Left err -> do
+          void $ runInBase $ $logTM ErrorS $ logStr $ displayException err
+          throwIO err
+  restoreM st
 
 runArchiveCleanup ::
   forall m.
-  (MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
   NominalDiffTime ->
   m ()
 runArchiveCleanup retention = do
@@ -307,42 +323,37 @@ runArchiveCleanup retention = do
     threadDelayMicro (MkFixed i) = liftBase $ threadDelay (fromInteger i)
 
 runTransaction ::
-  (MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
   Transaction a ->
   m a
-runTransaction q = do
-  p <- asks dbPool
-  log <- asks logger
-  let logErr = logWarning log
-      handleException e = do
-        liftBase $ logErr . T.pack $ displayException e
-        throwIO e
-  withResource p $ \conn ->
-    liftBase $ HasQL.run (transaction Serializable Write q) conn >>= either handleException pure
+runTransaction q = katipAddNamespace "transaction" $ runHasQL $ transaction Serializable Write q
 
 runStatement ::
-  (MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
   Statement () a ->
   m a
-runStatement q = do
-  p <- asks dbPool
-  log <- asks logger
-  let logErr = logWarning log
-      handleException e = do
-        liftBase $ logErr . T.pack $ displayException e
-        throwIO e
-  withResource p $ \conn ->
-    liftBase $ HasQL.run (HasQL.statement () q) conn >>= either handleException pure
+runStatement q = katipAddNamespace "statement" $ runHasQL $ HasQL.statement () q
 
--- | Helper to run the server.
-nt :: AppState -> AppM a -> Handler a
-nt s x = runReaderT x s
-
--- | Application with the Web UI API.
-app :: AppState -> Application
-app s = serve api $ hoistServer api (nt s) server
-  where
-    api = Proxy @API
+runApp :: forall api context m.
+  ( HasServer api context, KatipContext m, MonadBase IO m, MonadReader AppState m
+  , HasContextEntry (context .++ DefaultErrorFormatters) ErrorFormatters ) =>
+  Port ->
+  Proxy api ->
+  Servant.Context context ->
+  ServerT api AppM ->
+  m ()
+runApp portNum api ctx srv = do
+  appstate <- ask
+  logEnv <- getLogEnv
+  logCtx <- getKatipContext
+  ns <- getKatipNamespace
+  let
+    hoist :: AppM a -> Handler a
+    hoist act = runKatipContextT logEnv logCtx ns $ runReaderT act appstate
+    log req respStatus mSize = runKatipContextT logEnv logCtx ns $ do
+      $logTM DebugS $ show' req <> " " <> show' respStatus <> " " <> show' mSize
+  liftBase $ runSettings (setPort portNum $ setLogger log defaultSettings) $
+    serveWithContext api ctx $ hoistServerWithContext api (Proxy @context) hoist srv
 
 -- | Request handlers of the Web UI API application.
 server :: ServerT API AppM
@@ -377,22 +388,20 @@ defaultApplicationKeysH = lookupCache appOverrideKeysCache
 defaultApplicationOverridesH :: AppMConstraints m => Config 'DeploymentLevel -> m (DefaultConfig 'ApplicationLevel)
 defaultApplicationOverridesH = lookupCache appOverridesCache
 
+runServer :: (KatipContext m, MonadBase IO m, MonadReader AppState m) => Port -> m ()
+runServer portNum = katipAddNamespace "app" $ runApp portNum (Proxy @API) EmptyContext server
+
 -- | Application with the octo CLI API.
-powerApp :: AuthHeader -> AppState -> IO Application
-powerApp h s = do
-  jwk' <- liftIO $ genJWK (RSAGenParam (4096 `div` 8))
+runPowerServer :: (KatipContext m, MonadBase IO m, MonadReader AppState m) => Port -> AuthHeader -> m ()
+runPowerServer portNum h = katipAddNamespace "powerApp" $ do
+  jwk' <- liftBase $ genJWK (RSAGenParam (4096 `div` 8))
   let ctx :: Servant.Context Ctx
       ctx =
         h
           :. (defaultJWTSettings jwk' :: JWTSettings)
           :. (defaultCookieSettings :: CookieSettings)
           :. EmptyContext
-
-  return $
-    serveWithContext api ctx $
-      hoistServerWithContext api (Proxy @Ctx) (nt s) powerServer
-  where
-    api = Proxy @PowerAPI
+  runApp portNum (Proxy @PowerAPI) ctx powerServer
 
 type Ctx = '[AuthHeader, JWTSettings, CookieSettings]
 
@@ -410,10 +419,9 @@ powerServer (Authenticated ()) =
 powerServer _ = throwAll err401
 
 -- | Application with the WS API.
-wsApp :: TChan WSEvent -> Application
-wsApp channel = serve api $ wsServer channel
-  where
-    api = Proxy @WebSocketAPI
+runWsServer :: (KatipContext m, MonadBase IO m, MonadReader AppState m) => Port -> TChan WSEvent -> m ()
+runWsServer portNum channel = katipAddNamespace "wsApp" $
+  runApp portNum (Proxy @WebSocketAPI) EmptyContext $ wsServer channel
 
 -- | Request handlers of the application with the WS API.
 wsServer :: TChan WSEvent -> Server WebSocketAPI
@@ -437,7 +445,7 @@ powerListH = getFullInfo
 
 -- | Handles the 'full_info' request of the Web UI API.
 fullInfoH ::
-  (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
   DeploymentName ->
   m DeploymentFullInfo
 fullInfoH dName = do
@@ -454,29 +462,27 @@ powerFullInfoH :: DeploymentName -> AppM DeploymentFullInfo
 powerFullInfoH = fullInfoH
 
 getSingleFullInfo ::
-  (MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
   DeploymentName ->
   m (Maybe DeploymentFullInfo)
 getSingleFullInfo dName = do
-  AppState {logger = l} <- ask
   deploymentsSchema <- runStatement . select $ do
     d <- each deploymentSchema
     where_ $ d ^. #name ==. litExpr dName
     pure d
   deployments <- forM deploymentsSchema extractDeploymentFullInfo
-  liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
+  $logTM DebugS $ "get deployments: " <> show' deployments
   return $ listToMaybe deployments
 
 getFullInfo ::
-  (MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
   m [DeploymentFullInfo]
 getFullInfo = do
-  AppState {logger = l} <- ask
   deploymentsSchema <-
     runStatement . select . orderBy (view #updatedAt >$< desc) $
       each deploymentSchema
   deployments <- forM deploymentsSchema extractDeploymentFullInfo
-  liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
+  $logTM DebugS $ "get deployments: " <> show' deployments
   return deployments
 
 -- | Handles the 'create' request.
@@ -534,38 +540,35 @@ createH dep = do
             throwError err409 {errBody = appError "Some database error"}
     )
     $ \() -> do
-      st <- ask
-      liftBase $ sendReloadEvent st
+      sendReloadEvent
       updateDeploymentInfo (dep ^. #name)
       (ec, out, err, elTime) <- createDeployment dep
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog dep CreateAction ec elTime out err
-      liftBase $ sendReloadEvent st
+      sendReloadEvent
       liftBase $ handleExitCode ec
   pure Success
 
 -- | Updates deployment info.
 updateDeploymentInfo ::
-  (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
   DeploymentName ->
   m ()
 updateDeploymentInfo dName = do
-  log <- asks (logWarning . logger)
   DeploymentFullInfo {deployment = dep} <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
   (ec, out, err, _) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
-      Left err' -> liftBase $ log $ "could not get deployment info, could not parse CSV: " <> T.pack err'
+      Left err' -> $logTM ErrorS $ "could not get deployment info, could not parse CSV: " <> logStr err'
     ExitFailure _ ->
-      liftBase $
-        log $
-          "could not get deployment info, exit code: " <> (pack . show $ ec)
-            <> ", stdout: "
-            <> coerce out
-            <> "stderr: "
-            <> coerce err
+      $logTM ErrorS $
+        "could not get deployment info, exit code: " <> show' ec
+          <> ", stdout: "
+          <> logStr (unStdout out)
+          <> "stderr: "
+          <> logStr (unStderr err)
 
 getDeploymentConfig :: AppMConstraints m => Deployment -> m FullConfig
 getDeploymentConfig dep = do
@@ -579,21 +582,18 @@ getDeploymentConfig dep = do
 
 -- | Helper to create a new deployment.
 createDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   Deployment ->
   m (ExitCode, Stdout, Stderr, Duration)
 createDeployment dep = do
-  st <- ask
   cfg <- getDeploymentConfig dep
-  let log :: Text -> IO ()
-      log = logInfo (logger st)
   res <- runCommandArgs creationCommand =<< createCommandArgs cfg dep
-  liftBase . log $ "deployment created, deployment: " <> (pack . show $ dep)
+  $logTM InfoS $ "deployment created, deployment: " <> show' dep
   pure res
 
 -- | Helper to get deployment logs.
 selectDeploymentLogs ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   m [DeploymentLog]
 selectDeploymentLogs dName = (fmap . fmap) extractDeploymentLog . runStatement . select
@@ -648,7 +648,7 @@ processOutput (TransitionCleanupFailed x) = Just (x, CleanupAction)
 processOutput TransitionFailure {} = Nothing
 
 transitionToStatusS ::
-  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
   DeploymentName ->
   DeploymentStatusTransition ->
   m ()
@@ -682,7 +682,7 @@ transitionErrorToServerError = \case
     show'' = BSLC.pack . show
 
 getDeploymentS ::
-  (MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
+  (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) =>
   DeploymentName ->
   m DeploymentFullInfo
 getDeploymentS dName =
@@ -691,15 +691,13 @@ getDeploymentS dName =
     Nothing -> throwError err404 {errBody = "Deployment not found."}
 
 transitionToStatus ::
-  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
   DeploymentName ->
   DeploymentStatusTransition ->
   ExceptT StatusTransitionError m ()
 transitionToStatus dName s = do
-  st <- ask
-  let log = liftBase . logInfo (logger st)
-      newS = transitionStatus s
-  log $ "Transitioning deployment " <> (show' . unDeploymentName) dName <> " " <> show' s
+  let newS = transitionStatus s
+  $logTM InfoS $ "Transitioning deployment " <> show' (unDeploymentName dName) <> " " <> show' s
   res <- runTransaction . runExceptT $ do
     oldS <-
       (lift . statement () . select)
@@ -746,7 +744,7 @@ transitionToStatus dName s = do
     runBgWorker . void $
       runCommandArgs' nCmd
         =<< notificationCommandArgs dName oldS newS
-  liftBase $ sendReloadEvent st
+  sendReloadEvent
 
 assertStatusTransitionPossible ::
   MonadError StatusTransitionError m =>
@@ -760,7 +758,7 @@ assertStatusTransitionPossible dName old new =
     (throwError $ InvalidStatusTransition dName old new)
 
 assertDeploymentTransitionPossible ::
-  (MonadError StatusTransitionError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadError StatusTransitionError m, MonadReader AppState m, MonadBaseControl IO m) =>
   DeploymentName ->
   DeploymentStatus ->
   m ()
@@ -772,7 +770,7 @@ assertDeploymentTransitionPossible dName new = do
   assertStatusTransitionPossible dName (recordedStatus $ dep ^. #status) new
 
 assertDeploymentTransitionPossibleS ::
-  (MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadError ServerError m, MonadReader AppState m, MonadBaseControl IO m) =>
   DeploymentName ->
   DeploymentStatus ->
   m ()
@@ -819,8 +817,6 @@ archiveH dName = do
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName dUpdate = do
   failIfGracefulShutdownActivated
-  st <- ask
-  let log = logInfo (logger st)
   olDep <- getDeploymentS dName <&> (^. #deployment)
   failIfImageNotFound
     ( olDep
@@ -846,12 +842,12 @@ updateH dName dUpdate = do
           >>= ensureOne
 
     updateDeploymentInfo dName
-    liftBase $ sendReloadEvent st
+    sendReloadEvent
     cfg <- getDeploymentConfig dep
     (ec, out, err, elTime) <- runCommandArgs updateCommand =<< updateCommandArgs cfg dep
-    liftBase . log $
+    $logTM DebugS $ logStr $
       "deployment updated, name: "
-        <> coerce dName
+        <> unDeploymentName dName
     transitionToStatusS dName $
       TransitionUpdatePending
         StatusTransitionProcessOutput
@@ -866,19 +862,15 @@ updateH dName dUpdate = do
 -- | Handles the 'info' request of the Web UI API.
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
-  st <- ask
   dInfo <- getInfo dName
-  liftIO . logInfo (logger st) $
-    "get deployment info: " <> (pack . show $ dInfo)
+  $logTM DebugS $ "get deployment info: " <> show' dInfo
   pure [dInfo]
 
 -- | Handles the 'info' request of the octo CLI API.
 powerInfoH :: DeploymentName -> AppM [DeploymentInfo]
 powerInfoH dName = do
-  st <- ask
   dInfo <- getInfo dName
-  liftIO . logInfo (logger st) $
-    "get deployment info: " <> (pack . show $ dInfo)
+  $logTM DebugS $ "get deployment info: " <> show' dInfo
   pure [dInfo]
 
 -- | Helper to get deployment info from the database.
@@ -923,12 +915,10 @@ cleanupH dName = do
 
 -- | Helper to cleanup deployment.
 cleanupDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   DeploymentName ->
   m ()
 cleanupDeployment dName = do
-  st <- ask
-  let log = logInfo (logger st)
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
   (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
@@ -937,7 +927,7 @@ cleanupDeployment dName = do
     ExitSuccess -> do
       deleteDeploymentLogs dName
       deleteDeployment dName
-      liftBase $ log $ "deployment destroyed, name: " <> coerce dName
+      $logTM InfoS $ logStr $ "deployment destroyed, name: " <> unDeploymentName dName
     ExitFailure _ -> do
       transitionToStatusS dName $
         TransitionCleanupFailed
@@ -948,12 +938,12 @@ cleanupDeployment dName = do
             , stderr = err
             }
       pure ()
-  liftBase $ sendReloadEvent st
+  sendReloadEvent
   handleExitCode ec
 
 -- | Helper to delete deployment logs.
 deleteDeploymentLogs ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   m ()
 deleteDeploymentLogs dName =
@@ -968,7 +958,7 @@ deleteDeploymentLogs dName =
 
 -- | Helper to delete a deployment.
 deleteDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   m ()
 deleteDeployment dName =
@@ -1018,13 +1008,13 @@ getActionInfoH aId = do
       throwError err400 {errBody = appError "Action not found"}
 
 -- | Helper to handle exit code.
-handleExitCode :: MonadBaseControl IO m => ExitCode -> m ()
+handleExitCode :: MonadBase IO m => ExitCode -> m ()
 handleExitCode ExitSuccess = return ()
 handleExitCode (ExitFailure c) = liftBase . throwIO $ DeploymentFailed c
 
 -- | Helper to log a deployment action.
 createDeploymentLog ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
   Deployment ->
   Action ->
   ExitCode ->
@@ -1071,7 +1061,7 @@ ensureOne _ = throwError err500
 
 -- | Helper to insert or update deployment metadata.
 upsertDeploymentMetadatum ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   DeploymentMetadata ->
   m ()
@@ -1107,31 +1097,32 @@ validationError nameErrors =
   encode $ ValidationError nameErrors
 
 -- | Helper to send an event to the WS event channel.
-sendReloadEvent :: AppState -> IO ()
-sendReloadEvent state =
-  atomically $ writeTChan (eventSink state) FrontendPleaseUpdateEverything
+sendReloadEvent :: (MonadBase IO m, MonadReader AppState m) => m ()
+sendReloadEvent = do
+  sink <- asks eventSink
+  liftBase $ atomically $ writeTChan sink FrontendPleaseUpdateEverything
 
 -- | Runs the status updater.
-runStatusUpdater :: AppState -> IO ()
-runStatusUpdater state = do
+runStatusUpdater :: (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) => m ()
+runStatusUpdater = do
   let interval = 15 :: NominalDiffTime
-      logErr :: MonadBase IO m => Text -> m ()
-      logErr = liftBase . logWarning (logger state)
 
   forever $ do
     currentTime <- liftBase getCurrentTime
     let cutoff = addUTCTime (negate interval) currentTime
-    flip runReaderT state . (>>= logLeft) . runExceptT $ do
+    (>>= logLeft) . runExceptT $ do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
         where_ $ not_ $ (ds ^. #status) `in_` (litExpr <$> [Archived, CleanupFailed])
         pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
       checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
-        let timeout = statusUpdateTimeout state
+        timeout <- asks statusUpdateTimeout
         mEc <-
           getSingleFullInfo dName >>= \case
-            Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
+            Nothing -> do
+              $logTM ErrorS $ logStr $ "Couldn't find deployment: " <> unDeploymentName dName
+              pure Nothing
             Just (view #deployment -> dep) -> do
               cfg <- getDeploymentConfig dep
               case dStatus of
@@ -1160,16 +1151,13 @@ runStatusUpdater state = do
                   ($> True) $
                     (runExceptT . runExceptT) (transitionToStatus dName transition) >>= \case
                       Right (Right ()) -> updateCheckedAt (transitionStatus transition)
-                      Left e -> logErr $ show' e
-                      Right (Left e) -> logErr $ show' e
-      when (Prelude.or updated) $ liftBase $ sendReloadEvent state
+                      Left e -> $logTM ErrorS $ show' e
+                      Right (Left e) -> $logTM ErrorS $ show' e
+      when (Prelude.or updated) sendReloadEvent
       liftBase $ threadDelay 2000000
 
-logLeft :: (MonadBase IO m, MonadReader AppState m, Exception e) => Either e () -> m ()
-logLeft (Left err) = do
-  state <- ask
-  let logErr = liftBase . logWarning (logger state)
-  logErr . T.pack $ displayException err
+logLeft :: (HasCallStack, KatipContext m, Exception e) => Either e () -> m ()
+logLeft (Left err) = logLocM ErrorS $ logStr $ displayException err
 logLeft (Right ()) = pure ()
 
 -- | Returns the new deployment status.
@@ -1214,8 +1202,8 @@ isShuttingDown = do
 -- | Handles the graceful shutdown signal.
 -- Sends a signal to the 'shutdownSem' semaphore
 -- if the background worker counter is 0.
-terminationHandler :: IORef Int -> IORef Bool -> MVar () -> IO ()
-terminationHandler bgWorkersC gracefulShudownAct shutdownS = do
+terminationHandler :: MonadBase IO m => IORef Int -> IORef Bool -> MVar () -> m ()
+terminationHandler bgWorkersC gracefulShudownAct shutdownS = liftBase $ do
   atomicWriteIORef gracefulShudownAct True
   c <- readIORef bgWorkersC
   if c == 0
@@ -1224,8 +1212,10 @@ terminationHandler bgWorkersC gracefulShudownAct shutdownS = do
 
 -- | Waits on the 'shutdownSem' semaphore to determine when the
 -- server can shut down.
-runShutdownHandler :: AppState -> IO ()
-runShutdownHandler = takeMVar . shutdownSem
+runShutdownHandler :: (MonadBase IO m, MonadReader AppState m) => m ()
+runShutdownHandler = do
+  sem <- asks shutdownSem
+  liftBase $ takeMVar sem
 
 -- | Runs background the worker and increases the background worker counter.
 -- Decreases background worker counter
@@ -1251,7 +1241,7 @@ runBgWorker act = void $ L.forkFinally act' cleanup
 -- | Same as 'runBgWorker' but also locks the specified deployment.
 runDeploymentBgWorker ::
   forall m a.
-  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   -- | Status to set after the first part has finished.
   Maybe DeploymentStatus ->
   DeploymentName ->
@@ -1262,7 +1252,6 @@ runDeploymentBgWorker ::
   (a -> m ()) ->
   m ()
 runDeploymentBgWorker newS dName pre post = do
-  st <- ask
   mainThread <- L.myThreadId
   (err :: MVar (Either ServerError (StM m a))) <- L.newEmptyMVar
   runBgWorker $
@@ -1279,7 +1268,7 @@ runDeploymentBgWorker newS dName pre post = do
                     Left e -> L.putMVar err (Left e) $> False
                     Right () -> L.putMVar err (Right x) $> True
                 Nothing -> L.putMVar err (Right x) $> True
-              liftBase (sendReloadEvent st)
+              sendReloadEvent
               when proceed $ restoreM x >>= post
       )
   L.readMVar err >>= \case
