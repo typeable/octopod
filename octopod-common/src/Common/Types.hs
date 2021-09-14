@@ -244,17 +244,9 @@ data DeploymentFullInfo = DeploymentFullInfo
   , metadata :: DeploymentMetadata
   , createdAt :: UTCTime
   , updatedAt :: UTCTime
-  , deploymentDefaultConfig :: FullDefaultConfig
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentFullInfo
-
-getDeploymentConfig :: DeploymentFullInfo -> FullConfig
-getDeploymentConfig d =
-  FullConfig
-    { appConfig = applyOverrides (d ^. #deployment . #appOverrides) (d ^. #deploymentDefaultConfig . #appDefaultConfig)
-    , depConfig = applyOverrides (d ^. #deployment . #deploymentOverrides) (d ^. #deploymentDefaultConfig . #depDefaultConfig)
-    }
 
 isDeploymentArchived :: DeploymentFullInfo -> Bool
 isDeploymentArchived DeploymentFullInfo {status = s} = case s of

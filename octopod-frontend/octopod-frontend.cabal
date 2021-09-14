@@ -56,6 +56,7 @@ executable frontend
     -Wno-missed-specialisations
     -- Because reflex-dom is a false positive.
     -Wno-unused-packages
+    -Wno-partial-type-signatures
     -threaded
   default-extensions:  BlockArguments
                      , ConstraintKinds
@@ -87,6 +88,7 @@ executable frontend
                      , OverloadedLabels
                      , ViewPatterns
                      , ApplicativeDo
+                     , PartialTypeSignatures
   build-depends:       aeson
                      , base
                      , bytestring

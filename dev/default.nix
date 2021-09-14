@@ -103,7 +103,7 @@ in
       infoScript = pkgs.writeScript "info.sh" ''
         #!${pkgs.bash}/bin/bash
 
-        sleep 1
+        sleep 4
 
         echo "key,value"
         echo "key2,value2"
@@ -146,6 +146,8 @@ in
         export APPLICATION_KEYS_COMMAND=${infoScript}
         export UNARCHIVE_COMMAND=${writeScript}
         export POWER_AUTHORIZATION_HEADER="123"
+        export CACHE_INVALIDATION_TIME="60"
+        export CACHE_UPDATE_TIME="20"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
             --ui-port 3002 \
