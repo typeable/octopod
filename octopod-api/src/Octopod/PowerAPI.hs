@@ -48,30 +48,30 @@ type CleanArchiveEndpoint =
 type DeploymentAPI' c =
   Auth '[AuthHeaderAuth] () :> "api" :> "v1"
     :> ( "deployments"
-           :> ( ListEndpoint
-                  -- endpoint to get deployment list
-                  :<|> CreateEndpoint
-                  -- endpoint to create a new deployment
-                  :<|> ArchiveEndpoint c
-                  -- endpoint to archive an existing deployment
-                  :<|> UpdateEndpoint c
-                  -- endpoint to update an existing deployment
-                  :<|> InfoEndpoint c
-                  -- endpoint to get deployment info
-                  :<|> FullInfoEndpoint c
-                  -- endpoint to get full deployment info
-                  :<|> StatusEndpoint c
-                  -- endpoint to get deployment status
-                  :<|> CleanupEndpoint c
-                  -- endpoint to clean up resources of an archived deployment
-                  :<|> RestoreEndpoint c
-                  -- endpoint to restore an archived deployment
-              )
-           :<|> GetActionInfoEndpoint
-           -- endpoint to get action logs
-           :<|> CleanArchiveEndpoint
-           -- endpoint to clean up resources of all archived deployments
-           -- according to the archive retention policy
+          :> ( ListEndpoint
+                -- endpoint to get deployment list
+                :<|> CreateEndpoint
+                -- endpoint to create a new deployment
+                :<|> ArchiveEndpoint c
+                -- endpoint to archive an existing deployment
+                :<|> UpdateEndpoint c
+                -- endpoint to update an existing deployment
+                :<|> InfoEndpoint c
+                -- endpoint to get deployment info
+                :<|> FullInfoEndpoint c
+                -- endpoint to get full deployment info
+                :<|> StatusEndpoint c
+                -- endpoint to get deployment status
+                :<|> CleanupEndpoint c
+                -- endpoint to clean up resources of an archived deployment
+                :<|> RestoreEndpoint c
+                -- endpoint to restore an archived deployment
+             )
+          :<|> GetActionInfoEndpoint
+          -- endpoint to get action logs
+          :<|> CleanArchiveEndpoint
+          -- endpoint to clean up resources of all archived deployments
+          -- according to the archive retention policy
        )
 
 data AuthHeaderAuth
