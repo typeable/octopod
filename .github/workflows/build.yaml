@@ -19,7 +19,9 @@ jobs:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v12
       - name: Run fourmolu
-        run: nix-shell nix/ci.nix -j auto --run "git ls-files '*.hs' | xargs fourmolu -m check --ghc-opt -XRecursiveDo --ghc-opt -XTypeApplications"
+        run: |
+          nix-shell nix/ci.nix -j auto --run "git ls-files '*.hs' | xargs fourmolu -m inplace --ghc-opt -XRecursiveDo --ghc-opt -XTypeApplications"
+          git diff --exit-code
 
   octo-macOS:
     name: macOS octo CLI Release (Stack)

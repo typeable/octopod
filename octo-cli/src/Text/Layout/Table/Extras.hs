@@ -20,7 +20,7 @@ instance Cell Text where
       AlignInfo (T.length ls) $
         if T.null rs
           then Nothing
-          else Just $ T.length rs - 1
+          else Just $  T.length rs - 1
   buildCell = stringB . T.unpack
 
 instance StringBuilder Text where

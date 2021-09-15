@@ -2,5 +2,5 @@
 , pkgs ? import sources.nixpkgs { }
 }:
 pkgs.mkShell {
-  packages = [ pkgs.haskellPackages.fourmolu pkgs.git ];
+  packages = [ pkgs.haskellPackages.fourmolu ];
 }
