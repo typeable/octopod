@@ -12,6 +12,17 @@ on:
       - staging
 
 jobs:
+  check-formatting:
+    name: Check Haskell formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v12
+      - name: Run fourmolu
+        run: |
+          nix-shell nix/ci.nix -j auto --run "git ls-files '*.hs' | xargs fourmolu -m inplace --ghc-opt -XRecursiveDo --ghc-opt -XTypeApplications"
+          git diff --exit-code
+
   octo-macOS:
     name: macOS octo CLI Release (Stack)
     runs-on: macos-latest
@@ -47,7 +58,7 @@ jobs:
           name: octopod
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
       - name: Build
-        run: nix-build -A projectCross.musl64.hsPkgs.octo-cli.components.exes.octo --arg prod true
+        run: nix-build -A projectCross.musl64.hsPkgs.octo-cli.components.exes.octo --arg prod true -j auto
       - uses: actions/upload-artifact@v2
         with:
           name: octo-cli-linux
