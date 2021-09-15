@@ -16,8 +16,6 @@ module Frontend.Utils
     aButtonClassEnabled,
     buttonClassEnabled',
     kubeDashboardUrl,
-    loadingCommonWidget,
-    errorCommonWidget,
     aButtonDynClass',
     formatPosixToDate,
     overridesWidget,
@@ -34,7 +32,6 @@ module Frontend.Utils
     deploymentConfigProgressive,
     holdClearingWith,
     unitEv,
-    deploymentSection,
   )
 where
 
@@ -61,6 +58,7 @@ import Data.Witherable
 import Data.WorkingOverrides
 import Frontend.API
 import Frontend.GHCJS
+import Frontend.UIKit
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
@@ -418,20 +416,6 @@ octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
     pure $ value inp
   pure (valDyn, isValid)
 
--- | Widget with a loading spinner.
-loadingCommonWidget :: MonadWidget t m => m ()
-loadingCommonWidget =
-  divClass "loading loading--enlarged loading--alternate" $
-    text "Loading..."
-
--- | Widget with an error message.
-errorCommonWidget :: MonadWidget t m => m ()
-errorCommonWidget =
-  divClass "null null--data" $
-    divClass "null__content" $ do
-      elClass "b" "null__heading" $ text "Cannot retrieve the data"
-      divClass "null__message" $ text "Try to reload the page"
-
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
 overridesWidget ::
@@ -706,11 +690,6 @@ envVarsInput dCfg ovs = mdo
     Just _ -> pure ()
     Nothing -> loadingCommonWidget
   pure . updated $ destructWorkingOverrides <$> envsDyn
-
-deploymentSection :: DomBuilder t m => Text -> m a -> m a
-deploymentSection n m = elClass "section" "deployment__section" $ do
-  elClass "h3" "deployment__sub-heading" $ text n
-  elClass "div" "deployment__widget" m
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.

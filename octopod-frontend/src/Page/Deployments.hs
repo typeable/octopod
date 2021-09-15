@@ -33,6 +33,7 @@ import Data.These
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
+import Frontend.UIKit
 import Frontend.Utils
 import Page.ClassicPopup
 import Page.Elements.Links

@@ -41,6 +41,7 @@ executable frontend
                      , Data.Text.Search
                      , Data.UniqMap
                      , Data.WorkingOverrides
+                     , Frontend.UIKit
   ghc-options:
     -Weverything
     -Wno-implicit-prelude
