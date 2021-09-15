@@ -41,8 +41,22 @@
     .listing--for-text .listing__item:first-child {
         margin-top: 0;
     }
-        .listing--for-text b {
+        .listing--for-text .listing__key {
             font-weight: 500;
+        }
+
+        .listing--for-text .listing__value {
+            font-weight: 400;
+        }
+
+        .listing--for-text .listing__key.default {
+            font-weight: 300;
+            font-style: italic;
+        }
+
+        .listing--for-text .listing__value.default {
+            font-weight: 300;
+            font-style: italic;
         }
 
     .listing--for-text .listing__more {
