@@ -18,6 +18,7 @@ import Common.Types
 import Common.Validation (isNameValid)
 import Data.Maybe
 import Frontend.API
+import Frontend.UIKit
 import Frontend.Utils
 import Reflex.Network
 import Servant.Reflex
@@ -62,11 +63,16 @@ newDeploymentPopupHeader ::
   m (Event t (), Event t ())
 newDeploymentPopupHeader enabledDyn =
   divClass "popup__head" $ do
-    closeEv <- buttonClass "popup__close" "Close popup"
+    closeEv <- closePopupButton
     elClass "h2" "popup__project" $ text "Create new deployment"
     saveEv <-
       divClass "popup__operations" $
-        buttonClassEnabled "popup__action button button--save" "Save" enabledDyn
+        largeButton $
+          def
+            & #buttonStyle .~~ PopupActionLargeButtonStyle
+            & #buttonText .~~ "Save"
+            & #buttonEnabled .~~ enabledDyn
+            & #buttonType ?~~ SaveLargeButtonType
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 

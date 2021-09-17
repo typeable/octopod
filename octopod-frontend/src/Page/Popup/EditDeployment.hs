@@ -16,8 +16,10 @@ import Prelude as P
 
 import Common.Types
 import Common.Utils
+import Data.Generics.Labels ()
 import Data.Maybe
 import Frontend.API
+import Frontend.UIKit
 import Frontend.Utils
 import Reflex.Network
 import Servant.Reflex
@@ -68,11 +70,16 @@ editDeploymentPopupHeader ::
   m (Event t (), Event t ())
 editDeploymentPopupHeader dname validDyn =
   divClass "popup__head" $ do
-    closeEv <- buttonClass "popup__close" "Close popup"
+    closeEv <- closePopupButton
     elClass "h2" "popup__project" $ text $ "Edit " <> coerce dname
     saveEv <-
       divClass "popup__operations" $
-        buttonClassEnabled "popup__action button button--save" "Save" validDyn
+        largeButton $
+          def
+            & #buttonStyle .~~ PopupActionLargeButtonStyle
+            & #buttonText .~~ "Save"
+            & #buttonEnabled .~~ validDyn
+            & #buttonType ?~~ SaveLargeButtonType
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 

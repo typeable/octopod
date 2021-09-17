@@ -317,8 +317,18 @@ activeDeploymentWidget clickedEv dDyn' = do
                   )
                   $ text "Actions"
               body = do
-                btnEditEv <- buttonClassEnabled' "action action--edit" "Edit" (pure enabled) "action--disabled"
-                btnArcEv <- buttonClassEnabled' "action action--archive" "Move to archive" (pure enabled) "action--disabled"
+                btnEditEv <-
+                  actionButton $
+                    def
+                      & #buttonText .~~ "Edit"
+                      & #buttonEnabled .~~ pure enabled
+                      & #buttonType .~~ Just EditActionButtonType
+                btnArcEv <-
+                  actionButton $
+                    def
+                      & #buttonText .~~ "Move to archive"
+                      & #buttonEnabled .~~ pure enabled
+                      & #buttonType .~~ Just ArchiveActionButtonType
                 url' <- kubeDashboardUrl (view #deployment <$> dDyn)
                 void . dyn $
                   url'
@@ -326,10 +336,12 @@ activeDeploymentWidget clickedEv dDyn' = do
                       blank
                       ( \url ->
                           void $
-                            aButtonClass'
-                              "action action--logs"
-                              "Details"
-                              (pure $ "href" =: url <> "target" =: "_blank")
+                            actionButton
+                              def
+                                { buttonText = "Details"
+                                , buttonType = Just LogsActionButtonType
+                                , buttonBaseTag = ATag url
+                                }
                       )
                 pure $
                   leftmost
@@ -436,12 +448,12 @@ archivedDeploymentWidget clickedEv dDyn' = do
                       <> "id" =: elId
                   )
                   $ text "Actions"
-              body = do
-                btnArcEv <-
-                  buttonClass
-                    "action action--archive"
-                    "Restore from archive"
-                pure btnArcEv
+              body =
+                actionButton
+                  def
+                    { buttonText = "Restore from archive"
+                    , buttonType = Just ArchiveActionButtonType
+                    }
           btnEv <- dropdownWidget' clickedEv btn body
           void $ restoreEndpoint (constDyn $ Right $ dName) btnEv
       let route = DashboardRoute :/ Just dName
@@ -571,13 +583,16 @@ sortHeaderWithInitial f l defaultSorting initSortingM = do
           sortBtnEv
           sortingChanged
     tellMultiEvent . fmapMaybe id $ updated sortDyn
-    let classDyn =
-          fmap ("sort " <>) $
-            sortDyn <&> \case
-              Just (SortDesc _) -> "sort--active sort--desc"
-              Just (SortAsc _) -> "sort--active sort--asc"
-              Nothing -> ""
-    sortBtnEv <- buttonDynClass classDyn (pure l)
+    sortBtnEv <-
+      sortButton $
+        def
+          & #buttonText .~~ l
+          & #buttonState
+            .~~ ( sortDyn <&&> \case
+                    SortDesc _ -> SortDescButtonState
+                    SortAsc _ -> SortAscButtonState
+                )
+
     tellMultiEvent $ sortBtnEv $> SortingChanged
     pure ()
 

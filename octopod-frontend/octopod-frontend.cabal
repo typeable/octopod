@@ -42,6 +42,14 @@ executable frontend
                      , Data.UniqMap
                      , Data.WorkingOverrides
                      , Frontend.UIKit
+                     , Frontend.UIKit.Button.Large
+                     , Frontend.UIKit.Button.Dash
+                     , Frontend.Classes
+                     , Frontend.UIKit.Button.Common
+                     , Frontend.UIKit.Button.Expander
+                     , Frontend.UIKit.Button.Static
+                     , Frontend.UIKit.Button.Action
+                     , Frontend.UIKit.Button.Sort
   ghc-options:
     -Weverything
     -Wno-implicit-prelude
@@ -114,5 +122,6 @@ executable frontend
                      , ordered-containers
                      , witherable
                      , reflex
+                     , data-default
   hs-source-dirs:      src
   default-language:    Haskell2010

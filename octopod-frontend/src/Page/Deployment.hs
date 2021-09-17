@@ -118,29 +118,33 @@ deploymentHead dfiDyn sentEv =
               let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
               btnEnabledDyn <- holdDyn btnState $ leftmost [False <$ btnEv, sentEv]
               btnEv <-
-                aButtonClassEnabled
-                  "page__action button button--secondary button--restore \
-                  \classic-popup-handler"
-                  "Recover from archive"
-                  btnEnabledDyn
+                largeButton $
+                  def
+                    & #buttonType ?~~ RestoreLargeButtonType
+                    & #buttonPriority .~~ SecondaryLargeButton
+                    & #buttonStyle .~~ PageActionLargeButtonStyle
+                    & #buttonText .~~ "Recover from archive"
+                    & #buttonEnabled .~~ btnEnabledDyn
               void $ restoreEndpoint (Right . coerce <$> dname) btnEv
               pure (never, never)
             else mdo
               let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
               btnEnabledDyn <- holdDyn btnState $ not <$> sentEv
               editEv <-
-                buttonClassEnabled'
-                  "page__action button button--edit popup-handler"
-                  "Edit deployment"
-                  btnEnabledDyn
-                  "button--disabled"
+                largeButton $
+                  def
+                    & #buttonType ?~~ EditLargeButtonType
+                    & #buttonStyle .~~ PageActionLargeButtonStyle
+                    & #buttonText .~~ "Edit deployment"
+                    & #buttonEnabled .~~ btnEnabledDyn
               archEv <-
-                buttonClassEnabled'
-                  "page__action button button--secondary button--archive \
-                  \classic-popup-handler"
-                  "Move to archive"
-                  btnEnabledDyn
-                  "button--disabled"
+                largeButton $
+                  def
+                    & #buttonType ?~~ ArchiveLargeButtonType
+                    & #buttonPriority .~~ SecondaryLargeButton
+                    & #buttonStyle .~~ PageActionLargeButtonStyle
+                    & #buttonText .~~ "Move to archive"
+                    & #buttonEnabled .~~ btnEnabledDyn
               pure (R.tag (current dfiDyn) editEv, archEv)
     url' <- kubeDashboardUrl dfiDyn
     void . dyn $
@@ -149,10 +153,14 @@ deploymentHead dfiDyn sentEv =
           blank
           ( \url ->
               void $
-                aButtonDynClass'
-                  "page__action button button--secondary button--logs"
-                  "Details"
-                  (pure $ "href" =: url <> "target" =: "_blank")
+                largeButton $
+                  def
+                    { buttonText = "Details"
+                    , buttonType = Just LogsLargeButtonType
+                    , buttonPriority = SecondaryLargeButton
+                    , buttonStyle = PageActionLargeButtonStyle
+                    , buttonBaseTag = ATag url
+                    }
           )
     delEv <- confirmArchivePopup archEv $ do
       text "Are you sure you want to archive the"

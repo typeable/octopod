@@ -6,20 +6,14 @@
 --frontend modules.
 module Frontend.Utils
   ( sidebar,
-    buttonClass,
-    buttonClassEnabled,
     wrapRequestErrors,
     octopodTextInput,
     deploymentPopupBody,
     ClickedElement (..),
     pageNotification,
-    aButtonClassEnabled,
-    buttonClassEnabled',
     kubeDashboardUrl,
-    aButtonDynClass',
     formatPosixToDate,
     overridesWidget,
-    aButtonClass',
     statusWidget,
     elementClick,
     showT,
@@ -27,11 +21,11 @@ module Frontend.Utils
     formatPosixToDateTime,
     dropdownWidget,
     dropdownWidget',
-    buttonDynClass,
     deploymentConfigProgressiveComponents,
     deploymentConfigProgressive,
     holdClearingWith,
     unitEv,
+    (<&&>),
   )
 where
 
@@ -39,18 +33,15 @@ import Common.Types as CT
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import Data.Align
 import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
-import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Text as T (Text, intercalate, null, pack)
-import Data.These
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -160,148 +151,6 @@ sidebar showEv closeEv m = mdo
         ]
   pure $ switchDyn $ fst <$> resultEvDyn
 
--- | Dark unclickable background for opened sidebar.
-popupOverlay :: DomBuilder t m => m ()
-popupOverlay =
-  elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
-
--- | Button with customizable classes and label text.
-buttonClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  m (Event t ())
-buttonClass cl lbl = do
-  (bEl, _) <-
-    elDynAttr'
-      "button"
-      (constDyn $ "class" =: cl <> "type" =: "button")
-      $ text lbl
-  return $ domEvent Click bEl
-
--- | Advanced version of 'buttonClass' with dynamic arguments.
-buttonDynClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Dynamic t Text ->
-  -- | Label text.
-  Dynamic t Text ->
-  m (Event t ())
-buttonDynClass clDyn lblDyn = do
-  let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      dynText lblDyn
-  return $ domEvent Click bEl
-
--- | Advanced version of 'buttonClass' with a disabled state.
-buttonClassEnabled ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  m (Event t ())
-buttonClassEnabled cl lbl dDyn = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl <> "type" =: "button"
-        False ->
-          "class" =: (cl <> " button--disabled")
-            <> "type" =: "button"
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
--- | Special version of 'buttonClassEnabled' that supports custom classes for
--- the disabled state.
-buttonClassEnabled' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  -- | Custom classes for disabled state.
-  Text ->
-  m (Event t ())
-buttonClassEnabled' cl lbl dDyn disClass = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl <> "type" =: "button"
-        False ->
-          "class" =: (cl <> " " <> disClass)
-            <> "type" =: "button"
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonClass' for links that should look like buttons.
-aButtonClass' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Extra attributes
-  Dynamic t (Map Text Text) ->
-  m (Event t ())
-aButtonClass' cl lbl eAttrs = do
-  (bEl, _) <-
-    elDynAttr'
-      "a"
-      (fmap (<> ("class" =: cl)) eAttrs)
-      $ text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonDynClass' for links that should look like
--- buttons.
-aButtonDynClass' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Dynamic t Text ->
-  -- | Label text.
-  Dynamic t Text ->
-  -- | Extra attributes
-  Dynamic t (Map Text Text) ->
-  m (Event t ())
-aButtonDynClass' clDyn lblDyn eAttrs = do
-  let attrDyn' = ffor clDyn $ \cl -> "class" =: cl
-      attrDyn = (<>) <$> eAttrs <*> attrDyn'
-  (bEl, _) <-
-    elDynAttr' "a" attrDyn $
-      dynText lblDyn
-  return $ domEvent Click bEl
-
--- | Version of 'buttonClassEnabled' for links that should look like
--- buttons.
-aButtonClassEnabled ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  m (Event t ())
-aButtonClassEnabled cl lbl dDyn = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl
-        False ->
-          "class" =: (cl <> " button--disabled")
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "a" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
 -- | Formats posix seconds to date in iso8601.
 formatPosixToDate :: FormatTime t => t -> Text
 formatPosixToDate = pack . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
@@ -346,76 +195,6 @@ octopodTextInput clss lbl placeholder val errEv =
     elClass "div" "deployment__widget" $
       octopodTextInput' (pure False) clss placeholder (pure . fromMaybe "" $ val) errEv
 
--- | The only text input field that is used in project forms. This input
--- provides automatic error message hiding after user starts typing.
-octopodTextInput' ::
-  MonadWidget t m =>
-  -- | Disabled?
-  Dynamic t Bool ->
-  -- | Input field classes.
-  Text ->
-  -- | Placeholder for input field.
-  Text ->
-  -- | Possible init value.
-  (Dynamic t Text) ->
-  -- | Event carrying the error message.
-  Event t Text ->
-  m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
-  inValDyn <- holdUniqDyn inValDyn'
-  let inValEv =
-        align (updated inValDyn) (updated valDyn)
-          & fmapMaybe
-            ( \case
-                This x -> Just x
-                These inV currV | inV /= currV -> Just inV
-                _ -> Nothing
-            )
-  let inpClass = " input"
-      inpErrClass = " input input--error"
-  isValid <-
-    holdDyn True $
-      leftmost
-        [ False <$ errEv
-        , True <$ updated valDyn
-        ]
-  classDyn <-
-    holdDyn (clss <> inpClass) $
-      leftmost
-        [ (clss <> inpErrClass) <$ errEv
-        , (clss <> inpClass) <$ updated valDyn
-        ]
-  inVal <- sample . current $ inValDyn
-  disabled <- sample . current $ disabledDyn
-  valDyn <- elDynClass "div" classDyn $ do
-    inp <-
-      inputElement $
-        def
-          & initialAttributes
-            .~ ( "type" =: "text"
-                  <> "class" =: "input__widget"
-                  <> "placeholder" =: placeholder
-               )
-          & inputElementConfig_setValue .~ inValEv
-          & inputElementConfig_initialValue .~ inVal
-          & inputElementConfig_elementConfig . elementConfig_initialAttributes
-            %~ (if disabled then M.insert "disabled" "disabled" else id)
-          & inputElementConfig_elementConfig . elementConfig_modifyAttributes
-            <>~ updated
-              ( do
-                  disabled' <- disabledDyn
-                  pure $
-                    M.singleton "disabled" $
-                      if disabled' then Just "disabled" else Nothing
-              )
-    widgetHold_ blank $
-      leftmost
-        [ divClass "input__output" . text <$> errEv
-        , blank <$ updated valDyn
-        ]
-    pure $ value inp
-  pure (valDyn, isValid)
-
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
 overridesWidget ::
@@ -429,21 +208,23 @@ overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for
   listing visible
   when (envLength > 3) $ mdo
     let hidden = drop 3 envs
-    showDyn <- toggle False toggleEv
     dyn_ $
-      showDyn <&> \case
-        True -> listing hidden
-        False -> blank
-    let btnClassDyn =
-          ifThenElseDyn
-            showDyn
-            "listing__more expander expander--open"
-            "listing__more expander"
-        btnTextDyn =
-          ifThenElseDyn showDyn "Hide" $
-            "Show all (" <> showT envLength <> ")"
-    toggleEv <- buttonDynClass btnClassDyn btnTextDyn
-    blank
+      expandState <&> \case
+        ExpandedState -> listing hidden
+        ContractedState -> blank
+    expandState <-
+      expanderButton
+        ExpanderButtonConfig
+          { buttonText = do
+              state <- expandState
+              pure $ case state of
+                ExpandedState -> "Hide"
+                ContractedState -> "Show all (" <> showT envLength <> ")"
+          , buttonInitialState = ContractedState
+          , buttonType = Just ListingExpanderButton
+          , buttonStyle = RegularExpanderButtonStyle
+          }
+    pure ()
   where
     listing envs' = do
       forM_ envs' $ \(var, val) ->
@@ -452,21 +233,6 @@ overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for
           case val of
             ValueAdded v -> text v
             ValueDeleted -> el "i" $ text "<deleted>"
-
--- | @if-then-else@ helper for cases when bool value is wrapped in 'Dynamic'.
-ifThenElseDyn ::
-  Reflex t =>
-  -- | Condition wrapped in `Dynamic`.
-  Dynamic t Bool ->
-  -- | `then` branch.
-  b ->
-  -- | `else` branch.
-  b ->
-  Dynamic t b
-ifThenElseDyn bDyn t f =
-  bDyn <&> \case
-    True -> t
-    False -> f
 
 -- | Type of notification at the top of pages.
 data DeploymentPageNotification
@@ -490,7 +256,7 @@ pageNotification notEv = mdo
       messageClassWidget txt cl =
         divClass ("page__output notification " <> cl) $ do
           text txt
-          buttonClass "notification__close" ""
+          closeNotificationButton
       closeEv = switchDyn closeEvDyn
   closeEvDyn <-
     widgetHold (pure never) $
@@ -675,11 +441,13 @@ envVarsInput dCfg ovs = mdo
   envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
   let addEv = clickEv $> Endo (fst . insertUniqStart newWorkingOverride)
   clickEv <-
-    buttonClassEnabled'
-      "overrides__add dash dash--add"
-      "Add an override"
-      addingIsEnabled
-      "dash--disabled"
+    dashButton
+      DashButtonConfig
+        { buttonText = "Add an override"
+        , buttonEnabled = addingIsEnabled
+        , buttonType = Just AddDashButtonType
+        , buttonStyle = OverridesDashButtonStyle
+        }
   updEv <-
     switchDyn . fmap F.fold
       <$> listWithKey
@@ -708,18 +476,24 @@ envVarInput val = do
       k = val <&> \(WorkingOverrideKey _ x, _) -> x
       disabledKey = val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
 
-  divClass "overrides__item" $ do
-    (keyTextDyn, _) <-
-      octopodTextInput' disabledKey "overrides__key" "key" k never
-    (valTextDyn, _) <-
-      octopodTextInput' (pure False) "overrides__value" "value" v never
-    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    pure $
-      leftmost
-        [ UpdateKey <$> updated keyTextDyn
-        , UpdateValue <$> updated valTextDyn
-        , closeEv $> DeleteOverride
-        ]
+  (keyTextDyn, valTextDyn, closeEv) <-
+    overrideField
+      OverrideField
+        { fieldValue = k
+        , fieldError = never
+        , fieldDisabled = disabledKey
+        }
+      OverrideField
+        { fieldValue = v
+        , fieldError = never
+        , fieldDisabled = pure False
+        }
+  pure $
+    leftmost
+      [ UpdateKey <$> updated keyTextDyn
+      , UpdateValue <$> updated valTextDyn
+      , closeEv $> DeleteOverride
+      ]
 
 data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
 
@@ -769,3 +543,6 @@ holdClearingWith aEv clear =
 
 unitEv :: Reflex t => Dynamic t a -> Event t ()
 unitEv = fmapCheap (const ()) . updated
+
+(<&&>) :: (Functor f1, Functor f2) => f1 (f2 a) -> (a -> b) -> f1 (f2 b)
+x <&&> f = (fmap . fmap) f x
