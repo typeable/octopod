@@ -15,6 +15,7 @@ module Frontend.UIKit
     (?~~),
     OverrideFieldType (..),
     deletedOverride,
+    showNonEditableWorkingOverride,
   )
 where
 
@@ -26,6 +27,8 @@ import Data.Generics.Labels ()
 import qualified Data.Map as M
 import Data.Text (Text)
 import Data.These
+import Data.UniqMap
+import Data.WorkingOverrides
 import Frontend.Classes as X
 import Frontend.UIKit.Button.Action as X
 import Frontend.UIKit.Button.Dash as X
@@ -224,3 +227,32 @@ octopodTextInput' disabledDyn clssDyn placeholder inValDyn' errEv = mdo
 popupOverlay :: DomBuilder t m => m ()
 popupOverlay =
   elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
+
+-- | Widget that shows overrides list. It does not depend on their type.
+showNonEditableWorkingOverride ::
+  MonadWidget t m =>
+  -- | Overrides list.
+  WorkingOverrides ->
+  m ()
+showNonEditableWorkingOverride (elemsUniq -> cfg) =
+  divClass "deployment__widget" $
+    divClass "listing listing--for-text listing--larger" $
+      forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
+        let wrapper = case val of
+              WorkingDeletedValue _ -> divClass "listing__item deleted"
+              _ -> divClass "listing__item"
+        wrapper $ do
+          let keyWrapper = case keyType of
+                CustomWorkingOverrideKey -> elClass "span" "listing__key"
+                DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
+          keyWrapper $ do
+            text key
+            text ": "
+
+          case val of
+            WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
+            WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
+            WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
+            WorkingDeletedValue Nothing -> do
+              elClass "div" "listing__placeholder" $ pure ()
+              elClass "div" "listing__spinner" $ pure ()

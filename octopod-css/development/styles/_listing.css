@@ -38,6 +38,10 @@
         text-overflow: ellipsis;
     }
 
+    .listing--for-text .deleted > span {
+        text-decoration-line: line-through;
+        opacity: 0.2;
+    }
     .listing--for-text .listing__item:first-child {
         margin-top: 0;
     }
@@ -59,6 +63,15 @@
             font-style: italic;
         }
 
+        .listing__placeholder {
+            content: "";
+            display: inline-block;
+            height: 14px;
+            width: 200px;
+            border-radius: 2px;
+            background: rgba(143, 143, 143, 0.2);
+        }
+
     .listing--for-text .listing__more {
         margin-top: 8px;
     }
@@ -67,4 +80,24 @@
 .listing--for-text.listing--larger {
     font-size: 16px;
     line-height: 24px;
+}
+
+.listing__spinner {
+    display: inline-block;
+    vertical-align: top;
+    border: none;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: 24px 24px;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    text-indent: 200%;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 1;
+    background-image: url("../vectors/spot-loader.svg");
+    animation: loading 2.2s linear infinite;
 }

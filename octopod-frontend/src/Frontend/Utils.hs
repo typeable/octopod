@@ -26,6 +26,7 @@ module Frontend.Utils
     holdClearingWith,
     unitEv,
     (<&&>),
+    ProgressiveFullConfig (..),
   )
 where
 
@@ -50,6 +51,7 @@ import Data.WorkingOverrides
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.UIKit
+import GHC.Generics (Generic)
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
@@ -375,23 +377,27 @@ deploymentConfigProgressive ::
   RequestErrorHandler t m ->
   Dynamic t (Overrides 'DeploymentLevel) ->
   Dynamic t (Overrides 'ApplicationLevel) ->
-  m (Event t FullConfig)
+  m (Dynamic t ProgressiveFullConfig)
 deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
-  (_, defAppEv, depCfgEv) <- deploymentConfigProgressiveComponents hReq depOvsDyn
+  (depCfgEv, defAppEv, _) <- deploymentConfigProgressiveComponents hReq depOvsDyn
   defAppMDyn <- holdDynMaybe defAppEv
-  depCfgMDyn <- holdDynMaybe depCfgEv
-  pure . catMaybes . updated $ do
+  defCfgMDyn <- holdDynMaybe depCfgEv
+  pure $ do
     defAppM <- defAppMDyn
     appOvs <- appOvsDyn
-    depCfgM <- depCfgMDyn
-    pure $ do
-      defApp <- defAppM
-      depCfg <- depCfgM
-      pure
-        FullConfig
-          { appConfig = applyOverrides appOvs defApp
-          , depConfig = depCfg
-          }
+    defDepM <- defCfgMDyn
+    depOvs <- depOvsDyn
+    pure
+      ProgressiveFullConfig
+        { appConfig = constructWorkingOverrides defAppM appOvs
+        , depConfig = constructWorkingOverrides defDepM depOvs
+        }
+
+data ProgressiveFullConfig = ProgressiveFullConfig
+  { appConfig :: WorkingOverrides
+  , depConfig :: WorkingOverrides
+  }
+  deriving stock (Generic)
 
 waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
 waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev

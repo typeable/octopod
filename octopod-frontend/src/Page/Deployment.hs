@@ -19,7 +19,6 @@ import Common.Utils
 import Control.Monad.Reader
 import Data.Align
 import Data.Generics.Labels ()
-import qualified Data.Map.Ordered.Strict as OM
 import Data.Time
 import Frontend.API
 import Frontend.GHCJS
@@ -192,10 +191,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
   wrapRequestErrors $ \hReq -> do
     let nameDyn = dfiDyn <^.> dfiName
         depDyn = dfiDyn <^.> #deployment
-    cfgEv <- deploymentConfigProgressive hReq (depDyn <^.> #deploymentOverrides) (depDyn <^.> #appOverrides)
-    cfgMDyn <-
-      holdClearingWith cfgEv $
-        leftmost [unitEv $ depDyn <^.> #deploymentOverrides, unitEv $ depDyn <^.> #appOverrides]
+    cfgDyn <- deploymentConfigProgressive hReq (depDyn <^.> #deploymentOverrides) (depDyn <^.> #appOverrides)
     divClass "deployment__summary" $ do
       divClass "deployment__stat" $ do
         elClass "b" "deployment__param" $ text "Status"
@@ -221,40 +217,18 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
           void $ simpleList urlsDyn renderMetadataLink
     void $
       networkView $
-        cfgMDyn <&> \cfgM -> do
-          let showVars :: Getting (Config l) FullConfig (Config l) -> _
-              showVars l = case cfgM of
-                Just cfg -> allEnvsWidget (pure $ cfg ^. l)
-                Nothing -> loadingCommonWidget
+        cfgDyn <&> \cfg -> do
+          let showVars l = showNonEditableWorkingOverride (cfg ^. l)
           deploymentSection "App overrides" $ showVars #appConfig
           deploymentSection "Deployment overrides" $ showVars #depConfig
     deploymentSection "Actions" $
       divClass "table table--actions" $
         actionsTable updEv nameDyn
 
--- | Widget that shows overrides list. It does not depend on their type.
-allEnvsWidget ::
-  MonadWidget t m =>
-  -- | Overrides list.
-  Dynamic t (Config l) ->
-  m ()
-allEnvsWidget envsDyn =
-  divClass "deployment__widget" $
-    divClass "listing listing--for-text listing--larger" $
-      void $
-        simpleList (OM.assocs . unConfig <$> envsDyn) $ \envDyn -> do
-          let varDyn = fst <$> envDyn
-              valDyn = snd <$> envDyn
-          divClass "listing__item" $ do
-            el "b" $ do
-              dynText varDyn
-              text ": "
-            dynText valDyn
--- ^ Widget with a table of actions that can be performed on a deployment.
+-- | Widget with a table of actions that can be performed on a deployment.
 -- It requests deployment data.
 -- If a request fails it shows an error message,
 -- otherwise it calls 'actionsTableData', passing the received data.
-
 actionsTable ::
   MonadWidget t m =>
   -- | Event notifying about the need to update data.
