@@ -75,6 +75,29 @@ pub mod lib {
         pub chart_name: String,
     }
     
+    impl DefaultValues {
+        pub fn app_overrides(&self) -> Option<Vec<(String,String)>> {
+            if self.default_overrides.is_empty() {
+                None
+            } else {
+                let mut overrides: Vec<(String,String)> = Vec::new();
+                for app_override in &self.default_overrides {
+                    let split_override = app_override.split('=').collect::<Vec<_>>();
+                    overrides.push((split_override.first().unwrap().to_string(), split_override.last().unwrap().to_string()));
+                }
+                Some(overrides)
+            }
+        }
+        pub fn deployment_overrides(&self) -> Vec<(String,String)> {
+            vec![
+                (String::from("chart_repo_url"), self.chart_repo_url.clone()),
+                (String::from("chart_repo_name"), self.chart_repo_name.clone()),
+                (String::from("chart_version"), self.chart_version.clone()),
+                (String::from("chart_name"), self.chart_name.clone()),
+            ]   
+        }
+    }
+        
     #[derive(Debug, Clone)]
     pub struct HelmDeploymentParameters {
         pub chart_repo_url: String,

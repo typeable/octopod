@@ -1,6 +1,6 @@
 [package]
 name = "helm-control-scripts"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Aleksei Sizov <a.sizov@typeable.io>"]
 edition = "2018"
 
@@ -56,3 +56,11 @@ path = "src/init.rs"
 [[bin]]
 name = "tag_check"
 path = "src/tag_check.rs"
+
+[[bin]]
+name = "default_app_overrides"
+path = "src/default_app_overrides.rs"
+
+[[bin]]
+name = "default_deployment_overrides"
+path = "src/default_deployment_overrides.rs"
