@@ -179,7 +179,7 @@ statusWidget stDyn = do
 octopodTextInput ::
   MonadWidget t m =>
   -- | Input field classes.
-  Text ->
+  Classes ->
   -- | Label text.
   Text ->
   -- | Placeholder for input field.
@@ -193,7 +193,7 @@ octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
     elClass "div" "deployment__widget" $
-      octopodTextInput' (pure False) clss placeholder (pure . fromMaybe "" $ val) errEv
+      octopodTextInput' (pure False) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
 
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
@@ -456,7 +456,7 @@ envVarsInput dCfg ovs = mdo
   let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   case dCfg of
     Just _ -> pure ()
-    Nothing -> loadingCommonWidget
+    Nothing -> loadingOverrides
   pure . updated $ destructWorkingOverrides <$> envsDyn
 
 -- | Widget for entering a key-value pair. The updated overrides list is
@@ -467,33 +467,52 @@ envVarInput ::
   Dynamic t WorkingOverride ->
   m (Event t UserOverrideAction)
 envVarInput val = do
-  let v =
-        val <&> snd <&> \case
-          WorkingCustomValue x -> x
-          WorkingDefaultValue x -> x
-          WorkingDeletedValue (Just x) -> x
-          WorkingDeletedValue Nothing -> "<loading deleted>"
-      k = val <&> \(WorkingOverrideKey _ x, _) -> x
-      disabledKey = val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
-
-  (keyTextDyn, valTextDyn, closeEv) <-
-    overrideField
-      OverrideField
-        { fieldValue = k
-        , fieldError = never
-        , fieldDisabled = disabledKey
-        }
-      OverrideField
-        { fieldValue = v
-        , fieldError = never
-        , fieldDisabled = pure False
-        }
-  pure $
-    leftmost
-      [ UpdateKey <$> updated keyTextDyn
-      , UpdateValue <$> updated valTextDyn
-      , closeEv $> DeleteOverride
-      ]
+  let kDyn = val <&> \(WorkingOverrideKey _ x, _) -> x
+  -- Either <override present> <override deleted>
+  d <-
+    eitherDyn $
+      val <&> snd <&> \case
+        WorkingCustomValue v -> Right (v, EditedOverrideFieldType)
+        WorkingDefaultValue v -> Right (v, DefaultOverrideFieldType)
+        WorkingDeletedValue v -> Left v
+  networkView >=> switchHold never $
+    d <&> \case
+      Right vtDyn -> do
+        let (vDyn, vTypeDyn) = splitDynPure vtDyn
+        (keyTextDyn, valTextDyn, closeEv) <-
+          overrideField
+            OverrideField
+              { fieldValue = kDyn
+              , fieldError = never
+              , fieldDisabled =
+                  val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
+              , fieldType =
+                  val <&> \(WorkingOverrideKey t _, _) -> case t of
+                    CustomWorkingOverrideKey -> EditedOverrideFieldType
+                    DefaultWorkingOverrideKey -> DefaultOverrideFieldType
+              }
+            OverrideField
+              { fieldValue = vDyn
+              , fieldError = never
+              , fieldDisabled = pure False
+              , fieldType = vTypeDyn
+              }
+        pure $
+          leftmost
+            [ UpdateKey <$> updated keyTextDyn
+            , UpdateValue <$> updated valTextDyn
+            , closeEv $> DeleteOverride
+            ]
+      Left vDyn -> do
+        restoreEv <-
+          networkView >=> switchHold never $ do
+            v <- vDyn
+            k <- kDyn
+            pure $ deletedOverride k v
+        pure $
+          flip push restoreEv $ \() -> do
+            v <- sample . current $ vDyn
+            pure $ UpdateValue <$> v
 
 data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
 

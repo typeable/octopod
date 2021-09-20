@@ -13,16 +13,20 @@ module Frontend.UIKit
     module X,
     (.~~),
     (?~~),
+    OverrideFieldType (..),
+    deletedOverride,
   )
 where
 
 import Control.Lens
+import Control.Monad
 import Data.Align
 import Data.Default
 import Data.Generics.Labels ()
 import qualified Data.Map as M
 import Data.Text (Text)
 import Data.These
+import Frontend.Classes as X
 import Frontend.UIKit.Button.Action as X
 import Frontend.UIKit.Button.Dash as X
 import Frontend.UIKit.Button.Expander as X
@@ -61,25 +65,76 @@ data OverrideField t = OverrideField
   { fieldValue :: Dynamic t Text
   , fieldError :: Event t Text
   , fieldDisabled :: Dynamic t Bool
+  , fieldType :: Dynamic t OverrideFieldType
   }
   deriving stock (Generic)
+
+data OverrideFieldType
+  = DefaultOverrideFieldType
+  | EditedOverrideFieldType
+
+overrideFieldTypeClasses :: OverrideFieldType -> Classes
+overrideFieldTypeClasses DefaultOverrideFieldType = "input--default"
+overrideFieldTypeClasses EditedOverrideFieldType = mempty
 
 overrideField :: MonadWidget t m => OverrideField t -> OverrideField t -> m (Dynamic t Text, Dynamic t Text, Event t ())
 overrideField keyDyn valueDyn = do
   elDiv "overrides__item" $ do
     (keyTextDyn, _) <-
-      octopodTextInput' (keyDyn ^. #fieldDisabled) "overrides__key" "key" (keyDyn ^. #fieldValue) (keyDyn ^. #fieldError)
+      octopodTextInput'
+        (keyDyn ^. #fieldDisabled)
+        ( do
+            t <- keyDyn ^. #fieldType
+            pure $ "overrides__key" <> overrideFieldTypeClasses t
+        )
+        "key"
+        (keyDyn ^. #fieldValue)
+        (keyDyn ^. #fieldError)
     (valTextDyn, _) <-
-      octopodTextInput' (valueDyn ^. #fieldDisabled) "overrides__value" "value" (valueDyn ^. #fieldValue) (valueDyn ^. #fieldError)
+      octopodTextInput'
+        (valueDyn ^. #fieldDisabled)
+        ( do
+            t <- keyDyn ^. #fieldType
+            pure $ "overrides__value" <> overrideFieldTypeClasses t
+        )
+        "value"
+        (valueDyn ^. #fieldValue)
+        (valueDyn ^. #fieldError)
     closeEv <- deleteOverrideButton
     pure (keyTextDyn, valTextDyn, closeEv)
+
+deletedOverride :: MonadWidget t m => Text -> Maybe Text -> m (Event t ())
+deletedOverride k vM = do
+  elDiv "overrides__item" $ do
+    elDiv "overrides__key input input--deleted" $ field k
+    case vM of
+      Nothing -> do
+        elDiv "overrides__placeholder overrides__value" blank
+        loadingOverrideSpinner
+        pure never
+      Just v -> do
+        elDiv "overrides__value input input--deleted" $ field $ v
+        undoOverrideButton
+  where
+    field t =
+      void $
+        inputElement $
+          def
+            & inputElementConfig_initialValue .~ t
+            & initialAttributes .~ ("type" =: "text" <> "class" =: "input__widget")
+
+loadingOverrideField :: MonadWidget t m => m ()
+loadingOverrideField = elDiv "overrides__placeholder" blank
+
+loadingOverrideSpinner :: MonadWidget t m => m ()
+loadingOverrideSpinner = elDiv "overrides__delete spot spot--loader" blank
 
 loadingOverride :: MonadWidget t m => m ()
 loadingOverride = do
   elDiv "overrides__item loader" $ do
-    elDiv "overrides__placeholder" blank
-    elDiv "overrides__placeholder" blank
-    elDiv "overrides__delete spot spot--loader" blank
+    loadingOverrideField
+    loadingOverrideField
+    loadingOverrideSpinner
 
 loadingOverrides :: MonadWidget t m => m ()
 loadingOverrides = do
@@ -97,7 +152,7 @@ octopodTextInput' ::
   -- | Disabled?
   Dynamic t Bool ->
   -- | Input field classes.
-  Text ->
+  Dynamic t Classes ->
   -- | Placeholder for input field.
   Text ->
   -- | Init value.
@@ -105,7 +160,7 @@ octopodTextInput' ::
   -- | Event carrying the error message.
   Event t Text ->
   m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
+octopodTextInput' disabledDyn clssDyn placeholder inValDyn' errEv = mdo
   inValDyn <- holdUniqDyn inValDyn'
   let inValEv =
         align (updated inValDyn) (updated valDyn)
@@ -115,20 +170,25 @@ octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
                 These inV currV | inV /= currV -> Just inV
                 _ -> Nothing
             )
-  let inpClass = " input"
-      inpErrClass = " input input--error"
   isValid <-
     holdDyn True $
       leftmost
         [ False <$ errEv
         , True <$ updated valDyn
         ]
-  classDyn <-
-    holdDyn (clss <> inpClass) $
+
+  errorClassesDyn <-
+    holdDyn mempty $
       leftmost
-        [ (clss <> inpErrClass) <$ errEv
-        , (clss <> inpClass) <$ updated valDyn
+        [ "input--error" <$ errEv
+        , mempty <$ updated valDyn
         ]
+
+  let classDyn = do
+        errClasses <- errorClassesDyn
+        additionalClasses <- clssDyn
+        pure . destructClasses $ "input" <> errClasses <> additionalClasses
+
   inVal <- sample . current $ inValDyn
   disabled <- sample . current $ disabledDyn
   valDyn <- elDynClass "div" classDyn $ do

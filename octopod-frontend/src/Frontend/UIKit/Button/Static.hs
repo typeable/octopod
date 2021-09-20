@@ -3,6 +3,7 @@ module Frontend.UIKit.Button.Static
     closeClassicPopupButton,
     closePopupButton,
     deleteOverrideButton,
+    undoOverrideButton,
   )
 where
 
@@ -50,6 +51,18 @@ deleteOverrideButton =
   buttonEl
     CommonButtonConfig
       { constantClasses = pure "overrides__delete spot spot--cancel"
+      , enabledClasses = mempty
+      , disabledClasses = mempty
+      , buttonEnabled = pure True
+      , buttonText = pure ""
+      , buttonBaseTag = ButtonTag
+      }
+
+undoOverrideButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+undoOverrideButton =
+  buttonEl
+    CommonButtonConfig
+      { constantClasses = pure "overrides__delete spot spot--undo"
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
