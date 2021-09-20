@@ -218,7 +218,9 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
     void $
       networkView $
         cfgDyn <&> \cfg -> do
-          let showVars l = showNonEditableWorkingOverride (cfg ^. l)
+          let showVars l =
+                divClass "deployment__widget" $
+                  showNonEditableWorkingOverride LargeNonEditableWorkingOverrideStyle (cfg ^. l)
           deploymentSection "App overrides" $ showVars #appConfig
           deploymentSection "Deployment overrides" $ showVars #depConfig
     deploymentSection "Actions" $
