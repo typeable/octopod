@@ -1,5 +1,6 @@
 module Data.Text.Search
   ( fuzzySearch,
+    fuzzySearchMany,
     FuzzySearchStringChunk (..),
   )
 where
@@ -8,7 +9,9 @@ import Control.Applicative
 import Data.Bifunctor
 import Data.Char
 import Data.Function
+import Data.Functor
 import qualified Data.List as L
+import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -43,6 +46,16 @@ fuzzySearch "" h = Just ([NotMatched h], 0)
 fuzzySearch n h = case fuzzySearch' n h 0 0 of
   [] -> Nothing
   xs@(_ : _) -> Just . (first . fmap . fmap) T.pack $ L.maximumBy (compare `on` snd) xs
+
+fuzzySearchMany :: Needle -> [Haystack] -> [(Haystack, [FuzzySearchStringChunk Text])]
+fuzzySearchMany needle haystacks =
+  fmap fst . L.sortOn snd $
+    mapMaybe
+      ( \haystack ->
+          fuzzySearch needle haystack
+            <&> \(res, score) -> ((haystack, res), score)
+      )
+      haystacks
 
 data FuzzySearchStringChunk a = NotMatched !a | Matched !a
   deriving stock (Show, Eq, Functor)

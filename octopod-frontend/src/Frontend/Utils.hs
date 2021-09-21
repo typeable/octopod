@@ -196,8 +196,9 @@ octopodTextInput ::
 octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
-    elClass "div" "deployment__widget" $
-      octopodTextInput' (pure False) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
+    elClass "div" "deployment__widget" $ do
+      (value -> valDyn, validDyn) <- octopodTextInput' (pure []) (pure False) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
+      pure (valDyn, validDyn)
 
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
@@ -327,28 +328,25 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
-  let holdDCfg :: Dynamic t (Maybe (DefaultConfig l)) -> Overrides l -> m (Dynamic t (Overrides l))
-      holdDCfg dCfgDyn ovs = mdo
+  let holdDCfg ::
+        Dynamic t [Text] ->
+        Dynamic t (Maybe (DefaultConfig l)) ->
+        Overrides l ->
+        m (Dynamic t (Overrides l))
+      holdDCfg values dCfgDyn ovs = mdo
         ovsDyn <- holdDyn ovs ovsEv
         x <- attachDyn (current ovsDyn) dCfgDyn
-        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput dCfg ovs') >>= switchHold never >>= debounce 0.5
+        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput values dCfg ovs') >>= switchHold never >>= debounce 0.5
         pure ovsDyn
-      holdDKeys n keysDyn = do
-        let loading = loadingCommonWidget
-        deploymentSection n $
-          widgetHold_ loading $
-            keysDyn <&> \case
-              Just keys -> el "ul" $
-                forM_ keys $ \key -> el "li" $ text key
-              Nothing -> loading
 
-  deploymentOvsDyn <- deploymentSection "Deployment overrides" $ holdDCfg defDep defDepOv
-  holdDKeys "Deployment keys" (Just <$> depKeys)
+  depKeysDyn <- holdDyn [] depKeys
+  deploymentOvsDyn <- deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
+
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
-  applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg defAppM defAppOv
-  holdDKeys "App keys" appKeys
+  appKeysDyn <- holdDyn [] $ catMaybes appKeys
+  applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
 
   validDyn <- holdDyn True $ updated tOkEv
   pure $
@@ -468,12 +466,13 @@ errorHeader appErr = do
 envVarsInput ::
   forall l t m.
   MonadWidget t m =>
+  Dynamic t [Text] ->
   Maybe (DefaultConfig l) ->
   -- | Initial deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
   m (Event t (Overrides l))
-envVarsInput dCfg ovs = mdo
+envVarsInput values dCfg ovs = mdo
   envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
   let addEv = clickEv $> Endo (fst . insertUniqStart newWorkingOverride)
   clickEv <-
@@ -488,7 +487,7 @@ envVarsInput dCfg ovs = mdo
     switchDyn . fmap F.fold
       <$> listWithKey
         (uniqMap <$> envsDyn)
-        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput x)
+        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput values x)
   let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   case dCfg of
     Just _ -> pure ()
@@ -499,10 +498,12 @@ envVarsInput dCfg ovs = mdo
 -- written to the 'EventWriter'.
 envVarInput ::
   (MonadWidget t m) =>
+  -- | The key values to suggest to the user
+  Dynamic t [Text] ->
   -- | Current variable key and value.
   Dynamic t WorkingOverride ->
   m (Event t UserOverrideAction)
-envVarInput val = do
+envVarInput values val = do
   let kDyn = val <&> \(WorkingOverrideKey _ x, _) -> x
   -- Either <override present> <override deleted>
   d <-
@@ -517,6 +518,7 @@ envVarInput val = do
         let (vDyn, vTypeDyn) = splitDynPure vtDyn
         (keyTextDyn, valTextDyn, closeEv) <-
           overrideField
+            values
             OverrideField
               { fieldValue = kDyn
               , fieldError = never

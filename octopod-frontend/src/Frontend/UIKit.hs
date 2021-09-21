@@ -22,11 +22,14 @@ where
 
 import Control.Lens
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Align
 import Data.Default
+import Data.Functor
 import Data.Generics.Labels ()
 import qualified Data.Map as M
 import Data.Text (Text)
+import Data.Text.Search
 import Data.These
 import Data.WorkingOverrides
 import Frontend.Classes as X
@@ -38,6 +41,7 @@ import Frontend.UIKit.Button.Sort as X
 import Frontend.UIKit.Button.Static as X
 import GHC.Generics (Generic)
 import Reflex.Dom
+import Reflex.Network
 
 (.~~) :: ASetter' s a -> a -> s -> s
 (.~~) = (.~)
@@ -80,11 +84,12 @@ overrideFieldTypeClasses :: OverrideFieldType -> Classes
 overrideFieldTypeClasses DefaultOverrideFieldType = "input--default"
 overrideFieldTypeClasses EditedOverrideFieldType = mempty
 
-overrideField :: MonadWidget t m => OverrideField t -> OverrideField t -> m (Dynamic t Text, Dynamic t Text, Event t ())
-overrideField keyDyn valueDyn = do
+overrideField :: MonadWidget t m => Dynamic t [Text] -> OverrideField t -> OverrideField t -> m (Dynamic t Text, Dynamic t Text, Event t ())
+overrideField overrideKeyValues keyDyn valueDyn = do
   elDiv "overrides__item" $ do
-    (keyTextDyn, _) <-
+    (keyInp, _) <-
       octopodTextInput'
+        overrideKeyValues
         (keyDyn ^. #fieldDisabled)
         ( do
             t <- keyDyn ^. #fieldType
@@ -93,8 +98,10 @@ overrideField keyDyn valueDyn = do
         "key"
         (keyDyn ^. #fieldValue)
         (keyDyn ^. #fieldError)
-    (valTextDyn, _) <-
+    let keyTextDyn = value keyInp
+    (value -> valTextDyn, _) <-
       octopodTextInput'
+        (pure [])
         (valueDyn ^. #fieldDisabled)
         ( do
             t <- keyDyn ^. #fieldType
@@ -152,6 +159,8 @@ elDiv = elClass "div"
 -- provides automatic error message hiding after user starts typing.
 octopodTextInput' ::
   MonadWidget t m =>
+  -- | Value to suggest
+  (Dynamic t [Text]) ->
   -- | Disabled?
   Dynamic t Bool ->
   -- | Input field classes.
@@ -162,11 +171,12 @@ octopodTextInput' ::
   (Dynamic t Text) ->
   -- | Event carrying the error message.
   Event t Text ->
-  m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' disabledDyn clssDyn placeholder inValDyn' errEv = mdo
+  m (InputElement EventResult GhcjsDomSpace t, Dynamic t Bool)
+octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = mdo
   inValDyn <- holdUniqDyn inValDyn'
-  let inValEv =
-        align (updated inValDyn) (updated valDyn)
+  let valDyn = value inp
+      inValEv =
+        align (leftmost [selectedValue, updated inValDyn]) (updated valDyn)
           & fmapMaybe
             ( \case
                 This x -> Just x
@@ -194,8 +204,8 @@ octopodTextInput' disabledDyn clssDyn placeholder inValDyn' errEv = mdo
 
   inVal <- sample . current $ inValDyn
   disabled <- sample . current $ disabledDyn
-  valDyn <- elDynClass "div" classDyn $ do
-    inp <-
+  (inp, selectedValue) <- elDynClass "div" classDyn $ do
+    inp' <-
       inputElement $
         def
           & initialAttributes
@@ -220,8 +230,36 @@ octopodTextInput' disabledDyn clssDyn placeholder inValDyn' errEv = mdo
         [ divClass "input__output" . text <$> errEv
         , blank <$ updated valDyn
         ]
-    pure $ value inp
-  pure (valDyn, isValid)
+    delayedFalseFocus <- delayFalse $ _inputElement_hasFocus inp'
+    selectedValue' <- networkView >=> switchHoldPromptly never $ do
+      hasFocus <- delayedFalseFocus
+      values <- valuesDyn
+      case hasFocus of
+        True | (_ : _) <- values -> do
+          currVal <- valDyn
+          case fuzzySearchMany currVal values of
+            [] -> pure $ pure never
+            ress ->
+              pure $ do
+                elClass "ul" "overrides__search" $ do
+                  fmap leftmost $
+                    forM ress $ \(initialText, res) -> do
+                      (resEl, ()) <- elClass' "li" "overrides__search-item" $
+                        forM_ res $ \case
+                          Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
+                          NotMatched t -> text t
+                      pure $ domEvent Click resEl $> initialText
+        _ -> pure $ pure never
+    pure (inp', selectedValue')
+  pure (inp, isValid)
+
+delayFalse :: (MonadHold t m, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m)) => Dynamic t Bool -> m (Dynamic t Bool)
+delayFalse x = do
+  initVal <- sample . current $ x
+  let trueEv = ffilter id $ updated x
+      falseEv = ffilter not $ updated x
+  delayedFalseEv <- delay 0.1 falseEv
+  holdDyn initVal $ leftmost [trueEv, delayedFalseEv]
 
 -- | Dark unclickable background for opened sidebar.
 popupOverlay :: DomBuilder t m => m ()
