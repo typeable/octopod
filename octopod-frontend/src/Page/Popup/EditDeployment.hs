@@ -100,12 +100,13 @@ editDeploymentPopupBody ::
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns deployment update and validation state.
   m (Dynamic t (Maybe DeploymentUpdate))
-editDeploymentPopupBody dfi errEv = wrapRequestErrors $ \hReq -> do
+editDeploymentPopupBody dfi errEv = do
   divClass "popup__content" $
     divClass "deployment" $
-      deploymentPopupBody
-        hReq
-        (dfi ^. #deployment . #tag . coerced . to Just)
-        (dfi ^. #deployment . #appOverrides)
-        (dfi ^. #deployment . #deploymentOverrides)
-        errEv
+      wrapRequestErrors $ \hReq ->
+        deploymentPopupBody
+          hReq
+          (dfi ^. #deployment . #tag . coerced . to Just)
+          (dfi ^. #deployment . #appOverrides)
+          (dfi ^. #deployment . #deploymentOverrides)
+          errEv

@@ -277,7 +277,6 @@ data CommandResponse
   = Success
   | ValidationError
       { nameField :: [Text]
-      , tagField :: [Text]
       }
   | AppError
       {errorMessage :: Text}

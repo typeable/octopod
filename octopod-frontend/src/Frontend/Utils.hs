@@ -40,11 +40,10 @@ import Control.Monad.Reader
 import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
-import Data.Generics.Sum
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
 import Data.Monoid
-import Data.Text as T (Text, intercalate, null, pack)
+import Data.Text as T (Text, null, pack)
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -323,10 +322,9 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
-      tagErrEv = getTagError commandResponseEv tagDyn
   void $ hReq (errEv `R.difference` commandResponseEv)
 
-  (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
+  (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) never
 
   let holdDCfg ::
         Dynamic t [Text] ->
@@ -363,14 +361,6 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
               , appOverrides = appOvs
               , deploymentOverrides = depCfg
               }
-  where
-    getTagError crEv tagDyn =
-      let tagErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _2)) crEv
-          tagErrEv = ffilter (/= "") $ T.intercalate ". " <$> tagErrEv'
-          badTagText = "Tag should not be empty"
-          badNameEv = badTagText <$ ffilter (== "") (updated tagDyn)
-       in leftmost [tagErrEv, badNameEv]
-
 deploymentConfigProgressiveComponents ::
   MonadWidget t m =>
   RequestErrorHandler t m ->
@@ -458,7 +448,6 @@ errorHeader ::
   m ()
 errorHeader appErr = do
   divClass "deployment__output notification notification--danger" $ do
-    el "b" $ text "App error: "
     dynText appErr
 
 -- | Widget with override fields. This widget supports adding and

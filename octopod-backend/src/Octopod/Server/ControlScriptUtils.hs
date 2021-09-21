@@ -13,7 +13,7 @@ module Octopod.Server.ControlScriptUtils
     runCommandArgs',
     checkCommandArgs,
     archiveCheckArgs,
-    tagCheckCommandArgs,
+    configCheckCommandArgs,
 
     -- * overrides
     defaultDeploymentOverridesArgs,
@@ -104,8 +104,8 @@ infoCommandArgs = genericDeploymentCommandArgs
 checkCommandArgs :: GenericDeploymentCommandArgs m r
 checkCommandArgs = genericDeploymentCommandArgs
 
-tagCheckCommandArgs :: GenericDeploymentCommandArgs m r
-tagCheckCommandArgs = genericDeploymentCommandArgs
+configCheckCommandArgs :: GenericDeploymentCommandArgs m r
+configCheckCommandArgs = genericDeploymentCommandArgs
 
 defaultDeploymentOverridesArgs :: GenericDeploymentCommandArgsNoConfig m r
 defaultDeploymentOverridesArgs = genericDeploymentCommandArgsNoConfig

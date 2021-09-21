@@ -110,7 +110,13 @@ newDeploymentPopupBody errEv = divClass "popup__content" $
           True -> dep
   where
     getNameError crEv nameDyn =
-      let nameErrEv' = fmapMaybe (preview (_Ctor @"ValidationError" . _1)) crEv
+      let nameErrEv' =
+            fmapMaybe
+              ( \case
+                  ValidationError nameErr -> Just nameErr
+                  _ -> Nothing
+              )
+              crEv
           isNameValidDyn = isNameValid . DeploymentName <$> nameDyn
           badNameText =
             "Deployment name length should be longer than 2 characters \

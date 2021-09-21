@@ -115,7 +115,7 @@ data AppState = AppState
   , -- | archive checking command path
     archiveCheckingCommand :: Command
   , -- | tag checking command path
-    tagCheckingCommand :: Command
+    configCheckingCommand :: Command
   , infoCommand :: Command
   , notificationCommand :: Maybe Command
   , deploymentOverridesCommand :: Command
@@ -178,7 +178,7 @@ runOctopodServer = do
   checkingCmd <- Command . pack <$> getEnvOrDie "CHECKING_COMMAND"
   cleanupCmd <- Command . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   archiveCheckingCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
-  tagCheckingCmd <- Command . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
+  tagCheckingCmd <- Command . pack <$> getEnvOrDie "CONFIG_CHECKING_COMMAND"
   infoCmd <- Command . pack <$> getEnvOrDie "INFO_COMMAND"
   dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_OVERRIDES_COMMAND"
   dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
@@ -244,7 +244,7 @@ runOctopodServer = do
           , checkingCommand = checkingCmd
           , cleanupCommand = cleanupCmd
           , archiveCheckingCommand = archiveCheckingCmd
-          , tagCheckingCommand = tagCheckingCmd
+          , configCheckingCommand = tagCheckingCmd
           , infoCommand = infoCmd
           , notificationCommand = notificationCmd
           , deploymentOverridesCommand = dOverridesCmd
@@ -413,7 +413,7 @@ fullInfoH dName = do
     Nothing ->
       throwError
         err404
-          { errBody = validationError ["Name not found"] []
+          { errBody = validationError ["Name not found"]
           }
 
 -- | Handles the 'full_info' request of the octo CLI API.
@@ -454,7 +454,7 @@ createH dep = do
           \under 17 characters and begin with a letter."
     throwError
       err400
-        { errBody = validationError [badNameText] []
+        { errBody = validationError [badNameText]
         }
   t1 <- liftBase getCurrentTime
   failIfImageNotFound dep
@@ -495,7 +495,7 @@ createH dep = do
             | code == unique_violation ->
               throwError
                 err400
-                  { errBody = validationError ["Deployment already exists"] []
+                  { errBody = validationError ["Deployment already exists"]
                   }
           Left _ ->
             throwError err409 {errBody = appError "Some database error"}
@@ -1123,20 +1123,20 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs cfg dep
+  (ec, _, Stderr err) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
-      throwError err400 {errBody = validationError [] ["Tag not found"]}
+      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 err}
 
 -- | Helper to create an application-level error.
 appError :: Text -> BSL.ByteString
 appError = encode . AppError
 
 -- | Helper to create a validation-level error.
-validationError :: [Text] -> [Text] -> BSL.ByteString
-validationError nameErrors tagErrors =
-  encode $ ValidationError nameErrors tagErrors
+validationError :: [Text] -> BSL.ByteString
+validationError nameErrors =
+  encode $ ValidationError nameErrors
 
 -- | Helper to send an event to the WS event channel.
 sendReloadEvent :: AppState -> IO ()
