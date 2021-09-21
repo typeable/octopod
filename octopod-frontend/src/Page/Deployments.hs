@@ -510,8 +510,8 @@ tableHeader = do
       sortHeader (view dfiName) "Name" SortAsc
       el "th" $ text "Links"
       el "th" $ text "Tag"
-      el "th" $ text "App overrides"
       el "th" $ text "Deployment overrides"
+      el "th" $ text "App overrides"
       sortHeader (view $ field @"createdAt") "Created" SortDesc
       sortHeaderInitially (view $ field @"updatedAt") "Changed" SortDesc
       el "th" $

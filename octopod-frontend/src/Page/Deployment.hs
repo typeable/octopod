@@ -223,8 +223,8 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
                 divClass "deployment__widget" $
                   showNonEditableWorkingOverride (cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
                     elemsUniq (cfg ^. l)
-          deploymentSection "App overrides" $ showVars #appConfigLoading #appConfig
           deploymentSection "Deployment overrides" $ showVars #depConfigLoading #depConfig
+          deploymentSection "App overrides" $ showVars #appConfigLoading #appConfig
     deploymentSection "Actions" $
       divClass "table table--actions" $
         actionsTable hReq updEv nameDyn
