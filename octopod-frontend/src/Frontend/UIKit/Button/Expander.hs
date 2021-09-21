@@ -26,6 +26,7 @@ data ExpanderButtonConfig t = ExpanderButtonConfig
   deriving stock (Generic)
 
 data ExpanderState = ExpandedState | ContractedState
+  deriving stock (Eq)
 
 toggleState :: ExpanderState -> ExpanderState
 toggleState ExpandedState = ContractedState

@@ -27,6 +27,9 @@ module Frontend.Utils
     unitEv,
     (<&&>),
     ProgressiveFullConfig (..),
+    RequestErrorHandler,
+    deploymentOverridesWidget,
+    applicationOverridesWidget,
   )
 where
 
@@ -39,8 +42,7 @@ import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
 import qualified Data.Map as M
-import qualified Data.Map.Ordered.Strict as OM
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 import Data.Monoid
 import Data.Text as T (Text, intercalate, null, pack)
 import Data.Time
@@ -203,38 +205,62 @@ overridesWidget ::
   MonadWidget t m =>
   -- | List of overrides.
   Overrides l ->
+  (Event t () -> m (Event t (DefaultConfig l))) ->
   m ()
-overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for-text" $ do
-  let visible = take 3 envs
-      envLength = length envs
-  listing visible
-  when (envLength > 3) $ mdo
-    let hidden = drop 3 envs
-    dyn_ $
-      expandState <&> \case
-        ExpandedState -> listing hidden
-        ContractedState -> blank
-    expandState <-
-      expanderButton
-        ExpanderButtonConfig
-          { buttonText = do
-              state <- expandState
-              pure $ case state of
-                ExpandedState -> "Hide"
-                ContractedState -> "Show all (" <> showT envLength <> ")"
-          , buttonInitialState = ContractedState
-          , buttonType = Just ListingExpanderButton
-          , buttonStyle = RegularExpanderButtonStyle
-          }
-    pure ()
-  where
-    listing envs' = do
-      forM_ envs' $ \(var, val) ->
-        divClass "listing__item" $ do
-          el "b" $ text $ var <> ": "
-          case val of
-            ValueAdded v -> text v
-            ValueDeleted -> el "i" $ text "<deleted>"
+overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
+  defMDyn <- getDef firstExpand >>= holdDynMaybe
+  dyn_ $
+    expandState <&> \case
+      ExpandedState ->
+        void $
+          networkView $
+            do
+              defM <- defMDyn
+              pure $
+                showNonEditableWorkingOverride (isNothing defM) RegularNonEditableWorkingOverrideStyle $
+                  elemsUniq $ constructWorkingOverrides defM ovs
+      ContractedState ->
+        let ovsList = elemsUniq $ constructWorkingOverrides Nothing ovs
+         in showNonEditableWorkingOverride False RegularNonEditableWorkingOverrideStyle $
+              take 3 ovsList
+
+  expandState <-
+    expanderButton
+      ExpanderButtonConfig
+        { buttonText = do
+            state <- expandState
+            pure $ case state of
+              ExpandedState -> "Hide"
+              ContractedState -> "Show all"
+        , buttonInitialState = ContractedState
+        , buttonType = Just ListingExpanderButton
+        , buttonStyle = RegularExpanderButtonStyle
+        }
+  firstExpand <- headE $ ($> ()) $ ffilter (== ExpandedState) $ updated expandState
+  pure ()
+
+deploymentOverridesWidget ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Overrides 'DeploymentLevel ->
+  m ()
+deploymentOverridesWidget hReq depOvs =
+  overridesWidget depOvs $ defaultDeploymentOverrides >=> hReq
+
+applicationOverridesWidget ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Overrides 'DeploymentLevel ->
+  Overrides 'ApplicationLevel ->
+  m ()
+applicationOverridesWidget hReq depOvs appOvs =
+  overridesWidget appOvs $ \fire -> do
+    depDefEv <- defaultDeploymentOverrides fire >>= hReq
+    fmap switchDyn $
+      networkHold (pure never) $
+        depDefEv <&> \depDef -> do
+          pb <- getPostBuild
+          defaultApplicationOverrides (pure $ Right $ applyOverrides depOvs depDef) pb >>= hReq
 
 -- | Type of notification at the top of pages.
 data DeploymentPageNotification
@@ -390,12 +416,16 @@ deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
     pure
       ProgressiveFullConfig
         { appConfig = constructWorkingOverrides defAppM appOvs
+        , appConfigLoading = isNothing defAppM
         , depConfig = constructWorkingOverrides defDepM depOvs
+        , depConfigLoading = isNothing defDepM
         }
 
 data ProgressiveFullConfig = ProgressiveFullConfig
   { appConfig :: WorkingOverrides
+  , appConfigLoading :: Bool
   , depConfig :: WorkingOverrides
+  , depConfigLoading :: Bool
   }
   deriving stock (Generic)
 

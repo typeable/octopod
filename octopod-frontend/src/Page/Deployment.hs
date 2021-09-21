@@ -20,6 +20,7 @@ import Control.Monad.Reader
 import Data.Align
 import Data.Generics.Labels ()
 import Data.Time
+import Data.UniqMap
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
@@ -218,14 +219,15 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
     void $
       networkView $
         cfgDyn <&> \cfg -> do
-          let showVars l =
+          let showVars bL l =
                 divClass "deployment__widget" $
-                  showNonEditableWorkingOverride LargeNonEditableWorkingOverrideStyle (cfg ^. l)
-          deploymentSection "App overrides" $ showVars #appConfig
-          deploymentSection "Deployment overrides" $ showVars #depConfig
+                  showNonEditableWorkingOverride (cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
+                    elemsUniq (cfg ^. l)
+          deploymentSection "App overrides" $ showVars #appConfigLoading #appConfig
+          deploymentSection "Deployment overrides" $ showVars #depConfigLoading #depConfig
     deploymentSection "Actions" $
       divClass "table table--actions" $
-        actionsTable updEv nameDyn
+        actionsTable hReq updEv nameDyn
 
 -- | Widget with a table of actions that can be performed on a deployment.
 -- It requests deployment data.
@@ -233,11 +235,12 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
 -- otherwise it calls 'actionsTableData', passing the received data.
 actionsTable ::
   MonadWidget t m =>
+  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   m ()
-actionsTable updEv nameDyn = do
+actionsTable hReq updEv nameDyn = do
   pb <- getPostBuild
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
@@ -247,7 +250,7 @@ actionsTable updEv nameDyn = do
     widgetHold_ actionsTableLoading $
       leftmost
         [ actionsTableError <$ errEv
-        , actionsTableData updEv nameDyn <$> okEv
+        , actionsTableData hReq updEv nameDyn <$> okEv
         ]
 
 -- | Header of the actions table.
@@ -257,8 +260,8 @@ actionsTableHead =
     el "tr" $ do
       el "th" $ text "Action type"
       el "th" $ text "Image tag"
-      el "th" $ text "App overrides"
       el "th" $ text "Deployment overrides"
+      el "th" $ text "App overrides"
       el "th" $ text "Exit code"
       el "th" $ text "Created"
       el "th" $ text "Deployment duration"
@@ -286,24 +289,25 @@ actionsTableError = do
 -- It updates data every time when the supplied event fires.
 actionsTableData ::
   MonadWidget t m =>
+  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   -- | Initial logs.
   [DeploymentLog] ->
   m ()
-actionsTableData updEv nameDyn initLogs = do
+actionsTableData hReq updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
-  let okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
+  let okEv = (>>= logs) <$> fmapMaybe reqSuccess respEv
   logsDyn <- holdDyn initLogs okEv
   el "tbody" $
     void $
       simpleList logsDyn $ \logDyn -> do
-        dyn_ $ actinRow <$> logDyn
+        dyn_ $ actinRow hReq <$> logDyn
 
 -- | Data row of the actions table.
-actinRow :: MonadWidget t m => DeploymentLog -> m ()
-actinRow DeploymentLog {..} = do
+actinRow :: RequestErrorHandler t m -> MonadWidget t m => DeploymentLog -> m ()
+actinRow hReq DeploymentLog {..} = do
   el "tr" $ do
     el "td" $ do
       text $ actionToText action
@@ -312,8 +316,8 @@ actinRow DeploymentLog {..} = do
               <> if exitCode == 0 then "status--success" else "status--failure"
       divClass statusClass blank
     el "td" $ text $ coerce deploymentTag
-    el "td" $ overridesWidget $ deploymentAppOverrides
-    el "td" $ overridesWidget $ deploymentDepOverrides
+    el "td" $ deploymentOverridesWidget hReq deploymentDepOverrides
+    el "td" $ applicationOverridesWidget hReq deploymentDepOverrides deploymentAppOverrides
     el "td" $ text $ showT $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration

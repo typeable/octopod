@@ -28,7 +28,6 @@ import Data.Generics.Labels ()
 import qualified Data.Map as M
 import Data.Text (Text)
 import Data.These
-import Data.UniqMap
 import Data.WorkingOverrides
 import Frontend.Classes as X
 import Frontend.UIKit.Button.Action as X
@@ -240,31 +239,42 @@ nonEditableWorkingOverrideStyleClasses LargeNonEditableWorkingOverrideStyle = "l
 -- | Widget that shows overrides list. It does not depend on their type.
 showNonEditableWorkingOverride ::
   MonadWidget t m =>
+  -- | Loading?
+  Bool ->
   NonEditableWorkingOverrideStyle ->
   -- | Overrides list.
-  WorkingOverrides ->
+  [WorkingOverride] ->
   m ()
-showNonEditableWorkingOverride style (elemsUniq -> cfg) =
+showNonEditableWorkingOverride loading style cfg =
   divClass
     ( destructClasses $
         "listing" <> "listing--for-text" <> nonEditableWorkingOverrideStyleClasses style
     )
-    $ forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
-      let wrapper = case val of
-            WorkingDeletedValue _ -> divClass "listing__item deleted"
-            _ -> divClass "listing__item"
-      wrapper $ do
-        let keyWrapper = case keyType of
-              CustomWorkingOverrideKey -> elClass "span" "listing__key"
-              DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
-        keyWrapper $ do
-          text key
-          text ": "
+    $ do
+      case cfg of
+        [] ->
+          divClass "listing__item" $
+            elClass "span" "listing--info-text" $ text "no custom configuration"
+        _ -> forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
+          let wrapper = case val of
+                WorkingDeletedValue _ -> divClass "listing__item deleted"
+                _ -> divClass "listing__item"
+          wrapper $ do
+            let keyWrapper = case keyType of
+                  CustomWorkingOverrideKey -> elClass "span" "listing__key"
+                  DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
+            keyWrapper $ do
+              text key
+              text ": "
 
-        case val of
-          WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
-          WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
-          WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
-          WorkingDeletedValue Nothing -> do
-            elClass "div" "listing__placeholder" $ pure ()
-            elClass "div" "listing__spinner" $ pure ()
+            case val of
+              WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
+              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
+              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
+              WorkingDeletedValue Nothing -> do
+                elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
+                elClass "div" "listing__spinner" $ pure ()
+      when loading $
+        divClass "listing__item" $ do
+          elClass "div" "listing__placeholder" $ pure ()
+          elClass "div" "listing__spinner" $ pure ()

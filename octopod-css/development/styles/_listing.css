@@ -67,9 +67,20 @@
             content: "";
             display: inline-block;
             height: 14px;
-            width: 200px;
+            width: 140px;
             border-radius: 2px;
             background: rgba(143, 143, 143, 0.2);
+            margin-right: 4px;
+            margin-top: 3px;
+        }
+
+        .listing__placeholder__value {
+            width: 70px;
+        }
+
+        .listing--info-text {
+            font-style: italic;
+            color: rgba(143, 143, 143);
         }
 
     .listing--for-text .listing__more {
@@ -89,7 +100,7 @@
     background-color: transparent;
     background-repeat: no-repeat;
     background-position: center center;
-    background-size: 24px 24px;
+    background-size: 20px 20px;
     padding: 0;
     width: 20px;
     height: 20px;
