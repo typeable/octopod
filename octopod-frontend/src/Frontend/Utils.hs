@@ -6,22 +6,14 @@
 --frontend modules.
 module Frontend.Utils
   ( sidebar,
-    buttonClass,
-    buttonClassEnabled,
     wrapRequestErrors,
     octopodTextInput,
     deploymentPopupBody,
     ClickedElement (..),
     pageNotification,
-    aButtonClassEnabled,
-    buttonClassEnabled',
     kubeDashboardUrl,
-    loadingCommonWidget,
-    errorCommonWidget,
-    aButtonDynClass',
     formatPosixToDate,
     overridesWidget,
-    aButtonClass',
     statusWidget,
     elementClick,
     showT,
@@ -29,12 +21,15 @@ module Frontend.Utils
     formatPosixToDateTime,
     dropdownWidget,
     dropdownWidget',
-    buttonDynClass,
     deploymentConfigProgressiveComponents,
     deploymentConfigProgressive,
     holdClearingWith,
     unitEv,
-    deploymentSection,
+    (<&&>),
+    ProgressiveFullConfig (..),
+    RequestErrorHandler,
+    deploymentOverridesWidget,
+    applicationOverridesWidget,
   )
 where
 
@@ -42,18 +37,14 @@ import Common.Types as CT
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import Data.Align
 import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import Data.Generics.Sum
-import Data.Map (Map)
 import qualified Data.Map as M
-import qualified Data.Map.Ordered.Strict as OM
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 import Data.Monoid
 import Data.Text as T (Text, intercalate, null, pack)
-import Data.These
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -61,6 +52,8 @@ import Data.Witherable
 import Data.WorkingOverrides
 import Frontend.API
 import Frontend.GHCJS
+import Frontend.UIKit
+import GHC.Generics (Generic)
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
@@ -162,148 +155,6 @@ sidebar showEv closeEv m = mdo
         ]
   pure $ switchDyn $ fst <$> resultEvDyn
 
--- | Dark unclickable background for opened sidebar.
-popupOverlay :: DomBuilder t m => m ()
-popupOverlay =
-  elAttr "div" ("class" =: "popup__overlay" <> "aria-hidden" =: "true") blank
-
--- | Button with customizable classes and label text.
-buttonClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  m (Event t ())
-buttonClass cl lbl = do
-  (bEl, _) <-
-    elDynAttr'
-      "button"
-      (constDyn $ "class" =: cl <> "type" =: "button")
-      $ text lbl
-  return $ domEvent Click bEl
-
--- | Advanced version of 'buttonClass' with dynamic arguments.
-buttonDynClass ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Dynamic t Text ->
-  -- | Label text.
-  Dynamic t Text ->
-  m (Event t ())
-buttonDynClass clDyn lblDyn = do
-  let attrDyn = ffor clDyn $ \cl -> "class" =: cl <> "type" =: "button"
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      dynText lblDyn
-  return $ domEvent Click bEl
-
--- | Advanced version of 'buttonClass' with a disabled state.
-buttonClassEnabled ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  m (Event t ())
-buttonClassEnabled cl lbl dDyn = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl <> "type" =: "button"
-        False ->
-          "class" =: (cl <> " button--disabled")
-            <> "type" =: "button"
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
--- | Special version of 'buttonClassEnabled' that supports custom classes for
--- the disabled state.
-buttonClassEnabled' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  -- | Custom classes for disabled state.
-  Text ->
-  m (Event t ())
-buttonClassEnabled' cl lbl dDyn disClass = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl <> "type" =: "button"
-        False ->
-          "class" =: (cl <> " " <> disClass)
-            <> "type" =: "button"
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "button" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonClass' for links that should look like buttons.
-aButtonClass' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Extra attributes
-  Dynamic t (Map Text Text) ->
-  m (Event t ())
-aButtonClass' cl lbl eAttrs = do
-  (bEl, _) <-
-    elDynAttr'
-      "a"
-      (fmap (<> ("class" =: cl)) eAttrs)
-      $ text lbl
-  return $ domEvent Click bEl
-
--- | Version of 'buttonDynClass' for links that should look like
--- buttons.
-aButtonDynClass' ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Dynamic t Text ->
-  -- | Label text.
-  Dynamic t Text ->
-  -- | Extra attributes
-  Dynamic t (Map Text Text) ->
-  m (Event t ())
-aButtonDynClass' clDyn lblDyn eAttrs = do
-  let attrDyn' = ffor clDyn $ \cl -> "class" =: cl
-      attrDyn = (<>) <$> eAttrs <*> attrDyn'
-  (bEl, _) <-
-    elDynAttr' "a" attrDyn $
-      dynText lblDyn
-  return $ domEvent Click bEl
-
--- | Version of 'buttonClassEnabled' for links that should look like
--- buttons.
-aButtonClassEnabled ::
-  (DomBuilder t m, PostBuild t m) =>
-  -- | Classes.
-  Text ->
-  -- | Label text.
-  Text ->
-  -- | Enabled flag.
-  Dynamic t Bool ->
-  m (Event t ())
-aButtonClassEnabled cl lbl dDyn = do
-  let attrDyn = ffor dDyn $ \case
-        True -> "class" =: cl
-        False ->
-          "class" =: (cl <> " button--disabled")
-            <> "disabled" =: ""
-  (bEl, _) <-
-    elDynAttr' "a" attrDyn $
-      text lbl
-  return $ domEvent Click bEl
-
 -- | Formats posix seconds to date in iso8601.
 formatPosixToDate :: FormatTime t => t -> Text
 formatPosixToDate = pack . formatTime defaultTimeLocale (iso8601DateFormat Nothing)
@@ -332,7 +183,7 @@ statusWidget stDyn = do
 octopodTextInput ::
   MonadWidget t m =>
   -- | Input field classes.
-  Text ->
+  Classes ->
   -- | Label text.
   Text ->
   -- | Placeholder for input field.
@@ -345,92 +196,9 @@ octopodTextInput ::
 octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
-    elClass "div" "deployment__widget" $
-      octopodTextInput' (pure False) clss placeholder (pure . fromMaybe "" $ val) errEv
-
--- | The only text input field that is used in project forms. This input
--- provides automatic error message hiding after user starts typing.
-octopodTextInput' ::
-  MonadWidget t m =>
-  -- | Disabled?
-  Dynamic t Bool ->
-  -- | Input field classes.
-  Text ->
-  -- | Placeholder for input field.
-  Text ->
-  -- | Possible init value.
-  (Dynamic t Text) ->
-  -- | Event carrying the error message.
-  Event t Text ->
-  m (Dynamic t Text, Dynamic t Bool)
-octopodTextInput' disabledDyn clss placeholder inValDyn' errEv = mdo
-  inValDyn <- holdUniqDyn inValDyn'
-  let inValEv =
-        align (updated inValDyn) (updated valDyn)
-          & fmapMaybe
-            ( \case
-                This x -> Just x
-                These inV currV | inV /= currV -> Just inV
-                _ -> Nothing
-            )
-  let inpClass = " input"
-      inpErrClass = " input input--error"
-  isValid <-
-    holdDyn True $
-      leftmost
-        [ False <$ errEv
-        , True <$ updated valDyn
-        ]
-  classDyn <-
-    holdDyn (clss <> inpClass) $
-      leftmost
-        [ (clss <> inpErrClass) <$ errEv
-        , (clss <> inpClass) <$ updated valDyn
-        ]
-  inVal <- sample . current $ inValDyn
-  disabled <- sample . current $ disabledDyn
-  valDyn <- elDynClass "div" classDyn $ do
-    inp <-
-      inputElement $
-        def
-          & initialAttributes
-            .~ ( "type" =: "text"
-                  <> "class" =: "input__widget"
-                  <> "placeholder" =: placeholder
-               )
-          & inputElementConfig_setValue .~ inValEv
-          & inputElementConfig_initialValue .~ inVal
-          & inputElementConfig_elementConfig . elementConfig_initialAttributes
-            %~ (if disabled then M.insert "disabled" "disabled" else id)
-          & inputElementConfig_elementConfig . elementConfig_modifyAttributes
-            <>~ updated
-              ( do
-                  disabled' <- disabledDyn
-                  pure $
-                    M.singleton "disabled" $
-                      if disabled' then Just "disabled" else Nothing
-              )
-    widgetHold_ blank $
-      leftmost
-        [ divClass "input__output" . text <$> errEv
-        , blank <$ updated valDyn
-        ]
-    pure $ value inp
-  pure (valDyn, isValid)
-
--- | Widget with a loading spinner.
-loadingCommonWidget :: MonadWidget t m => m ()
-loadingCommonWidget =
-  divClass "loading loading--enlarged loading--alternate" $
-    text "Loading..."
-
--- | Widget with an error message.
-errorCommonWidget :: MonadWidget t m => m ()
-errorCommonWidget =
-  divClass "null null--data" $
-    divClass "null__content" $ do
-      elClass "b" "null__heading" $ text "Cannot retrieve the data"
-      divClass "null__message" $ text "Try to reload the page"
+    elClass "div" "deployment__widget" $ do
+      (value -> valDyn, validDyn) <- octopodTextInput' (pure []) (pure False) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
+      pure (valDyn, validDyn)
 
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
@@ -438,51 +206,62 @@ overridesWidget ::
   MonadWidget t m =>
   -- | List of overrides.
   Overrides l ->
+  (Event t () -> m (Event t (DefaultConfig l))) ->
   m ()
-overridesWidget (Overrides (OM.assocs -> envs)) = divClass "listing listing--for-text" $ do
-  let visible = take 3 envs
-      envLength = length envs
-  listing visible
-  when (envLength > 3) $ mdo
-    let hidden = drop 3 envs
-    showDyn <- toggle False toggleEv
-    dyn_ $
-      showDyn <&> \case
-        True -> listing hidden
-        False -> blank
-    let btnClassDyn =
-          ifThenElseDyn
-            showDyn
-            "listing__more expander expander--open"
-            "listing__more expander"
-        btnTextDyn =
-          ifThenElseDyn showDyn "Hide" $
-            "Show all (" <> showT envLength <> ")"
-    toggleEv <- buttonDynClass btnClassDyn btnTextDyn
-    blank
-  where
-    listing envs' = do
-      forM_ envs' $ \(var, val) ->
-        divClass "listing__item" $ do
-          el "b" $ text $ var <> ": "
-          case val of
-            ValueAdded v -> text v
-            ValueDeleted -> el "i" $ text "<deleted>"
+overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
+  defMDyn <- getDef firstExpand >>= holdDynMaybe
+  dyn_ $
+    expandState <&> \case
+      ExpandedState ->
+        void $
+          networkView $
+            do
+              defM <- defMDyn
+              pure $
+                showNonEditableWorkingOverride (isNothing defM) RegularNonEditableWorkingOverrideStyle $
+                  elemsUniq $ constructWorkingOverrides defM ovs
+      ContractedState ->
+        let ovsList = elemsUniq $ constructWorkingOverrides Nothing ovs
+         in showNonEditableWorkingOverride False RegularNonEditableWorkingOverrideStyle $
+              take 3 ovsList
 
--- | @if-then-else@ helper for cases when bool value is wrapped in 'Dynamic'.
-ifThenElseDyn ::
-  Reflex t =>
-  -- | Condition wrapped in `Dynamic`.
-  Dynamic t Bool ->
-  -- | `then` branch.
-  b ->
-  -- | `else` branch.
-  b ->
-  Dynamic t b
-ifThenElseDyn bDyn t f =
-  bDyn <&> \case
-    True -> t
-    False -> f
+  expandState <-
+    expanderButton
+      ExpanderButtonConfig
+        { buttonText = do
+            state <- expandState
+            pure $ case state of
+              ExpandedState -> "Hide"
+              ContractedState -> "Show all"
+        , buttonInitialState = ContractedState
+        , buttonType = Just ListingExpanderButton
+        , buttonStyle = RegularExpanderButtonStyle
+        }
+  firstExpand <- headE $ ($> ()) $ ffilter (== ExpandedState) $ updated expandState
+  pure ()
+
+deploymentOverridesWidget ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Overrides 'DeploymentLevel ->
+  m ()
+deploymentOverridesWidget hReq depOvs =
+  overridesWidget depOvs $ defaultDeploymentOverrides >=> hReq
+
+applicationOverridesWidget ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Overrides 'DeploymentLevel ->
+  Overrides 'ApplicationLevel ->
+  m ()
+applicationOverridesWidget hReq depOvs appOvs =
+  overridesWidget appOvs $ \fire -> do
+    depDefEv <- defaultDeploymentOverrides fire >>= hReq
+    fmap switchDyn $
+      networkHold (pure never) $
+        depDefEv <&> \depDef -> do
+          pb <- getPostBuild
+          defaultApplicationOverrides (pure $ Right $ applyOverrides depOvs depDef) pb >>= hReq
 
 -- | Type of notification at the top of pages.
 data DeploymentPageNotification
@@ -506,7 +285,7 @@ pageNotification notEv = mdo
       messageClassWidget txt cl =
         divClass ("page__output notification " <> cl) $ do
           text txt
-          buttonClass "notification__close" ""
+          closeNotificationButton
       closeEv = switchDyn closeEvDyn
   closeEvDyn <-
     widgetHold (pure never) $
@@ -549,28 +328,25 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) tagErrEv
 
-  let holdDCfg :: Dynamic t (Maybe (DefaultConfig l)) -> Overrides l -> m (Dynamic t (Overrides l))
-      holdDCfg dCfgDyn ovs = mdo
+  let holdDCfg ::
+        Dynamic t [Text] ->
+        Dynamic t (Maybe (DefaultConfig l)) ->
+        Overrides l ->
+        m (Dynamic t (Overrides l))
+      holdDCfg values dCfgDyn ovs = mdo
         ovsDyn <- holdDyn ovs ovsEv
         x <- attachDyn (current ovsDyn) dCfgDyn
-        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput dCfg ovs') >>= switchHold never >>= debounce 0.5
+        ovsEv <- dyn (x <&> \(ovs', dCfg) -> envVarsInput values dCfg ovs') >>= switchHold never >>= debounce 0.5
         pure ovsDyn
-      holdDKeys n keysDyn = do
-        let loading = loadingCommonWidget
-        deploymentSection n $
-          widgetHold_ loading $
-            keysDyn <&> \case
-              Just keys -> el "ul" $
-                forM_ keys $ \key -> el "li" $ text key
-              Nothing -> loading
 
-  deploymentOvsDyn <- deploymentSection "Deployment overrides" $ holdDCfg defDep defDepOv
-  holdDKeys "Deployment keys" (Just <$> depKeys)
+  depKeysDyn <- holdDyn [] depKeys
+  deploymentOvsDyn <- deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
+
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
-  applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg defAppM defAppOv
-  holdDKeys "App keys" appKeys
+  appKeysDyn <- holdDyn [] $ catMaybes appKeys
+  applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
 
   validDyn <- holdDyn True $ updated tOkEv
   pure $
@@ -625,23 +401,31 @@ deploymentConfigProgressive ::
   RequestErrorHandler t m ->
   Dynamic t (Overrides 'DeploymentLevel) ->
   Dynamic t (Overrides 'ApplicationLevel) ->
-  m (Event t FullConfig)
+  m (Dynamic t ProgressiveFullConfig)
 deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
-  (_, defAppEv, depCfgEv) <- deploymentConfigProgressiveComponents hReq depOvsDyn
+  (depCfgEv, defAppEv, _) <- deploymentConfigProgressiveComponents hReq depOvsDyn
   defAppMDyn <- holdDynMaybe defAppEv
-  depCfgMDyn <- holdDynMaybe depCfgEv
-  pure . catMaybes . updated $ do
+  defCfgMDyn <- holdDynMaybe depCfgEv
+  pure $ do
     defAppM <- defAppMDyn
     appOvs <- appOvsDyn
-    depCfgM <- depCfgMDyn
-    pure $ do
-      defApp <- defAppM
-      depCfg <- depCfgM
-      pure
-        FullConfig
-          { appConfig = applyOverrides appOvs defApp
-          , depConfig = depCfg
-          }
+    defDepM <- defCfgMDyn
+    depOvs <- depOvsDyn
+    pure
+      ProgressiveFullConfig
+        { appConfig = constructWorkingOverrides defAppM appOvs
+        , appConfigLoading = isNothing defAppM
+        , depConfig = constructWorkingOverrides defDepM depOvs
+        , depConfigLoading = isNothing defDepM
+        }
+
+data ProgressiveFullConfig = ProgressiveFullConfig
+  { appConfig :: WorkingOverrides
+  , appConfigLoading :: Bool
+  , depConfig :: WorkingOverrides
+  , depConfigLoading :: Bool
+  }
+  deriving stock (Generic)
 
 waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
 waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev
@@ -682,65 +466,91 @@ errorHeader appErr = do
 envVarsInput ::
   forall l t m.
   MonadWidget t m =>
+  Dynamic t [Text] ->
   Maybe (DefaultConfig l) ->
   -- | Initial deployment overrides.
   Overrides l ->
   -- | Updated deployment overrides.
   m (Event t (Overrides l))
-envVarsInput dCfg ovs = mdo
+envVarsInput values dCfg ovs = mdo
   envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
   let addEv = clickEv $> Endo (fst . insertUniqStart newWorkingOverride)
   clickEv <-
-    buttonClassEnabled'
-      "overrides__add dash dash--add"
-      "Add an override"
-      addingIsEnabled
-      "dash--disabled"
+    dashButton
+      DashButtonConfig
+        { buttonText = "Add an override"
+        , buttonEnabled = addingIsEnabled
+        , buttonType = Just AddDashButtonType
+        , buttonStyle = OverridesDashButtonStyle
+        }
   updEv <-
     switchDyn . fmap F.fold
       <$> listWithKey
         (uniqMap <$> envsDyn)
-        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput x)
+        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput values x)
   let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   case dCfg of
     Just _ -> pure ()
-    Nothing -> loadingCommonWidget
+    Nothing -> loadingOverrides
   pure . updated $ destructWorkingOverrides <$> envsDyn
-
-deploymentSection :: DomBuilder t m => Text -> m a -> m a
-deploymentSection n m = elClass "section" "deployment__section" $ do
-  elClass "h3" "deployment__sub-heading" $ text n
-  elClass "div" "deployment__widget" m
 
 -- | Widget for entering a key-value pair. The updated overrides list is
 -- written to the 'EventWriter'.
 envVarInput ::
   (MonadWidget t m) =>
+  -- | The key values to suggest to the user
+  Dynamic t [Text] ->
   -- | Current variable key and value.
   Dynamic t WorkingOverride ->
   m (Event t UserOverrideAction)
-envVarInput val = do
-  let v =
-        val <&> snd <&> \case
-          WorkingCustomValue x -> x
-          WorkingDefaultValue x -> x
-          WorkingDeletedValue (Just x) -> x
-          WorkingDeletedValue Nothing -> "<loading deleted>"
-      k = val <&> \(WorkingOverrideKey _ x, _) -> x
-      disabledKey = val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
-
-  divClass "overrides__item" $ do
-    (keyTextDyn, _) <-
-      octopodTextInput' disabledKey "overrides__key" "key" k never
-    (valTextDyn, _) <-
-      octopodTextInput' (pure False) "overrides__value" "value" v never
-    closeEv <- buttonClass "overrides__delete spot spot--cancel" "Delete"
-    pure $
-      leftmost
-        [ UpdateKey <$> updated keyTextDyn
-        , UpdateValue <$> updated valTextDyn
-        , closeEv $> DeleteOverride
-        ]
+envVarInput values val = do
+  let kDyn = val <&> \(WorkingOverrideKey _ x, _) -> x
+  -- Either <override present> <override deleted>
+  d <-
+    eitherDyn $
+      val <&> snd <&> \case
+        WorkingCustomValue v -> Right (v, EditedOverrideFieldType)
+        WorkingDefaultValue v -> Right (v, DefaultOverrideFieldType)
+        WorkingDeletedValue v -> Left v
+  networkView >=> switchHold never $
+    d <&> \case
+      Right vtDyn -> do
+        let (vDyn, vTypeDyn) = splitDynPure vtDyn
+        (keyTextDyn, valTextDyn, closeEv) <-
+          overrideField
+            values
+            OverrideField
+              { fieldValue = kDyn
+              , fieldError = never
+              , fieldDisabled =
+                  val <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
+              , fieldType =
+                  val <&> \(WorkingOverrideKey t _, _) -> case t of
+                    CustomWorkingOverrideKey -> EditedOverrideFieldType
+                    DefaultWorkingOverrideKey -> DefaultOverrideFieldType
+              }
+            OverrideField
+              { fieldValue = vDyn
+              , fieldError = never
+              , fieldDisabled = pure False
+              , fieldType = vTypeDyn
+              }
+        pure $
+          leftmost
+            [ UpdateKey <$> updated keyTextDyn
+            , UpdateValue <$> updated valTextDyn
+            , closeEv $> DeleteOverride
+            ]
+      Left vDyn -> do
+        restoreEv <-
+          networkView >=> switchHold never $ do
+            v <- vDyn
+            k <- kDyn
+            pure $ deletedOverride k v
+        pure $
+          flip push restoreEv $ \() -> do
+            v <- sample . current $ vDyn
+            pure $ UpdateValue <$> v
 
 data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
 
@@ -790,3 +600,6 @@ holdClearingWith aEv clear =
 
 unitEv :: Reflex t => Dynamic t a -> Event t ()
 unitEv = fmapCheap (const ()) . updated
+
+(<&&>) :: (Functor f1, Functor f2) => f1 (f2 a) -> (a -> b) -> f1 (f2 b)
+x <&&> f = (fmap . fmap) f x

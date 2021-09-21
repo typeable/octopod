@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
-import Frontend.Utils (errorCommonWidget, loadingCommonWidget)
+import Frontend.UIKit
 import Page.Deployment
 import Page.Deployments
 

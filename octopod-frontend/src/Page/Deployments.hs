@@ -33,6 +33,7 @@ import Data.These
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
+import Frontend.UIKit
 import Frontend.Utils
 import Page.ClassicPopup
 import Page.Elements.Links
@@ -77,18 +78,19 @@ deploymentsWidget ::
   [DeploymentFullInfo] ->
   m ()
 deploymentsWidget updAllEv dfis = do
-  (showNewDeploymentEv, editEv) <- deploymentsWidgetWrapper $ mdo
-    pageNotification $
-      leftmost
-        [ DPMError
-            "Deployment list update failed, deployment list\
-            \ may be slightly outdated."
-            <$ errUpdEv
-        , DPMClear <$ okUpdEv
-        ]
-    (showNewDeploymentEv', termDyn) <- deploymentsHeadWidget True okUpdEv
-    (okUpdEv, errUpdEv, editEv) <- deploymentsListWidget updAllEv termDyn dfis
-    pure (showNewDeploymentEv', editEv)
+  (showNewDeploymentEv, editEv) <- deploymentsWidgetWrapper $
+    wrapRequestErrors $ \hReq -> mdo
+      pageNotification $
+        leftmost
+          [ DPMError
+              "Deployment list update failed, deployment list\
+              \ may be slightly outdated."
+              <$ errUpdEv
+          , DPMClear <$ okUpdEv
+          ]
+      (showNewDeploymentEv', termDyn) <- deploymentsHeadWidget True okUpdEv
+      (okUpdEv, errUpdEv, editEv) <- deploymentsListWidget hReq updAllEv termDyn dfis
+      pure (showNewDeploymentEv', editEv)
   void $ newDeploymentPopup showNewDeploymentEv never
   void $ editDeploymentPopup editEv never
 
@@ -172,12 +174,13 @@ deploymentsListWidget ::
   , SetRoute t (R Routes) m
   , MonadReader ProjectConfig m
   ) =>
+  RequestErrorHandler t m ->
   Event t () ->
   Dynamic t Text ->
   -- | Initial deployment data
   [DeploymentFullInfo] ->
   m (Event t (), Event t (), Event t DeploymentFullInfo)
-deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
+deploymentsListWidget hReq updAllEv termDyn ds = dataWidgetWrapper $ mdo
   retryEv <- delay 10 errUpdEv
   updRespEv <- listEndpoint $ leftmost [updAllEv, () <$ retryEv]
   let okUpdEv = fmapMaybe reqSuccess updRespEv
@@ -192,8 +195,8 @@ deploymentsListWidget updAllEv termDyn ds = dataWidgetWrapper $ mdo
             <$> filteredDyn
       searchSorting = termDyn $> Just (SortDesc (view #score))
   clickedEv <- elementClick
-  editEv <- activeDeploymentsWidget searchSorting clickedEv activeDsDyn
-  archivedDeploymentsWidget searchSorting clickedEv archivedDsDyn
+  editEv <- activeDeploymentsWidget hReq searchSorting clickedEv activeDsDyn
+  archivedDeploymentsWidget hReq searchSorting clickedEv archivedDsDyn
   pure (() <$ okUpdEv, () <$ errUpdEv, editEv)
 
 data SearchedDeploymentFullInfo = SearchedDeploymentFullInfo
@@ -235,6 +238,7 @@ activeDeploymentsWidget ::
   , SetRoute t (R Routes) m
   , MonadReader ProjectConfig m
   ) =>
+  RequestErrorHandler t m ->
   Dynamic t (Maybe (SortDir SearchedDeploymentFullInfo)) ->
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
@@ -243,7 +247,7 @@ activeDeploymentsWidget ::
   -- | Returns an event carrying editable deployment
   -- to \"edit deployment\" sidebar.
   m (Event t DeploymentFullInfo)
-activeDeploymentsWidget searchSorting clickedEv dsDyn =
+activeDeploymentsWidget hReq searchSorting clickedEv dsDyn =
   divClass "data__primary" $
     tableWrapper (updated searchSorting $> SortingChanged) $ \sortDyn -> do
       let colSortDyn = fmap (contramap (view #deployment)) <$> sortDyn
@@ -255,7 +259,7 @@ activeDeploymentsWidget searchSorting clickedEv dsDyn =
         dyn $
           emptyDyn <&> \case
             False -> do
-              editEvs <- simpleList dsSortedDyn (activeDeploymentWidget clickedEv)
+              editEvs <- simpleList dsSortedDyn (activeDeploymentWidget hReq clickedEv)
               pure $ switchDyn $ leftmost <$> editEvs
             True -> do
               emptyTableBody $ noDeploymentsWidget
@@ -275,6 +279,7 @@ activeDeploymentWidget ::
   , SetRoute t (R Routes) m
   , MonadReader ProjectConfig m
   ) =>
+  RequestErrorHandler t m ->
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   Event t ClickedElement ->
@@ -282,7 +287,7 @@ activeDeploymentWidget ::
   -- | Returns event carrying editable deployment
   -- that is required by \"edit deployment\" sidebar.
   m (Event t DeploymentFullInfo)
-activeDeploymentWidget clickedEv dDyn' = do
+activeDeploymentWidget hReq clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   editEvEv <- dyn $
     ffor dDyn $ \s@SearchedDeploymentFullInfo {deployment = d@DeploymentFullInfo {..}} -> do
@@ -297,9 +302,12 @@ activeDeploymentWidget clickedEv dDyn' = do
             forM_ (unDeploymentMetadata metadata) (renderMetadataLink . pure)
         el "td" tag'
         el "td" $
-          overridesWidget $ deployment ^. field @"appOverrides" . coerced
+          deploymentOverridesWidget hReq (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          overridesWidget $ deployment ^. field @"deploymentOverrides" . coerced
+          applicationOverridesWidget
+            hReq
+            (deployment ^. field @"deploymentOverrides" . coerced)
+            (deployment ^. field @"appOverrides" . coerced)
         el "td" $
           text $ formatPosixToDate createdAt
         el "td" $
@@ -316,8 +324,18 @@ activeDeploymentWidget clickedEv dDyn' = do
                   )
                   $ text "Actions"
               body = do
-                btnEditEv <- buttonClassEnabled' "action action--edit" "Edit" (pure enabled) "action--disabled"
-                btnArcEv <- buttonClassEnabled' "action action--archive" "Move to archive" (pure enabled) "action--disabled"
+                btnEditEv <-
+                  actionButton $
+                    def
+                      & #buttonText .~~ "Edit"
+                      & #buttonEnabled .~~ pure enabled
+                      & #buttonType .~~ Just EditActionButtonType
+                btnArcEv <-
+                  actionButton $
+                    def
+                      & #buttonText .~~ "Move to archive"
+                      & #buttonEnabled .~~ pure enabled
+                      & #buttonType .~~ Just ArchiveActionButtonType
                 url' <- kubeDashboardUrl (view #deployment <$> dDyn)
                 void . dyn $
                   url'
@@ -325,10 +343,12 @@ activeDeploymentWidget clickedEv dDyn' = do
                       blank
                       ( \url ->
                           void $
-                            aButtonClass'
-                              "action action--logs"
-                              "Details"
-                              (pure $ "href" =: url <> "target" =: "_blank")
+                            actionButton
+                              def
+                                { buttonText = "Details"
+                                , buttonType = Just LogsActionButtonType
+                                , buttonBaseTag = ATag url
+                                }
                       )
                 pure $
                   leftmost
@@ -370,13 +390,14 @@ archivedDeploymentsWidget ::
   ( MonadWidget t m
   , SetRoute t (R Routes) m
   ) =>
+  RequestErrorHandler t m ->
   Dynamic t (Maybe (SortDir SearchedDeploymentFullInfo)) ->
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   Event t ClickedElement ->
   Dynamic t [SearchedDeploymentFullInfo] ->
   m ()
-archivedDeploymentsWidget searchSorting clickedEv dsDyn = do
+archivedDeploymentsWidget hReq searchSorting clickedEv dsDyn = do
   showDyn <- toggleButton
   let classDyn = ffor showDyn $ \case
         True -> "data__archive data__archive--open"
@@ -394,7 +415,7 @@ archivedDeploymentsWidget searchSorting clickedEv dsDyn = do
             void $
               simpleList
                 dsSortedDyn
-                (archivedDeploymentWidget clickedEv)
+                (archivedDeploymentWidget hReq clickedEv)
           True -> emptyTableBody $ noDeploymentsWidget
 
 -- | Row with archived deployment.
@@ -402,10 +423,11 @@ archivedDeploymentWidget ::
   ( MonadWidget t m
   , SetRoute t (R Routes) m
   ) =>
+  RequestErrorHandler t m ->
   Event t ClickedElement ->
   Dynamic t SearchedDeploymentFullInfo ->
   m ()
-archivedDeploymentWidget clickedEv dDyn' = do
+archivedDeploymentWidget hReq clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $
     ffor dDyn $ \s@SearchedDeploymentFullInfo {deployment = DeploymentFullInfo {..}} -> do
@@ -418,9 +440,12 @@ archivedDeploymentWidget clickedEv dDyn' = do
         el "td" $ text "..."
         el "td" tag'
         el "td" $
-          overridesWidget $ deployment ^. field @"appOverrides" . coerced
+          deploymentOverridesWidget hReq (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          overridesWidget $ deployment ^. field @"deploymentOverrides" . coerced
+          applicationOverridesWidget
+            hReq
+            (deployment ^. field @"deploymentOverrides" . coerced)
+            (deployment ^. field @"appOverrides" . coerced)
         el "td" $
           text $ formatPosixToDate createdAt
         el "td" $
@@ -435,12 +460,12 @@ archivedDeploymentWidget clickedEv dDyn' = do
                       <> "id" =: elId
                   )
                   $ text "Actions"
-              body = do
-                btnArcEv <-
-                  buttonClass
-                    "action action--archive"
-                    "Restore from archive"
-                pure btnArcEv
+              body =
+                actionButton
+                  def
+                    { buttonText = "Restore from archive"
+                    , buttonType = Just ArchiveActionButtonType
+                    }
           btnEv <- dropdownWidget' clickedEv btn body
           void $ restoreEndpoint (constDyn $ Right $ dName) btnEv
       let route = DashboardRoute :/ Just dName
@@ -485,8 +510,8 @@ tableHeader = do
       sortHeader (view dfiName) "Name" SortAsc
       el "th" $ text "Links"
       el "th" $ text "Tag"
-      el "th" $ text "App overrides"
       el "th" $ text "Deployment overrides"
+      el "th" $ text "App overrides"
       sortHeader (view $ field @"createdAt") "Created" SortDesc
       sortHeaderInitially (view $ field @"updatedAt") "Changed" SortDesc
       el "th" $
@@ -570,13 +595,16 @@ sortHeaderWithInitial f l defaultSorting initSortingM = do
           sortBtnEv
           sortingChanged
     tellMultiEvent . fmapMaybe id $ updated sortDyn
-    let classDyn =
-          fmap ("sort " <>) $
-            sortDyn <&> \case
-              Just (SortDesc _) -> "sort--active sort--desc"
-              Just (SortAsc _) -> "sort--active sort--asc"
-              Nothing -> ""
-    sortBtnEv <- buttonDynClass classDyn (pure l)
+    sortBtnEv <-
+      sortButton $
+        def
+          & #buttonText .~~ l
+          & #buttonState
+            .~~ ( sortDyn <&&> \case
+                    SortDesc _ -> SortDescButtonState
+                    SortAsc _ -> SortAscButtonState
+                )
+
     tellMultiEvent $ sortBtnEv $> SortingChanged
     pure ()
 

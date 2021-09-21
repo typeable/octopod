@@ -1,6 +1,6 @@
 # Octopod
 
-[Octopod](https://octopod.site/) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
+[Octopod](https://github.com/typeable/octopod) is a fully open-source self-hosted solution for managing multiple deployments in a Kubernetes cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
 
 ## TL;DR
 ```console
