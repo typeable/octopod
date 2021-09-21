@@ -200,12 +200,9 @@ runCommandArgs' ::
   ControlScriptArgs ->
   m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
-  let logText = T.unwords (cmd : fmap T.pack args)
-  logLocM DebugS $ "Calling control script: " <> logStr logText
   t1 <- liftBase getCurrentTime
   (ec, out, err) <- runCommand (T.unpack cmd) args
   t2 <- liftBase getCurrentTime
-  logLocM DebugS $ "Control script " <> logStr logText <> " exited with: " <> show' ec
   let elTime = elapsedTime t2 t1
   return (ec, out, err, elTime)
 
@@ -215,7 +212,8 @@ elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime`
 
 -- | Helper to run command with pipes.
 runCommand ::
-  ( MonadBase IO m
+  ( KatipContext m
+  , MonadBase IO m
   , MonadReader r m
   , HasType ControlScriptTimeout r
   ) =>
@@ -223,6 +221,7 @@ runCommand ::
   [String] ->
   m (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
+  logLocM DebugS $ "Calling control script: " <> logStr cmd <> " " <> show' args
   ControlScriptTimeout timeout <- asks getTyped
   let pc =
         proc cmd args
@@ -238,6 +237,10 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
+  logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ "Control script " <> logStr cmd <> " " <> show' args <>
+    " exited with: " <> show' ec <>
+    "\nStdout was:\n" <> logStr out <>
+    "\nStderr was:\n" <> logStr err
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
