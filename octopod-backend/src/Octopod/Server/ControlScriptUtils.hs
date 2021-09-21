@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 -- |
 --Module      : Octopod.Server.ControlScriptUtils
 --Description : Control script utils.
@@ -202,11 +201,11 @@ runCommandArgs' ::
   m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
   let logText = T.unwords (cmd : fmap T.pack args)
-  $logTM DebugS $ "Calling control script: " <> logStr logText
+  logLocM DebugS $ "Calling control script: " <> logStr logText
   t1 <- liftBase getCurrentTime
   (ec, out, err) <- runCommand (T.unpack cmd) args
   t2 <- liftBase getCurrentTime
-  $logTM DebugS $ "Control script " <> logStr logText <> " exited with: " <> show' ec
+  logLocM DebugS $ "Control script " <> logStr logText <> " exited with: " <> show' ec
   let elTime = elapsedTime t2 t1
   return (ec, out, err, elTime)
 

@@ -26,6 +26,10 @@ data Args = Args
     db :: ByteString
   , -- | database pool size
     dbPoolSize :: Int
+  , -- | log debug messages
+    debug :: Bool
+  , -- | whether log output should be minimal
+    minimal :: Bool
   }
   deriving stock (Generic, Show)
 
@@ -44,6 +48,10 @@ data OctopodOpts = OctopodOpts
     octopodDB :: DBConnectionString
   , -- | database pool size
     octopodDBPoolSize :: DBPoolSize
+  , -- | log debug messages
+    octopodDebug :: Bool
+  , -- | whether log output should be minimal
+    octopodMinimal :: Bool
   }
   deriving stock (Show)
 
@@ -58,3 +66,5 @@ parseArgs = do
       (coerce $ wsPort args)
       (coerce $ db args)
       (coerce $ dbPoolSize args)
+      (debug args)
+      (minimal args)

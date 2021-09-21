@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Octopod.Server.Posix (installShutdownHandler) where
 
 import Control.Monad.Trans.Control
@@ -27,5 +26,5 @@ installShutdownHandler signals action =
     installHandler signal (Catch $ void $ run $ handler signal) Nothing
   where
     handler signal = katipAddNamespace "signal handler" $ katipAddContext (SigContext signal) $ do
-      $logTM InfoS "Shutdown initiated by signal"
+      logLocM InfoS "Shutdown initiated by signal"
       action

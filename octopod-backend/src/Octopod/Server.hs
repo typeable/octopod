@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Octopod.Server (runOctopodServer) where
 
 import Common.Validation
@@ -200,7 +199,7 @@ runOctopodServer sha = do
       either500S :: (KatipContext m, MonadError ServerError m) => Either String x -> m x
       either500S (Right x) = pure x
       either500S (Left err) = do
-        $logTM ErrorS $ logStr err
+        logLocM ErrorS $ logStr err
         throwError err500 {errBody = BSLC.pack err}
   notificationCmd <-
     (fmap . fmap) (Command . pack) $
@@ -219,7 +218,12 @@ runOctopodServer sha = do
   appOverridesCache' <- cacheMap $ \cfg -> do
     (_, Stdout out, _, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
-  runLog projName DebugS $ do
+  let logConfig = LogConfig
+        { project = projName
+        , debug = octopodDebug opts
+        , minimal = octopodMinimal opts
+        }
+  runLog logConfig $ do
     void $ do
       let termHandler = terminationHandler bgWorkersC gracefulShutdownAct shutdownS
       installShutdownHandler [sigTERM] termHandler
@@ -294,7 +298,7 @@ runHasQL s = do
       HasQL.run s conn >>= \case
         Right x -> runInBase $ pure x
         Left err -> do
-          void $ runInBase $ $logTM ErrorS $ logStr $ displayException err
+          void $ runInBase $ logLocM ErrorS $ logStr $ displayException err
           throwIO err
   restoreM st
 
@@ -351,7 +355,7 @@ runApp portNum api ctx srv = do
     hoist :: AppM a -> Handler a
     hoist act = runKatipContextT logEnv logCtx ns $ runReaderT act appstate
     log req respStatus mSize = runKatipContextT logEnv logCtx ns $ do
-      $logTM DebugS $ show' req <> " " <> show' respStatus <> " " <> show' mSize
+      logLocM DebugS $ show' req <> " " <> show' respStatus <> " " <> show' mSize
   liftBase $ runSettings (setPort portNum $ setLogger log defaultSettings) $
     serveWithContext api ctx $ hoistServerWithContext api (Proxy @context) hoist srv
 
@@ -471,7 +475,7 @@ getSingleFullInfo dName = do
     where_ $ d ^. #name ==. litExpr dName
     pure d
   deployments <- forM deploymentsSchema extractDeploymentFullInfo
-  $logTM DebugS $ "get deployments: " <> show' deployments
+  logLocM DebugS $ "get deployments: " <> show' deployments
   return $ listToMaybe deployments
 
 getFullInfo ::
@@ -482,7 +486,7 @@ getFullInfo = do
     runStatement . select . orderBy (view #updatedAt >$< desc) $
       each deploymentSchema
   deployments <- forM deploymentsSchema extractDeploymentFullInfo
-  $logTM DebugS $ "get deployments: " <> show' deployments
+  logLocM DebugS $ "get deployments: " <> show' deployments
   return deployments
 
 -- | Handles the 'create' request.
@@ -561,9 +565,9 @@ updateDeploymentInfo dName = do
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
-      Left err' -> $logTM ErrorS $ "could not get deployment info, could not parse CSV: " <> logStr err'
+      Left err' -> logLocM ErrorS $ "could not get deployment info, could not parse CSV: " <> logStr err'
     ExitFailure _ ->
-      $logTM ErrorS $
+      logLocM ErrorS $
         "could not get deployment info, exit code: " <> show' ec
           <> ", stdout: "
           <> logStr (unStdout out)
@@ -588,7 +592,7 @@ createDeployment ::
 createDeployment dep = do
   cfg <- getDeploymentConfig dep
   res <- runCommandArgs creationCommand =<< createCommandArgs cfg dep
-  $logTM InfoS $ "deployment created, deployment: " <> show' dep
+  logLocM InfoS $ "deployment created, deployment: " <> show' dep
   pure res
 
 -- | Helper to get deployment logs.
@@ -697,7 +701,7 @@ transitionToStatus ::
   ExceptT StatusTransitionError m ()
 transitionToStatus dName s = do
   let newS = transitionStatus s
-  $logTM InfoS $ "Transitioning deployment " <> show' (unDeploymentName dName) <> " " <> show' s
+  logLocM InfoS $ "Transitioning deployment " <> show' (unDeploymentName dName) <> " " <> show' s
   res <- runTransaction . runExceptT $ do
     oldS <-
       (lift . statement () . select)
@@ -845,7 +849,7 @@ updateH dName dUpdate = do
     sendReloadEvent
     cfg <- getDeploymentConfig dep
     (ec, out, err, elTime) <- runCommandArgs updateCommand =<< updateCommandArgs cfg dep
-    $logTM DebugS $ logStr $
+    logLocM DebugS $ logStr $
       "deployment updated, name: "
         <> unDeploymentName dName
     transitionToStatusS dName $
@@ -863,14 +867,14 @@ updateH dName dUpdate = do
 infoH :: DeploymentName -> AppM [DeploymentInfo]
 infoH dName = do
   dInfo <- getInfo dName
-  $logTM DebugS $ "get deployment info: " <> show' dInfo
+  logLocM DebugS $ "get deployment info: " <> show' dInfo
   pure [dInfo]
 
 -- | Handles the 'info' request of the octo CLI API.
 powerInfoH :: DeploymentName -> AppM [DeploymentInfo]
 powerInfoH dName = do
   dInfo <- getInfo dName
-  $logTM DebugS $ "get deployment info: " <> show' dInfo
+  logLocM DebugS $ "get deployment info: " <> show' dInfo
   pure [dInfo]
 
 -- | Helper to get deployment info from the database.
@@ -927,7 +931,7 @@ cleanupDeployment dName = do
     ExitSuccess -> do
       deleteDeploymentLogs dName
       deleteDeployment dName
-      $logTM InfoS $ logStr $ "deployment destroyed, name: " <> unDeploymentName dName
+      logLocM InfoS $ logStr $ "deployment destroyed, name: " <> unDeploymentName dName
     ExitFailure _ -> do
       transitionToStatusS dName $
         TransitionCleanupFailed
@@ -1121,7 +1125,7 @@ runStatusUpdater = do
         mEc <-
           getSingleFullInfo dName >>= \case
             Nothing -> do
-              $logTM ErrorS $ logStr $ "Couldn't find deployment: " <> unDeploymentName dName
+              logLocM ErrorS $ logStr $ "Couldn't find deployment: " <> unDeploymentName dName
               pure Nothing
             Just (view #deployment -> dep) -> do
               cfg <- getDeploymentConfig dep
@@ -1151,8 +1155,8 @@ runStatusUpdater = do
                   ($> True) $
                     (runExceptT . runExceptT) (transitionToStatus dName transition) >>= \case
                       Right (Right ()) -> updateCheckedAt (transitionStatus transition)
-                      Left e -> $logTM ErrorS $ show' e
-                      Right (Left e) -> $logTM ErrorS $ show' e
+                      Left e -> logLocM ErrorS $ show' e
+                      Right (Left e) -> logLocM ErrorS $ show' e
       when (Prelude.or updated) sendReloadEvent
       liftBase $ threadDelay 2000000
 
