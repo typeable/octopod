@@ -169,7 +169,8 @@ in
             --ui-port 3002 \
             --ws-port 4020 \
             --db "host='127.0.0.1' port=5432 user='octopod' password='octopod'" \
-            --db-pool-size 10
+            --db-pool-size 10 \
+            --debug --minimal
       '';
     in
     runBackend;
