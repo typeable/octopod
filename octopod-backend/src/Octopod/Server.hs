@@ -218,22 +218,24 @@ runOctopodServer sha = do
   appOverridesCache' <- cacheMap $ \cfg -> do
     (_, Stdout out, _, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
-  let logConfig = LogConfig
-        { project = projName
-        , debug = octopodDebug opts
-        , minimal = octopodMinimal opts
-        }
+  let logConfig =
+        LogConfig
+          { project = projName
+          , debug = octopodDebug opts
+          , minimal = octopodMinimal opts
+          }
   runLog logConfig $ do
     void $ do
       let termHandler = terminationHandler bgWorkersC gracefulShutdownAct shutdownS
       installShutdownHandler [sigTERM] termHandler
-    dbPool' <- liftBase $
-      createPool
-        (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
-        release
-        1
-        30
-        (unDBPoolSize $ octopodDBPoolSize opts)
+    dbPool' <-
+      liftBase $
+        createPool
+          (fmap (either (error . show) id) . acquire $ unDBConnectionString $ octopodDB opts)
+          release
+          1
+          30
+          (unDBPoolSize $ octopodDBPoolSize opts)
     channel <- liftBase . atomically $ newBroadcastTChan
     lockedDs <- liftBase initLockedDeployments
     let
@@ -283,9 +285,10 @@ runOctopodServer sha = do
         `raceM_` runArchiveCleanup archRetention
 
 raceM_ :: MonadBaseControl IO m => m a -> m b -> m ()
-raceM_ a b = liftBaseWith $ \runInBase -> race (runInBase a) (runInBase b) >>= \case
-  Left x -> void $ restoreM x
-  Right y -> void $ restoreM y
+raceM_ a b = liftBaseWith $ \runInBase ->
+  race (runInBase a) (runInBase b) >>= \case
+    Left x -> void $ restoreM x
+    Right y -> void $ restoreM y
 
 runHasQL ::
   (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
@@ -338,9 +341,14 @@ runStatement ::
   m a
 runStatement q = katipAddNamespace "statement" $ runHasQL $ HasQL.statement () q
 
-runApp :: forall api context m.
-  ( HasServer api context, KatipContext m, MonadBase IO m, MonadReader AppState m
-  , HasContextEntry (context .++ DefaultErrorFormatters) ErrorFormatters ) =>
+runApp ::
+  forall api context m.
+  ( HasServer api context
+  , KatipContext m
+  , MonadBase IO m
+  , MonadReader AppState m
+  , HasContextEntry (context .++ DefaultErrorFormatters) ErrorFormatters
+  ) =>
   Port ->
   Proxy api ->
   Servant.Context context ->
@@ -351,13 +359,13 @@ runApp portNum api ctx srv = do
   logEnv <- getLogEnv
   logCtx <- getKatipContext
   ns <- getKatipNamespace
-  let
-    hoist :: AppM a -> Handler a
-    hoist act = runKatipContextT logEnv logCtx ns $ runReaderT act appstate
-    log req respStatus mSize = runKatipContextT logEnv logCtx ns $ do
-      logLocM DebugS $ show' req <> " " <> show' respStatus <> " " <> show' mSize
-  liftBase $ runSettings (setPort portNum $ setLogger log defaultSettings) $
-    serveWithContext api ctx $ hoistServerWithContext api (Proxy @context) hoist srv
+  let hoist :: AppM a -> Handler a
+      hoist act = runKatipContextT logEnv logCtx ns $ runReaderT act appstate
+      log req respStatus mSize = runKatipContextT logEnv logCtx ns $ do
+        logLocM DebugS $ show' req <> " " <> show' respStatus <> " " <> show' mSize
+  liftBase $
+    runSettings (setPort portNum $ setLogger log defaultSettings) $
+      serveWithContext api ctx $ hoistServerWithContext api (Proxy @context) hoist srv
 
 -- | Request handlers of the Web UI API application.
 server :: ServerT API AppM
@@ -424,8 +432,9 @@ powerServer _ = throwAll err401
 
 -- | Application with the WS API.
 runWsServer :: (KatipContext m, MonadBase IO m, MonadReader AppState m) => Port -> TChan WSEvent -> m ()
-runWsServer portNum channel = katipAddNamespace "wsApp" $
-  runApp portNum (Proxy @WebSocketAPI) EmptyContext $ wsServer channel
+runWsServer portNum channel =
+  katipAddNamespace "wsApp" $
+    runApp portNum (Proxy @WebSocketAPI) EmptyContext $ wsServer channel
 
 -- | Request handlers of the application with the WS API.
 wsServer :: TChan WSEvent -> Server WebSocketAPI

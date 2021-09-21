@@ -237,10 +237,14 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
-  logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ "Control script " <> logStr cmd <> " " <> show' args <>
-    " exited with: " <> show' ec <>
-    "\nStdout was:\n" <> logStr out <>
-    "\nStderr was:\n" <> logStr err
+  logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
+    "Control script " <> logStr cmd <> " " <> show' args
+      <> " exited with: "
+      <> show' ec
+      <> "\nStdout was:\n"
+      <> logStr out
+      <> "\nStderr was:\n"
+      <> logStr err
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
