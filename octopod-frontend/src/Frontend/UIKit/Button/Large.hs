@@ -20,7 +20,7 @@ import Reflex.Dom
 data LargeButtonConfig t = LargeButtonConfig
   { buttonText :: Text
   , buttonEnabled :: Dynamic t Bool
-  , buttonType :: Maybe LargeButtonType
+  , buttonType :: Dynamic t (Maybe LargeButtonType)
   , buttonPriority :: LargeButtonPriority
   , buttonStyle :: LargeButtonStyle
   , buttonBaseTag :: BaseButtonTag
@@ -50,7 +50,7 @@ instance Reflex t => Default (LargeButtonConfig t) where
     LargeButtonConfig
       { buttonText = ""
       , buttonEnabled = pure True
-      , buttonType = Nothing
+      , buttonType = pure Nothing
       , buttonStyle = RegularLargeButtonStyle
       , buttonPriority = PrimaryLargeButton
       , buttonBaseTag = ButtonTag
@@ -63,6 +63,7 @@ data LargeButtonType
   | EditLargeButtonType
   | LogsLargeButtonType
   | SaveLargeButtonType
+  | LoadingLargeButtonType
 
 buttonTypeClasses :: LargeButtonType -> Classes
 buttonTypeClasses AddLargeButtonType = "button--add"
@@ -71,6 +72,7 @@ buttonTypeClasses RestoreLargeButtonType = "button--restore"
 buttonTypeClasses EditLargeButtonType = "button--edit"
 buttonTypeClasses LogsLargeButtonType = "button--logs"
 buttonTypeClasses SaveLargeButtonType = "button--save"
+buttonTypeClasses LoadingLargeButtonType = "button--save-loading"
 
 largeButton ::
   (DomBuilder t m, PostBuild t m) =>
@@ -79,10 +81,11 @@ largeButton ::
 largeButton cfg =
   buttonEl
     CommonButtonConfig
-      { constantClasses =
+      { constantClasses = do
+          bType <- cfg ^. #buttonType
           pure $
             "button"
-              <> maybe mempty buttonTypeClasses (cfg ^. #buttonType)
+              <> maybe mempty buttonTypeClasses bType
               <> buttonStyleClasses (cfg ^. #buttonStyle)
               <> buttonPriorityClasses (cfg ^. #buttonPriority)
       , enabledClasses = mempty

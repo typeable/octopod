@@ -120,7 +120,7 @@ deploymentHead dfiDyn sentEv =
               btnEv <-
                 largeButton $
                   def
-                    & #buttonType ?~~ RestoreLargeButtonType
+                    & #buttonType .~~ pure (Just RestoreLargeButtonType)
                     & #buttonPriority .~~ SecondaryLargeButton
                     & #buttonStyle .~~ PageActionLargeButtonStyle
                     & #buttonText .~~ "Recover from archive"
@@ -133,14 +133,14 @@ deploymentHead dfiDyn sentEv =
               editEv <-
                 largeButton $
                   def
-                    & #buttonType ?~~ EditLargeButtonType
+                    & #buttonType .~~ pure (Just EditLargeButtonType)
                     & #buttonStyle .~~ PageActionLargeButtonStyle
                     & #buttonText .~~ "Edit deployment"
                     & #buttonEnabled .~~ btnEnabledDyn
               archEv <-
                 largeButton $
                   def
-                    & #buttonType ?~~ ArchiveLargeButtonType
+                    & #buttonType .~~ pure (Just ArchiveLargeButtonType)
                     & #buttonPriority .~~ SecondaryLargeButton
                     & #buttonStyle .~~ PageActionLargeButtonStyle
                     & #buttonText .~~ "Move to archive"
@@ -156,7 +156,7 @@ deploymentHead dfiDyn sentEv =
                 largeButton $
                   def
                     { buttonText = "Details"
-                    , buttonType = Just LogsLargeButtonType
+                    , buttonType = pure $ Just LogsLargeButtonType
                     , buttonPriority = SecondaryLargeButton
                     , buttonStyle = PageActionLargeButtonStyle
                     , buttonBaseTag = ATag url

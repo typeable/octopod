@@ -36,7 +36,7 @@ editDeploymentPopup ::
 editDeploymentPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
-    (closeEv', saveEv) <- editDeploymentPopupHeader dname enabledDyn
+    (closeEv', saveEv) <- editDeploymentPopupHeader dname enabledDyn sentDyn
     deploymentMDyn <- editDeploymentPopupBody dfi respEv
     respEv <-
       holdDyn (pure never) >=> networkView >=> switchHold never $
@@ -66,9 +66,11 @@ editDeploymentPopupHeader ::
   DeploymentName ->
   -- | Form validation state.
   Dynamic t Bool ->
+  -- | Loading
+  Dynamic t Bool ->
   -- | \"Close\" event and \"Save\" click event.
   m (Event t (), Event t ())
-editDeploymentPopupHeader dname validDyn =
+editDeploymentPopupHeader dname validDyn loadingDyn =
   divClass "popup__head" $ do
     closeEv <- closePopupButton
     elClass "h2" "popup__project" $ text $ "Edit " <> coerce dname
@@ -79,7 +81,12 @@ editDeploymentPopupHeader dname validDyn =
             & #buttonStyle .~~ PopupActionLargeButtonStyle
             & #buttonText .~~ "Save"
             & #buttonEnabled .~~ validDyn
-            & #buttonType ?~~ SaveLargeButtonType
+            & #buttonType
+              .~~ ( loadingDyn <&> \case
+                      False -> Just SaveLargeButtonType
+                      True -> Just LoadingLargeButtonType
+                  )
+
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 

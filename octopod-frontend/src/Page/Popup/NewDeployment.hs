@@ -35,7 +35,7 @@ newDeploymentPopup showEv hideEv = void $
   sidebar showEv hideEv $
     const $ mdo
       divClass "popup__body" $ mdo
-        (closeEv', saveEv) <- newDeploymentPopupHeader enabledDyn
+        (closeEv', saveEv) <- newDeploymentPopupHeader enabledDyn sentDyn
         deploymentMDyn <- newDeploymentPopupBody respEv
         respEv <-
           holdDyn (pure never) >=> networkView >=> switchHold never $
@@ -60,8 +60,10 @@ newDeploymentPopup showEv hideEv = void $
 newDeploymentPopupHeader ::
   MonadWidget t m =>
   Dynamic t Bool ->
+  -- | Loading
+  Dynamic t Bool ->
   m (Event t (), Event t ())
-newDeploymentPopupHeader enabledDyn =
+newDeploymentPopupHeader enabledDyn loadingDyn =
   divClass "popup__head" $ do
     closeEv <- closePopupButton
     elClass "h2" "popup__project" $ text "Create new deployment"
@@ -72,7 +74,11 @@ newDeploymentPopupHeader enabledDyn =
             & #buttonStyle .~~ PopupActionLargeButtonStyle
             & #buttonText .~~ "Save"
             & #buttonEnabled .~~ enabledDyn
-            & #buttonType ?~~ SaveLargeButtonType
+            & #buttonType
+              .~~ ( loadingDyn <&> \case
+                      False -> Just SaveLargeButtonType
+                      True -> Just LoadingLargeButtonType
+                  )
     divClass "popup__menu drop drop--actions" blank
     pure (closeEv, saveEv)
 
