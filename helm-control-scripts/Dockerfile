@@ -23,3 +23,8 @@ ADD target/x86_64-unknown-linux-musl/release/info /utils/
 ADD target/x86_64-unknown-linux-musl/release/update /utils/
 ADD target/x86_64-unknown-linux-musl/release/init /utils/
 ADD target/x86_64-unknown-linux-musl/release/tag_check /utils/
+ADD target/x86_64-unknown-linux-musl/release/app_overrides /utils/
+ADD target/x86_64-unknown-linux-musl/release/app_keys /utils/
+ADD target/x86_64-unknown-linux-musl/release/deployment_overrides /utils/
+ADD target/x86_64-unknown-linux-musl/release/deployment_keys /utils/
+ADD target/x86_64-unknown-linux-musl/release/unarchive /utils/

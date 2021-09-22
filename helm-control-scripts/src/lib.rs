@@ -96,6 +96,14 @@ pub mod lib {
                 (String::from("chart_name"), self.chart_name.clone()),
             ]   
         }
+        pub fn deployment_keys(&self) -> Vec<String> {
+            vec![
+                String::from("chart_repo_url"),
+                String::from("chart_repo_name"),
+                String::from("chart_version"),
+                String::from("chart_name"),
+            ]   
+        }
     }
         
     #[derive(Debug, Clone)]
@@ -190,6 +198,13 @@ pub mod lib {
                     args.extend(chart_version);
                     args.extend(self.set_flag_values());
                 },
+                HelmMode::ShowValues => {
+                    args.extend(namespace);
+                    args.push(String::from("show"));
+                    args.push(String::from("values"));
+                    args.push(chart_location);
+                    args.extend(chart_version);
+                },
                 HelmMode::RepoAdd => {
                     args.push(String::from("repo"));
                     args.push(String::from("add"));
@@ -260,6 +275,7 @@ pub mod lib {
         RepoAdd,
         RepoUpdate,
         Status,
+        ShowValues,
     }
     
     pub struct KubectlCmd {
@@ -529,6 +545,18 @@ pub mod lib {
         }
         return out_string;
     }
+    pub fn print_keys(vals: Option<Vec<String>>) -> String {
+        let mut out_string = String::from("");
+        match vals {
+            Some(values) => {
+                for value in values {
+                    out_string.push_str(&format!("{}\n", value));
+                }
+            },
+            None => return out_string
+        }
+        return out_string;
+    }
     //TODO: Generics!!!
     pub fn deployments_statefulsets_to_images(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>) -> Option<Vec<String>> {
         let mut images: Vec<String> = Vec::new();
@@ -683,6 +711,41 @@ pub mod lib {
                 info!("Starting helm initialization");
                 helm_repo_add_update(&envs, &deployment_parameters);
             }
+        }
+    }
+    pub fn helm_values_as_keys(yaml: String) -> Option<Vec<String>> {
+        let mut keys: Vec<String> = Vec::new();
+        let docs = YamlLoader::load_from_str(&yaml).unwrap();
+        let docs_hash = &docs[0].clone().into_hash().unwrap();
+        for doc in docs_hash {
+            match doc.1.as_hash() {
+                Some(hash) => {
+                    if hash.is_empty() {
+                        keys.push(format!("{}", doc.0.as_str().unwrap()));
+                    }else{
+                        for doc_2 in hash {
+                            match doc_2.1.as_hash() {
+                                Some(hash_2) => {
+                                    if hash_2.is_empty() {
+                                        keys.push(format!("{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap()));
+                                    }else{
+                                        for key in hash_2.keys() {
+                                            keys.push(format!("{}.{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap(), key.as_str().unwrap()));
+                                        }
+                                    }
+                                },
+                                None => keys.push(format!("{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap()))
+                            }
+                        }
+                    }
+                },
+                None => continue
+            }
+        }
+        if keys.is_empty() {
+            None
+        }else{
+            Some(keys)
         }
     }
 }

@@ -58,9 +58,21 @@ name = "tag_check"
 path = "src/tag_check.rs"
 
 [[bin]]
-name = "default_app_overrides"
-path = "src/default_app_overrides.rs"
+name = "app_overrides"
+path = "src/app_overrides.rs"
 
 [[bin]]
-name = "default_deployment_overrides"
-path = "src/default_deployment_overrides.rs"
+name = "deployment_overrides"
+path = "src/deployment_overrides.rs"
+
+[[bin]]
+name = "deployment_keys"
+path = "src/deployment_keys.rs"
+
+[[bin]]
+name = "app_keys"
+path = "src/app_keys.rs"
+
+[[bin]]
+name = "unarchive"
+path = "src/unarchive.rs"

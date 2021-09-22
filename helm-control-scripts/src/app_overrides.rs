@@ -7,7 +7,5 @@ fn main() {
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
     let default_values: DefaultValues = serde_json::from_str(&envs.defaults).unwrap();
-    let cli_opts = CliOpts::from_args();
-    info!("Cli options received {:?}", &cli_opts);
     print!("{}", print_kv(default_values.app_overrides()));
 }
