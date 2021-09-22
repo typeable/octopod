@@ -1,10 +1,13 @@
 pub mod lib {
     pub use std::io::prelude::*;
     pub use std::process::{Command, ExitStatus, Stdio};
+    pub use std::error::Error;
+    pub use std::fmt;
     pub use structopt::StructOpt;
     pub use env_logger::{Builder, Target};
     pub use log::{LevelFilter, info, warn, error};
     pub use serde::{Serialize, Deserialize};
+    pub use serde_json::json;
     pub use std::error;
     pub use yaml_rust::{YamlLoader, YamlEmitter};
     pub use k8s_openapi::api::{
@@ -13,12 +16,12 @@ pub mod lib {
         networking::v1beta1::Ingress as OldIngress
     };
     pub use kube::{
-        api::{Api, ListParams, ResourceExt},
+        api::{Api, ListParams, ResourceExt, Patch, PatchParams},
         Client,
     };
     pub use dkregistry::{
         v2::Client as RegClient,
-        errors::Error
+        errors::Error as RegError,
     };
     pub use regex::Regex;
     
@@ -395,8 +398,37 @@ pub mod lib {
         }
         return Ok((deployments, statefulsets, ingresses, old_ingresses));
     }
+    
+    #[derive(Debug)]
+    pub struct NoReplicasError(String);
+    
+    impl fmt::Display for NoReplicasError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Deployment {} doesn't have any replicas", self.0)
+        }
+    }
+    impl Error for NoReplicasError {}
+    
+    #[derive(Debug)]
+    pub enum KubeError {
+        NoReplicasError(NoReplicasError),
+        KubeApiError(kube::Error),
+    }
+    
+    impl From<NoReplicasError> for KubeError {
+        fn from(error: NoReplicasError) -> Self {
+            KubeError::NoReplicasError(error)
+        }
+    }
+
+    impl From<kube::Error> for KubeError {
+        fn from(error: kube::Error) -> Self {
+            KubeError::KubeApiError(error)
+        }
+    }
+    
     #[tokio::main]
-    async fn check_deployment(namespace: &str, name: &str) -> Result<(), kube::Error> {
+    async fn check_deployment(namespace: &str, name: &str) -> Result<(), KubeError> {
         let client = Client::try_default().await?;
         let api: Api<Deployment> = Api::namespaced(client, &namespace);
         let deployment = api.get(&name).await?;
@@ -405,22 +437,22 @@ pub mod lib {
                 match status.available_replicas {
                     Some(replicas) => {
                         if !replicas >= 1 {
-                            panic!("Deployment {} doesn't have any replicas", &name);
+                           return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                         }
                     },
                     None => {
-                        panic!("Deployment {} doesn't have any replicas", &name);
+                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                     }
                 }
             },
             None => {
-                panic!("Unable to get status for deployment {}", &name);
+                return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
             }
         }
         Ok(())
     }
     #[tokio::main]
-    async fn check_statefulset(namespace: &str, name: &str) -> Result<(), kube::Error> {
+    async fn check_statefulset(namespace: &str, name: &str) -> Result<(), KubeError> {
         let client = Client::try_default().await?;
         let api: Api<StatefulSet> = Api::namespaced(client, &namespace);
         let statefulset = api.get(&name).await?;
@@ -429,21 +461,21 @@ pub mod lib {
                 match status.current_replicas {
                     Some(replicas) => {
                         if !replicas >= 1 {
-                            panic!("StatefulSet {} doesn't have any replicas", &name);
+                            return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                         }
                     },
                     None => {
-                        panic!("StatefulSet {} doesn't have any replicas", &name);
+                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                     }
                 }
             },
             None => {
-                panic!("Unable to get status for StatefulSet {}", &name);
+                return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
             }
         }
         Ok(())
     }
-    pub fn check_all(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String) -> Result<(), Box<dyn error::Error>> {
+    pub fn check_all(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String) -> Result<(), KubeError> {
         if deployments.is_empty() {
             info!("No deployments to check");
         }else{
@@ -451,7 +483,7 @@ pub mod lib {
                 match check_deployment(&namespace, &deploy.name()) {
                     Ok(status) => status,
                     Err(err) => {
-                        return Err(Box::new(err));
+                        return Err(err);
                     }
                 }
             }
@@ -464,7 +496,7 @@ pub mod lib {
                 match check_statefulset(&namespace, &statefulset.name()) {
                     Ok(status) => status,
                     Err(err) => {
-                        return Err(Box::new(err));
+                        return Err(err);
                     }
                 }
             }
@@ -615,7 +647,7 @@ pub mod lib {
         }
     }
     #[tokio::main]
-    async fn check_image(registry: &str, repository: &str, tag: &str) -> Result<(), dkregistry::errors::Error> {
+    async fn check_image(registry: &str, repository: &str, tag: &str) -> Result<(), RegError> {
         let client = RegClient::configure()
             .insecure_registry(false)
             .registry(registry)
@@ -649,7 +681,7 @@ pub mod lib {
         info!("Checking image: {} {} {}", registry, repository, tag);
         (registry, repository, tag)
     }
-    pub fn check_images(images: Vec<String>) -> Result<(), dkregistry::errors::Error> {
+    pub fn check_images(images: Vec<String>) -> Result<(), RegError> {
         for image in images {
             let (registry, repository, tag) = parse_image_name(&image);
             match check_image(&registry, &repository, &tag) {
@@ -747,5 +779,73 @@ pub mod lib {
         }else{
             Some(keys)
         }
+    }
+    #[tokio::main]
+    async fn scale_deployment(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Deployment> = Api::namespaced(client, &namespace);
+        let deployment = api.get(&name).await?;
+        let mut spec = match deployment.spec {
+            Some(spec) => spec,
+            None => panic!("Deployment without any spec!")
+        };
+        spec.replicas = Some(replicas);
+        let patched_deployment = Deployment {
+            metadata: deployment.metadata,
+            spec: Some(spec),
+            status: None
+        };
+        let patch = Patch::Merge(patched_deployment);
+        let patch_params = PatchParams::apply("octopod");
+        api.patch(&name, &patch_params, &patch).await?;
+        Ok(())
+    }
+    #[tokio::main]
+    async fn scale_statefulset(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<StatefulSet> = Api::namespaced(client, &namespace);
+        let statefulset = api.get(&name).await?;
+        let mut spec = match statefulset.spec {
+            Some(spec) => spec,
+            None => panic!("StatefulSet without any spec!")
+        };
+        spec.replicas = Some(replicas);
+        let patched_statefulset = StatefulSet {
+            metadata: statefulset.metadata,
+            spec: Some(spec),
+            status: None
+        };
+        let patch = Patch::Merge(patched_statefulset);
+        let patch_params = PatchParams::apply("octopod");
+        api.patch(&name, &patch_params, &patch).await?;
+        Ok(())
+    }
+    pub fn scale(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String, replicas: i32) -> Result<(), Box<dyn error::Error>> {
+        if deployments.is_empty() {
+            info!("No deployments to check");
+        }else{
+            for deploy in deployments {
+                match scale_deployment(&namespace, &deploy.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        
+        if statefulsets.is_empty() {
+            info!("No statefulsets to check");
+        }else{
+            for statefulset in statefulsets {
+                match scale_statefulset(&namespace, &statefulset.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

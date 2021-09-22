@@ -47,7 +47,7 @@ fn main() {
                 Ok(_status) => info!("Success!"),
                 Err(status) => {
                     error!("Error checking statuses");
-                    panic!("{}", status);
+                    panic!("{:?}", status);
                 }
             }
         }

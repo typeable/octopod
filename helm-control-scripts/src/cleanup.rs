@@ -10,6 +10,25 @@ fn main() {
     let cli_opts = CliOpts::from_args();
     info!("Cli options received {:?}", &cli_opts);
     let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &default_values, &envs);
+    let helm_cmd = HelmCmd {
+        name: envs.helm_bin,
+        mode: HelmMode::Uninstall,
+        release_name: cli_opts.name.clone(),
+        release_domain: String::from(""),
+        namespace: cli_opts.namespace.clone(),
+        deployment_parameters: deployment_parameters.clone(),
+        overrides: vec![],
+        default_values: vec![],
+        image_tag: String::from("")
+    };
+    info!("Generated Helm args: {:?}", &helm_cmd.args());
+    match helm_cmd.run() {
+        Ok(_status) => info!("Success!"),
+        Err(status) => {
+            error!("Error during helm execution");
+            panic!("{:?}", status);
+        }
+    }
     let kubectl_cmd =  KubectlCmd {
         name: envs.kubectl_bin,
         release_name: cli_opts.name,
