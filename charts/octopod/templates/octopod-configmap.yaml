@@ -18,6 +18,11 @@ data:
   ARCHIVE_CHECKING_COMMAND: {{ printf "%s/archive_check" (include "controlScriptsPath" .)  | quote }}
   TAG_CHECKING_COMMAND: {{ printf "%s/tag_check" (include "controlScriptsPath" .)  | quote }}
   INFO_COMMAND: {{ printf "%s/info" (include "controlScriptsPath" .)  | quote }}
+  DEPLOYMENT_OVERRIDES_COMMAND: {{ printf "%s/deployment_overrides" (include "controlScriptsPath" .)  | quote }}
+  DEPLOYMENT_KEYS_COMMAND: {{ printf "%s/deployment_keys" (include "controlScriptsPath" .)  | quote }}
+  APPLICATION_OVERRIDES_COMMAND: {{ printf "%s/app_overrides" (include "controlScriptsPath" .)  | quote }}
+  APPLICATION_KEYS_COMMAND: {{ printf "%s/app_keys" (include "controlScriptsPath" .)  | quote }}
+  UNARCHIVE_COMMAND: {{ printf "%s/unarchive" (include "controlScriptsPath" .)  | quote }}
   {{- range $name, $value := .Values.octopod.env }}
   {{ $name }}: {{ $value | quote }}
   {{- end }}
