@@ -12,7 +12,8 @@ where
 
 import Reflex.Dom
 
-import Frontend.Utils
+import Data.Generics.Labels ()
+import Frontend.UIKit
 
 -- | The root function of a popup.
 classicPopup ::
@@ -51,7 +52,7 @@ popupWidget m =
         divClass "classic-popup__viewport" $
           divClass "classic-popup__slot" $ do
             (okEv, cancelEv) <- m
-            closeEv <- buttonClass "classic-popup__close" "Close"
+            closeEv <- closeClassicPopupButton
             pure $ (okEv, leftmost [cancelEv, closeEv])
 
 -- | Popup that requires confirmation of deployment deletion.
@@ -65,8 +66,16 @@ confirmArchivePopup showEv txt = do
         divClass "dialog dialog--archive" $ do
           divClass "dialog__content" txt
           divClass "dialog__footer" $ do
-            okEv <- buttonClass "dialog__action button" "Archive"
+            okEv <-
+              largeButton $
+                def
+                  & #buttonStyle .~~ DialogActionLargeButtonStyle
+                  & #buttonText .~~ "Archive"
             cancelEv <-
-              buttonClass "dialog__action button--secondary button" "Cancel"
+              largeButton $
+                def
+                  & #buttonStyle .~~ DialogActionLargeButtonStyle
+                  & #buttonPriority .~~ SecondaryLargeButton
+                  & #buttonText .~~ "Cancel"
             pure (okEv, cancelEv)
   classicPopup showEv body
