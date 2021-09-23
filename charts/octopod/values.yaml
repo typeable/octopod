@@ -79,8 +79,8 @@ octopod:
   projectName: Octopod
   deploymentNamespace: octopod-deployment
   baseDomain: ""
-  statusUpdateTimeout: 600
-  archiveRetention: 1209600
+  statusUpdateTimeout: "600"
+  archiveRetention: "1209600"
   migrations:
     enabled: true
   env:
@@ -99,7 +99,7 @@ controlScripts:
   image:
     repository: typeable/octopod-helm-control-scripts
     pullPolicy: IfNotPresent
-    tag: 0.1.0
+    tag: 0.2.0
 sqitch:
   image:
     repository: typeable/sqitch
