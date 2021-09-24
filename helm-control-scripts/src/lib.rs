@@ -220,11 +220,6 @@ pub mod lib {
                     args.push(String::from("repo"));
                     args.push(String::from("update"));
                 },
-                HelmMode::Status => {
-                    args.extend(namespace);
-                    args.push(String::from("status"));
-                    args.push(String::from(&self.release_name));
-                },
             }
     
             return args;
@@ -274,7 +269,6 @@ pub mod lib {
         Template,
         RepoAdd,
         RepoUpdate,
-        Status,
         ShowValues,
     }
     
