@@ -17,13 +17,6 @@ fn main() {
     let namespace = String::from(&cli_opts.namespace);
     let release_name = String::from(&cli_opts.name);
     let domain_name = domain_name(&cli_opts);
-    let image_tag = match cli_opts.tag {
-        Some(tag) => tag,
-        None => {
-            error!("mandatory tag argument was not provided");
-            panic!();
-        }
-    };
     helm_init(&envs, &deployment_parameters);
     let helm_cmd = HelmCmd {
         name: envs.helm_bin.clone(),
@@ -34,7 +27,6 @@ fn main() {
         deployment_parameters: deployment_parameters.clone(),
         overrides: vec![],
         default_values: vec![],
-        image_tag: String::from("")
     };
     let helm_template = HelmCmd {
         name: envs.helm_bin,
@@ -45,7 +37,6 @@ fn main() {
         deployment_parameters: deployment_parameters,
         overrides: overrides,
         default_values: default_values.default_overrides,
-        image_tag: image_tag
     };
     info!("Generated Helm args: {:?}", &helm_cmd.args());
     match helm_template.run_stdout() {

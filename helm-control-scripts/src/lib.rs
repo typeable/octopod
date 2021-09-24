@@ -165,7 +165,6 @@ pub mod lib {
         pub deployment_parameters: HelmDeploymentParameters,
         pub overrides: Vec<String>,
         pub default_values: Vec<String>,
-        pub image_tag: String,
     }
     
     impl HelmCmd {
@@ -233,7 +232,6 @@ pub mod lib {
         fn set_flag_values(&self) -> Vec<String> {
             let mut values = Vec::new();
             let mut set_values = Vec::new();
-            values.push(format!("image.tag={}", &self.image_tag));
             values.push(format!("ingress.host={}", &self.release_domain));
             values.extend(self.default_values.clone());
             values.extend(self.overrides.clone());
@@ -649,7 +647,6 @@ pub mod lib {
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
             default_values: vec![],
-            image_tag: String::from(""),
         };
         let helm_repo_update = HelmCmd {
             name: String::from(&envs.helm_bin),
@@ -660,7 +657,6 @@ pub mod lib {
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
             default_values: vec![],
-            image_tag: String::from(""),
         };
         match helm_repo_add.run() {
             Ok(_status) => info!("Repo add success!"),

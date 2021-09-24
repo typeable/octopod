@@ -21,7 +21,6 @@ fn main() {
         deployment_parameters: deployment_parameters,
         overrides: vec![],
         default_values: default_values.default_overrides,
-        image_tag: String::from("")
     };
     info!("Generated Helm args: {:?}", &helm_values.args());
     match helm_values.run_stdout() {
