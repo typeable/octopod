@@ -85,7 +85,6 @@ octopod:
     enabled: true
   env:
     HELM_BIN: "/utils/helm"
-    KUBECTL_BIN: "/utils/kubectl"
     DEFAULTS: |
      {
       "chart_name": "wordpress",

@@ -13,10 +13,11 @@ pub mod lib {
     pub use k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
         networking::v1::Ingress,
-        networking::v1beta1::Ingress as OldIngress
+        networking::v1beta1::Ingress as OldIngress,
+        core::v1::{PersistentVolumeClaim, Secret}
     };
     pub use kube::{
-        api::{Api, ListParams, ResourceExt, Patch, PatchParams},
+        api::{Api, ListParams, ResourceExt, Patch, PatchParams, DeleteParams},
         Client,
     };
     pub use dkregistry::{
@@ -47,7 +48,6 @@ pub mod lib {
     #[derive(Deserialize, Debug)]
     pub struct EnvVars {
         pub helm_bin: String,
-        pub kubectl_bin: String,
         pub defaults: String, //json of DefaultValues
         #[serde(default)]
         pub helm_user: String,
@@ -226,7 +226,6 @@ pub mod lib {
                     args.push(String::from("status"));
                     args.push(String::from(&self.release_name));
                 },
-                _ => panic!("This helm mode is not expected"),
             }
     
             return args;
@@ -279,57 +278,6 @@ pub mod lib {
         RepoUpdate,
         Status,
         ShowValues,
-    }
-    
-    pub struct KubectlCmd {
-        pub name: String,
-        pub release_name: String,
-        pub namespace: String,
-        pub deployment_parameters: HelmDeploymentParameters,
-    }
-
-    impl KubectlCmd {
-        pub fn args(&self, cmd_type: &str) -> Vec<String> {
-            let mut args: Vec<String> = Vec::new();
-            let namespace = vec![String::from("-n"), String::from(&self.namespace),];
-            let cert_secret_name = format!("{}-{}-tls", &self.release_name, &self.deployment_parameters.chart_name);
-            let label = vec![String::from("-l"), format!("app.kubernetes.io/instance={}", &self.release_name)];
-            args.extend(namespace);
-            args.push(String::from("delete"));
-            match cmd_type {
-                "pvc" => {
-                    args.push(String::from("pvc"));
-                    args.extend(label);
-                    return args;
-                },
-                "cert" => {
-                    args.push(String::from("secret"));
-                    args.push(cert_secret_name);
-                    return args;
-                },
-                _ => unreachable!(),
-            }
-        }
-        pub fn run(&self) {
-            info!("Starting pvc cleanup");
-            info!("kubectl args: {:?}", &self.args("pvc"));
-            let kubectl_pvc = Command::new(&self.name)
-                .args(&self.args("pvc"))
-                .output()
-                .expect("Failed to run");
-            info!("kubectl stdout:\n {}", String::from_utf8(kubectl_pvc.stdout).unwrap());
-            info!("kubectl stderr:\n {}", String::from_utf8(kubectl_pvc.stderr).unwrap());
-            info!("Starting certificates cleanup");
-            info!("kubectl args: {:?}", &self.args("pvc"));
-            let kubectl_cert = Command::new(&self.name)
-                .args(&self.args("cert"))
-                .output()
-                .expect("Failed to run");
-            info!("kubectl stdout:\n {}", String::from_utf8(kubectl_cert.stdout).unwrap());
-            info!("kubectl stderr:\n {}", String::from_utf8(kubectl_cert.stderr).unwrap());
-            assert!(kubectl_pvc.status.success());
-            assert!(kubectl_cert.status.success());
-        }
     }
     
     fn check_value(value: String) -> Result<String, String> {
@@ -846,6 +794,66 @@ pub mod lib {
                 }
             }
         }
+        Ok(())
+    }
+    pub fn ingresses_to_secrets(new_ingresses: Vec<Ingress>, old_ingresses: Vec<OldIngress>) -> Option<Vec<String>> {
+        let mut secrets: Vec<String> = Vec::new();
+        if new_ingresses.is_empty() {
+            for ingress in old_ingresses {
+                match &ingress.spec {
+                    Some(spec) => {
+                        if spec.tls.is_empty() {
+                            continue
+                        }else{
+                            for tls in &spec.tls {
+                                match &tls.secret_name {
+                                    Some(secret) => secrets.push(String::from(secret)),
+                                    None => continue
+                                }
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }else{
+            for ingress in new_ingresses {
+                match &ingress.spec {
+                    Some(spec) => {
+                        if spec.tls.is_empty() {
+                            continue
+                        }else{
+                            for tls in &spec.tls {
+                                match &tls.secret_name {
+                                    Some(secret) => secrets.push(String::from(secret)),
+                                    None => continue
+                                }
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }
+        if secrets.is_empty() {
+            None
+        }else{
+            Some(secrets)
+        }
+    }
+    #[tokio::main]
+    pub async fn delete_pvcs(namespace: &str, selector: &str) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<PersistentVolumeClaim> = Api::namespaced(client, &namespace);
+        let pvc_list = ListParams::default().labels(selector);
+        api.delete_collection(&DeleteParams::default(), &pvc_list).await?;
+        Ok(())
+    }
+    #[tokio::main]
+    pub async fn delete_secret(namespace: &str, secret: &str) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Secret> = Api::namespaced(client, &namespace);
+        api.delete(&secret, &DeleteParams::default()).await?;
         Ok(())
     }
 }
