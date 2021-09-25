@@ -97,13 +97,13 @@ newDeploymentPopupBody errEv = divClass "popup__content" $
       let commandResponseEv = fmapMaybe commandResponse errEv
           nameErrEv = getNameError commandResponseEv nameDyn
       (nameDyn, validNameDyn) <- octopodTextInput "tag" "Name" "Name" Nothing nameErrEv
-      depDyn <- deploymentPopupBody hReq Nothing mempty mempty errEv
+      depDyn <- deploymentPopupBody hReq mempty mempty errEv
       let dep = do
             depDyn >>= \case
               Nothing -> pure Nothing
               Just du' -> do
                 name <- DeploymentName <$> nameDyn
-                pure . Just $ Deployment name (du' ^. #newTag) (du' ^. #appOverrides) (du' ^. #deploymentOverrides)
+                pure . Just $ Deployment name (du' ^. #appOverrides) (du' ^. #deploymentOverrides)
       pure $ do
         validNameDyn >>= \case
           False -> pure Nothing

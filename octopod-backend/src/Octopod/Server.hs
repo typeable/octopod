@@ -474,7 +474,6 @@ createH dep = do
                         [ DeploymentSchema
                             { id_ = unsafeDefault
                             , name = litExpr $ dep ^. #name
-                            , tag = litExpr $ dep ^. #tag
                             , appOverrides = litExpr $ dep ^. #appOverrides
                             , deploymentOverrides = litExpr $ dep ^. #deploymentOverrides
                             , createdAt = now
@@ -566,8 +565,6 @@ createDeployment dep = do
           , T.unpack . coerce $ namespace st
           , "--name"
           , T.unpack . coerce $ dep ^. #name
-          , "--tag"
-          , T.unpack . coerce $ dep ^. #tag
           ]
           <> fullConfigArgs cfg
   (ec, out, err) <- runCommandArgs creationCommand args
@@ -722,7 +719,7 @@ transitionToStatus dName s = do
   forM_ notificationCmd $ \nCmd ->
     runBgWorker . void $
       runCommandArgs' nCmd
-        =<< notificationCommandArgs dName (dep ^. #tag) oldS newS
+        =<< notificationCommandArgs dName oldS newS
   liftBase $ sendReloadEvent st
 
 assertStatusTransitionPossible ::
@@ -831,7 +828,6 @@ updateH dName dUpdate = do
                 , set = \() ds ->
                     ds & #appOverrides .~ litExpr (dUpdate ^. #appOverrides)
                       & #deploymentOverrides .~ litExpr (dUpdate ^. #deploymentOverrides)
-                      & #tag .~ litExpr (dUpdate ^. #newTag)
                 , updateWhere = \() ds -> ds ^. #name ==. litExpr dName
                 , returning = Projection id
                 }
@@ -851,16 +847,12 @@ updateH dName dUpdate = do
             , T.unpack . coerce $ namespace st
             , "--name"
             , T.unpack . coerce $ dName
-            , "--tag"
-            , T.unpack . coerce $ dep ^. #tag
             ]
             <> fullConfigArgs cfg
     (ec, out, err) <- runCommandArgs updateCommand args
     liftBase . log $
       "deployment updated, name: "
         <> coerce dName
-        <> ", tag: "
-        <> coerce (dep ^. #tag)
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
@@ -1080,7 +1072,6 @@ createDeploymentLog dep act ec dur out err = do
                     { actionId = unsafeDefault
                     , deploymentId = litExpr dId
                     , action = litExpr act
-                    , deploymentTag = litExpr $ dep ^. #tag
                     , exitCode = litExpr $ case ec of
                         ExitSuccess -> 0
                         ExitFailure errCode -> fromIntegral errCode
@@ -1165,8 +1156,8 @@ runStatusUpdater state = do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
         where_ $ ds ^. #status /=. litExpr Archived
-        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt), ds ^. #tag)
-      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts, _) -> do
+        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
+      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
         let timeout = statusUpdateTimeout state
         mEc <- case dStatus of
           ArchivePending -> do

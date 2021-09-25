@@ -106,7 +106,6 @@ editDeploymentPopupBody dfi errEv = do
       wrapRequestErrors $ \hReq ->
         deploymentPopupBody
           hReq
-          (dfi ^. #deployment . #tag . coerced . to Just)
           (dfi ^. #deployment . #appOverrides)
           (dfi ^. #deployment . #deploymentOverrides)
           errEv

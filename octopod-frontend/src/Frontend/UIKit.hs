@@ -41,6 +41,7 @@ import Frontend.UIKit.Button.Sort as X
 import Frontend.UIKit.Button.Static as X
 import GHC.Generics (Generic)
 import Reflex.Dom
+import Reflex.Dom.Renderable
 import Reflex.Network
 
 (.~~) :: ASetter' s a -> a -> s -> s
@@ -276,12 +277,12 @@ nonEditableWorkingOverrideStyleClasses LargeNonEditableWorkingOverrideStyle = "l
 
 -- | Widget that shows overrides list. It does not depend on their type.
 showNonEditableWorkingOverride ::
-  MonadWidget t m =>
+  (MonadWidget t m, Renderable te) =>
   -- | Loading?
   Bool ->
   NonEditableWorkingOverrideStyle ->
   -- | Overrides list.
-  [WorkingOverride] ->
+  [WorkingOverride' te] ->
   m ()
 showNonEditableWorkingOverride loading style cfg =
   divClass
@@ -302,13 +303,13 @@ showNonEditableWorkingOverride loading style cfg =
                   CustomWorkingOverrideKey -> elClass "span" "listing__key"
                   DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
             keyWrapper $ do
-              text key
+              rndr key
               text ": "
 
             case val of
-              WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
-              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
-              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
+              WorkingCustomValue txt -> elClass "span" "listing__value" $ rndr txt
+              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ rndr txt
+              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ rndr txt
               WorkingDeletedValue Nothing -> do
                 elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
                 elClass "div" "listing__spinner" $ pure ()

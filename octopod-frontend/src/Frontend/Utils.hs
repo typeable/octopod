@@ -29,7 +29,10 @@ module Frontend.Utils
     ProgressiveFullConfig (..),
     RequestErrorHandler,
     deploymentOverridesWidget,
+    deploymentOverridesWidgetSearched,
     applicationOverridesWidget,
+    applicationOverridesWidgetSearched,
+    debounceDyn,
   )
 where
 
@@ -44,6 +47,7 @@ import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
 import Data.Monoid
 import Data.Text as T (Text, null, pack)
+import Data.Text.Search
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -59,6 +63,7 @@ import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
 import GHCJS.DOM.Node as DOM
 import Reflex.Dom as R
+import Reflex.Dom.Renderable
 import Reflex.Network
 import Servant.Common.Req
 import Servant.Reflex.Extra
@@ -202,10 +207,10 @@ octopodTextInput clss lbl placeholder val errEv =
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
 overridesWidget ::
-  MonadWidget t m =>
+  (MonadWidget t m, Renderable te, Ord te) =>
   -- | List of overrides.
-  Overrides l ->
-  (Event t () -> m (Event t (DefaultConfig l))) ->
+  Overrides' te l ->
+  (Event t () -> m (Event t (DefaultConfig' te l))) ->
   m ()
 overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
   defMDyn <- getDef firstExpand >>= holdDynMaybe
@@ -240,12 +245,20 @@ overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
   pure ()
 
 deploymentOverridesWidget ::
-  MonadWidget t m =>
+  (MonadWidget t m) =>
   RequestErrorHandler t m ->
   Overrides 'DeploymentLevel ->
   m ()
 deploymentOverridesWidget hReq depOvs =
-  overridesWidget depOvs $ defaultDeploymentOverrides >=> hReq
+  deploymentOverridesWidgetSearched hReq (wrapResult depOvs)
+
+deploymentOverridesWidgetSearched ::
+  (MonadWidget t m) =>
+  RequestErrorHandler t m ->
+  Overrides' SearchResult 'DeploymentLevel ->
+  m ()
+deploymentOverridesWidgetSearched hReq depOvs =
+  overridesWidget depOvs $ (fmap . fmap . fmap) wrapResult $ defaultDeploymentOverrides >=> hReq
 
 applicationOverridesWidget ::
   MonadWidget t m =>
@@ -254,13 +267,23 @@ applicationOverridesWidget ::
   Overrides 'ApplicationLevel ->
   m ()
 applicationOverridesWidget hReq depOvs appOvs =
+  applicationOverridesWidgetSearched hReq (wrapResult depOvs) (wrapResult appOvs)
+
+applicationOverridesWidgetSearched ::
+  MonadWidget t m =>
+  RequestErrorHandler t m ->
+  Overrides' SearchResult 'DeploymentLevel ->
+  Overrides' SearchResult 'ApplicationLevel ->
+  m ()
+applicationOverridesWidgetSearched hReq depOvs appOvs =
   overridesWidget appOvs $ \fire -> do
     depDefEv <- defaultDeploymentOverrides fire >>= hReq
     fmap switchDyn $
-      networkHold (pure never) $
-        depDefEv <&> \depDef -> do
-          pb <- getPostBuild
-          defaultApplicationOverrides (pure $ Right $ applyOverrides depOvs depDef) pb >>= hReq
+      (fmap . fmap . fmap) wrapResult $
+        networkHold (pure never) $
+          depDefEv <&> \depDef -> do
+            pb <- getPostBuild
+            defaultApplicationOverrides (pure $ Right $ applyOverrides (deSearch depOvs) depDef) pb >>= hReq
 
 -- | Type of notification at the top of pages.
 data DeploymentPageNotification
@@ -307,14 +330,13 @@ deploymentPopupBody ::
   forall t m tag.
   MonadWidget t m =>
   RequestErrorHandler t m ->
-  Maybe DeploymentTag ->
   Overrides 'ApplicationLevel ->
   Overrides 'DeploymentLevel ->
   -- | \"Edit request\" failure event.
   Event t (ReqResult tag CommandResponse) ->
   -- | Returns deployment update and validation state.
   m (Dynamic t (Maybe DeploymentUpdate))
-deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
+deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
   (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDyn
   defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
@@ -323,8 +345,6 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
 
   let commandResponseEv = fmapMaybe commandResponse errEv
   void $ hReq (errEv `R.difference` commandResponseEv)
-
-  (tagDyn, tOkEv) <- octopodTextInput "tag" "Tag" "Tag" (unDeploymentTag <$> defTag) never
 
   let holdDCfg ::
         Dynamic t [Text] ->
@@ -346,21 +366,15 @@ deploymentPopupBody hReq defTag defAppOv defDepOv errEv = mdo
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
   applicationOvsDyn <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
 
-  validDyn <- holdDyn True $ updated tOkEv
-  pure $
-    validDyn >>= \case
-      False -> pure Nothing
-      True -> do
-        depCfg <- deploymentOvsDyn
-        appOvs <- applicationOvsDyn
-        tag' <- DeploymentTag <$> tagDyn
-        pure $
-          Just $
-            DeploymentUpdate
-              { newTag = tag'
-              , appOverrides = appOvs
-              , deploymentOverrides = depCfg
-              }
+  pure $ do
+    depCfg <- deploymentOvsDyn
+    appOvs <- applicationOvsDyn
+    pure $
+      Just $
+        DeploymentUpdate
+          { appOverrides = appOvs
+          , deploymentOverrides = depCfg
+          }
 deploymentConfigProgressiveComponents ::
   MonadWidget t m =>
   RequestErrorHandler t m ->
@@ -592,3 +606,18 @@ unitEv = fmapCheap (const ()) . updated
 
 (<&&>) :: (Functor f1, Functor f2) => f1 (f2 a) -> (a -> b) -> f1 (f2 b)
 x <&&> f = (fmap . fmap) f x
+
+debounceDyn ::
+  ( PerformEvent t m
+  , TriggerEvent t m
+  , MonadIO (Performable m)
+  , MonadHold t m
+  , MonadFix m
+  ) =>
+  NominalDiffTime ->
+  Dynamic t a ->
+  m (Dynamic t a)
+debounceDyn t d = do
+  currD <- sample . current $ d
+  ev <- debounce t (updated d)
+  holdDyn currD ev

@@ -67,8 +67,6 @@ genericDeploymentCommandArgs cfg dep = do
       , T.unpack . coerce $ namespace
       , "--name"
       , T.unpack . coerce $ dep ^. #name
-      , "--tag"
-      , T.unpack . coerce $ tag dep
       ]
       <> fullConfigArgs cfg
 
@@ -132,13 +130,12 @@ notificationCommandArgs ::
   , HasType Domain r
   ) =>
   DeploymentName ->
-  DeploymentTag ->
   -- | Previous status
   DeploymentStatus ->
   -- | New status
   DeploymentStatus ->
   m ControlScriptArgs
-notificationCommandArgs dName dTag old new = do
+notificationCommandArgs dName old new = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -152,8 +149,6 @@ notificationCommandArgs dName dTag old new = do
       , T.unpack namespace
       , "--name"
       , T.unpack . coerce $ dName
-      , "--tag"
-      , T.unpack . coerce $ dTag
       , "--old-status"
       , T.unpack $ deploymentStatusToText old
       , "--new-status"

@@ -57,6 +57,8 @@ library
                      , ViewPatterns
                      , TupleSections
                      , GADTs
+                     , TypeSynonymInstances
+                     , FlexibleInstances
   exposed-modules:
       Octopod.Server
       Octopod.Server.Args

@@ -1,9 +1,12 @@
 module Data.WorkingOverrides
   ( WorkingOverrides,
     WorkingOverride,
-    WorkingOverrideKey (..),
+    WorkingOverride',
+    WorkingOverrideKey' (..),
+    WorkingOverrideKey,
     WorkingOverrideKeyType (..),
-    WorkingOverrideValue (..),
+    WorkingOverrideValue' (..),
+    WorkingOverrideValue,
     destructWorkingOverrides,
     constructWorkingOverrides,
     newWorkingOverride,
@@ -17,20 +20,28 @@ import Data.Maybe
 import Data.Text (Text)
 import Data.UniqMap
 
-type WorkingOverrides = UniqKeyMap WorkingOverride
+type WorkingOverrides = WorkingOverrides' Text
 
-type WorkingOverride = (WorkingOverrideKey, WorkingOverrideValue)
+type WorkingOverrides' te = UniqKeyMap (WorkingOverride' te)
 
-data WorkingOverrideKey = WorkingOverrideKey !WorkingOverrideKeyType !Text
+type WorkingOverride = WorkingOverride' Text
+
+type WorkingOverride' te = (WorkingOverrideKey' te, WorkingOverrideValue' te)
+
+type WorkingOverrideKey = WorkingOverrideKey' Text
+
+data WorkingOverrideKey' te = WorkingOverrideKey !WorkingOverrideKeyType !te
   deriving stock (Show)
 
 data WorkingOverrideKeyType = CustomWorkingOverrideKey | DefaultWorkingOverrideKey
   deriving stock (Show, Eq)
 
-data WorkingOverrideValue
-  = WorkingCustomValue !Text
-  | WorkingDefaultValue !Text
-  | WorkingDeletedValue !(Maybe Text)
+type WorkingOverrideValue = WorkingOverrideValue' Text
+
+data WorkingOverrideValue' te
+  = WorkingCustomValue !te
+  | WorkingDefaultValue !te
+  | WorkingDeletedValue !(Maybe te)
   deriving stock (Show)
 
 destructWorkingOverrides :: WorkingOverrides -> Overrides l
@@ -51,7 +62,11 @@ destructWorkingOverrides =
     getWorkingOverrideValue (WorkingDefaultValue x) = ValueAdded x
     getWorkingOverrideValue (WorkingDeletedValue _) = ValueDeleted
 
-constructWorkingOverrides :: Maybe (DefaultConfig l) -> Overrides l -> WorkingOverrides
+constructWorkingOverrides ::
+  Ord te =>
+  Maybe (DefaultConfig' te l) ->
+  Overrides' te l ->
+  WorkingOverrides' te
 constructWorkingOverrides (Just (DefaultConfig dCfg)) (Overrides ovsM) =
   let custom =
         uniqMapFromList
