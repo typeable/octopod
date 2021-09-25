@@ -101,7 +101,7 @@ in
 
         echo "You did something wrong, but you shouldn't see this."
 
-        exit 1
+        exit 0
       '';
 
       infoScript = pkgs.writeScript "info.sh" ''
