@@ -36,7 +36,7 @@ import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
-import Data.Text (pack, unpack, unwords)
+import Data.Text (pack)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
@@ -774,22 +774,10 @@ archiveH :: DeploymentName -> AppM CommandResponse
 archiveH dName = do
   failIfGracefulShutdownActivated
   t1 <- liftBase getCurrentTime
-  st <- ask
-  let log = liftBase . logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ archiveCommand st
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
-    log $ "call " <> unwords (cmd : args)
-    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+    (view #deployment -> dep) <- getDeploymentS dName
+    cfg <- getDeploymentConfig dep
+    (ec, out, err) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
@@ -926,25 +914,15 @@ cleanupH dName = do
 
 -- | Helper to cleanup deployment.
 cleanupDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   DeploymentName ->
   m ()
 cleanupDeployment dName = do
   st <- ask
   let log = logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ cleanupCommand st
-  liftBase . log $ "call " <> unwords (cmd : args)
-  (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+  (view #deployment -> dep) <- getDeploymentS dName
+  cfg <- getDeploymentConfig dep
+  (ec, out, err) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
   liftBase $ print out >> print err
   deleteDeploymentLogs dName
   deleteDeployment dName
@@ -1159,17 +1137,18 @@ runStatusUpdater state = do
         pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
       checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
         let timeout = statusUpdateTimeout state
-        mEc <- case dStatus of
-          ArchivePending -> do
-            (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs dName
-            pure $ Just ec
-          _ -> do
-            getSingleFullInfo dName >>= \case
-              Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
-              Just (view #deployment -> dep) -> do
-                cfg <- getDeploymentConfig dep
-                (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
-                pure $ Just ec
+        mEc <-
+          getSingleFullInfo dName >>= \case
+            Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
+            Just (view #deployment -> dep) -> do
+              cfg <- getDeploymentConfig dep
+              case dStatus of
+                ArchivePending -> do
+                  (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
+                  pure $ Just ec
+                _ -> do
+                  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+                  pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-
         for (catMaybes checkResult) $ \(dName, transitionM, dStatus) ->

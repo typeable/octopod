@@ -5,7 +5,9 @@
 --This module contains control script utils.
 module Octopod.Server.ControlScriptUtils
   ( infoCommandArgs,
+    archiveCommandArgs,
     unarchiveCommandArgs,
+    cleanupCommandArgs,
     notificationCommandArgs,
     runCommand,
     runCommandWithoutPipes,
@@ -99,6 +101,15 @@ genericDeploymentCommandArgsNoConfig = do
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
 
+archiveCommandArgs :: GenericDeploymentCommandArgs m r
+archiveCommandArgs = genericDeploymentCommandArgs
+
+cleanupCommandArgs :: GenericDeploymentCommandArgs m r
+cleanupCommandArgs = genericDeploymentCommandArgs
+
+archiveCheckArgs :: GenericDeploymentCommandArgs m r
+archiveCheckArgs = genericDeploymentCommandArgs
+
 checkCommandArgs :: GenericDeploymentCommandArgs m r
 checkCommandArgs = genericDeploymentCommandArgs
 
@@ -153,30 +164,6 @@ notificationCommandArgs dName old new = do
       , T.unpack $ deploymentStatusToText old
       , "--new-status"
       , T.unpack $ deploymentStatusToText new
-      ]
-
-archiveCheckArgs ::
-  ( MonadReader r m
-  , HasType Namespace r
-  , HasType ProjectName r
-  , HasType Domain r
-  ) =>
-  DeploymentName ->
-  m ControlScriptArgs
-archiveCheckArgs dName = do
-  (ProjectName projectName) <- asks getTyped
-  (Domain domain) <- asks getTyped
-  (Namespace namespace) <- asks getTyped
-  return $
-    ControlScriptArgs
-      [ "--project-name"
-      , T.unpack projectName
-      , "--base-domain"
-      , T.unpack domain
-      , "--namespace"
-      , T.unpack namespace
-      , "--name"
-      , T.unpack . coerce $ dName
       ]
 
 runCommandArgs ::
