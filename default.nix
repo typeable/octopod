@@ -32,7 +32,23 @@ let
         dontStrip = false;
         dontPatchELF = false;
         enableDeadCodeElimination = true;
-        packages.octopod-backend = addLocalOptions { src = ./octopod-backend; };
+        packages.octopod-backend = addLocalOptions (
+          if prod
+          then {
+            src = pkgs.runCommand "octopod-backend-src" { }
+              ''
+                mkdir -p $out
+                cp -r ${./octopod-backend}/* $out
+                cp -r ${builtins.path { path = ./.git; name = "dot-git"; }}/ $out/.git/
+              '';
+            components.exes.octopod-exe = {
+              build-tools =
+                pkgs.lib.mkForce [ pkgs.buildPackages.buildPackages.gitReallyMinimal ];
+              extraSrcFiles = [ ".git/**/*" ];
+            };
+          }
+          else { src = ./octopod-backend; }
+        );
         packages.octo-cli = addLocalOptions { src = ./octo-cli; };
         packages.octopod-api = addLocalOptions { src = ./octopod-api; };
         packages.octopod-frontend = addLocalOptions { src = ./octopod-frontend; };

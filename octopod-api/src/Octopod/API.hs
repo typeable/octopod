@@ -42,7 +42,7 @@ type DefaultApplicationOverrides =
     :> ReqBody '[JSON] (Config 'DeploymentLevel)
     :> Post '[JSON] (DefaultConfig 'ApplicationLevel)
 
-type PingEndpoint = "ping" :> GetNoContent
+type PingEndpoint = "ping" :> Get '[PlainText] Text
 type ProjectNameEndpoint =
   "project_name" :> Get '[JSON] ProjectName
 
