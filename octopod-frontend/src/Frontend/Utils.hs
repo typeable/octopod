@@ -235,8 +235,8 @@ overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
         { buttonText = do
             state <- expandState
             pure $ case state of
-              ExpandedState -> "Hide"
-              ContractedState -> "Show all"
+              ExpandedState -> "Hide default configuration"
+              ContractedState -> "Show full configuration"
         , buttonInitialState = ContractedState
         , buttonType = Just ListingExpanderButton
         , buttonStyle = RegularExpanderButtonStyle
