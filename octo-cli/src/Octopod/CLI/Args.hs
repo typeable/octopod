@@ -14,8 +14,6 @@ data Args
   = Create
       { -- | deployment name
         name :: Text
-      , -- | deployment tag
-        tag :: Text
       , -- | application-level overrides to set
         setAppOverrides :: [Text]
       , -- | deployment-level overrides to set
@@ -29,8 +27,6 @@ data Args
   | Update
       { -- | deployment name
         name :: Text
-      , -- | deployment tag
-        newTag :: Maybe Text
       , -- | application-level overrides to set
         setAppOverrides :: [Text]
       , -- | application-level overrides to unset
@@ -96,7 +92,6 @@ createArgs :: Parser Args
 createArgs =
   Create
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-    <*> strOption (long "tag" <> short 't' <> help "deployment tag")
     <*> many
       ( strOption
           ( long "set-app-env-override"
@@ -128,7 +123,6 @@ updateArgs :: Parser Args
 updateArgs =
   Update
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-    <*> optional (strOption (long "tag" <> short 't' <> help "deployment tag"))
     <*> many
       ( strOption
           ( long "set-app-env-override"

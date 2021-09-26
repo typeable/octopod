@@ -157,10 +157,6 @@ newtype DeploymentName' t = DeploymentName {unDeploymentName :: t}
 
 type DeploymentName = DeploymentName' Text
 
-newtype DeploymentTag = DeploymentTag {unDeploymentTag :: Text}
-  deriving newtype
-    (Show, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq)
-
 data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction
   deriving stock (Show, Read, Eq, Ord, Generic)
   deriving (FromJSON, ToJSON) via Snake Action
