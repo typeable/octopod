@@ -22,6 +22,7 @@ import Data.Char
 import Data.Function
 import qualified Data.List as L
 import Data.Maybe (catMaybes)
+import Data.Ord
 import Data.Semigroup
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -62,7 +63,7 @@ fuzzySearch n h = case fuzzySearch' n h 0 0 of
 
 fuzzySearchMany :: Needle -> [Haystack] -> [(Haystack, [FuzzySearchStringChunk Text])]
 fuzzySearchMany needle haystacks =
-  fmap fst . L.sortOn snd $
+  fmap fst . L.sortOn (Down . snd) $
     mapMaybe
       ( \haystack ->
           fuzzySearch needle haystack
@@ -77,7 +78,7 @@ searchMany ::
   [Searched x SearchResult]
 searchMany "" = fmap wrapResult
 searchMany t =
-  fmap snd . L.sortOn fst . catMaybes
+  fmap snd . L.sortOn (Down . fst) . catMaybes
     . withStrategy (parListChunk 3 rpar)
     . fmap (search t)
 {-# INLINE searchMany #-}
