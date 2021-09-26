@@ -44,7 +44,7 @@ import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, isNothing, isJust)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Monoid
 import Data.Text as T (Text, null, pack)
 import Data.Text.Search
