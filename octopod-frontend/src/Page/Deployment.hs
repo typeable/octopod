@@ -218,7 +218,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
         cfgDyn <&> \cfg -> do
           let showVars bL l =
                 divClass "deployment__widget" $
-                  showNonEditableWorkingOverride (cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
+                  showNonEditableWorkingOverride (cfg ^. bL) (not $ cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
                     elemsUniq (cfg ^. l)
           deploymentSection "Deployment overrides" $ showVars #depConfigLoading #depConfig
           deploymentSection "App overrides" $ showVars #appConfigLoading #appConfig

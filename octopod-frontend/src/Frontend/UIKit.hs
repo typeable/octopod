@@ -280,11 +280,13 @@ showNonEditableWorkingOverride ::
   (MonadWidget t m, Renderable te) =>
   -- | Loading?
   Bool ->
+  -- | Is it fully loaded?
+  Bool ->
   NonEditableWorkingOverrideStyle ->
   -- | Overrides list.
   [WorkingOverride' te] ->
   m ()
-showNonEditableWorkingOverride loading style cfg =
+showNonEditableWorkingOverride loading loaded style cfg =
   divClass
     ( destructClasses $
         "listing" <> "listing--for-text" <> nonEditableWorkingOverrideStyleClasses style
@@ -293,7 +295,9 @@ showNonEditableWorkingOverride loading style cfg =
       case cfg of
         [] ->
           divClass "listing__item" $
-            elClass "span" "listing--info-text" $ text "no custom configuration"
+            elClass "span" "listing--info-text" $
+              text $
+                if loaded then "no configuration" else "no custom configuration"
         _ -> forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
           let wrapper = case val of
                 WorkingDeletedValue _ -> divClass "listing__item deleted"
@@ -312,7 +316,7 @@ showNonEditableWorkingOverride loading style cfg =
               WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ rndr txt
               WorkingDeletedValue Nothing -> do
                 elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
-                elClass "div" "listing__spinner" $ pure ()
+                when loading $ elClass "div" "listing__spinner" $ pure ()
       when loading $
         divClass "listing__item" $ do
           elClass "div" "listing__placeholder" $ pure ()

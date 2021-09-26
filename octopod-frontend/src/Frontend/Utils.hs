@@ -44,7 +44,7 @@ import qualified Data.Foldable as F
 import Data.Functor
 import Data.Generics.Labels ()
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, isNothing, isJust)
 import Data.Monoid
 import Data.Text as T (Text, null, pack)
 import Data.Text.Search
@@ -222,11 +222,11 @@ overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
             do
               defM <- defMDyn
               pure $
-                showNonEditableWorkingOverride (isNothing defM) RegularNonEditableWorkingOverrideStyle $
+                showNonEditableWorkingOverride (isNothing defM) (isJust defM) RegularNonEditableWorkingOverrideStyle $
                   elemsUniq $ constructWorkingOverrides defM ovs
       ContractedState ->
         let ovsList = elemsUniq $ constructWorkingOverrides Nothing ovs
-         in showNonEditableWorkingOverride False RegularNonEditableWorkingOverrideStyle $
+         in showNonEditableWorkingOverride False False RegularNonEditableWorkingOverrideStyle $
               take 3 ovsList
 
   expandState <-
