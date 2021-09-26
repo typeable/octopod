@@ -21,7 +21,6 @@ module Frontend.API
     fullInfoEndpoint,
     statusEndpoint,
     restoreEndpoint,
-    pingEndpoint,
     projectName,
     commandResponse,
     wsPath,
@@ -127,10 +126,6 @@ restoreEndpoint ::
   Dynamic t (Either Text DeploymentName) ->
   Event t () ->
   m (Event t (ReqResult () CommandResponse))
-pingEndpoint ::
-  MonadWidget t m =>
-  Event t () ->
-  m (Event t (ReqResult () NoContent))
 projectName ::
   MonadWidget t m =>
   Event t () ->
@@ -148,7 +143,7 @@ deploymentOverrideKeys
           :<|> statusEndpoint
           :<|> restoreEndpoint
         )
-  :<|> pingEndpoint
+  :<|> _pingEndpoint
   :<|> projectName = apiClients
 
 -- | Parser of kubectl command responses.

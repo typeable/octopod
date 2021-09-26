@@ -130,6 +130,7 @@ data AppState = AppState
   , depOverrideKeysCache :: CacheMap ServerError AppM' () [Text]
   , appOverridesCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
   , appOverrideKeysCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text]
+  , gitSha :: Text
   }
   deriving stock (Generic)
 
@@ -154,8 +155,11 @@ data FullInfoListType
   | FullInfoOnlyForOne DeploymentName
   deriving stock (Show)
 
-runOctopodServer :: IO ()
-runOctopodServer = do
+runOctopodServer ::
+  -- | The git SHA
+  Text ->
+  IO ()
+runOctopodServer sha = do
   logger' <- newLogger
   logInfo logger' "started"
   bgWorkersC <- newIORef 0
@@ -257,6 +261,7 @@ runOctopodServer = do
           , depOverrideKeysCache = depOverrideKeysCache'
           , appOverridesCache = appOverridesCache'
           , appOverrideKeysCache = appOverrideKeysCache'
+          , gitSha = sha
           }
 
       app' = app appSt
@@ -885,10 +890,10 @@ getInfo dName = do
       }
 
 -- | Handles the 'ping' request.
-pingH :: AppM NoContent
+pingH :: AppM Text
 pingH = do
   _ <- runStatement $ select $ pure $ litExpr True
-  pure NoContent
+  asks gitSha
 
 -- | Handles the 'project_name' request.
 projectNameH :: AppM ProjectName
