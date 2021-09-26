@@ -25,7 +25,6 @@ deploymentSchema =
         DeploymentSchema
           { id_ = "id"
           , name = "name"
-          , tag = "tag"
           , appOverrides = "app_overrides"
           , deploymentOverrides = "deployment_overrides"
           , createdAt = "created_at"
@@ -41,7 +40,6 @@ deploymentSchema =
 data DeploymentSchema f = DeploymentSchema
   { id_ :: Column f DeploymentId
   , name :: Column f DeploymentName
-  , tag :: Column f DeploymentTag
   , appOverrides :: Column f (Overrides 'ApplicationLevel)
   , deploymentOverrides :: Column f (Overrides 'DeploymentLevel)
   , createdAt :: Column f UTCTime
@@ -62,7 +60,6 @@ data DeploymentLogSchema f = DeploymentLogSchema
   { actionId :: Column f ActionId
   , deploymentId :: Column f DeploymentId
   , action :: Column f Action
-  , deploymentTag :: Column f DeploymentTag
   , exitCode :: Column f Int64
   , createdAt :: Column f UTCTime
   , archived :: Column f Bool
@@ -85,7 +82,6 @@ deploymentLogSchema =
           { actionId = "id"
           , deploymentId = "deployment_id"
           , action = "action"
-          , deploymentTag = "tag"
           , exitCode = "exit_code"
           , createdAt = "created_at"
           , archived = "archived"

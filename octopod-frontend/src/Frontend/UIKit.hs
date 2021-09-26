@@ -41,6 +41,7 @@ import Frontend.UIKit.Button.Sort as X
 import Frontend.UIKit.Button.Static as X
 import GHC.Generics (Generic)
 import Reflex.Dom
+import Reflex.Dom.Renderable
 import Reflex.Network
 
 (.~~) :: ASetter' s a -> a -> s -> s
@@ -276,14 +277,16 @@ nonEditableWorkingOverrideStyleClasses LargeNonEditableWorkingOverrideStyle = "l
 
 -- | Widget that shows overrides list. It does not depend on their type.
 showNonEditableWorkingOverride ::
-  MonadWidget t m =>
+  (MonadWidget t m, Renderable te) =>
   -- | Loading?
+  Bool ->
+  -- | Is it fully loaded?
   Bool ->
   NonEditableWorkingOverrideStyle ->
   -- | Overrides list.
-  [WorkingOverride] ->
+  [WorkingOverride' te] ->
   m ()
-showNonEditableWorkingOverride loading style cfg =
+showNonEditableWorkingOverride loading loaded style cfg =
   divClass
     ( destructClasses $
         "listing" <> "listing--for-text" <> nonEditableWorkingOverrideStyleClasses style
@@ -292,7 +295,9 @@ showNonEditableWorkingOverride loading style cfg =
       case cfg of
         [] ->
           divClass "listing__item" $
-            elClass "span" "listing--info-text" $ text "no custom configuration"
+            elClass "span" "listing--info-text" $
+              text $
+                if loaded then "no configuration" else "no custom configuration"
         _ -> forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
           let wrapper = case val of
                 WorkingDeletedValue _ -> divClass "listing__item deleted"
@@ -302,16 +307,16 @@ showNonEditableWorkingOverride loading style cfg =
                   CustomWorkingOverrideKey -> elClass "span" "listing__key"
                   DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
             keyWrapper $ do
-              text key
+              rndr key
               text ": "
 
             case val of
-              WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
-              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
-              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
+              WorkingCustomValue txt -> elClass "span" "listing__value" $ rndr txt
+              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ rndr txt
+              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ rndr txt
               WorkingDeletedValue Nothing -> do
                 elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
-                elClass "div" "listing__spinner" $ pure ()
+                when loading $ elClass "div" "listing__spinner" $ pure ()
       when loading $
         divClass "listing__item" $ do
           elClass "div" "listing__placeholder" $ pure ()

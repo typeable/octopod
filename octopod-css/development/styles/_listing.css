@@ -66,12 +66,13 @@
         .listing__placeholder {
             content: "";
             display: inline-block;
-            height: 14px;
+            height: 12px;
             width: 140px;
             border-radius: 2px;
             background: rgba(143, 143, 143, 0.2);
             margin-right: 4px;
-            margin-top: 3px;
+            margin-top: -5px;
+            margin-bottom: -1px;
         }
 
         .listing__placeholder__value {
@@ -95,7 +96,7 @@
 
 .listing__spinner {
     display: inline-block;
-    vertical-align: top;
+    vertical-align: middle;
     border: none;
     background-color: transparent;
     background-repeat: no-repeat;
@@ -104,11 +105,24 @@
     padding: 0;
     width: 20px;
     height: 20px;
-    cursor: pointer;
+    margin-top: -10px;
+    margin-bottom: -7px;
+    cursor: default;
     text-indent: 200%;
     white-space: nowrap;
     overflow: hidden;
     opacity: 1;
     background-image: url("../vectors/spot-loader.svg");
     animation: loading 2.2s linear infinite;
+}
+
+.listing.listing--larger .listing__placeholder {
+    height: 14px;
+}
+
+.listing.listing--larger .listing__spinner {
+    background-size: 24px 24px;
+    width: 24px;
+    height: 24px;
+    margin-bottom: -5px;
 }

@@ -23,9 +23,6 @@ deriving newtype instance DBEq DeploymentId
 deriving newtype instance DBType DeploymentName
 deriving newtype instance DBEq DeploymentName
 
-deriving newtype instance DBType DeploymentTag
-deriving newtype instance DBEq DeploymentTag
-
 instance DBType Action where
   typeInformation = parseTypeInformationFromMapping actionText
 

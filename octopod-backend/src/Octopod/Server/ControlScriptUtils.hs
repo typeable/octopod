@@ -5,7 +5,9 @@
 --This module contains control script utils.
 module Octopod.Server.ControlScriptUtils
   ( infoCommandArgs,
+    archiveCommandArgs,
     unarchiveCommandArgs,
+    cleanupCommandArgs,
     notificationCommandArgs,
     runCommand,
     runCommandWithoutPipes,
@@ -13,7 +15,7 @@ module Octopod.Server.ControlScriptUtils
     runCommandArgs',
     checkCommandArgs,
     archiveCheckArgs,
-    tagCheckCommandArgs,
+    configCheckCommandArgs,
 
     -- * overrides
     defaultDeploymentOverridesArgs,
@@ -67,8 +69,6 @@ genericDeploymentCommandArgs cfg dep = do
       , T.unpack . coerce $ namespace
       , "--name"
       , T.unpack . coerce $ dep ^. #name
-      , "--tag"
-      , T.unpack . coerce $ tag dep
       ]
       <> fullConfigArgs cfg
 
@@ -101,11 +101,20 @@ genericDeploymentCommandArgsNoConfig = do
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
 
+archiveCommandArgs :: GenericDeploymentCommandArgs m r
+archiveCommandArgs = genericDeploymentCommandArgs
+
+cleanupCommandArgs :: GenericDeploymentCommandArgs m r
+cleanupCommandArgs = genericDeploymentCommandArgs
+
+archiveCheckArgs :: GenericDeploymentCommandArgs m r
+archiveCheckArgs = genericDeploymentCommandArgs
+
 checkCommandArgs :: GenericDeploymentCommandArgs m r
 checkCommandArgs = genericDeploymentCommandArgs
 
-tagCheckCommandArgs :: GenericDeploymentCommandArgs m r
-tagCheckCommandArgs = genericDeploymentCommandArgs
+configCheckCommandArgs :: GenericDeploymentCommandArgs m r
+configCheckCommandArgs = genericDeploymentCommandArgs
 
 defaultDeploymentOverridesArgs :: GenericDeploymentCommandArgsNoConfig m r
 defaultDeploymentOverridesArgs = genericDeploymentCommandArgsNoConfig
@@ -132,13 +141,12 @@ notificationCommandArgs ::
   , HasType Domain r
   ) =>
   DeploymentName ->
-  DeploymentTag ->
   -- | Previous status
   DeploymentStatus ->
   -- | New status
   DeploymentStatus ->
   m ControlScriptArgs
-notificationCommandArgs dName dTag old new = do
+notificationCommandArgs dName old new = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -152,36 +160,10 @@ notificationCommandArgs dName dTag old new = do
       , T.unpack namespace
       , "--name"
       , T.unpack . coerce $ dName
-      , "--tag"
-      , T.unpack . coerce $ dTag
       , "--old-status"
       , T.unpack $ deploymentStatusToText old
       , "--new-status"
       , T.unpack $ deploymentStatusToText new
-      ]
-
-archiveCheckArgs ::
-  ( MonadReader r m
-  , HasType Namespace r
-  , HasType ProjectName r
-  , HasType Domain r
-  ) =>
-  DeploymentName ->
-  m ControlScriptArgs
-archiveCheckArgs dName = do
-  (ProjectName projectName) <- asks getTyped
-  (Domain domain) <- asks getTyped
-  (Namespace namespace) <- asks getTyped
-  return $
-    ControlScriptArgs
-      [ "--project-name"
-      , T.unpack projectName
-      , "--base-domain"
-      , T.unpack domain
-      , "--namespace"
-      , T.unpack namespace
-      , "--name"
-      , T.unpack . coerce $ dName
       ]
 
 runCommandArgs ::

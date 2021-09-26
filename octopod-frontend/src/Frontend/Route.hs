@@ -33,7 +33,7 @@ data Routes :: Type -> Type where
 deriving stock instance Show (Routes a)
 
 fmap mconcat . sequence $
-  [ makeWrapped ''DeploymentName
+  [ makeWrapped ''DeploymentName'
   , deriveRouteComponent ''Routes
   ]
 

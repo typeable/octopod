@@ -84,12 +84,11 @@
     /* В случае table-layout: fixed; ширины колонкам задаются по ширинам в первой строке */
     .table--deployments th:nth-child(1) { width: 16.1818%; } /* 178px */
     .table--deployments th:nth-child(2) { width: 16.1818%; } /* 178px */
-    .table--deployments th:nth-child(3) { width: 8%; } /* 88px */
-    .table--deployments th:nth-child(4) { width: 20.3636%; } /* 224px */
-    .table--deployments th:nth-child(5) { width: 20.3636%; } /* 224px */
+    .table--deployments th:nth-child(3) { width: 24.3636%; } /* 224px */
+    .table--deployments th:nth-child(4) { width: 24.3636%; } /* 224px */
+    .table--deployments th:nth-child(5) { width: 9.4546%; } /* 104px */
     .table--deployments th:nth-child(6) { width: 9.4546%; } /* 104px */
-    .table--deployments th:nth-child(7) { width: 9.4546%; } /* 104px */
-    .table--deployments th:nth-child(8) { width: 52px; }
+    .table--deployments th:nth-child(7) { width: 52px; }
 
     .table--deployments th:first-child,
     .table--deployments td:first-child {
@@ -119,38 +118,32 @@
 
     }
 
-    /* Tag */
-    .table--deployments td:nth-child(3) {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
     /* App overrides */
-    .table--deployments td:nth-child(4) {
+    .table--deployments td:nth-child(3) {
 
     }
 
     /* Deployment overrides */
-    .table--deployments td:nth-child(5) {
+    .table--deployments td:nth-child(4) {
 
     }
 
     /* Created */
-    .table--deployments td:nth-child(6) {
+    .table--deployments td:nth-child(5) {
         white-space: nowrap;
     }
 
     /* Changed */
-    .table--deployments td:nth-child(7) {
+    .table--deployments td:nth-child(6) {
         white-space: nowrap;
     }
 
     /* Dropdown */
-    .table--deployments td:nth-child(8) {
+    .table--deployments td:nth-child(7) {
 
     }
-        .table--deployments td:nth-child(8) .drop {
+
+        .table--deployments td:nth-child(7) .drop {
             margin: -8px;
         }
 
@@ -166,12 +159,11 @@
 
     /* В случае table-layout: fixed; ширины колонкам задаются по ширинам в первой строке */
     .table--actions th:nth-child(1) { width: 8%; }
-    .table--actions th:nth-child(2) { width: 20%; }
-    .table--actions th:nth-child(3) { width: 21%; }
-    .table--actions th:nth-child(4) { width: 20%; }
-    .table--actions th:nth-child(5) { width: 7%; }
-    .table--actions th:nth-child(6) { width: 15%; }
-    .table--actions th:nth-child(7) { width: 9%; }
+    .table--actions th:nth-child(2) { width: 30%; }
+    .table--actions th:nth-child(3) { width: 31%; }
+    .table--actions th:nth-child(4) { width: 7%; }
+    .table--actions th:nth-child(5) { width: 15%; }
+    .table--actions th:nth-child(6) { width: 9%; }
 
     .table--actions th:first-child,
     .table--actions td:first-child {
@@ -197,7 +189,6 @@
 
     /* Image tag */
     .table--actions td:nth-child(2) {
-        word-break: break-all;
     }
 
     /* Overrides */

@@ -97,7 +97,11 @@ in
       failScript = pkgs.writeScript "fail.sh" ''
         #!${pkgs.bash}/bin/bash
 
-        exit 1
+        1>&2 echo "You did something wrong :("
+
+        echo "You did something wrong, but you shouldn't see this."
+
+        exit 0
       '';
 
       infoScript = pkgs.writeScript "info.sh" ''
@@ -137,7 +141,7 @@ in
         export CHECKING_COMMAND=${echoScript}
         export CLEANUP_COMMAND=${echoScript}
         export ARCHIVE_CHECKING_COMMAND=${echoScript}
-        export TAG_CHECKING_COMMAND=${echoScript}
+        export CONFIG_CHECKING_COMMAND=${failScript}
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_OVERRIDES_COMMAND=${infoScript}

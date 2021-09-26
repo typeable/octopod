@@ -36,7 +36,7 @@ import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
-import Data.Text (pack, unpack, unwords)
+import Data.Text (pack)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
@@ -115,7 +115,7 @@ data AppState = AppState
   , -- | archive checking command path
     archiveCheckingCommand :: Command
   , -- | tag checking command path
-    tagCheckingCommand :: Command
+    configCheckingCommand :: Command
   , infoCommand :: Command
   , notificationCommand :: Maybe Command
   , deploymentOverridesCommand :: Command
@@ -178,7 +178,7 @@ runOctopodServer = do
   checkingCmd <- Command . pack <$> getEnvOrDie "CHECKING_COMMAND"
   cleanupCmd <- Command . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   archiveCheckingCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
-  tagCheckingCmd <- Command . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
+  tagCheckingCmd <- Command . pack <$> getEnvOrDie "CONFIG_CHECKING_COMMAND"
   infoCmd <- Command . pack <$> getEnvOrDie "INFO_COMMAND"
   dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_OVERRIDES_COMMAND"
   dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
@@ -244,7 +244,7 @@ runOctopodServer = do
           , checkingCommand = checkingCmd
           , cleanupCommand = cleanupCmd
           , archiveCheckingCommand = archiveCheckingCmd
-          , tagCheckingCommand = tagCheckingCmd
+          , configCheckingCommand = tagCheckingCmd
           , infoCommand = infoCmd
           , notificationCommand = notificationCmd
           , deploymentOverridesCommand = dOverridesCmd
@@ -413,7 +413,7 @@ fullInfoH dName = do
     Nothing ->
       throwError
         err404
-          { errBody = validationError ["Name not found"] []
+          { errBody = validationError ["Name not found"]
           }
 
 -- | Handles the 'full_info' request of the octo CLI API.
@@ -454,7 +454,7 @@ createH dep = do
           \under 17 characters and begin with a letter."
     throwError
       err400
-        { errBody = validationError [badNameText] []
+        { errBody = validationError [badNameText]
         }
   t1 <- liftBase getCurrentTime
   failIfImageNotFound dep
@@ -474,7 +474,6 @@ createH dep = do
                         [ DeploymentSchema
                             { id_ = unsafeDefault
                             , name = litExpr $ dep ^. #name
-                            , tag = litExpr $ dep ^. #tag
                             , appOverrides = litExpr $ dep ^. #appOverrides
                             , deploymentOverrides = litExpr $ dep ^. #deploymentOverrides
                             , createdAt = now
@@ -495,7 +494,7 @@ createH dep = do
             | code == unique_violation ->
               throwError
                 err400
-                  { errBody = validationError ["Deployment already exists"] []
+                  { errBody = validationError ["Deployment already exists"]
                   }
           Left _ ->
             throwError err409 {errBody = appError "Some database error"}
@@ -566,8 +565,6 @@ createDeployment dep = do
           , T.unpack . coerce $ namespace st
           , "--name"
           , T.unpack . coerce $ dep ^. #name
-          , "--tag"
-          , T.unpack . coerce $ dep ^. #tag
           ]
           <> fullConfigArgs cfg
   (ec, out, err) <- runCommandArgs creationCommand args
@@ -722,7 +719,7 @@ transitionToStatus dName s = do
   forM_ notificationCmd $ \nCmd ->
     runBgWorker . void $
       runCommandArgs' nCmd
-        =<< notificationCommandArgs dName (dep ^. #tag) oldS newS
+        =<< notificationCommandArgs dName oldS newS
   liftBase $ sendReloadEvent st
 
 assertStatusTransitionPossible ::
@@ -777,22 +774,10 @@ archiveH :: DeploymentName -> AppM CommandResponse
 archiveH dName = do
   failIfGracefulShutdownActivated
   t1 <- liftBase getCurrentTime
-  st <- ask
-  let log = liftBase . logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ archiveCommand st
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
-    log $ "call " <> unwords (cmd : args)
-    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+    (view #deployment -> dep) <- getDeploymentS dName
+    cfg <- getDeploymentConfig dep
+    (ec, out, err) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
@@ -831,7 +816,6 @@ updateH dName dUpdate = do
                 , set = \() ds ->
                     ds & #appOverrides .~ litExpr (dUpdate ^. #appOverrides)
                       & #deploymentOverrides .~ litExpr (dUpdate ^. #deploymentOverrides)
-                      & #tag .~ litExpr (dUpdate ^. #newTag)
                 , updateWhere = \() ds -> ds ^. #name ==. litExpr dName
                 , returning = Projection id
                 }
@@ -851,16 +835,12 @@ updateH dName dUpdate = do
             , T.unpack . coerce $ namespace st
             , "--name"
             , T.unpack . coerce $ dName
-            , "--tag"
-            , T.unpack . coerce $ dep ^. #tag
             ]
             <> fullConfigArgs cfg
     (ec, out, err) <- runCommandArgs updateCommand args
     liftBase . log $
       "deployment updated, name: "
         <> coerce dName
-        <> ", tag: "
-        <> coerce (dep ^. #tag)
     t2 <- liftBase getCurrentTime
     let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
@@ -934,25 +914,15 @@ cleanupH dName = do
 
 -- | Helper to cleanup deployment.
 cleanupDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   DeploymentName ->
   m ()
 cleanupDeployment dName = do
   st <- ask
   let log = logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ cleanupCommand st
-  liftBase . log $ "call " <> unwords (cmd : args)
-  (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+  (view #deployment -> dep) <- getDeploymentS dName
+  cfg <- getDeploymentConfig dep
+  (ec, out, err) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
   liftBase $ print out >> print err
   deleteDeploymentLogs dName
   deleteDeployment dName
@@ -1080,7 +1050,6 @@ createDeploymentLog dep act ec dur out err = do
                     { actionId = unsafeDefault
                     , deploymentId = litExpr dId
                     , action = litExpr act
-                    , deploymentTag = litExpr $ dep ^. #tag
                     , exitCode = litExpr $ case ec of
                         ExitSuccess -> 0
                         ExitFailure errCode -> fromIntegral errCode
@@ -1123,20 +1092,20 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs cfg dep
+  (ec, _, Stderr err) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
-      throwError err400 {errBody = validationError [] ["Tag not found"]}
+      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 err}
 
 -- | Helper to create an application-level error.
 appError :: Text -> BSL.ByteString
 appError = encode . AppError
 
 -- | Helper to create a validation-level error.
-validationError :: [Text] -> [Text] -> BSL.ByteString
-validationError nameErrors tagErrors =
-  encode $ ValidationError nameErrors tagErrors
+validationError :: [Text] -> BSL.ByteString
+validationError nameErrors =
+  encode $ ValidationError nameErrors
 
 -- | Helper to send an event to the WS event channel.
 sendReloadEvent :: AppState -> IO ()
@@ -1165,20 +1134,21 @@ runStatusUpdater state = do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
         where_ $ ds ^. #status /=. litExpr Archived
-        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt), ds ^. #tag)
-      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts, _) -> do
+        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
+      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
         let timeout = statusUpdateTimeout state
-        mEc <- case dStatus of
-          ArchivePending -> do
-            (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs dName
-            pure $ Just ec
-          _ -> do
-            getSingleFullInfo dName >>= \case
-              Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
-              Just (view #deployment -> dep) -> do
-                cfg <- getDeploymentConfig dep
-                (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
-                pure $ Just ec
+        mEc <-
+          getSingleFullInfo dName >>= \case
+            Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
+            Just (view #deployment -> dep) -> do
+              cfg <- getDeploymentConfig dep
+              case dStatus of
+                ArchivePending -> do
+                  (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
+                  pure $ Just ec
+                _ -> do
+                  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+                  pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-
         for (catMaybes checkResult) $ \(dName, transitionM, dStatus) ->

@@ -16,7 +16,7 @@ data:
   CHECKING_COMMAND: {{ printf "%s/check" (include "controlScriptsPath" .)  | quote }}
   CLEANUP_COMMAND: {{ printf "%s/cleanup" (include "controlScriptsPath" .)  | quote }}
   ARCHIVE_CHECKING_COMMAND: {{ printf "%s/archive_check" (include "controlScriptsPath" .)  | quote }}
-  TAG_CHECKING_COMMAND: {{ printf "%s/tag_check" (include "controlScriptsPath" .)  | quote }}
+  CONFIG_CHECKING_COMMAND: {{ printf "%s/tag_check" (include "controlScriptsPath" .)  | quote }}
   INFO_COMMAND: {{ printf "%s/info" (include "controlScriptsPath" .)  | quote }}
   {{- range $name, $value := .Values.octopod.env }}
   {{ $name }}: {{ $value | quote }}
