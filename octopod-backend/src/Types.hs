@@ -13,7 +13,6 @@ module Types
     Domain (..),
     Namespace (..),
     Command (..),
-    ArchiveRetention (..),
     Timeout (..),
     ControlScriptArgs (..),
   )
@@ -51,10 +50,6 @@ newtype Domain = Domain {unDomain :: Text}
 
 -- | A Kubernetes namespace.
 newtype Namespace = Namespace {unNamespace :: Text}
-  deriving stock (Show)
-
--- | Archive retention.
-newtype ArchiveRetention = ArchiveRetention {unArchiveRetention :: NominalDiffTime}
   deriving stock (Show)
 
 -- | Timeout.

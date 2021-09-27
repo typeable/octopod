@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
 import qualified Data.Csv as C
+import Data.Fixed
 import Data.Foldable
 import Data.Functor
 import Data.Generics.Labels ()
@@ -99,8 +100,6 @@ data AppState = AppState
     baseDomain :: !Domain
   , -- | namespace
     namespace :: !Namespace
-  , -- | archive retention
-    archiveRetention :: !ArchiveRetention
   , -- | status update timeout
     statusUpdateTimeout :: !Timeout
   , -- | creation command path
@@ -176,7 +175,7 @@ runOctopodServer sha = do
   projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  archRetention <- ArchiveRetention . fromIntegral <$> getEnvOrDieWith "ARCHIVE_RETENTION" (readMaybe @Int)
+  archRetention <- fromIntegral <$> getEnvOrDieWith "ARCHIVE_RETENTION" (readMaybe @Int)
   stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral <$> getEnvOrDieWith "STATUS_UPDATE_TIMEOUT" (readMaybe @Int)
   creationCmd <- Command . pack <$> getEnvOrDie "CREATION_COMMAND"
   updateCmd <- Command . pack <$> getEnvOrDie "UPDATE_COMMAND"
@@ -242,7 +241,6 @@ runOctopodServer sha = do
           , projectName = projName
           , baseDomain = domain
           , namespace = ns
-          , archiveRetention = archRetention
           , statusUpdateTimeout = stUpdateTimeout
           , creationCommand = creationCmd
           , updateCommand = updateCmd
@@ -272,12 +270,37 @@ runOctopodServer sha = do
       uiServerPort = unServerPort $ octopodUIPort opts
       powerServerPort = unServerPort serverPort
       wsServerPort = unServerPort $ octopodWSPort opts
+  void . L.fork $ flip runReaderT appSt $ runArchiveCleanup archRetention
   powerApp' <- powerApp powerAuthorizationHeader appSt
   (run uiServerPort app')
     `race_` (run powerServerPort powerApp')
     `race_` (run wsServerPort wsApp')
     `race_` (runStatusUpdater appSt)
     `race_` (runShutdownHandler appSt)
+
+runArchiveCleanup ::
+  forall m.
+  (MonadReader AppState m, MonadBaseControl IO m) =>
+  NominalDiffTime ->
+  m ()
+runArchiveCleanup retention = do
+  isShuttingDown >>= \case
+    True -> pure ()
+    False -> do
+      cutoff <- liftBase getCurrentTime <&> addUTCTime (negate retention)
+      dNames <- runStatement $
+        select $ do
+          ds <- each deploymentSchema
+          where_ $ (ds ^. #status) `in_` (litExpr <$> archivedStatuses)
+          where_ $ ds ^. #archivedAt <. litExpr (Just cutoff)
+          pure $ ds ^. #name
+      for_ dNames $ \dName -> (>>= logLeft) . runExceptT $
+        runDeploymentBgWorker Nothing dName (pure ()) $ \() -> cleanupDeployment dName
+      threadDelayMicro (realToFrac $ retention / 10)
+      runArchiveCleanup retention
+  where
+    threadDelayMicro :: Micro -> m ()
+    threadDelayMicro (MkFixed i) = liftBase $ threadDelay (fromInteger i)
 
 runTransaction ::
   (MonadReader AppState m, MonadBaseControl IO m) =>
@@ -380,7 +403,6 @@ powerServer (Authenticated ()) =
       :<|> restoreH
   )
     :<|> getActionInfoH
-    :<|> cleanArchiveH
 powerServer _ = throwAll err401
 
 -- | Application with the WS API.
@@ -967,25 +989,6 @@ deleteDeployment dName =
         , returning = pure ()
         }
 
--- | Handles the 'clean-archive' request.
-cleanArchiveH :: AppM CommandResponse
-cleanArchiveH = do
-  failIfGracefulShutdownActivated
-  st <- ask
-  let archRetention = unArchiveRetention . archiveRetention $ st
-  cutoff <- liftBase getCurrentTime <&> addUTCTime (negate archRetention)
-  dNames <- runStatement $
-    select $ do
-      ds <- each deploymentSchema
-      where_ $ (ds ^. #status) `in_` (litExpr <$> archivedStatuses)
-      where_ $ ds ^. #archivedAt <. litExpr (Just cutoff)
-      pure $ ds ^. #name
-  runBgWorker . void $
-    for dNames $ \dName ->
-      runDeploymentBgWorker Nothing dName (pure ()) $ \() -> cleanupDeployment dName
-
-  pure Success
-
 -- | Handles the 'restore' request.
 restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
@@ -1133,10 +1136,7 @@ runStatusUpdater state = do
   forever $ do
     currentTime <- liftBase getCurrentTime
     let cutoff = addUTCTime (negate interval) currentTime
-        logLeft :: Either ServerError () -> IO ()
-        logLeft (Left err) = logErr . T.pack $ displayException err
-        logLeft (Right ()) = pure ()
-    (>>= logLeft) . runExceptT . flip runReaderT state $ do
+    flip runReaderT state . (>>= logLeft) . runExceptT $ do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
@@ -1180,6 +1180,13 @@ runStatusUpdater state = do
       when (Prelude.or updated) $ liftBase $ sendReloadEvent state
       liftBase $ threadDelay 2000000
 
+logLeft :: (MonadBase IO m, MonadReader AppState m, Exception e) => Either e () -> m ()
+logLeft (Left err) = do
+  state <- ask
+  let logErr = liftBase . logWarning (logger state)
+  logErr . T.pack $ displayException err
+logLeft (Right ()) = pure ()
+
 -- | Returns the new deployment status.
 statusTransition ::
   ExitCode ->
@@ -1209,11 +1216,15 @@ failureStatusType _ = GenericFailure
 -- if graceful shutdown has been activated.
 failIfGracefulShutdownActivated :: AppM ()
 failIfGracefulShutdownActivated = do
-  gracefulShutdownAct <- gracefulShutdownActivated <$> ask
-  gracefulShutdown <- liftIO . readIORef $ gracefulShutdownAct
+  gracefulShutdown <- isShuttingDown
   if gracefulShutdown
     then throwError err405 {errBody = appError "Graceful shutdown activated"}
     else pure ()
+
+isShuttingDown :: (MonadReader AppState m, MonadBase IO m) => m Bool
+isShuttingDown = do
+  gracefulShutdownAct <- gracefulShutdownActivated <$> ask
+  liftBase . readIORef $ gracefulShutdownAct
 
 -- | Handles the graceful shutdown signal.
 -- Sends a signal to the 'shutdownSem' semaphore
