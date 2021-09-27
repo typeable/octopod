@@ -67,6 +67,7 @@ import System.Environment (lookupEnv)
 import System.Exit
 import System.Log.FastLogger
 import System.Posix.Signals (sigTERM)
+import Text.Read (readMaybe)
 import Types
 import Prelude hiding (lines, log, unlines, unwords)
 
@@ -81,56 +82,56 @@ newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
 -- | Octopod Server state definition.
 data AppState = AppState
   { -- | postgres pool
-    dbPool :: Pool Connection
+    dbPool :: !(Pool Connection)
   , -- | logger
-    logger :: TimedFastLogger
+    logger :: !TimedFastLogger
   , -- | channel for WS events for the frontend
-    eventSink :: TChan WSEvent
+    eventSink :: !(TChan WSEvent)
   , -- | background workers counter
-    bgWorkersCounter :: IORef Int
+    bgWorkersCounter :: !(IORef Int)
   , -- | flag of activating graceful shutdown
-    gracefulShutdownActivated :: IORef Bool
+    gracefulShutdownActivated :: !(IORef Bool)
   , -- | semaphore for graceful shutdown
-    shutdownSem :: MVar ()
+    shutdownSem :: !(MVar ())
   , -- | project name
-    projectName :: ProjectName
+    projectName :: !ProjectName
   , -- | base domain
-    baseDomain :: Domain
+    baseDomain :: !Domain
   , -- | namespace
-    namespace :: Namespace
+    namespace :: !Namespace
   , -- | archive retention
-    archiveRetention :: ArchiveRetention
+    archiveRetention :: !ArchiveRetention
   , -- | status update timeout
-    statusUpdateTimeout :: Timeout
+    statusUpdateTimeout :: !Timeout
   , -- | creation command path
-    creationCommand :: Command
+    creationCommand :: !Command
   , -- | update command path
-    updateCommand :: Command
+    updateCommand :: !Command
   , -- | deletion command path
-    archiveCommand :: Command
+    archiveCommand :: !Command
   , -- | checking command path
-    checkingCommand :: Command
+    checkingCommand :: !Command
   , -- | cleanup command path
-    cleanupCommand :: Command
+    cleanupCommand :: !Command
   , -- | archive checking command path
-    archiveCheckingCommand :: Command
+    archiveCheckingCommand :: !Command
   , -- | tag checking command path
-    configCheckingCommand :: Command
-  , infoCommand :: Command
-  , notificationCommand :: Maybe Command
-  , deploymentOverridesCommand :: Command
-  , deploymentOverrideKeysCommand :: Command
-  , applicationOverridesCommand :: Command
-  , applicationOverrideKeysCommand :: Command
-  , unarchiveCommand :: Command
+    configCheckingCommand :: !Command
+  , infoCommand :: !Command
+  , notificationCommand :: !(Maybe Command)
+  , deploymentOverridesCommand :: !Command
+  , deploymentOverrideKeysCommand :: !Command
+  , applicationOverridesCommand :: !Command
+  , applicationOverrideKeysCommand :: !Command
+  , unarchiveCommand :: !Command
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
-    lockedDeployments :: LockedDeployments
-  , depOverridesCache :: CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel)
-  , depOverrideKeysCache :: CacheMap ServerError AppM' () [Text]
-  , appOverridesCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
-  , appOverrideKeysCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text]
-  , gitSha :: Text
+    lockedDeployments :: !LockedDeployments
+  , depOverridesCache :: !(CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel))
+  , depOverrideKeysCache :: !(CacheMap ServerError AppM' () [Text])
+  , appOverridesCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
+  , appOverrideKeysCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text])
+  , gitSha :: !Text
   }
   deriving stock (Generic)
 
@@ -171,11 +172,12 @@ runOctopodServer sha = do
   opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
       getEnvOrDie eName = lookupEnv eName ?! (eName <> " is not set")
+      getEnvOrDieWith eName f = fmap (>>= f) (lookupEnv eName) ?! (eName <> " is not set")
   projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  archRetention <- ArchiveRetention . fromIntegral . read @Int <$> getEnvOrDie "ARCHIVE_RETENTION"
-  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral . read @Int <$> getEnvOrDie "STATUS_UPDATE_TIMEOUT"
+  archRetention <- ArchiveRetention . fromIntegral <$> getEnvOrDieWith "ARCHIVE_RETENTION" (readMaybe @Int)
+  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral <$> getEnvOrDieWith "STATUS_UPDATE_TIMEOUT" (readMaybe @Int)
   creationCmd <- Command . pack <$> getEnvOrDie "CREATION_COMMAND"
   updateCmd <- Command . pack <$> getEnvOrDie "UPDATE_COMMAND"
   archiveCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_COMMAND"
