@@ -42,9 +42,6 @@ type RestoreEndpoint c =
 type GetActionInfoEndpoint =
   "log" :> Capture "action_id" ActionId :> Get '[JSON] ActionInfo
 
-type CleanArchiveEndpoint =
-  "clean_archive" :> Delete '[JSON] CommandResponse
-
 type DeploymentAPI' c =
   Auth '[AuthHeaderAuth] () :> "api" :> "v1"
     :> ( "deployments"
@@ -69,9 +66,6 @@ type DeploymentAPI' c =
              )
           :<|> GetActionInfoEndpoint
           -- endpoint to get action logs
-          :<|> CleanArchiveEndpoint
-          -- endpoint to clean up resources of all archived deployments
-          -- according to the archive retention policy
        )
 
 data AuthHeaderAuth

@@ -81,8 +81,6 @@ runOcto = do
         handleCleanup auth . coerce $ tName
       Restore tName ->
         handleRestore auth . coerce $ tName
-      CleanArchive ->
-        handleCleanArchive auth
       GetActionLogs aId l -> handleGetActionInfo auth aId l
 
 -- | Returns BaseUrl from 'OCTOPOD_URL' environment variable
@@ -190,13 +188,6 @@ handleRestore auth dName = do
   liftIO $
     handleResponse (const $ pure ()) =<< runClientM (restoreH auth dName) clientEnv
 
--- | Handles the 'clean-archive' subcommand.
-handleCleanArchive :: AuthContext AuthHeaderAuth -> ReaderT ClientEnv IO ()
-handleCleanArchive auth = do
-  clientEnv <- ask
-  liftIO $
-    handleResponse (const $ pure ()) =<< runClientM (cleanArchiveH auth) clientEnv
-
 -- | Handles the 'logs' subcommand.
 handleGetActionInfo :: AuthContext AuthHeaderAuth -> ActionId -> LogOutput -> ReaderT ClientEnv IO ()
 handleGetActionInfo auth aId l = do
@@ -223,7 +214,6 @@ _statusH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CurrentDeplo
 cleanupH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 restoreH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 getActionInfoH :: AuthContext AuthHeaderAuth -> ActionId -> ClientM ActionInfo
-cleanArchiveH :: AuthContext AuthHeaderAuth -> ClientM CommandResponse
 ( listH
     :<|> createH
     :<|> archiveH
@@ -234,8 +224,7 @@ cleanArchiveH :: AuthContext AuthHeaderAuth -> ClientM CommandResponse
     :<|> cleanupH
     :<|> restoreH
   )
-  :<|> getActionInfoH
-  :<|> cleanArchiveH = pushArrowIntoServantAlt $ client (Proxy @PowerAPI)
+  :<|> getActionInfoH = pushArrowIntoServantAlt $ client (Proxy @PowerAPI)
 
 type PushArrowIntoServantAlt a b = PushArrowIntoServantAlt' a b (CanPushArrow a)
 

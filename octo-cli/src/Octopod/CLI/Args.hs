@@ -48,7 +48,6 @@ data Args
       { -- | deployment name
         name :: Text
       }
-  | CleanArchive
   | GetActionLogs ActionId LogOutput
   deriving stock (Show)
 
@@ -79,9 +78,6 @@ commandArgs =
         <> command "info" (info infoArgs (progDesc "get the deployment info"))
         <> command "cleanup" (info cleanupArgs (progDesc "cleanup the deployment"))
         <> command "restore" (info restoreArgs (progDesc "restore the deployment"))
-        <> command
-          "clean-archive"
-          (info cleanupArchiveArgs (progDesc "cleanup all archived deployments"))
         <> command
           "logs"
           (info actionLogsArgs (progDesc "get deployment logs of a given action"))
@@ -169,11 +165,6 @@ restoreArgs :: Parser Args
 restoreArgs =
   Restore
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-
--- | Parses arguments of 'clean-archive' subcommand.
-cleanupArchiveArgs :: Parser Args
-cleanupArchiveArgs =
-  pure CleanArchive
 
 actionLogsArgs :: Parser Args
 actionLogsArgs =
