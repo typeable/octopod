@@ -131,6 +131,7 @@ data AppState = AppState
   , appOverridesCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
   , appOverrideKeysCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text])
   , gitSha :: !Text
+  , controlScriptTimeout :: !ControlScriptTimeout
   }
   deriving stock (Generic)
 
@@ -175,8 +176,9 @@ runOctopodServer sha = do
   projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  archRetention <- fromIntegral <$> getEnvOrDieWith "ARCHIVE_RETENTION" (readMaybe @Int)
-  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral <$> getEnvOrDieWith "STATUS_UPDATE_TIMEOUT" (readMaybe @Int)
+  archRetention <- fromInteger <$> getEnvOrDieWith "ARCHIVE_RETENTION" readMaybe
+  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromInteger <$> getEnvOrDieWith "STATUS_UPDATE_TIMEOUT" readMaybe
+  scriptTimeout <- ControlScriptTimeout . fromInteger . maybe (60 * 30) read <$> lookupEnv "CONTROL_SCRIPT_TIMEOUT"
   creationCmd <- Command . pack <$> getEnvOrDie "CREATION_COMMAND"
   updateCmd <- Command . pack <$> getEnvOrDie "UPDATE_COMMAND"
   archiveCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_COMMAND"
@@ -262,6 +264,7 @@ runOctopodServer sha = do
           , appOverridesCache = appOverridesCache'
           , appOverrideKeysCache = appOverrideKeysCache'
           , gitSha = sha
+          , controlScriptTimeout = scriptTimeout
           }
 
       app' = app appSt
@@ -291,7 +294,7 @@ runArchiveCleanup retention = do
       dNames <- runStatement $
         select $ do
           ds <- each deploymentSchema
-          where_ $ (ds ^. #status) `in_` (litExpr <$> archivedStatuses)
+          where_ $ (ds ^. #status) ==. litExpr Archived
           where_ $ ds ^. #archivedAt <. litExpr (Just cutoff)
           pure $ ds ^. #name
       for_ dNames $ \dName -> (>>= logLeft) . runExceptT $

@@ -115,6 +115,7 @@ library
     , hasql-transaction
     , ordered-containers
     , vector
+    , process
   default-language: Haskell2010
 
 executable octopod-exe

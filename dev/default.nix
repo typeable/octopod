@@ -152,6 +152,7 @@ in
         export POWER_AUTHORIZATION_HEADER="123"
         export CACHE_INVALIDATION_TIME="60"
         export CACHE_UPDATE_TIME="20"
+        export CONTROL_SCRIPT_TIMEOUT="10"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
             --ui-port 3002 \
