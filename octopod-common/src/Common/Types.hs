@@ -157,7 +157,7 @@ newtype DeploymentName' t = DeploymentName {unDeploymentName :: t}
 
 type DeploymentName = DeploymentName' Text
 
-data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction
+data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction | CleanupAction
   deriving stock (Show, Read, Eq, Ord, Generic)
   deriving (FromJSON, ToJSON) via Snake Action
 
@@ -194,6 +194,7 @@ deploymentStatusText =
   , (UpdatePending, "UpdatePending")
   , (ArchivePending, "ArchivePending")
   , (Archived, "Archived")
+  , (CleanupFailed, "CleanupFailed")
   ]
 
 deploymentStatusToText :: DeploymentStatus -> Text
@@ -206,6 +207,7 @@ data DeploymentStatus
   | UpdatePending
   | ArchivePending
   | Archived
+  | CleanupFailed
   deriving stock (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
 

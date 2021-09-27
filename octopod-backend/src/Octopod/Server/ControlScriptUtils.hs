@@ -38,6 +38,7 @@ import Data.Generics.Product.Typed
 import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Time
 import Octopod.Server.Logger
 import System.Exit
 import System.Log.FastLogger
@@ -170,7 +171,7 @@ runCommandArgs ::
   (MonadReader r m, MonadBase IO m, HasType TimedFastLogger r) =>
   (r -> Command) ->
   ControlScriptArgs ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs f args = do
   cmd <- asks f
   runCommandArgs' cmd args
@@ -179,16 +180,24 @@ runCommandArgs' ::
   (MonadBase IO m, HasType TimedFastLogger r, MonadReader r m) =>
   Command ->
   ControlScriptArgs ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
+  t1 <- liftBase getCurrentTime
+
   logger <- asks (getTyped @TimedFastLogger)
   let logText = T.unwords (cmd : fmap T.pack args)
   liftBase $ logInfo logger $ "calling: " <> logText
-  res@(ec, _, _) <- runCommand (T.unpack cmd) args
+  (ec, out, err) <- runCommand (T.unpack cmd) args
   liftBase $
     logInfo logger $
       "calling `" <> logText <> "` exited with: " <> show' ec
-  return res
+  t2 <- liftBase getCurrentTime
+  let elTime = elapsedTime t2 t1
+  return (ec, out, err, elTime)
+
+-- | Returns time delta between 2 timestamps.
+elapsedTime :: UTCTime -> UTCTime -> Duration
+elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
 
 -- | Helper to run command with pipes.
 runCommand :: MonadBase IO m => FilePath -> [String] -> m (ExitCode, Stdout, Stderr)

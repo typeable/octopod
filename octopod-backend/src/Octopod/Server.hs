@@ -210,16 +210,16 @@ runOctopodServer sha = do
         Just "" -> Nothing
         x -> x
   depOverrideKeysCache' <- cacheMap $ \() -> do
-    (_, Stdout out, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
+    (_, Stdout out, _, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
     pure $ T.lines out
   depOverridesCache' <- cacheMap $ \() -> do
-    (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
+    (_, Stdout out, _, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
   appOverrideKeysCache' <- cacheMap $ \cfg -> do
-    (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
+    (_, Stdout out, _, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
     pure $ T.lines out
   appOverridesCache' <- cacheMap $ \cfg -> do
-    (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
+    (_, Stdout out, _, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
   dbPool' <-
     createPool
@@ -485,7 +485,6 @@ createH dep = do
       err400
         { errBody = validationError [badNameText]
         }
-  t1 <- liftBase getCurrentTime
   failIfImageNotFound dep
   failIfGracefulShutdownActivated
   runDeploymentBgWorker
@@ -532,9 +531,7 @@ createH dep = do
       st <- ask
       liftBase $ sendReloadEvent st
       updateDeploymentInfo (dep ^. #name)
-      (ec, out, err) <- createDeployment dep
-      t2 <- liftBase getCurrentTime
-      let elTime = elapsedTime t2 t1
+      (ec, out, err, elTime) <- createDeployment dep
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog dep CreateAction ec elTime out err
       liftBase $ sendReloadEvent st
@@ -550,7 +547,7 @@ updateDeploymentInfo dName = do
   log <- asks (logWarning . logger)
   DeploymentFullInfo {deployment = dep} <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
+  (ec, out, err, _) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
@@ -578,7 +575,7 @@ getDeploymentConfig dep = do
 createDeployment ::
   (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   Deployment ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 createDeployment dep = do
   st <- ask
   cfg <- getDeploymentConfig dep
@@ -596,9 +593,9 @@ createDeployment dep = do
           , T.unpack . coerce $ dep ^. #name
           ]
           <> fullConfigArgs cfg
-  (ec, out, err) <- runCommandArgs creationCommand args
+  res <- runCommandArgs creationCommand args
   liftBase . log $ "deployment created, deployment: " <> (pack . show $ dep)
-  pure (ec, out, err)
+  pure res
 
 -- | Helper to get deployment logs.
 selectDeploymentLogs ::
@@ -628,6 +625,7 @@ data DeploymentStatusTransition
   | TransitionArchivePending StatusTransitionProcessOutput
   | TransitionUpdatePending StatusTransitionProcessOutput
   | TransitionCreatePending StatusTransitionProcessOutput
+  | TransitionCleanupFailed StatusTransitionProcessOutput
   | TransitionFailure FailureType
   deriving stock (Show)
 
@@ -639,6 +637,7 @@ transitionStatus TransitionRestore {} = CreatePending
 transitionStatus TransitionArchivePending {} = ArchivePending
 transitionStatus TransitionUpdatePending {} = UpdatePending
 transitionStatus TransitionCreatePending {} = CreatePending
+transitionStatus TransitionCleanupFailed {} = CleanupFailed
 transitionStatus (TransitionFailure t) = Failure t
 
 processOutput :: DeploymentStatusTransition -> Maybe (StatusTransitionProcessOutput, Action)
@@ -649,6 +648,7 @@ processOutput (TransitionRestore x) = Just (x, RestoreAction)
 processOutput (TransitionArchivePending x) = Just (x, ArchiveAction)
 processOutput (TransitionUpdatePending x) = Just (x, UpdateAction)
 processOutput (TransitionCreatePending x) = Just (x, CreateAction)
+processOutput (TransitionCleanupFailed x) = Just (x, CleanupAction)
 processOutput TransitionFailure {} = Nothing
 
 transitionToStatusS ::
@@ -791,9 +791,10 @@ possibleTransitions :: DeploymentStatus -> DeploymentStatus -> Bool
 possibleTransitions CreatePending = anyPred [is #_Running, is #_Failure]
 possibleTransitions Running = anyPred [is #_Failure, is #_ArchivePending, is #_UpdatePending]
 possibleTransitions UpdatePending = anyPred [is #_Failure, is #_Running]
-possibleTransitions (Failure _) = anyPred [is #_UpdatePending, is #_Running, is #_ArchivePending]
+possibleTransitions (Failure _) = anyPred [is #_UpdatePending, is #_Running, is #_ArchivePending, is #_CleanupFailed]
 possibleTransitions ArchivePending = anyPred [is #_ArchivePending, is #_Archived]
-possibleTransitions Archived = anyPred [is #_CreatePending]
+possibleTransitions Archived = anyPred [is #_CreatePending, is #_CleanupFailed]
+possibleTransitions CleanupFailed = const False
 
 anyPred :: [a -> Bool] -> a -> Bool
 anyPred preds x = any ($ x) preds
@@ -802,13 +803,10 @@ anyPred preds x = any ($ x) preds
 archiveH :: DeploymentName -> AppM CommandResponse
 archiveH dName = do
   failIfGracefulShutdownActivated
-  t1 <- liftBase getCurrentTime
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
     (view #deployment -> dep) <- getDeploymentS dName
     cfg <- getDeploymentConfig dep
-    (ec, out, err) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
+    (ec, out, err, elTime) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
     transitionToStatusS dName $
       TransitionArchivePending
         StatusTransitionProcessOutput
@@ -824,7 +822,6 @@ archiveH dName = do
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName dUpdate = do
   failIfGracefulShutdownActivated
-  t1 <- liftIO getCurrentTime
   st <- ask
   let log = logInfo (logger st)
   olDep <- getDeploymentS dName <&> (^. #deployment)
@@ -866,12 +863,10 @@ updateH dName dUpdate = do
             , T.unpack . coerce $ dName
             ]
             <> fullConfigArgs cfg
-    (ec, out, err) <- runCommandArgs updateCommand args
+    (ec, out, err, elTime) <- runCommandArgs updateCommand args
     liftBase . log $
       "deployment updated, name: "
         <> coerce dName
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
       TransitionUpdatePending
         StatusTransitionProcessOutput
@@ -928,7 +923,7 @@ statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -951,11 +946,23 @@ cleanupDeployment dName = do
   let log = logInfo (logger st)
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, out, err) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
+  (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
   liftBase $ print out >> print err
-  deleteDeploymentLogs dName
-  deleteDeployment dName
-  liftBase $ log $ "deployment destroyed, name: " <> coerce dName
+  case ec of
+    ExitSuccess -> do
+      deleteDeploymentLogs dName
+      deleteDeployment dName
+      liftBase $ log $ "deployment destroyed, name: " <> coerce dName
+    ExitFailure _ -> do
+      transitionToStatusS dName $
+        TransitionCleanupFailed
+          StatusTransitionProcessOutput
+            { exitCode = ec
+            , duration = elTime
+            , stdout = out
+            , stderr = err
+            }
+      pure ()
   liftBase $ sendReloadEvent st
   handleExitCode ec
 
@@ -993,7 +1000,6 @@ deleteDeployment dName =
 restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
   failIfGracefulShutdownActivated
-  t1 <- liftBase getCurrentTime
   dep <- getDeploymentS dName
   failIfImageNotFound $ dep ^. #deployment
   failIfGracefulShutdownActivated
@@ -1001,9 +1007,7 @@ restoreH dName = do
     (view #deployment -> dep') <- getDeploymentS dName
     updateDeploymentInfo dName
     cfg <- getDeploymentConfig dep'
-    (ec, out, err) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
+    (ec, out, err, elTime) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
     transitionToStatusS dName $
       TransitionRestore
         StatusTransitionProcessOutput
@@ -1102,7 +1106,7 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, Stderr err) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
+  (ec, _, Stderr err, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
@@ -1122,10 +1126,6 @@ sendReloadEvent :: AppState -> IO ()
 sendReloadEvent state =
   atomically $ writeTChan (eventSink state) FrontendPleaseUpdateEverything
 
--- | Returns time delta between 2 timestamps.
-elapsedTime :: UTCTime -> UTCTime -> Duration
-elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
-
 -- | Runs the status updater.
 runStatusUpdater :: AppState -> IO ()
 runStatusUpdater state = do
@@ -1140,7 +1140,7 @@ runStatusUpdater state = do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
-        where_ $ ds ^. #status /=. litExpr Archived
+        where_ $ not_ $ (ds ^. #status) `in_` (litExpr <$> [Archived, CleanupFailed])
         pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
       checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
         let timeout = statusUpdateTimeout state
@@ -1151,10 +1151,10 @@ runStatusUpdater state = do
               cfg <- getDeploymentConfig dep
               case dStatus of
                 ArchivePending -> do
-                  (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
+                  (ec, _, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
                   pure $ Just ec
                 _ -> do
-                  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+                  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
                   pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-
@@ -1267,6 +1267,7 @@ runBgWorker act = void $ L.forkFinally act' cleanup
 runDeploymentBgWorker ::
   forall m a.
   (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
+  -- | Status to set after the first part has finished.
   Maybe DeploymentStatus ->
   DeploymentName ->
   -- | Think of this as running synchronously.

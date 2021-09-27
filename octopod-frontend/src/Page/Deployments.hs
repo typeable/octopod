@@ -381,7 +381,7 @@ archivedDeploymentWidget hReq clickedEv dDyn' = do
       (linkEl, _) <- el' "tr" $ do
         el "td" $ do
           rndr . unDeploymentName $ deployment ^. #name
-          divClass "status status--archived" $ text "Archived"
+          statusWidget (pure status)
         el "td" $ text "..."
         el "td" $
           deploymentOverridesWidgetSearched hReq (deployment ^. field @"deploymentOverrides" . coerced)

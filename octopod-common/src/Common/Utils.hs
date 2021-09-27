@@ -47,3 +47,4 @@ isPending = \case
   CreatePending -> True
   UpdatePending -> True
   ArchivePending -> True
+  CleanupFailed -> True
