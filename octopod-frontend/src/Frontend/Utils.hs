@@ -182,6 +182,7 @@ statusWidget stDyn = do
       DeploymentNotPending UpdatePending -> loadingWidget $ text "Updating..."
       DeploymentNotPending ArchivePending -> loadingWidget $ text "Archiving..."
       DeploymentNotPending Archived -> divClass "status status--archived" $ text "Archived"
+      DeploymentNotPending CleanupFailed -> divClass "status status--failure" $ text "Cleanup failed (contact admin)"
 
 -- | Text input field with label.
 octopodTextInput ::
