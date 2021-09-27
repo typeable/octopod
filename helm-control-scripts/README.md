@@ -14,7 +14,7 @@ You can get pre-built docker images from [hub.docker.com/r/typeable/octopod-gene
 - cleanup – a script to delete dangling PVCs and letsencrypt certs left after `helm uninstall` command
 - check – a script to check if resources created by helm are healthy. Right now only deployments and statefuls sets are checked
 - init – a script to initialize something. This is the only script not run by Octopod, but as an init container.
-- tag_check – a script to check that images in helm release are present in registries before invoking create script 
+- config_check – a script to check that configuration (such as image tag name) passed to Octopod is correct. This script is invoked before deployment creation.
 - app_overrides - a scirpt which returns a list of default app overrides wichh were passed in default_overrides parameter described below.
 - deployment_overrides - a scirpt which returns a list of default deployment overrides from default paramaters option.
 - deployment_keys - a scripts which returns a list of the possible deployment overrides keys user can use.

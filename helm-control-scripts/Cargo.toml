@@ -54,8 +54,8 @@ name = "init"
 path = "src/init.rs"
 
 [[bin]]
-name = "tag_check"
-path = "src/tag_check.rs"
+name = "config_check"
+path = "src/config_check.rs"
 
 [[bin]]
 name = "app_overrides"
