@@ -4,6 +4,7 @@ module Frontend.UIKit
     loadingCommonWidget,
     errorCommonWidget,
     octopodTextInput',
+    octopodTextInputDyn,
     loadingOverride,
     loadingOverrides,
     overrideField,
@@ -27,7 +28,10 @@ import Data.Align
 import Data.Default
 import Data.Functor
 import Data.Generics.Labels ()
+import Data.List.NonEmpty
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import Data.Maybe (isNothing, maybeToList)
 import Data.Text (Text)
 import Data.Text.Search
 import Data.These
@@ -71,7 +75,7 @@ errorCommonWidget =
 
 data OverrideField t = OverrideField
   { fieldValue :: Dynamic t Text
-  , fieldError :: Event t Text
+  , fieldError :: Dynamic t (Maybe (NonEmpty Text))
   , fieldDisabled :: Dynamic t Bool
   , fieldType :: Dynamic t OverrideFieldType
   }
@@ -88,8 +92,8 @@ overrideFieldTypeClasses EditedOverrideFieldType = mempty
 overrideField :: MonadWidget t m => Dynamic t [Text] -> OverrideField t -> OverrideField t -> m (Dynamic t Text, Dynamic t Text, Event t ())
 overrideField overrideKeyValues keyDyn valueDyn = do
   elDiv "overrides__item" $ do
-    (keyInp, _) <-
-      octopodTextInput'
+    keyInp <-
+      octopodTextInputDyn
         overrideKeyValues
         (keyDyn ^. #fieldDisabled)
         ( do
@@ -100,8 +104,8 @@ overrideField overrideKeyValues keyDyn valueDyn = do
         (keyDyn ^. #fieldValue)
         (keyDyn ^. #fieldError)
     let keyTextDyn = value keyInp
-    (value -> valTextDyn, _) <-
-      octopodTextInput'
+    (value -> valTextDyn) <-
+      octopodTextInputDyn
         (pure [])
         (valueDyn ^. #fieldDisabled)
         ( do
@@ -174,6 +178,33 @@ octopodTextInput' ::
   Event t Text ->
   m (InputElement EventResult GhcjsDomSpace t, Dynamic t Bool)
 octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = mdo
+  errDyn <-
+    holdDyn Nothing $
+      leftmost
+        [ Just . pure <$> errEv
+        , Nothing <$ updated (value inp)
+        ]
+  inp <- octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn
+  pure (inp, isNothing <$> errDyn)
+
+-- | The only text input field that is used in project forms. This input
+-- provides automatic error message hiding after user starts typing.
+octopodTextInputDyn ::
+  MonadWidget t m =>
+  -- | Value to suggest
+  (Dynamic t [Text]) ->
+  -- | Disabled?
+  Dynamic t Bool ->
+  -- | Input field classes.
+  Dynamic t Classes ->
+  -- | Placeholder for input field.
+  Text ->
+  -- | Init value.
+  (Dynamic t Text) ->
+  -- | Event carrying the error message.
+  Dynamic t (Maybe (NonEmpty Text)) ->
+  m (InputElement EventResult GhcjsDomSpace t)
+octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn = mdo
   inValDyn <- holdUniqDyn inValDyn'
   let valDyn = value inp
       inValEv =
@@ -184,19 +215,12 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                 These inV currV | inV /= currV -> Just inV
                 _ -> Nothing
             )
-  isValid <-
-    holdDyn True $
-      leftmost
-        [ False <$ errEv
-        , True <$ updated valDyn
-        ]
 
-  errorClassesDyn <-
-    holdDyn mempty $
-      leftmost
-        [ "input--error" <$ errEv
-        , mempty <$ updated valDyn
-        ]
+  let errorClassesDyn = do
+        err <- errDyn
+        case err of
+          Just _ -> "input--error"
+          Nothing -> mempty
 
   let classDyn = do
         errClasses <- errorClassesDyn
@@ -226,11 +250,10 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                     M.singleton "disabled" $
                       if disabled' then Just "disabled" else Nothing
               )
-    widgetHold_ blank $
-      leftmost
-        [ divClass "input__output" . text <$> errEv
-        , blank <$ updated valDyn
-        ]
+    void $
+      simpleList ((maybeToList >=> NE.toList) <$> errDyn) $ \err ->
+        divClass "input__output" $ dynText err
+
     delayedFalseFocus <- delayFalse $ _inputElement_hasFocus inp'
     selectedValue' <- networkView >=> switchHoldPromptly never $ do
       hasFocus <- delayedFalseFocus
@@ -252,7 +275,7 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                       pure $ domEvent Click resEl $> initialText
         _ -> pure $ pure never
     pure (inp', selectedValue')
-  pure (inp, isValid)
+  pure inp
 
 delayFalse :: (MonadHold t m, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m)) => Dynamic t Bool -> m (Dynamic t Bool)
 delayFalse x = do
