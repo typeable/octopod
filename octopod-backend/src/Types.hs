@@ -15,6 +15,7 @@ module Types
     Command (..),
     Timeout (..),
     ControlScriptArgs (..),
+    ControlScriptTimeout (..),
   )
 where
 
@@ -65,3 +66,5 @@ newtype ControlScriptArgs = ControlScriptArgs
   {unControlScriptArgs :: [String]}
   deriving stock (Show)
   deriving newtype (Semigroup, Monoid)
+
+newtype ControlScriptTimeout = ControlScriptTimeout DiffTime

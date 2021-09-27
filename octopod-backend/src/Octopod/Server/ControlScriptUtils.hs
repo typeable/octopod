@@ -10,7 +10,6 @@ module Octopod.Server.ControlScriptUtils
     cleanupCommandArgs,
     notificationCommandArgs,
     runCommand,
-    runCommandWithoutPipes,
     runCommandArgs,
     runCommandArgs',
     checkCommandArgs,
@@ -29,11 +28,14 @@ module Octopod.Server.ControlScriptUtils
   )
 where
 
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.STM
 import Control.Lens
 import Control.Monad.Base
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as TL
 import Data.Coerce
+import Data.Fixed
 import Data.Generics.Product.Typed
 import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
@@ -42,6 +44,7 @@ import Data.Time
 import Octopod.Server.Logger
 import System.Exit
 import System.Log.FastLogger
+import System.Process (terminateProcess)
 import System.Process.Typed
 import Types
 
@@ -168,7 +171,11 @@ notificationCommandArgs dName old new = do
       ]
 
 runCommandArgs ::
-  (MonadReader r m, MonadBase IO m, HasType TimedFastLogger r) =>
+  ( MonadReader r m
+  , MonadBase IO m
+  , HasType TimedFastLogger r
+  , HasType ControlScriptTimeout r
+  ) =>
   (r -> Command) ->
   ControlScriptArgs ->
   m (ExitCode, Stdout, Stderr, Duration)
@@ -177,7 +184,11 @@ runCommandArgs f args = do
   runCommandArgs' cmd args
 
 runCommandArgs' ::
-  (MonadBase IO m, HasType TimedFastLogger r, MonadReader r m) =>
+  ( MonadBase IO m
+  , HasType TimedFastLogger r
+  , MonadReader r m
+  , HasType ControlScriptTimeout r
+  ) =>
   Command ->
   ControlScriptArgs ->
   m (ExitCode, Stdout, Stderr, Duration)
@@ -200,19 +211,38 @@ elapsedTime :: UTCTime -> UTCTime -> Duration
 elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
 
 -- | Helper to run command with pipes.
-runCommand :: MonadBase IO m => FilePath -> [String] -> m (ExitCode, Stdout, Stderr)
+runCommand ::
+  ( MonadBase IO m
+  , MonadReader r m
+  , HasType ControlScriptTimeout r
+  ) =>
+  FilePath ->
+  [String] ->
+  m (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
-  (ec, out, err) <- liftBase . readProcess $ proc cmd args
+  ControlScriptTimeout timeout <- asks getTyped
+  let pc =
+        proc cmd args
+          & setStdout byteStringOutput
+          & setStderr byteStringOutput
+  (ec, out, err) <- liftBase $
+    withProcessTerm pc $ \p -> do
+      void . forkIO $ do
+        threadDelayMicro $ realToFrac timeout
+        terminateProcess $ unsafeProcessHandle p
+      atomically $
+        (,,)
+          <$> waitExitCodeSTM p
+          <*> getStdout p
+          <*> getStderr p
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
     , Stderr . T.decodeUtf8 . TL.toStrict $ err
     )
-
--- | Helper to run command without pipes.
-runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
-runCommandWithoutPipes cmd args =
-  withProcessWait (proc cmd args) waitExitCode
+  where
+    threadDelayMicro :: Micro -> IO ()
+    threadDelayMicro (MkFixed i) = threadDelay (fromInteger i)
 
 fullConfigArgs :: FullConfig -> ControlScriptArgs
 fullConfigArgs cfg = overridesArgs (appConfig cfg) <> overridesArgs (depConfig cfg)
