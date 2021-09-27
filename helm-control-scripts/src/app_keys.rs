@@ -6,11 +6,9 @@ fn main() {
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
-    let default_values: DefaultValues = serde_json::from_str(&envs.defaults).unwrap();
-    // let cli_opts = CliOpts::from_args();
-    // info!("Cli options received {:?}", &cli_opts);
-    // let domain_name = domain_name(&cli_opts);
-    let deployment_parameters = HelmDeploymentParameters::new_env_only(&default_values, &envs);
+    let cli_opts = CliOpts::from_args();
+    info!("Cli options received {:?}", &cli_opts);
+    let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
     helm_init(&envs, &deployment_parameters);
     let helm_values = HelmCmd {
         name: envs.helm_bin,
@@ -20,7 +18,6 @@ fn main() {
         namespace: String::from(""),
         deployment_parameters: deployment_parameters,
         overrides: vec![],
-        default_values: default_values.default_overrides,
     };
     info!("Generated Helm args: {:?}", &helm_values.args());
     match helm_values.run_stdout() {

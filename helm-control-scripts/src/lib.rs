@@ -36,7 +36,7 @@ pub mod lib {
         #[structopt(long)]
         pub namespace: String,
         #[structopt(long)]
-        pub name: String,
+        pub name: Option<String>,
         #[structopt(long)]
         pub tag: Option<String>,
         #[structopt(long)]
@@ -67,6 +67,12 @@ pub mod lib {
             };
             return envs;
         }
+    }
+    
+    #[derive(Debug, Serialize, Deserialize)]
+    struct HelmRepo {
+        name: String,
+        url: String
     }
     
     #[derive(Deserialize, Debug)]
@@ -105,11 +111,13 @@ pub mod lib {
                 String::from("chart_repo_name"),
                 String::from("chart_version"),
                 String::from("chart_name"),
+                String::from("chart_repo_user"),
+                String::from("chart_repo_pass"),
             ]   
         }
     }
         
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct HelmDeploymentParameters {
         pub chart_repo_url: String,
         pub chart_repo_name: String,
@@ -120,30 +128,23 @@ pub mod lib {
     }
     
     impl HelmDeploymentParameters {
-        pub fn new(cli_opts: &CliOpts, default_values: &DefaultValues, envs: &EnvVars) -> Self {
-            let mut default_parameters = Self {
-                chart_repo_url:  default_values.chart_repo_url.clone(),
-                chart_repo_name: default_values.chart_repo_name.clone(),
-                chart_repo_user: envs.helm_user.clone(),
-                chart_repo_pass: envs.helm_pass.clone(),
-                chart_version: default_values.chart_version.clone(),
-                chart_name: default_values.chart_name.clone(),
-            };
-            if cli_opts.deployment_override.is_empty() {
-                return default_parameters;
-            } else {
-                for deployment_override in cli_opts.deployment_override.clone().into_iter() {
-                    let split_override = deployment_override.split('=').collect::<Vec<_>>();
-                    match split_override.first().unwrap().as_ref() {
-                        "chart_repo_url" => default_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
-                        "chart_repo_name" => default_parameters.chart_repo_name = split_override.last().unwrap().to_string(),
-                        "chart_version" => default_parameters.chart_version = split_override.last().unwrap().to_string(),
-                        "chart_name" => default_parameters.chart_name = split_override.last().unwrap().to_string(),
-                        _ => continue,
-                    }
+        pub fn new(cli_opts: &CliOpts, envs: &EnvVars) -> Self {
+            let mut deployment_parameters = Self::default();
+            deployment_parameters.chart_repo_user = envs.helm_user.clone();
+            deployment_parameters.chart_repo_pass = envs.helm_pass.clone();
+            for deployment_override in cli_opts.deployment_override.clone().into_iter() {
+                let split_override = deployment_override.split('=').collect::<Vec<_>>();
+                match split_override.first().unwrap().as_ref() {
+                    "chart_repo_url" => deployment_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
+                    "chart_repo_name" => deployment_parameters.chart_repo_name = split_override.last().unwrap().to_string(),
+                    "chart_version" => deployment_parameters.chart_version = split_override.last().unwrap().to_string(),
+                    "chart_name" => deployment_parameters.chart_name = split_override.last().unwrap().to_string(),
+                    "chart_repo_user" => deployment_parameters.chart_repo_user = split_override.last().unwrap().to_string(),
+                    "chart_repo_pass" => deployment_parameters.chart_repo_pass = split_override.last().unwrap().to_string(),
+                    _ => continue,
                 }
-                return default_parameters;
             }
+            return deployment_parameters;
         }
         pub fn new_env_only(default_values: &DefaultValues, envs: &EnvVars) -> Self {
             Self {
@@ -164,7 +165,6 @@ pub mod lib {
         pub namespace: String,
         pub deployment_parameters: HelmDeploymentParameters,
         pub overrides: Vec<String>,
-        pub default_values: Vec<String>,
     }
     
     impl HelmCmd {
@@ -220,6 +220,12 @@ pub mod lib {
                     args.push(String::from("repo"));
                     args.push(String::from("update"));
                 },
+                HelmMode::RepoList => {
+                    args.push(String::from("repo"));
+                    args.push(String::from("list"));
+                    args.push(String::from("-o"));
+                    args.push(String::from("json"));
+                },
             }
     
             return args;
@@ -228,7 +234,6 @@ pub mod lib {
             let mut values = Vec::new();
             let mut set_values = Vec::new();
             values.push(format!("ingress.host={}", &self.release_domain));
-            values.extend(self.default_values.clone());
             values.extend(self.overrides.clone());
             for value in values.into_iter() {
                 set_values.push(String::from("--set"));
@@ -269,6 +274,7 @@ pub mod lib {
         Template,
         RepoAdd,
         RepoUpdate,
+        RepoList,
         ShowValues,
     }
     
@@ -294,7 +300,12 @@ pub mod lib {
         }
     }
     pub fn domain_name(cli_opts: &CliOpts) -> String {
-        format!("{}.{}", &cli_opts.name, &cli_opts.base_domain)
+        match &cli_opts.name {
+            Some(name) => {
+                return format!("{}.{}", name, &cli_opts.base_domain);
+            },
+            None => panic!("No name argument provided")
+        }
     }
     pub fn parse_to_k8s(yaml: String) -> Result<(Vec<Deployment>, Vec<StatefulSet>, Vec<Ingress>, Vec<OldIngress>), serde_yaml::Error> {
         let docs = YamlLoader::load_from_str(&yaml).unwrap();
@@ -640,7 +651,6 @@ pub mod lib {
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
-            default_values: vec![],
         };
         let helm_repo_update = HelmCmd {
             name: String::from(&envs.helm_bin),
@@ -650,7 +660,6 @@ pub mod lib {
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
-            default_values: vec![],
         };
         match helm_repo_add.run() {
             Ok(_status) => info!("Repo add success!"),
@@ -673,15 +682,53 @@ pub mod lib {
                 if *enabled {
                     info!("Skipping helm initialization, it must be initialied on init");
                 } else {
-                    info!("Starting helm initialization");
-                    helm_repo_add_update(&envs, &deployment_parameters);
+                    if helm_repo_exists(&envs, &deployment_parameters) {
+                        info!("Skipping helm initialization, because requested repo was already added");
+                    } else {
+                        info!("Starting helm initialization");
+                        helm_repo_add_update(&envs, &deployment_parameters);
+                    }
                 }
             },
             None => {
-                info!("Starting helm initialization");
-                helm_repo_add_update(&envs, &deployment_parameters);
+                if helm_repo_exists(&envs, &deployment_parameters) {
+                    info!("Skipping helm initialization, because requested repo was already added");
+                } else {
+                    info!("Starting helm initialization");
+                    helm_repo_add_update(&envs, &deployment_parameters);
+                }
             }
         }
+    }
+
+    fn helm_repo_exists(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) -> bool {
+        let chart_repo_url = String::from(&deployment_parameters.chart_repo_url);
+        let chart_repo_name = String::from(&deployment_parameters.chart_repo_name);
+        let helm_repo_list = HelmCmd {
+            name: String::from(&envs.helm_bin),
+            mode: HelmMode::RepoList,
+            release_name: String::from(""),
+            release_domain: String::from(""),
+            namespace: String::from(""),
+            deployment_parameters: deployment_parameters.clone(),
+            overrides: vec![],
+        };
+        match helm_repo_list.run_stdout() {
+            Ok(list) => {
+                let helm_repos: Vec<HelmRepo> = serde_json::from_str(&list).unwrap();
+                for repo in helm_repos {
+                    if repo.name == chart_repo_name && repo.url == chart_repo_url {
+                       return true;
+                    } else {
+                        continue
+                    }
+                }
+            },
+            Err(_err) => {
+                return false;
+            }
+        }
+        false
     }
     pub fn helm_values_as_keys(yaml: String) -> Option<Vec<String>> {
         let mut keys: Vec<String> = Vec::new();

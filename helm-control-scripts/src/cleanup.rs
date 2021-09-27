@@ -6,37 +6,41 @@ fn main() {
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
-    let default_values: DefaultValues = serde_json::from_str(&envs.defaults).unwrap();
     let cli_opts = CliOpts::from_args();
     info!("Cli options received {:?}", &cli_opts);
     let overrides = match overrides(&cli_opts) {
         Some(inner) => inner,
         None => vec![],
     };
-    let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &default_values, &envs);
+    
+    let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
     let namespace = String::from(&cli_opts.namespace);
-    let release_name = String::from(&cli_opts.name);
     let domain_name = domain_name(&cli_opts);
+    let release_name = match cli_opts.name {
+        Some(name) => name,
+        None => {
+            error!("mandatory name argument was not provided");
+            panic!();
+        }
+    };
     helm_init(&envs, &deployment_parameters);
     let helm_cmd = HelmCmd {
         name: envs.helm_bin.clone(),
         mode: HelmMode::Uninstall,
-        release_name: cli_opts.name.clone(),
+        release_name: release_name.clone(),
         release_domain: String::from(""),
         namespace: cli_opts.namespace.clone(),
         deployment_parameters: deployment_parameters.clone(),
         overrides: vec![],
-        default_values: vec![],
     };
     let helm_template = HelmCmd {
         name: envs.helm_bin,
         mode: HelmMode::Template,
-        release_name: cli_opts.name,
+        release_name: release_name.clone(),
         release_domain: domain_name, 
         namespace: cli_opts.namespace,
         deployment_parameters: deployment_parameters,
         overrides: overrides,
-        default_values: default_values.default_overrides,
     };
     info!("Generated Helm args: {:?}", &helm_cmd.args());
     match helm_template.run_stdout() {
