@@ -106,14 +106,16 @@ pub mod lib {
             ]   
         }
         pub fn deployment_keys(&self) -> Vec<String> {
-            vec![
+            let mut keys: Vec<String> = vec![
                 String::from("chart_repo_url"),
                 String::from("chart_repo_name"),
                 String::from("chart_version"),
                 String::from("chart_name"),
                 String::from("chart_repo_user"),
                 String::from("chart_repo_pass"),
-            ]   
+            ];
+            keys.sort();
+            keys
         }
     }
         
@@ -762,6 +764,7 @@ pub mod lib {
         if keys.is_empty() {
             None
         }else{
+            keys.sort();
             Some(keys)
         }
     }
