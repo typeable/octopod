@@ -235,7 +235,7 @@ pub mod lib {
         fn set_flag_values(&self) -> Vec<String> {
             let mut values = Vec::new();
             let mut set_values = Vec::new();
-            values.push(format!("ingress.host={}", &self.release_domain));
+            values.push(format!("ingress.hostname={}", &self.release_domain));
             values.extend(self.overrides.clone());
             for value in values.into_iter() {
                 set_values.push(String::from("--set"));
