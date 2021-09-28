@@ -4,6 +4,7 @@ module Frontend.UIKit
     loadingCommonWidget,
     errorCommonWidget,
     octopodTextInput',
+    octopodTextInputDyn,
     loadingOverride,
     loadingOverrides,
     overrideField,
@@ -27,7 +28,10 @@ import Data.Align
 import Data.Default
 import Data.Functor
 import Data.Generics.Labels ()
+import Data.List.NonEmpty
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import Data.Maybe (isNothing, maybeToList)
 import Data.Text (Text)
 import Data.Text.Search
 import Data.These
@@ -41,6 +45,7 @@ import Frontend.UIKit.Button.Sort as X
 import Frontend.UIKit.Button.Static as X
 import GHC.Generics (Generic)
 import Reflex.Dom
+import Reflex.Dom.Renderable
 import Reflex.Network
 
 (.~~) :: ASetter' s a -> a -> s -> s
@@ -70,7 +75,7 @@ errorCommonWidget =
 
 data OverrideField t = OverrideField
   { fieldValue :: Dynamic t Text
-  , fieldError :: Event t Text
+  , fieldError :: Dynamic t (Maybe (NonEmpty Text))
   , fieldDisabled :: Dynamic t Bool
   , fieldType :: Dynamic t OverrideFieldType
   }
@@ -87,8 +92,8 @@ overrideFieldTypeClasses EditedOverrideFieldType = mempty
 overrideField :: MonadWidget t m => Dynamic t [Text] -> OverrideField t -> OverrideField t -> m (Dynamic t Text, Dynamic t Text, Event t ())
 overrideField overrideKeyValues keyDyn valueDyn = do
   elDiv "overrides__item" $ do
-    (keyInp, _) <-
-      octopodTextInput'
+    keyInp <-
+      octopodTextInputDyn
         overrideKeyValues
         (keyDyn ^. #fieldDisabled)
         ( do
@@ -99,8 +104,8 @@ overrideField overrideKeyValues keyDyn valueDyn = do
         (keyDyn ^. #fieldValue)
         (keyDyn ^. #fieldError)
     let keyTextDyn = value keyInp
-    (value -> valTextDyn, _) <-
-      octopodTextInput'
+    (value -> valTextDyn) <-
+      octopodTextInputDyn
         (pure [])
         (valueDyn ^. #fieldDisabled)
         ( do
@@ -173,6 +178,33 @@ octopodTextInput' ::
   Event t Text ->
   m (InputElement EventResult GhcjsDomSpace t, Dynamic t Bool)
 octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = mdo
+  errDyn <-
+    holdDyn Nothing $
+      leftmost
+        [ Just . pure <$> errEv
+        , Nothing <$ updated (value inp)
+        ]
+  inp <- octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn
+  pure (inp, isNothing <$> errDyn)
+
+-- | The only text input field that is used in project forms. This input
+-- provides automatic error message hiding after user starts typing.
+octopodTextInputDyn ::
+  MonadWidget t m =>
+  -- | Value to suggest
+  (Dynamic t [Text]) ->
+  -- | Disabled?
+  Dynamic t Bool ->
+  -- | Input field classes.
+  Dynamic t Classes ->
+  -- | Placeholder for input field.
+  Text ->
+  -- | Init value.
+  (Dynamic t Text) ->
+  -- | Event carrying the error message.
+  Dynamic t (Maybe (NonEmpty Text)) ->
+  m (InputElement EventResult GhcjsDomSpace t)
+octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn = mdo
   inValDyn <- holdUniqDyn inValDyn'
   let valDyn = value inp
       inValEv =
@@ -183,19 +215,12 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                 These inV currV | inV /= currV -> Just inV
                 _ -> Nothing
             )
-  isValid <-
-    holdDyn True $
-      leftmost
-        [ False <$ errEv
-        , True <$ updated valDyn
-        ]
 
-  errorClassesDyn <-
-    holdDyn mempty $
-      leftmost
-        [ "input--error" <$ errEv
-        , mempty <$ updated valDyn
-        ]
+  let errorClassesDyn = do
+        err <- errDyn
+        case err of
+          Just _ -> "input--error"
+          Nothing -> mempty
 
   let classDyn = do
         errClasses <- errorClassesDyn
@@ -225,11 +250,10 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                     M.singleton "disabled" $
                       if disabled' then Just "disabled" else Nothing
               )
-    widgetHold_ blank $
-      leftmost
-        [ divClass "input__output" . text <$> errEv
-        , blank <$ updated valDyn
-        ]
+    void $
+      simpleList ((maybeToList >=> NE.toList) <$> errDyn) $ \err ->
+        divClass "input__output" $ dynText err
+
     delayedFalseFocus <- delayFalse $ _inputElement_hasFocus inp'
     selectedValue' <- networkView >=> switchHoldPromptly never $ do
       hasFocus <- delayedFalseFocus
@@ -251,7 +275,7 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
                       pure $ domEvent Click resEl $> initialText
         _ -> pure $ pure never
     pure (inp', selectedValue')
-  pure (inp, isValid)
+  pure inp
 
 delayFalse :: (MonadHold t m, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m)) => Dynamic t Bool -> m (Dynamic t Bool)
 delayFalse x = do
@@ -276,14 +300,16 @@ nonEditableWorkingOverrideStyleClasses LargeNonEditableWorkingOverrideStyle = "l
 
 -- | Widget that shows overrides list. It does not depend on their type.
 showNonEditableWorkingOverride ::
-  MonadWidget t m =>
+  (MonadWidget t m, Renderable te) =>
   -- | Loading?
+  Bool ->
+  -- | Is it fully loaded?
   Bool ->
   NonEditableWorkingOverrideStyle ->
   -- | Overrides list.
-  [WorkingOverride] ->
+  [WorkingOverride' te] ->
   m ()
-showNonEditableWorkingOverride loading style cfg =
+showNonEditableWorkingOverride loading loaded style cfg =
   divClass
     ( destructClasses $
         "listing" <> "listing--for-text" <> nonEditableWorkingOverrideStyleClasses style
@@ -292,7 +318,9 @@ showNonEditableWorkingOverride loading style cfg =
       case cfg of
         [] ->
           divClass "listing__item" $
-            elClass "span" "listing--info-text" $ text "no custom configuration"
+            elClass "span" "listing--info-text" $
+              text $
+                if loaded then "no configuration" else "no custom configuration"
         _ -> forM_ cfg $ \(WorkingOverrideKey keyType key, val) -> do
           let wrapper = case val of
                 WorkingDeletedValue _ -> divClass "listing__item deleted"
@@ -302,16 +330,16 @@ showNonEditableWorkingOverride loading style cfg =
                   CustomWorkingOverrideKey -> elClass "span" "listing__key"
                   DefaultWorkingOverrideKey -> elClass "span" "listing__key default"
             keyWrapper $ do
-              text key
+              rndr key
               text ": "
 
             case val of
-              WorkingCustomValue txt -> elClass "span" "listing__value" $ text txt
-              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ text txt
-              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ text txt
+              WorkingCustomValue txt -> elClass "span" "listing__value" $ rndr txt
+              WorkingDefaultValue txt -> elClass "span" "listing__value default" $ rndr txt
+              WorkingDeletedValue (Just txt) -> elClass "span" "listing__value default" $ rndr txt
               WorkingDeletedValue Nothing -> do
                 elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
-                elClass "div" "listing__spinner" $ pure ()
+                when loading $ elClass "div" "listing__spinner" $ pure ()
       when loading $
         divClass "listing__item" $ do
           elClass "div" "listing__placeholder" $ pure ()

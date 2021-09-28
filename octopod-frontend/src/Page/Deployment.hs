@@ -208,9 +208,6 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
         divClass "deployment__value" $ do
           let createdAtDyn = dfiDyn <^.> field @"updatedAt"
           dynText $ formatPosixToDate <$> createdAtDyn
-    deploymentSection "Tag" $ do
-      let tagDyn = dfiDyn <^.> field @"deployment" . field @"tag" . coerced
-      divClass "deployment__widget" $ dynText tagDyn
     deploymentSection "Links" $ do
       let urlsDyn = dfiDyn <^.> field @"metadata" . to unDeploymentMetadata
       divClass "deployment__widget" $
@@ -221,7 +218,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
         cfgDyn <&> \cfg -> do
           let showVars bL l =
                 divClass "deployment__widget" $
-                  showNonEditableWorkingOverride (cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
+                  showNonEditableWorkingOverride (cfg ^. bL) (not $ cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
                     elemsUniq (cfg ^. l)
           deploymentSection "Deployment overrides" $ showVars #depConfigLoading #depConfig
           deploymentSection "App overrides" $ showVars #appConfigLoading #appConfig
@@ -259,7 +256,6 @@ actionsTableHead =
   el "thead" $
     el "tr" $ do
       el "th" $ text "Action type"
-      el "th" $ text "Image tag"
       el "th" $ text "Deployment overrides"
       el "th" $ text "App overrides"
       el "th" $ text "Exit code"
@@ -315,7 +311,6 @@ actinRow hReq DeploymentLog {..} = do
             "status "
               <> if exitCode == 0 then "status--success" else "status--failure"
       divClass statusClass blank
-    el "td" $ text $ coerce deploymentTag
     el "td" $ deploymentOverridesWidget hReq deploymentDepOverrides
     el "td" $ applicationOverridesWidget hReq deploymentDepOverrides deploymentAppOverrides
     el "td" $ text $ showT $ exitCode

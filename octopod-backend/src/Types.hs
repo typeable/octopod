@@ -13,9 +13,9 @@ module Types
     Domain (..),
     Namespace (..),
     Command (..),
-    ArchiveRetention (..),
     Timeout (..),
     ControlScriptArgs (..),
+    ControlScriptTimeout (..),
   )
 where
 
@@ -53,10 +53,6 @@ newtype Domain = Domain {unDomain :: Text}
 newtype Namespace = Namespace {unNamespace :: Text}
   deriving stock (Show)
 
--- | Archive retention.
-newtype ArchiveRetention = ArchiveRetention {unArchiveRetention :: NominalDiffTime}
-  deriving stock (Show)
-
 -- | Timeout.
 newtype Timeout = Timeout {unTimeout :: CalendarDiffTime}
   deriving stock (Show)
@@ -70,3 +66,5 @@ newtype ControlScriptArgs = ControlScriptArgs
   {unControlScriptArgs :: [String]}
   deriving stock (Show)
   deriving newtype (Semigroup, Monoid)
+
+newtype ControlScriptTimeout = ControlScriptTimeout DiffTime

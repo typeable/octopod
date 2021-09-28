@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
 import qualified Data.Csv as C
+import Data.Fixed
 import Data.Foldable
 import Data.Functor
 import Data.Generics.Labels ()
@@ -36,7 +37,7 @@ import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
-import Data.Text (pack, unpack, unwords)
+import Data.Text (pack)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
@@ -67,6 +68,7 @@ import System.Environment (lookupEnv)
 import System.Exit
 import System.Log.FastLogger
 import System.Posix.Signals (sigTERM)
+import Text.Read (readMaybe)
 import Types
 import Prelude hiding (lines, log, unlines, unwords)
 
@@ -81,55 +83,55 @@ newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
 -- | Octopod Server state definition.
 data AppState = AppState
   { -- | postgres pool
-    dbPool :: Pool Connection
+    dbPool :: !(Pool Connection)
   , -- | logger
-    logger :: TimedFastLogger
+    logger :: !TimedFastLogger
   , -- | channel for WS events for the frontend
-    eventSink :: TChan WSEvent
+    eventSink :: !(TChan WSEvent)
   , -- | background workers counter
-    bgWorkersCounter :: IORef Int
+    bgWorkersCounter :: !(IORef Int)
   , -- | flag of activating graceful shutdown
-    gracefulShutdownActivated :: IORef Bool
+    gracefulShutdownActivated :: !(IORef Bool)
   , -- | semaphore for graceful shutdown
-    shutdownSem :: MVar ()
+    shutdownSem :: !(MVar ())
   , -- | project name
-    projectName :: ProjectName
+    projectName :: !ProjectName
   , -- | base domain
-    baseDomain :: Domain
+    baseDomain :: !Domain
   , -- | namespace
-    namespace :: Namespace
-  , -- | archive retention
-    archiveRetention :: ArchiveRetention
+    namespace :: !Namespace
   , -- | status update timeout
-    statusUpdateTimeout :: Timeout
+    statusUpdateTimeout :: !Timeout
   , -- | creation command path
-    creationCommand :: Command
+    creationCommand :: !Command
   , -- | update command path
-    updateCommand :: Command
+    updateCommand :: !Command
   , -- | deletion command path
-    archiveCommand :: Command
+    archiveCommand :: !Command
   , -- | checking command path
-    checkingCommand :: Command
+    checkingCommand :: !Command
   , -- | cleanup command path
-    cleanupCommand :: Command
+    cleanupCommand :: !Command
   , -- | archive checking command path
-    archiveCheckingCommand :: Command
+    archiveCheckingCommand :: !Command
   , -- | tag checking command path
-    tagCheckingCommand :: Command
-  , infoCommand :: Command
-  , notificationCommand :: Maybe Command
-  , deploymentOverridesCommand :: Command
-  , deploymentOverrideKeysCommand :: Command
-  , applicationOverridesCommand :: Command
-  , applicationOverrideKeysCommand :: Command
-  , unarchiveCommand :: Command
+    configCheckingCommand :: !Command
+  , infoCommand :: !Command
+  , notificationCommand :: !(Maybe Command)
+  , deploymentOverridesCommand :: !Command
+  , deploymentOverrideKeysCommand :: !Command
+  , applicationOverridesCommand :: !Command
+  , applicationOverrideKeysCommand :: !Command
+  , unarchiveCommand :: !Command
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
-    lockedDeployments :: LockedDeployments
-  , depOverridesCache :: CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel)
-  , depOverrideKeysCache :: CacheMap ServerError AppM' () [Text]
-  , appOverridesCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel)
-  , appOverrideKeysCache :: CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text]
+    lockedDeployments :: !LockedDeployments
+  , depOverridesCache :: !(CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel))
+  , depOverrideKeysCache :: !(CacheMap ServerError AppM' () [Text])
+  , appOverridesCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
+  , appOverrideKeysCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text])
+  , gitSha :: !Text
+  , controlScriptTimeout :: !ControlScriptTimeout
   }
   deriving stock (Generic)
 
@@ -154,8 +156,11 @@ data FullInfoListType
   | FullInfoOnlyForOne DeploymentName
   deriving stock (Show)
 
-runOctopodServer :: IO ()
-runOctopodServer = do
+runOctopodServer ::
+  -- | The git SHA
+  Text ->
+  IO ()
+runOctopodServer sha = do
   logger' <- newLogger
   logInfo logger' "started"
   bgWorkersC <- newIORef 0
@@ -167,18 +172,20 @@ runOctopodServer = do
   opts <- parseArgs
   let a ?! e = a >>= maybe (die e) pure
       getEnvOrDie eName = lookupEnv eName ?! (eName <> " is not set")
+      getEnvOrDieWith eName f = fmap (>>= f) (lookupEnv eName) ?! (eName <> " is not set")
   projName <- coerce . pack <$> getEnvOrDie "PROJECT_NAME"
   domain <- coerce . pack <$> getEnvOrDie "BASE_DOMAIN"
   ns <- coerce . pack <$> getEnvOrDie "NAMESPACE"
-  archRetention <- ArchiveRetention . fromIntegral . read @Int <$> getEnvOrDie "ARCHIVE_RETENTION"
-  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromIntegral . read @Int <$> getEnvOrDie "STATUS_UPDATE_TIMEOUT"
+  archRetention <- fromInteger <$> getEnvOrDieWith "ARCHIVE_RETENTION" readMaybe
+  stUpdateTimeout <- Timeout . CalendarDiffTime 0 . fromInteger <$> getEnvOrDieWith "STATUS_UPDATE_TIMEOUT" readMaybe
+  scriptTimeout <- ControlScriptTimeout . fromInteger . maybe (60 * 30) read <$> lookupEnv "CONTROL_SCRIPT_TIMEOUT"
   creationCmd <- Command . pack <$> getEnvOrDie "CREATION_COMMAND"
   updateCmd <- Command . pack <$> getEnvOrDie "UPDATE_COMMAND"
   archiveCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_COMMAND"
   checkingCmd <- Command . pack <$> getEnvOrDie "CHECKING_COMMAND"
   cleanupCmd <- Command . pack <$> getEnvOrDie "CLEANUP_COMMAND"
   archiveCheckingCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
-  tagCheckingCmd <- Command . pack <$> getEnvOrDie "TAG_CHECKING_COMMAND"
+  tagCheckingCmd <- Command . pack <$> getEnvOrDie "CONFIG_CHECKING_COMMAND"
   infoCmd <- Command . pack <$> getEnvOrDie "INFO_COMMAND"
   dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_OVERRIDES_COMMAND"
   dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
@@ -205,16 +212,16 @@ runOctopodServer = do
         Just "" -> Nothing
         x -> x
   depOverrideKeysCache' <- cacheMap $ \() -> do
-    (_, Stdout out, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
+    (_, Stdout out, _, _) <- deploymentOverrideKeys >>= runCommandArgs deploymentOverrideKeysCommand
     pure $ T.lines out
   depOverridesCache' <- cacheMap $ \() -> do
-    (_, Stdout out, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
+    (_, Stdout out, _, _) <- defaultDeploymentOverridesArgs >>= runCommandArgs deploymentOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
   appOverrideKeysCache' <- cacheMap $ \cfg -> do
-    (_, Stdout out, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
+    (_, Stdout out, _, _) <- applicationOverrideKeys cfg >>= runCommandArgs applicationOverrideKeysCommand
     pure $ T.lines out
   appOverridesCache' <- cacheMap $ \cfg -> do
-    (_, Stdout out, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
+    (_, Stdout out, _, _) <- defaultApplicationOverridesArgs cfg >>= runCommandArgs applicationOverridesCommand
     either500S $ decodeCSVDefaultConfig . BSL.fromStrict . T.encodeUtf8 $ out
   dbPool' <-
     createPool
@@ -236,7 +243,6 @@ runOctopodServer = do
           , projectName = projName
           , baseDomain = domain
           , namespace = ns
-          , archiveRetention = archRetention
           , statusUpdateTimeout = stUpdateTimeout
           , creationCommand = creationCmd
           , updateCommand = updateCmd
@@ -244,7 +250,7 @@ runOctopodServer = do
           , checkingCommand = checkingCmd
           , cleanupCommand = cleanupCmd
           , archiveCheckingCommand = archiveCheckingCmd
-          , tagCheckingCommand = tagCheckingCmd
+          , configCheckingCommand = tagCheckingCmd
           , infoCommand = infoCmd
           , notificationCommand = notificationCmd
           , deploymentOverridesCommand = dOverridesCmd
@@ -257,6 +263,8 @@ runOctopodServer = do
           , depOverrideKeysCache = depOverrideKeysCache'
           , appOverridesCache = appOverridesCache'
           , appOverrideKeysCache = appOverrideKeysCache'
+          , gitSha = sha
+          , controlScriptTimeout = scriptTimeout
           }
 
       app' = app appSt
@@ -265,12 +273,37 @@ runOctopodServer = do
       uiServerPort = unServerPort $ octopodUIPort opts
       powerServerPort = unServerPort serverPort
       wsServerPort = unServerPort $ octopodWSPort opts
+  void . L.fork $ flip runReaderT appSt $ runArchiveCleanup archRetention
   powerApp' <- powerApp powerAuthorizationHeader appSt
   (run uiServerPort app')
     `race_` (run powerServerPort powerApp')
     `race_` (run wsServerPort wsApp')
     `race_` (runStatusUpdater appSt)
     `race_` (runShutdownHandler appSt)
+
+runArchiveCleanup ::
+  forall m.
+  (MonadReader AppState m, MonadBaseControl IO m) =>
+  NominalDiffTime ->
+  m ()
+runArchiveCleanup retention = do
+  isShuttingDown >>= \case
+    True -> pure ()
+    False -> do
+      cutoff <- liftBase getCurrentTime <&> addUTCTime (negate retention)
+      dNames <- runStatement $
+        select $ do
+          ds <- each deploymentSchema
+          where_ $ (ds ^. #status) ==. litExpr Archived
+          where_ $ ds ^. #archivedAt <. litExpr (Just cutoff)
+          pure $ ds ^. #name
+      for_ dNames $ \dName -> (>>= logLeft) . runExceptT $
+        runDeploymentBgWorker Nothing dName (pure ()) $ \() -> cleanupDeployment dName
+      threadDelayMicro (realToFrac $ retention / 10)
+      runArchiveCleanup retention
+  where
+    threadDelayMicro :: Micro -> m ()
+    threadDelayMicro (MkFixed i) = liftBase $ threadDelay (fromInteger i)
 
 runTransaction ::
   (MonadReader AppState m, MonadBaseControl IO m) =>
@@ -373,7 +406,6 @@ powerServer (Authenticated ()) =
       :<|> restoreH
   )
     :<|> getActionInfoH
-    :<|> cleanArchiveH
 powerServer _ = throwAll err401
 
 -- | Application with the WS API.
@@ -413,7 +445,7 @@ fullInfoH dName = do
     Nothing ->
       throwError
         err404
-          { errBody = validationError ["Name not found"] []
+          { errBody = validationError ["Name not found"]
           }
 
 -- | Handles the 'full_info' request of the octo CLI API.
@@ -454,9 +486,8 @@ createH dep = do
           \under 17 characters and begin with a letter."
     throwError
       err400
-        { errBody = validationError [badNameText] []
+        { errBody = validationError [badNameText]
         }
-  t1 <- liftBase getCurrentTime
   failIfImageNotFound dep
   failIfGracefulShutdownActivated
   runDeploymentBgWorker
@@ -474,7 +505,6 @@ createH dep = do
                         [ DeploymentSchema
                             { id_ = unsafeDefault
                             , name = litExpr $ dep ^. #name
-                            , tag = litExpr $ dep ^. #tag
                             , appOverrides = litExpr $ dep ^. #appOverrides
                             , deploymentOverrides = litExpr $ dep ^. #deploymentOverrides
                             , createdAt = now
@@ -495,7 +525,7 @@ createH dep = do
             | code == unique_violation ->
               throwError
                 err400
-                  { errBody = validationError ["Deployment already exists"] []
+                  { errBody = validationError ["Deployment already exists"]
                   }
           Left _ ->
             throwError err409 {errBody = appError "Some database error"}
@@ -504,9 +534,7 @@ createH dep = do
       st <- ask
       liftBase $ sendReloadEvent st
       updateDeploymentInfo (dep ^. #name)
-      (ec, out, err) <- createDeployment dep
-      t2 <- liftBase getCurrentTime
-      let elTime = elapsedTime t2 t1
+      (ec, out, err, elTime) <- createDeployment dep
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog dep CreateAction ec elTime out err
       liftBase $ sendReloadEvent st
@@ -522,7 +550,7 @@ updateDeploymentInfo dName = do
   log <- asks (logWarning . logger)
   DeploymentFullInfo {deployment = dep} <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, out, err) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
+  (ec, out, err, _) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
@@ -550,7 +578,7 @@ getDeploymentConfig dep = do
 createDeployment ::
   (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   Deployment ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 createDeployment dep = do
   st <- ask
   cfg <- getDeploymentConfig dep
@@ -566,13 +594,11 @@ createDeployment dep = do
           , T.unpack . coerce $ namespace st
           , "--name"
           , T.unpack . coerce $ dep ^. #name
-          , "--tag"
-          , T.unpack . coerce $ dep ^. #tag
           ]
           <> fullConfigArgs cfg
-  (ec, out, err) <- runCommandArgs creationCommand args
+  res <- runCommandArgs creationCommand args
   liftBase . log $ "deployment created, deployment: " <> (pack . show $ dep)
-  pure (ec, out, err)
+  pure res
 
 -- | Helper to get deployment logs.
 selectDeploymentLogs ::
@@ -602,6 +628,7 @@ data DeploymentStatusTransition
   | TransitionArchivePending StatusTransitionProcessOutput
   | TransitionUpdatePending StatusTransitionProcessOutput
   | TransitionCreatePending StatusTransitionProcessOutput
+  | TransitionCleanupFailed StatusTransitionProcessOutput
   | TransitionFailure FailureType
   deriving stock (Show)
 
@@ -613,6 +640,7 @@ transitionStatus TransitionRestore {} = CreatePending
 transitionStatus TransitionArchivePending {} = ArchivePending
 transitionStatus TransitionUpdatePending {} = UpdatePending
 transitionStatus TransitionCreatePending {} = CreatePending
+transitionStatus TransitionCleanupFailed {} = CleanupFailed
 transitionStatus (TransitionFailure t) = Failure t
 
 processOutput :: DeploymentStatusTransition -> Maybe (StatusTransitionProcessOutput, Action)
@@ -623,6 +651,7 @@ processOutput (TransitionRestore x) = Just (x, RestoreAction)
 processOutput (TransitionArchivePending x) = Just (x, ArchiveAction)
 processOutput (TransitionUpdatePending x) = Just (x, UpdateAction)
 processOutput (TransitionCreatePending x) = Just (x, CreateAction)
+processOutput (TransitionCleanupFailed x) = Just (x, CleanupAction)
 processOutput TransitionFailure {} = Nothing
 
 transitionToStatusS ::
@@ -722,7 +751,7 @@ transitionToStatus dName s = do
   forM_ notificationCmd $ \nCmd ->
     runBgWorker . void $
       runCommandArgs' nCmd
-        =<< notificationCommandArgs dName (dep ^. #tag) oldS newS
+        =<< notificationCommandArgs dName oldS newS
   liftBase $ sendReloadEvent st
 
 assertStatusTransitionPossible ::
@@ -765,9 +794,10 @@ possibleTransitions :: DeploymentStatus -> DeploymentStatus -> Bool
 possibleTransitions CreatePending = anyPred [is #_Running, is #_Failure]
 possibleTransitions Running = anyPred [is #_Failure, is #_ArchivePending, is #_UpdatePending]
 possibleTransitions UpdatePending = anyPred [is #_Failure, is #_Running]
-possibleTransitions (Failure _) = anyPred [is #_UpdatePending, is #_Running, is #_ArchivePending]
+possibleTransitions (Failure _) = anyPred [is #_UpdatePending, is #_Running, is #_ArchivePending, is #_CleanupFailed]
 possibleTransitions ArchivePending = anyPred [is #_ArchivePending, is #_Archived]
-possibleTransitions Archived = anyPred [is #_CreatePending]
+possibleTransitions Archived = anyPred [is #_CreatePending, is #_CleanupFailed]
+possibleTransitions CleanupFailed = const False
 
 anyPred :: [a -> Bool] -> a -> Bool
 anyPred preds x = any ($ x) preds
@@ -776,25 +806,10 @@ anyPred preds x = any ($ x) preds
 archiveH :: DeploymentName -> AppM CommandResponse
 archiveH dName = do
   failIfGracefulShutdownActivated
-  t1 <- liftBase getCurrentTime
-  st <- ask
-  let log = liftBase . logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ archiveCommand st
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
-    log $ "call " <> unwords (cmd : args)
-    (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
+    (view #deployment -> dep) <- getDeploymentS dName
+    cfg <- getDeploymentConfig dep
+    (ec, out, err, elTime) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
     transitionToStatusS dName $
       TransitionArchivePending
         StatusTransitionProcessOutput
@@ -810,7 +825,6 @@ archiveH dName = do
 updateH :: DeploymentName -> DeploymentUpdate -> AppM CommandResponse
 updateH dName dUpdate = do
   failIfGracefulShutdownActivated
-  t1 <- liftIO getCurrentTime
   st <- ask
   let log = logInfo (logger st)
   olDep <- getDeploymentS dName <&> (^. #deployment)
@@ -831,7 +845,6 @@ updateH dName dUpdate = do
                 , set = \() ds ->
                     ds & #appOverrides .~ litExpr (dUpdate ^. #appOverrides)
                       & #deploymentOverrides .~ litExpr (dUpdate ^. #deploymentOverrides)
-                      & #tag .~ litExpr (dUpdate ^. #newTag)
                 , updateWhere = \() ds -> ds ^. #name ==. litExpr dName
                 , returning = Projection id
                 }
@@ -851,18 +864,12 @@ updateH dName dUpdate = do
             , T.unpack . coerce $ namespace st
             , "--name"
             , T.unpack . coerce $ dName
-            , "--tag"
-            , T.unpack . coerce $ dep ^. #tag
             ]
             <> fullConfigArgs cfg
-    (ec, out, err) <- runCommandArgs updateCommand args
+    (ec, out, err, elTime) <- runCommandArgs updateCommand args
     liftBase . log $
       "deployment updated, name: "
         <> coerce dName
-        <> ", tag: "
-        <> coerce (dep ^. #tag)
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
     transitionToStatusS dName $
       TransitionUpdatePending
         StatusTransitionProcessOutput
@@ -905,10 +912,10 @@ getInfo dName = do
       }
 
 -- | Handles the 'ping' request.
-pingH :: AppM NoContent
+pingH :: AppM Text
 pingH = do
   _ <- runStatement $ select $ pure $ litExpr True
-  pure NoContent
+  asks gitSha
 
 -- | Handles the 'project_name' request.
 projectNameH :: AppM ProjectName
@@ -919,7 +926,7 @@ statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -934,29 +941,31 @@ cleanupH dName = do
 
 -- | Helper to cleanup deployment.
 cleanupDeployment ::
-  (MonadBaseControl IO m, MonadReader AppState m) =>
+  (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
   DeploymentName ->
   m ()
 cleanupDeployment dName = do
   st <- ask
   let log = logInfo (logger st)
-      args =
-        [ "--project-name"
-        , coerce $ projectName st
-        , "--base-domain"
-        , coerce $ baseDomain st
-        , "--namespace"
-        , coerce $ namespace st
-        , "--name"
-        , coerce dName
-        ]
-      cmd = coerce $ cleanupCommand st
-  liftBase . log $ "call " <> unwords (cmd : args)
-  (ec, out, err) <- runCommand (unpack cmd) (unpack <$> args)
+  (view #deployment -> dep) <- getDeploymentS dName
+  cfg <- getDeploymentConfig dep
+  (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
   liftBase $ print out >> print err
-  deleteDeploymentLogs dName
-  deleteDeployment dName
-  liftBase $ log $ "deployment destroyed, name: " <> coerce dName
+  case ec of
+    ExitSuccess -> do
+      deleteDeploymentLogs dName
+      deleteDeployment dName
+      liftBase $ log $ "deployment destroyed, name: " <> coerce dName
+    ExitFailure _ -> do
+      transitionToStatusS dName $
+        TransitionCleanupFailed
+          StatusTransitionProcessOutput
+            { exitCode = ec
+            , duration = elTime
+            , stdout = out
+            , stderr = err
+            }
+      pure ()
   liftBase $ sendReloadEvent st
   handleExitCode ec
 
@@ -990,30 +999,10 @@ deleteDeployment dName =
         , returning = pure ()
         }
 
--- | Handles the 'clean-archive' request.
-cleanArchiveH :: AppM CommandResponse
-cleanArchiveH = do
-  failIfGracefulShutdownActivated
-  st <- ask
-  let archRetention = unArchiveRetention . archiveRetention $ st
-  cutoff <- liftBase getCurrentTime <&> addUTCTime (negate archRetention)
-  dNames <- runStatement $
-    select $ do
-      ds <- each deploymentSchema
-      where_ $ (ds ^. #status) `in_` (litExpr <$> archivedStatuses)
-      where_ $ ds ^. #archivedAt <. litExpr (Just cutoff)
-      pure $ ds ^. #name
-  runBgWorker . void $
-    for dNames $ \dName ->
-      runDeploymentBgWorker Nothing dName (pure ()) $ \() -> cleanupDeployment dName
-
-  pure Success
-
 -- | Handles the 'restore' request.
 restoreH :: DeploymentName -> AppM CommandResponse
 restoreH dName = do
   failIfGracefulShutdownActivated
-  t1 <- liftBase getCurrentTime
   dep <- getDeploymentS dName
   failIfImageNotFound $ dep ^. #deployment
   failIfGracefulShutdownActivated
@@ -1021,9 +1010,7 @@ restoreH dName = do
     (view #deployment -> dep') <- getDeploymentS dName
     updateDeploymentInfo dName
     cfg <- getDeploymentConfig dep'
-    (ec, out, err) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
-    t2 <- liftBase getCurrentTime
-    let elTime = elapsedTime t2 t1
+    (ec, out, err, elTime) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
     transitionToStatusS dName $
       TransitionRestore
         StatusTransitionProcessOutput
@@ -1080,7 +1067,6 @@ createDeploymentLog dep act ec dur out err = do
                     { actionId = unsafeDefault
                     , deploymentId = litExpr dId
                     , action = litExpr act
-                    , deploymentTag = litExpr $ dep ^. #tag
                     , exitCode = litExpr $ case ec of
                         ExitSuccess -> 0
                         ExitFailure errCode -> fromIntegral errCode
@@ -1123,29 +1109,25 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, _) <- runCommandArgs tagCheckingCommand =<< tagCheckCommandArgs cfg dep
+  (ec, _, Stderr err, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
-      throwError err400 {errBody = validationError [] ["Tag not found"]}
+      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 err}
 
 -- | Helper to create an application-level error.
 appError :: Text -> BSL.ByteString
 appError = encode . AppError
 
 -- | Helper to create a validation-level error.
-validationError :: [Text] -> [Text] -> BSL.ByteString
-validationError nameErrors tagErrors =
-  encode $ ValidationError nameErrors tagErrors
+validationError :: [Text] -> BSL.ByteString
+validationError nameErrors =
+  encode $ ValidationError nameErrors
 
 -- | Helper to send an event to the WS event channel.
 sendReloadEvent :: AppState -> IO ()
 sendReloadEvent state =
   atomically $ writeTChan (eventSink state) FrontendPleaseUpdateEverything
-
--- | Returns time delta between 2 timestamps.
-elapsedTime :: UTCTime -> UTCTime -> Duration
-elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
 
 -- | Runs the status updater.
 runStatusUpdater :: AppState -> IO ()
@@ -1157,28 +1139,26 @@ runStatusUpdater state = do
   forever $ do
     currentTime <- liftBase getCurrentTime
     let cutoff = addUTCTime (negate interval) currentTime
-        logLeft :: Either ServerError () -> IO ()
-        logLeft (Left err) = logErr . T.pack $ displayException err
-        logLeft (Right ()) = pure ()
-    (>>= logLeft) . runExceptT . flip runReaderT state $ do
+    flip runReaderT state . (>>= logLeft) . runExceptT $ do
       rows' <- runStatement . select $ do
         ds <- each deploymentSchema
         where_ $ ds ^. #checkedAt <. litExpr cutoff
-        where_ $ ds ^. #status /=. litExpr Archived
-        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt), ds ^. #tag)
-      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts, _) -> do
+        where_ $ not_ $ (ds ^. #status) `in_` (litExpr <$> [Archived, CleanupFailed])
+        pure (ds ^. #name, ds ^. #status, now `diffTime` (ds ^. #statusUpdatedAt))
+      checkResult <- for rows' $ \(dName, dStatus, Timestamp -> ts) -> do
         let timeout = statusUpdateTimeout state
-        mEc <- case dStatus of
-          ArchivePending -> do
-            (ec, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs dName
-            pure $ Just ec
-          _ -> do
-            getSingleFullInfo dName >>= \case
-              Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
-              Just (view #deployment -> dep) -> do
-                cfg <- getDeploymentConfig dep
-                (ec, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
-                pure $ Just ec
+        mEc <-
+          getSingleFullInfo dName >>= \case
+            Nothing -> liftBase (logErr $ "Couldn't find deployment: " <> coerce dName) $> Nothing
+            Just (view #deployment -> dep) -> do
+              cfg <- getDeploymentConfig dep
+              case dStatus of
+                ArchivePending -> do
+                  (ec, _, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
+                  pure $ Just ec
+                _ -> do
+                  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+                  pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-
         for (catMaybes checkResult) $ \(dName, transitionM, dStatus) ->
@@ -1202,6 +1182,13 @@ runStatusUpdater state = do
                       Right (Left e) -> logErr $ show' e
       when (Prelude.or updated) $ liftBase $ sendReloadEvent state
       liftBase $ threadDelay 2000000
+
+logLeft :: (MonadBase IO m, MonadReader AppState m, Exception e) => Either e () -> m ()
+logLeft (Left err) = do
+  state <- ask
+  let logErr = liftBase . logWarning (logger state)
+  logErr . T.pack $ displayException err
+logLeft (Right ()) = pure ()
 
 -- | Returns the new deployment status.
 statusTransition ::
@@ -1232,11 +1219,15 @@ failureStatusType _ = GenericFailure
 -- if graceful shutdown has been activated.
 failIfGracefulShutdownActivated :: AppM ()
 failIfGracefulShutdownActivated = do
-  gracefulShutdownAct <- gracefulShutdownActivated <$> ask
-  gracefulShutdown <- liftIO . readIORef $ gracefulShutdownAct
+  gracefulShutdown <- isShuttingDown
   if gracefulShutdown
     then throwError err405 {errBody = appError "Graceful shutdown activated"}
     else pure ()
+
+isShuttingDown :: (MonadReader AppState m, MonadBase IO m) => m Bool
+isShuttingDown = do
+  gracefulShutdownAct <- gracefulShutdownActivated <$> ask
+  liftBase . readIORef $ gracefulShutdownAct
 
 -- | Handles the graceful shutdown signal.
 -- Sends a signal to the 'shutdownSem' semaphore
@@ -1279,6 +1270,7 @@ runBgWorker act = void $ L.forkFinally act' cleanup
 runDeploymentBgWorker ::
   forall m a.
   (MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
+  -- | Status to set after the first part has finished.
   Maybe DeploymentStatus ->
   DeploymentName ->
   -- | Think of this as running synchronously.

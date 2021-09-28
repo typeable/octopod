@@ -19,6 +19,7 @@ library
                      , Common.Utils
                      , Common.Validation
                      , Data.Map.Ordered.Strict.Extra
+                     , Control.Searchable
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -47,6 +48,12 @@ library
                      , EmptyDataDeriving
                      , TupleSections
                      , AllowAmbiguousTypes
+                     , TypeFamilies
+                     , RankNTypes
+                     , MultiParamTypeClasses
+                     , ApplicativeDo
+                     , UndecidableInstances
+                     , FunctionalDependencies
   build-depends:       base
                      , aeson
                      , cassava

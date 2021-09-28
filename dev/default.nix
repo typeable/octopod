@@ -97,6 +97,10 @@ in
       failScript = pkgs.writeScript "fail.sh" ''
         #!${pkgs.bash}/bin/bash
 
+        1>&2 echo "You did something wrong :("
+
+        echo "You did something wrong, but you shouldn't see this."
+
         exit 1
       '';
 
@@ -137,7 +141,7 @@ in
         export CHECKING_COMMAND=${echoScript}
         export CLEANUP_COMMAND=${echoScript}
         export ARCHIVE_CHECKING_COMMAND=${echoScript}
-        export TAG_CHECKING_COMMAND=${echoScript}
+        export CONFIG_CHECKING_COMMAND=${echoScript}
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_OVERRIDES_COMMAND=${infoScript}
@@ -148,6 +152,7 @@ in
         export POWER_AUTHORIZATION_HEADER="123"
         export CACHE_INVALIDATION_TIME="60"
         export CACHE_UPDATE_TIME="20"
+        export CONTROL_SCRIPT_TIMEOUT="10"
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
             --ui-port 3002 \

@@ -16,3 +16,4 @@ rename_delete_to_archive_2 2020-11-26T08:28:58Z Typeable LLC <octopod@typeable.i
 add_detailed_failures 2021-02-04T11:01:15Z Typeable LLC <octopod@typeable.io> # Added more failure states
 remove_archived_column 2021-01-28T18:44:54Z Typeable LLC <octopod@typeable.io> # Removed 'archived' column
 migrate_2.0 2021-08-11T17:09:37Z Typeable LLC <octopod@typeable.io> # Migrate to 2.0-style tables. (Less tables)
+move_tag_to_overrides 2021-09-25T14:29:43Z Typeable LLC <octopod@typeable.io> # Remove tag as a special field, making it an override field.

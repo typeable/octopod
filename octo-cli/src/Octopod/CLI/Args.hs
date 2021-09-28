@@ -14,8 +14,6 @@ data Args
   = Create
       { -- | deployment name
         name :: Text
-      , -- | deployment tag
-        tag :: Text
       , -- | application-level overrides to set
         setAppOverrides :: [Text]
       , -- | deployment-level overrides to set
@@ -29,8 +27,6 @@ data Args
   | Update
       { -- | deployment name
         name :: Text
-      , -- | deployment tag
-        newTag :: Maybe Text
       , -- | application-level overrides to set
         setAppOverrides :: [Text]
       , -- | application-level overrides to unset
@@ -52,7 +48,6 @@ data Args
       { -- | deployment name
         name :: Text
       }
-  | CleanArchive
   | GetActionLogs ActionId LogOutput
   deriving stock (Show)
 
@@ -84,9 +79,6 @@ commandArgs =
         <> command "cleanup" (info cleanupArgs (progDesc "cleanup the deployment"))
         <> command "restore" (info restoreArgs (progDesc "restore the deployment"))
         <> command
-          "clean-archive"
-          (info cleanupArchiveArgs (progDesc "cleanup all archived deployments"))
-        <> command
           "logs"
           (info actionLogsArgs (progDesc "get deployment logs of a given action"))
     )
@@ -96,7 +88,6 @@ createArgs :: Parser Args
 createArgs =
   Create
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-    <*> strOption (long "tag" <> short 't' <> help "deployment tag")
     <*> many
       ( strOption
           ( long "set-app-env-override"
@@ -128,7 +119,6 @@ updateArgs :: Parser Args
 updateArgs =
   Update
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-    <*> optional (strOption (long "tag" <> short 't' <> help "deployment tag"))
     <*> many
       ( strOption
           ( long "set-app-env-override"
@@ -175,11 +165,6 @@ restoreArgs :: Parser Args
 restoreArgs =
   Restore
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
-
--- | Parses arguments of 'clean-archive' subcommand.
-cleanupArchiveArgs :: Parser Args
-cleanupArchiveArgs =
-  pure CleanArchive
 
 actionLogsArgs :: Parser Args
 actionLogsArgs =

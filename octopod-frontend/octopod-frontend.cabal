@@ -50,6 +50,7 @@ executable frontend
                      , Frontend.UIKit.Button.Static
                      , Frontend.UIKit.Button.Action
                      , Frontend.UIKit.Button.Sort
+                     , Reflex.Dom.Renderable
   ghc-options:
     -Weverything
     -Wno-implicit-prelude
@@ -123,5 +124,9 @@ executable frontend
                      , witherable
                      , reflex
                      , data-default
+                     , free
+                     , parallel
+                     , generic-data
+                     , monoidal-containers
   hs-source-dirs:      src
   default-language:    Haskell2010

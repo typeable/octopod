@@ -5,15 +5,16 @@
 --This module contains control script utils.
 module Octopod.Server.ControlScriptUtils
   ( infoCommandArgs,
+    archiveCommandArgs,
     unarchiveCommandArgs,
+    cleanupCommandArgs,
     notificationCommandArgs,
     runCommand,
-    runCommandWithoutPipes,
     runCommandArgs,
     runCommandArgs',
     checkCommandArgs,
     archiveCheckArgs,
-    tagCheckCommandArgs,
+    configCheckCommandArgs,
 
     -- * overrides
     defaultDeploymentOverridesArgs,
@@ -27,18 +28,23 @@ module Octopod.Server.ControlScriptUtils
   )
 where
 
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.STM
 import Control.Lens
 import Control.Monad.Base
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as TL
 import Data.Coerce
+import Data.Fixed
 import Data.Generics.Product.Typed
 import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Time
 import Octopod.Server.Logger
 import System.Exit
 import System.Log.FastLogger
+import System.Process (terminateProcess)
 import System.Process.Typed
 import Types
 
@@ -67,8 +73,6 @@ genericDeploymentCommandArgs cfg dep = do
       , T.unpack . coerce $ namespace
       , "--name"
       , T.unpack . coerce $ dep ^. #name
-      , "--tag"
-      , T.unpack . coerce $ tag dep
       ]
       <> fullConfigArgs cfg
 
@@ -101,11 +105,20 @@ genericDeploymentCommandArgsNoConfig = do
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
 
+archiveCommandArgs :: GenericDeploymentCommandArgs m r
+archiveCommandArgs = genericDeploymentCommandArgs
+
+cleanupCommandArgs :: GenericDeploymentCommandArgs m r
+cleanupCommandArgs = genericDeploymentCommandArgs
+
+archiveCheckArgs :: GenericDeploymentCommandArgs m r
+archiveCheckArgs = genericDeploymentCommandArgs
+
 checkCommandArgs :: GenericDeploymentCommandArgs m r
 checkCommandArgs = genericDeploymentCommandArgs
 
-tagCheckCommandArgs :: GenericDeploymentCommandArgs m r
-tagCheckCommandArgs = genericDeploymentCommandArgs
+configCheckCommandArgs :: GenericDeploymentCommandArgs m r
+configCheckCommandArgs = genericDeploymentCommandArgs
 
 defaultDeploymentOverridesArgs :: GenericDeploymentCommandArgsNoConfig m r
 defaultDeploymentOverridesArgs = genericDeploymentCommandArgsNoConfig
@@ -132,13 +145,12 @@ notificationCommandArgs ::
   , HasType Domain r
   ) =>
   DeploymentName ->
-  DeploymentTag ->
   -- | Previous status
   DeploymentStatus ->
   -- | New status
   DeploymentStatus ->
   m ControlScriptArgs
-notificationCommandArgs dName dTag old new = do
+notificationCommandArgs dName old new = do
   (Namespace namespace) <- asks getTyped
   (ProjectName projectName) <- asks getTyped
   (Domain domain) <- asks getTyped
@@ -152,76 +164,85 @@ notificationCommandArgs dName dTag old new = do
       , T.unpack namespace
       , "--name"
       , T.unpack . coerce $ dName
-      , "--tag"
-      , T.unpack . coerce $ dTag
       , "--old-status"
       , T.unpack $ deploymentStatusToText old
       , "--new-status"
       , T.unpack $ deploymentStatusToText new
       ]
 
-archiveCheckArgs ::
-  ( MonadReader r m
-  , HasType Namespace r
-  , HasType ProjectName r
-  , HasType Domain r
-  ) =>
-  DeploymentName ->
-  m ControlScriptArgs
-archiveCheckArgs dName = do
-  (ProjectName projectName) <- asks getTyped
-  (Domain domain) <- asks getTyped
-  (Namespace namespace) <- asks getTyped
-  return $
-    ControlScriptArgs
-      [ "--project-name"
-      , T.unpack projectName
-      , "--base-domain"
-      , T.unpack domain
-      , "--namespace"
-      , T.unpack namespace
-      , "--name"
-      , T.unpack . coerce $ dName
-      ]
-
 runCommandArgs ::
-  (MonadReader r m, MonadBase IO m, HasType TimedFastLogger r) =>
+  ( MonadReader r m
+  , MonadBase IO m
+  , HasType TimedFastLogger r
+  , HasType ControlScriptTimeout r
+  ) =>
   (r -> Command) ->
   ControlScriptArgs ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs f args = do
   cmd <- asks f
   runCommandArgs' cmd args
 
 runCommandArgs' ::
-  (MonadBase IO m, HasType TimedFastLogger r, MonadReader r m) =>
+  ( MonadBase IO m
+  , HasType TimedFastLogger r
+  , MonadReader r m
+  , HasType ControlScriptTimeout r
+  ) =>
   Command ->
   ControlScriptArgs ->
-  m (ExitCode, Stdout, Stderr)
+  m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
+  t1 <- liftBase getCurrentTime
+
   logger <- asks (getTyped @TimedFastLogger)
   let logText = T.unwords (cmd : fmap T.pack args)
   liftBase $ logInfo logger $ "calling: " <> logText
-  res@(ec, _, _) <- runCommand (T.unpack cmd) args
+  (ec, out, err) <- runCommand (T.unpack cmd) args
   liftBase $
     logInfo logger $
       "calling `" <> logText <> "` exited with: " <> show' ec
-  return res
+  t2 <- liftBase getCurrentTime
+  let elTime = elapsedTime t2 t1
+  return (ec, out, err, elTime)
+
+-- | Returns time delta between 2 timestamps.
+elapsedTime :: UTCTime -> UTCTime -> Duration
+elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
 
 -- | Helper to run command with pipes.
-runCommand :: MonadBase IO m => FilePath -> [String] -> m (ExitCode, Stdout, Stderr)
+runCommand ::
+  ( MonadBase IO m
+  , MonadReader r m
+  , HasType ControlScriptTimeout r
+  ) =>
+  FilePath ->
+  [String] ->
+  m (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
-  (ec, out, err) <- liftBase . readProcess $ proc cmd args
+  ControlScriptTimeout timeout <- asks getTyped
+  let pc =
+        proc cmd args
+          & setStdout byteStringOutput
+          & setStderr byteStringOutput
+  (ec, out, err) <- liftBase $
+    withProcessTerm pc $ \p -> do
+      void . forkIO $ do
+        threadDelayMicro $ realToFrac timeout
+        terminateProcess $ unsafeProcessHandle p
+      atomically $
+        (,,)
+          <$> waitExitCodeSTM p
+          <*> getStdout p
+          <*> getStderr p
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
     , Stderr . T.decodeUtf8 . TL.toStrict $ err
     )
-
--- | Helper to run command without pipes.
-runCommandWithoutPipes :: FilePath -> [String] -> IO ExitCode
-runCommandWithoutPipes cmd args =
-  withProcessWait (proc cmd args) waitExitCode
+  where
+    threadDelayMicro :: Micro -> IO ()
+    threadDelayMicro (MkFixed i) = threadDelay (fromInteger i)
 
 fullConfigArgs :: FullConfig -> ControlScriptArgs
 fullConfigArgs cfg = overridesArgs (appConfig cfg) <> overridesArgs (depConfig cfg)

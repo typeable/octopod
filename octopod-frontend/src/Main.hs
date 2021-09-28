@@ -92,7 +92,8 @@ headWidget ::
   Event t ProjectName ->
   m ()
 headWidget projectNameEv = do
-  elAttr "meta" ("charset" =: "urf8 ") blank
+  elAttr "meta" ("charset" =: "UTF-8") blank
+  elAttr "meta" ("name" =: "theme-color" <> "content" =: "#3671E3") blank
   elAttr
     "meta"
     ( "http-equiv" =: "x-ua-compatible"

@@ -64,26 +64,23 @@ runOcto = do
   let clientEnv = mkClientEnv manager env
   flip runReaderT clientEnv $
     case args of
-      Create tName tTag tSetAp tSetDep -> do
+      Create tName tSetAp tSetDep -> do
         appOvs <- either dieT pure $ parseSetOverrides tSetAp
         depOvs <- either dieT pure $ parseSetOverrides tSetDep
-        handleCreate auth $ Deployment (coerce tName) (coerce tTag) appOvs depOvs
+        handleCreate auth $ Deployment (coerce tName) appOvs depOvs
       List -> handleList auth
       Archive tName -> handleArchive auth . coerce $ tName
-      Update tName tTag tSetAp unsetApp tSetD unsetDep -> do
+      Update tName tSetAp unsetApp tSetD unsetDep -> do
         appOvs <- either dieT pure $ parseSetOverrides tSetAp
         depOvs <- either dieT pure $ parseSetOverrides tSetD
         let tName' = coerce tName
-            tTag' = coerce <$> tTag
-        handleUpdate auth tName' tTag' appOvs unsetApp depOvs unsetDep
+        handleUpdate auth tName' appOvs unsetApp depOvs unsetDep
       Info tName ->
         handleInfo auth . coerce $ tName
       Cleanup tName ->
         handleCleanup auth . coerce $ tName
       Restore tName ->
         handleRestore auth . coerce $ tName
-      CleanArchive ->
-        handleCleanArchive auth
       GetActionLogs aId l -> handleGetActionInfo auth aId l
 
 -- | Returns BaseUrl from 'OCTOPOD_URL' environment variable
@@ -126,13 +123,12 @@ handleArchive auth dName = do
 handleUpdate ::
   AuthContext AuthHeaderAuth ->
   DeploymentName ->
-  Maybe DeploymentTag ->
   Overrides 'ApplicationLevel ->
   [Text] ->
   Overrides 'DeploymentLevel ->
   [Text] ->
   ReaderT ClientEnv IO ()
-handleUpdate auth dName dTag dNewAppOvs removedAppOvs dNewDepOvs removedDepOvs = do
+handleUpdate auth dName dNewAppOvs removedAppOvs dNewDepOvs removedDepOvs = do
   clientEnv <- ask
   dep <- runClientM' (_fullInfoH auth dName) clientEnv
   let removeAll :: Ord k => [k] -> OM.OMap k v -> Either k (OM.OMap k v)
@@ -156,8 +152,7 @@ handleUpdate auth dName dTag dNewAppOvs removedAppOvs dNewDepOvs removedDepOvs =
   liftIO $ do
     let dUpdate =
           DeploymentUpdate
-            { newTag = fromMaybe (dep ^. #deployment . #tag) dTag
-            , appOverrides = appOverrides'
+            { appOverrides = appOverrides'
             , deploymentOverrides = deploymentOverrides'
             }
     response <- runClientM (updateH auth dName dUpdate) clientEnv
@@ -193,13 +188,6 @@ handleRestore auth dName = do
   liftIO $
     handleResponse (const $ pure ()) =<< runClientM (restoreH auth dName) clientEnv
 
--- | Handles the 'clean-archive' subcommand.
-handleCleanArchive :: AuthContext AuthHeaderAuth -> ReaderT ClientEnv IO ()
-handleCleanArchive auth = do
-  clientEnv <- ask
-  liftIO $
-    handleResponse (const $ pure ()) =<< runClientM (cleanArchiveH auth) clientEnv
-
 -- | Handles the 'logs' subcommand.
 handleGetActionInfo :: AuthContext AuthHeaderAuth -> ActionId -> LogOutput -> ReaderT ClientEnv IO ()
 handleGetActionInfo auth aId l = do
@@ -226,7 +214,6 @@ _statusH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CurrentDeplo
 cleanupH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 restoreH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 getActionInfoH :: AuthContext AuthHeaderAuth -> ActionId -> ClientM ActionInfo
-cleanArchiveH :: AuthContext AuthHeaderAuth -> ClientM CommandResponse
 ( listH
     :<|> createH
     :<|> archiveH
@@ -237,8 +224,7 @@ cleanArchiveH :: AuthContext AuthHeaderAuth -> ClientM CommandResponse
     :<|> cleanupH
     :<|> restoreH
   )
-  :<|> getActionInfoH
-  :<|> cleanArchiveH = pushArrowIntoServantAlt $ client (Proxy @PowerAPI)
+  :<|> getActionInfoH = pushArrowIntoServantAlt $ client (Proxy @PowerAPI)
 
 type PushArrowIntoServantAlt a b = PushArrowIntoServantAlt' a b (CanPushArrow a)
 
@@ -268,17 +254,16 @@ handleResponse _ (Left err) =
 decodeError :: LBSC.ByteString -> Text
 decodeError body =
   case decode body of
-    Just (ValidationError nameErrors tagErrors) ->
-      T.concat ((<> "\n") <$> nameErrors) <> T.concat ((<> "\n") <$> tagErrors)
+    Just (ValidationError nameErrors) ->
+      T.concat ((<> "\n") <$> nameErrors)
     Just (AppError errorMsg) -> errorMsg
     Just Success -> "ok"
     _ -> "error: " <> (T.pack . LBSC.unpack $ body)
 
 -- | Pretty-prints the 'info' subcommand result.
 printInfo :: DeploymentInfo -> IO ()
-printInfo (DeploymentInfo (Deployment _ dTag dAppOvs dStOvs) (DeploymentMetadata dMeta) dLogs) = do
+printInfo (DeploymentInfo (Deployment _ dAppOvs dStOvs) (DeploymentMetadata dMeta) dLogs) = do
   T.putStrLn "Current settings:"
-  T.putStrLn $ "tag: " <> coerce dTag
   T.putStrLn $
     "application overrides: "
       <> formatOverrides dAppOvs
@@ -329,7 +314,6 @@ ppDeploymentLogRow dLog =
       ]
     , [dLog ^. field @"actionId" . to unActionId . re _Show . packed]
     , [dLog ^. field @"action" . to actionToText]
-    , [dLog ^. field @"deploymentTag" . coerced]
     , dLog ^. field @"deploymentAppOverrides" . to formatOverrides'
     , dLog ^. field @"deploymentDepOverrides" . to formatOverrides'
     , [dLog ^. field @"exitCode" . re _Show . packed]

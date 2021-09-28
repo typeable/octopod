@@ -39,6 +39,7 @@ import Page.ClassicPopup
 import Page.Elements.Links
 import Page.Popup.EditDeployment
 import Page.Popup.NewDeployment
+import Reflex.Dom.Renderable
 import Reflex.MultiEventWriter.Class
 import Servant.Reflex.Extra
 
@@ -88,9 +89,10 @@ deploymentsWidget updAllEv dfis = do
               <$ errUpdEv
           , DPMClear <$ okUpdEv
           ]
-      (showNewDeploymentEv', termDyn) <- deploymentsHeadWidget True okUpdEv
+      (showNewDeploymentEv', termDyn') <- deploymentsHeadWidget True okUpdEv
+      termDyn <- debounceDyn 0.3 termDyn'
       (okUpdEv, errUpdEv, editEv) <- deploymentsListWidget hReq updAllEv termDyn dfis
-      pure (showNewDeploymentEv', editEv)
+      pure (showNewDeploymentEv', deSearch <$> editEv)
   void $ newDeploymentPopup showNewDeploymentEv never
   void $ editDeploymentPopup editEv never
 
@@ -179,58 +181,24 @@ deploymentsListWidget ::
   Dynamic t Text ->
   -- | Initial deployment data
   [DeploymentFullInfo] ->
-  m (Event t (), Event t (), Event t DeploymentFullInfo)
+  m (Event t (), Event t (), Event t SearchedDeploymentInfo)
 deploymentsListWidget hReq updAllEv termDyn ds = dataWidgetWrapper $ mdo
   retryEv <- delay 10 errUpdEv
   updRespEv <- listEndpoint $ leftmost [updAllEv, () <$ retryEv]
   let okUpdEv = fmapMaybe reqSuccess updRespEv
       errUpdEv = fmapMaybe reqErrorBody updRespEv
   dsDyn <- holdDyn ds okUpdEv
-  let isArchived = isDeploymentArchived . view #deployment
-      filteredDyn = ffor2 termDyn dsDyn $ \term ds' ->
-        mapMaybe (searchDeployments . T.filter (not . isSpace) $ term) ds'
+  let searchedDyn = ffor2 termDyn dsDyn $ \term ds' ->
+        searchMany (T.filter (not . isSpace) term) ds'
       (archivedDsDyn, activeDsDyn) =
-        splitDynPure $
-          L.partition isArchived
-            <$> filteredDyn
-      searchSorting = termDyn $> Just (SortDesc (view #score))
+        splitDynPure $ L.partition isDeploymentArchived <$> searchedDyn
+      searchSorting = termDyn $> Nothing
   clickedEv <- elementClick
   editEv <- activeDeploymentsWidget hReq searchSorting clickedEv activeDsDyn
   archivedDeploymentsWidget hReq searchSorting clickedEv archivedDsDyn
   pure (() <$ okUpdEv, () <$ errUpdEv, editEv)
 
-data SearchedDeploymentFullInfo = SearchedDeploymentFullInfo
-  { deployment :: DeploymentFullInfo
-  , searchResult :: DeploymentSearchResult
-  , score :: Int
-  }
-  deriving stock (Generic, Show, Eq)
-
--- | Compares deployment fields (name and tag) with a search term.
-searchDeployments ::
-  -- | Search term.
-  Text ->
-  -- | Deployment data.
-  DeploymentFullInfo ->
-  Maybe SearchedDeploymentFullInfo
-searchDeployments term d = case (tagResult, nameResult) of
-  (Nothing, Nothing) -> Nothing
-  (Just (res, score), Nothing) ->
-    Just $ SearchedDeploymentFullInfo d (DeploymentTagResult res) score
-  (Nothing, Just (res, score)) ->
-    Just $ SearchedDeploymentFullInfo d (DeploymentNameResult res) score
-  (Just (tRes, tScore), Just (nRes, nScore)) ->
-    if tScore > nScore
-      then Just $ SearchedDeploymentFullInfo d (DeploymentTagResult tRes) tScore
-      else Just $ SearchedDeploymentFullInfo d (DeploymentNameResult nRes) nScore
-  where
-    tagResult = fuzzySearch term . unDeploymentTag $ d ^. field @"deployment" . field @"tag"
-    nameResult = fuzzySearch term . unDeploymentName $ d ^. dfiName
-
-data DeploymentSearchResult
-  = DeploymentNameResult [FuzzySearchStringChunk Text]
-  | DeploymentTagResult [FuzzySearchStringChunk Text]
-  deriving stock (Show, Eq)
+type SearchedDeploymentInfo = DeploymentFullInfo' SearchResult
 
 -- | Table with active deployments.
 activeDeploymentsWidget ::
@@ -239,19 +207,18 @@ activeDeploymentsWidget ::
   , MonadReader ProjectConfig m
   ) =>
   RequestErrorHandler t m ->
-  Dynamic t (Maybe (SortDir SearchedDeploymentFullInfo)) ->
+  Dynamic t (Maybe (SortDir DeploymentFullInfo)) ->
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   Event t ClickedElement ->
-  Dynamic t [SearchedDeploymentFullInfo] ->
+  Dynamic t [SearchedDeploymentInfo] ->
   -- | Returns an event carrying editable deployment
   -- to \"edit deployment\" sidebar.
-  m (Event t DeploymentFullInfo)
+  m (Event t SearchedDeploymentInfo)
 activeDeploymentsWidget hReq searchSorting clickedEv dsDyn =
   divClass "data__primary" $
     tableWrapper (updated searchSorting $> SortingChanged) $ \sortDyn -> do
-      let colSortDyn = fmap (contramap (view #deployment)) <$> sortDyn
-      sorting <- holdDyn Nothing (mergeWith (<|>) [updated colSortDyn, updated searchSorting])
+      sorting <- holdDyn Nothing (mergeWith (<|>) [updated sortDyn, updated searchSorting])
       let emptyDyn' = L.null <$> dsDyn
           dsSortedDyn = zipDynWith sortDeployments dsDyn sorting
       emptyDyn <- holdUniqDyn emptyDyn'
@@ -262,7 +229,7 @@ activeDeploymentsWidget hReq searchSorting clickedEv dsDyn =
               editEvs <- simpleList dsSortedDyn (activeDeploymentWidget hReq clickedEv)
               pure $ switchDyn $ leftmost <$> editEvs
             True -> do
-              emptyTableBody $ noDeploymentsWidget
+              emptyTableBody noDeploymentsWidget
               pure never
       switchHold never editEvEv
 
@@ -283,28 +250,27 @@ activeDeploymentWidget ::
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   Event t ClickedElement ->
-  Dynamic t SearchedDeploymentFullInfo ->
+  Dynamic t SearchedDeploymentInfo ->
   -- | Returns event carrying editable deployment
   -- that is required by \"edit deployment\" sidebar.
-  m (Event t DeploymentFullInfo)
+  m (Event t SearchedDeploymentInfo)
 activeDeploymentWidget hReq clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   editEvEv <- dyn $
-    ffor dDyn $ \s@SearchedDeploymentFullInfo {deployment = d@DeploymentFullInfo {..}} -> do
-      let (name, tag') = displaySearchHighlighting s
-          dName = deployment ^. #name
+    ffor dDyn $ \d@DeploymentFullInfo {..} -> do
+      let desearchedDeployment = deSearch d
+          dName = desearchedDeployment ^. #deployment . #name
       (linkEl, dropdownEv) <- el' "tr" $ do
         el "td" $ do
-          name
+          rndr . unDeploymentName $ d ^. #deployment . #name
           statusWidget $ constDyn status
         el "td" $
           divClass "listing" $
             forM_ (unDeploymentMetadata metadata) (renderMetadataLink . pure)
-        el "td" tag'
         el "td" $
-          deploymentOverridesWidget hReq (deployment ^. field @"deploymentOverrides" . coerced)
+          deploymentOverridesWidgetSearched hReq (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          applicationOverridesWidget
+          applicationOverridesWidgetSearched
             hReq
             (deployment ^. field @"deploymentOverrides" . coerced)
             (deployment ^. field @"appOverrides" . coerced)
@@ -314,13 +280,11 @@ activeDeploymentWidget hReq clickedEv dDyn' = do
           text $ formatPosixToDate updatedAt
         el "td" $ do
           let enabled = not . isPending . recordedStatus $ status
-              elId = "deployment_row_" <> unDeploymentName dName
               btn =
                 elAttr
                   "button"
                   ( "class" =: "drop__handler"
                       <> "type" =: "button"
-                      <> "id" =: elId
                   )
                   $ text "Actions"
               body = do
@@ -336,7 +300,7 @@ activeDeploymentWidget hReq clickedEv dDyn' = do
                       & #buttonText .~~ "Move to archive"
                       & #buttonEnabled .~~ pure enabled
                       & #buttonType .~~ Just ArchiveActionButtonType
-                url' <- kubeDashboardUrl (view #deployment <$> dDyn)
+                url' <- kubeDashboardUrl (pure desearchedDeployment)
                 void . dyn $
                   url'
                     <&> maybe
@@ -366,24 +330,6 @@ activeDeploymentWidget hReq clickedEv dDyn' = do
       pure editEv
   switchHold never editEvEv
 
-displaySearchHighlighting :: DomBuilder t m => SearchedDeploymentFullInfo -> (m (), m ())
-displaySearchHighlighting
-  SearchedDeploymentFullInfo {searchResult = DeploymentNameResult res, deployment = d} =
-    ( markMatches res
-    , text . unDeploymentTag $ d ^. #deployment . #tag
-    )
-displaySearchHighlighting
-  SearchedDeploymentFullInfo {searchResult = DeploymentTagResult res, deployment = d} =
-    ( text . unDeploymentName $ d ^. #deployment . #name
-    , markMatches res
-    )
-
-markMatches :: DomBuilder t m => [FuzzySearchStringChunk Text] -> m ()
-markMatches [] = blank
-markMatches (NotMatched x : xs) = text x >> markMatches xs
-markMatches (Matched x : xs) =
-  elAttr "span" ("style" =: "text-decoration: underline;") (text x) >> markMatches xs
-
 -- | Table with archived deployments.
 archivedDeploymentsWidget ::
   forall t m.
@@ -391,11 +337,11 @@ archivedDeploymentsWidget ::
   , SetRoute t (R Routes) m
   ) =>
   RequestErrorHandler t m ->
-  Dynamic t (Maybe (SortDir SearchedDeploymentFullInfo)) ->
+  Dynamic t (Maybe (SortDir DeploymentFullInfo)) ->
   -- | Event that carries the clicked DOM element. This event is required by
   -- `dropdownWidget'`.
   Event t ClickedElement ->
-  Dynamic t [SearchedDeploymentFullInfo] ->
+  Dynamic t [SearchedDeploymentInfo] ->
   m ()
 archivedDeploymentsWidget hReq searchSorting clickedEv dsDyn = do
   showDyn <- toggleButton
@@ -404,8 +350,7 @@ archivedDeploymentsWidget hReq searchSorting clickedEv dsDyn = do
         False -> "data__archive"
   elDynClass "div" classDyn $
     tableWrapper (updated searchSorting $> SortingChanged) $ \sortDyn -> do
-      let colSortDyn = fmap (contramap (view #deployment)) <$> sortDyn
-      sorting <- holdDyn Nothing (mergeWith (<|>) [updated colSortDyn, updated searchSorting])
+      sorting <- holdDyn Nothing (mergeWith (<|>) [updated sortDyn, updated searchSorting])
       let emptyDyn' = L.null <$> dsDyn
           dsSortedDyn = zipDynWith sortDeployments dsDyn sorting
       emptyDyn <- holdUniqDyn emptyDyn'
@@ -416,7 +361,7 @@ archivedDeploymentsWidget hReq searchSorting clickedEv dsDyn = do
               simpleList
                 dsSortedDyn
                 (archivedDeploymentWidget hReq clickedEv)
-          True -> emptyTableBody $ noDeploymentsWidget
+          True -> emptyTableBody noDeploymentsWidget
 
 -- | Row with archived deployment.
 archivedDeploymentWidget ::
@@ -425,24 +370,23 @@ archivedDeploymentWidget ::
   ) =>
   RequestErrorHandler t m ->
   Event t ClickedElement ->
-  Dynamic t SearchedDeploymentFullInfo ->
+  Dynamic t SearchedDeploymentInfo ->
   m ()
 archivedDeploymentWidget hReq clickedEv dDyn' = do
   dDyn <- holdUniqDyn dDyn'
   dyn_ $
-    ffor dDyn $ \s@SearchedDeploymentFullInfo {deployment = DeploymentFullInfo {..}} -> do
-      let (name, tag') = displaySearchHighlighting s
-          dName = deployment ^. #name
+    ffor dDyn $ \d@DeploymentFullInfo {..} -> do
+      let desearchedDeployment = deSearch d
+          dName = desearchedDeployment ^. #deployment . #name
       (linkEl, _) <- el' "tr" $ do
         el "td" $ do
-          name
-          divClass "status status--archived" $ text "Archived"
+          rndr . unDeploymentName $ deployment ^. #name
+          statusWidget (pure status)
         el "td" $ text "..."
-        el "td" tag'
         el "td" $
-          deploymentOverridesWidget hReq (deployment ^. field @"deploymentOverrides" . coerced)
+          deploymentOverridesWidgetSearched hReq (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          applicationOverridesWidget
+          applicationOverridesWidgetSearched
             hReq
             (deployment ^. field @"deploymentOverrides" . coerced)
             (deployment ^. field @"appOverrides" . coerced)
@@ -451,13 +395,11 @@ archivedDeploymentWidget hReq clickedEv dDyn' = do
         el "td" $
           text $ formatPosixToDate updatedAt
         el "td" $ do
-          let elId = "deployment_row_" <> (unDeploymentName dName)
-              btn =
+          let btn =
                 elAttr
                   "button"
                   ( "class" =: "drop__handler"
                       <> "type" =: "button"
-                      <> "id" =: elId
                   )
                   $ text "Actions"
               body =
@@ -473,16 +415,16 @@ archivedDeploymentWidget hReq clickedEv dDyn' = do
 
 -- | Sort deployments by the supplied condition.
 sortDeployments ::
-  [SearchedDeploymentFullInfo] ->
+  [SearchedDeploymentInfo] ->
   -- | Sorting condition.
-  Maybe (SortDir SearchedDeploymentFullInfo) ->
-  [SearchedDeploymentFullInfo]
-sortDeployments items s = L.sortBy sortFunc items
+  Maybe (SortDir DeploymentFullInfo) ->
+  [SearchedDeploymentInfo]
+sortDeployments items Nothing = items
+sortDeployments items (Just (contramap deSearch -> s)) = L.sortBy sortFunc items
   where
     sortFunc a b = case s of
-      Just (SortAsc get) -> compare (get a) (get b)
-      Just (SortDesc get) -> compare (get b) (get a)
-      Nothing -> EQ
+      (SortAsc get) -> compare (get a) (get b)
+      (SortDesc get) -> compare (get b) (get a)
 
 -- | Each constructor contains a getter
 -- that extracts the field that is used for sorting.
@@ -509,7 +451,6 @@ tableHeader = do
     el "tr" $ do
       sortHeader (view dfiName) "Name" SortAsc
       el "th" $ text "Links"
-      el "th" $ text "Tag"
       el "th" $ text "Deployment overrides"
       el "th" $ text "App overrides"
       sortHeader (view $ field @"createdAt") "Created" SortDesc
