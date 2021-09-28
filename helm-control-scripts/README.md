@@ -27,10 +27,11 @@ All scipts accept common parametes which are passed by Octopod when it invokes t
 Also, several environment variables are used to parametrize the default behavior:
 
 - HELM_BIN – the path to the `helm` executable
-- KUBECTL_BIN – the path to the `kubectl` executable
 - HELM_USER – the (optional) user for a private helm registry
 - HELM_PASS – the (optional) password for a private helm registry
 - DEFAUTLS – the json with the default parameters (described below)
+- HELM_ON_INIT_ONLY - run helm add and update repository as a part of init script execution only. Otherwise `helm repo add` and `helm repo update` will be executed every time before any other helm command.
+- INGRESS_HOST_KEY - key name which will be populated with domain name generated for the Octopod deployment. Defaults to `ingress.hostname`.
 
 #### Default parameters
 - default_overrides – an array with key-value pairs which will be passed as a `--set` flags for helm for each deployment

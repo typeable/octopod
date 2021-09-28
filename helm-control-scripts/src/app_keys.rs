@@ -14,7 +14,6 @@ fn main() {
         name: envs.helm_bin,
         mode: HelmMode::ShowValues,
         release_name: String::from(""),
-        release_domain: String::from(""),
         namespace: String::from(""),
         deployment_parameters: deployment_parameters,
         overrides: vec![],

@@ -8,13 +8,11 @@ fn main() {
     info!("Env variables received {:?}", &envs);
     let cli_opts = CliOpts::from_args();
     info!("Cli options received {:?}", &cli_opts);
-    let overrides = match overrides(&cli_opts) {
+    let overrides = match overrides(&cli_opts, &envs) {
         Some(inner) => inner,
         None => vec![],
     };
     
-    let domain_name = domain_name(&cli_opts);
-    info!("Domain generated for deployment: {}", &domain_name);
     let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
     let namespace = String::from(&cli_opts.namespace);
     let release_name = match cli_opts.name {
@@ -28,7 +26,6 @@ fn main() {
         name: envs.helm_bin,
         mode: HelmMode::Template,
         release_name: release_name,
-        release_domain: domain_name, 
         namespace: cli_opts.namespace,
         deployment_parameters: deployment_parameters,
         overrides: overrides,

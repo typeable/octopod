@@ -8,14 +8,13 @@ fn main() {
     info!("Env variables received {:?}", &envs);
     let cli_opts = CliOpts::from_args();
     info!("Cli options received {:?}", &cli_opts);
-    let overrides = match overrides(&cli_opts) {
+    let overrides = match overrides(&cli_opts, &envs) {
         Some(inner) => inner,
         None => vec![],
     };
     
     let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
     let namespace = String::from(&cli_opts.namespace);
-    let domain_name = domain_name(&cli_opts);
     let release_name = match cli_opts.name {
         Some(name) => name,
         None => {
@@ -28,7 +27,6 @@ fn main() {
         name: envs.helm_bin.clone(),
         mode: HelmMode::Uninstall,
         release_name: release_name.clone(),
-        release_domain: String::from(""),
         namespace: cli_opts.namespace.clone(),
         deployment_parameters: deployment_parameters.clone(),
         overrides: vec![],
@@ -37,7 +35,6 @@ fn main() {
         name: envs.helm_bin,
         mode: HelmMode::Template,
         release_name: release_name.clone(),
-        release_domain: domain_name, 
         namespace: cli_opts.namespace,
         deployment_parameters: deployment_parameters,
         overrides: overrides,

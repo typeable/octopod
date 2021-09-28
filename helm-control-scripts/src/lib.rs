@@ -54,6 +54,7 @@ pub mod lib {
         #[serde(default)]
         pub helm_pass: String,
         pub helm_on_init_only: Option<bool>,
+        pub ingress_host_key: Option<String>,
     }
     
     impl EnvVars {
@@ -163,7 +164,6 @@ pub mod lib {
         pub name: String,
         pub mode: HelmMode,
         pub release_name: String,
-        pub release_domain: String,
         pub namespace: String,
         pub deployment_parameters: HelmDeploymentParameters,
         pub overrides: Vec<String>,
@@ -235,7 +235,6 @@ pub mod lib {
         fn set_flag_values(&self) -> Vec<String> {
             let mut values = Vec::new();
             let mut set_values = Vec::new();
-            values.push(format!("ingress.hostname={}", &self.release_domain));
             values.extend(self.overrides.clone());
             for value in values.into_iter() {
                 set_values.push(String::from("--set"));
@@ -288,9 +287,14 @@ pub mod lib {
             Err(format!("Override value {} is malformed", value))
         }
     }
-    pub fn overrides(cli_opts: &CliOpts) -> Option<Vec<String>> {
+    pub fn overrides(cli_opts: &CliOpts, envs: &EnvVars) -> Option<Vec<String>> {
         let mut overrides_opts = Vec::new();
         overrides_opts.extend(&cli_opts.app_env_override);
+        let ingress_override = match &envs.ingress_host_key {
+            Some(key) => format!("{}={}", &key, domain_name(&cli_opts)),
+            None => format!("ingress.hostname={}", domain_name(&cli_opts)),
+        };
+        overrides_opts.push(&ingress_override);
         if overrides_opts.is_empty() {
             None
         } else {
@@ -301,7 +305,7 @@ pub mod lib {
                 )
         }
     }
-    pub fn domain_name(cli_opts: &CliOpts) -> String {
+    fn domain_name(cli_opts: &CliOpts) -> String {
         match &cli_opts.name {
             Some(name) => {
                 return format!("{}.{}", name, &cli_opts.base_domain);
@@ -649,7 +653,6 @@ pub mod lib {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoAdd,
             release_name: String::from(""),
-            release_domain: String::from(""),
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
@@ -658,7 +661,6 @@ pub mod lib {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoUpdate,
             release_name: String::from(""),
-            release_domain: String::from(""),
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
@@ -710,7 +712,6 @@ pub mod lib {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoList,
             release_name: String::from(""),
-            release_domain: String::from(""),
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
