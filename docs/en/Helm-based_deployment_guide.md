@@ -78,9 +78,9 @@ And create one more deployment, this time using a different set of overrides:
 |      `chart_name` | `octopod`                             |
 | `chart_repo_name` | `typeable`                            |
 |  `chart_repo_url` | `https://typeable.github.io/octopod/` |
-|   `chart_version` | `0.5.1`                               |
+|   `chart_version` | `0.6.0`                               |
 
 
-As in the previous example we took the _App Overrides_ from the [chart documentation](../../charts/octopod/README.md#Parameters), but the _Deployment Overrides_ are passed as configuration to the control scripts. You can read more about these parameters in the [control script docs](../../helm-control-scripts/README.md).
+As in the previous example Octopod parsed the _App Overrides_ from the [chart values](../../charts/octopod/values.yaml), but the _Deployment Overrides_ are passed as configuration to the control scripts. You can read more about these parameters in the [control script docs](../../helm-control-scripts/README.md).
 
-Now you have Octopod inside Octopod! Now you can install your own helm chart!
+Now you have Octopod inside Octopod! Try to install your own chart with Octopod!
