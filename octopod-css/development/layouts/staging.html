@@ -1,404 +1,406 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="x-ua-compatible" content="ie=edge">
-        <title>Deployment</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <!--<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">-->
-        <link rel="stylesheet" href="../styles/style.css">
-    </head>
-    <body>
 
-        <!--[if IE]>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>Deployment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">-->
+  <link rel="stylesheet" href="../styles/style.css">
+</head>
+
+<body>
+
+  <!--[if IE]>
             <div class="browserupgrade">
                 You are using an <strong>outdated</strong> browser.
                 Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.
             </div>
         <![endif]-->
 
-        <header class="header">
-            <div class="header__wrap container">
-                <b class="header__logo">
+  <header class="header">
+    <div class="header__wrap container">
+      <b class="header__logo">
                     Deployment Manager
                 </b>
-                <div class="header__project">
-                    Project name
-                </div>
-            </div>
-        </header>
+      <div class="header__project">
+        Project name
+      </div>
+    </div>
+  </header>
 
-        <div class="page">
-            <div class="page__wrap container">
-                <div class="page__output notification notification--success">
-                    <b>System error.</b> Сan not move the deployment to the archive right now. Please try later.
-                    <button class="notification__close" type="button"></button>
-                </div>
-                <a class="page__back dash dash--back dash--smaller" href="index.html">
+  <div class="page">
+    <div class="page__wrap container">
+      <div class="page__output notification notification--success">
+        <b>System error.</b> Сan not move the deployment to the archive right now. Please try later.
+        <button class="notification__close" type="button"></button>
+      </div>
+      <a class="page__back dash dash--back dash--smaller" href="index.html">
                     All deployments
                 </a>
-                <div class="page__head">
-                    <h1 class="page__heading title">
-                        Project name
-                    </h1>
-                    <a class="page__action button button--edit popup-handler" href="#deployment">
+      <div class="page__head">
+        <h1 class="page__heading title">
+          Project name
+        </h1>
+        <a class="page__action button button--edit popup-handler" href="#deployment">
                         Edit deployment
                     </a>
-                    <a class="page__action button button--secondary button--archive classic-popup-handler" href="#dialog">
+        <a class="page__action button button--secondary button--archive classic-popup-handler" href="#dialog">
                         Move to archive
                     </a>
-                    <!-- temp -->
-                    &nbsp;&nbsp;&nbsp;или для уже архивных:
-                    <!--/temp -->
-                    <a class="page__action button button--secondary button--restore classic-popup-handler" href="#dialog">
+        <!-- temp -->
+        &nbsp;&nbsp;&nbsp;или для уже архивных:
+        <!--/temp -->
+        <a class="page__action button button--secondary button--restore classic-popup-handler" href="#dialog">
                         Recover from archive
                     </a>
-                </div>
-                <div class="page__body">
-                    <div class="deployment">
-                        <div class="deployment__output notification notification--danger">
-                            <b>Project successfully updated</b>
-                            <button class="notification__close" type="button"></button>
-                        </div>
-                        <div class="deployment__summary">
-                            <div class="deployment__stat">
-                                <b class="deployment__param">
+      </div>
+      <div class="page__body">
+        <div class="deployment">
+          <div class="deployment__output notification notification--danger">
+            <b>Project successfully updated</b>
+            <button class="notification__close" type="button"></button>
+          </div>
+          <div class="deployment__summary">
+            <div class="deployment__stat">
+              <b class="deployment__param">
                                     Status
                                 </b>
-                                <div class="deployment__value">
-                                    <div class="status status--success">Success</div>
-                                </div>
-                            </div>
-                            <div class="deployment__stat">
-                                <b class="deployment__param">
+              <div class="deployment__value">
+                <div class="status status--success">Success</div>
+              </div>
+            </div>
+            <div class="deployment__stat">
+              <b class="deployment__param">
                                     Created
                                 </b>
-                                <div class="deployment__value">
-                                    15.05.2020
-                                </div>
-                            </div>
-                            <div class="deployment__stat">
-                                <b class="deployment__param">
+              <div class="deployment__value">
+                15.05.2020
+              </div>
+            </div>
+            <div class="deployment__stat">
+              <b class="deployment__param">
                                     Changed
                                 </b>
-                                <div class="deployment__value">
-                                    01.06.2020
-                                </div>
-                            </div>
-                        </div>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Tag
-                            </h3>
-                            <div class="deployment__widget">
-                                H97HF384GKERP39740223
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Links
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="listing">
-                                    <a class="listing__item external bar bar--larger" href="#">
+              <div class="deployment__value">
+                01.06.2020
+              </div>
+            </div>
+          </div>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Tag
+            </h3>
+            <div class="deployment__widget">
+              H97HF384GKERP39740223
+            </div>
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Links
+            </h3>
+            <div class="deployment__widget">
+              <div class="listing">
+                <a class="listing__item external bar bar--larger" href="#">
                                         app.feature-name.project.name.com
                                     </a>
-                                    <a class="listing__item external bar bar--larger" href="#">
+                <a class="listing__item external bar bar--larger" href="#">
                                         admin.feature-name.project.name.com
                                     </a>
-                                </div>
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                App overrides
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="listing listing--for-text listing--larger">
-                                    <div class="listing__item">
-                                        <span class="listing__key">ENVIRONMENT:</span>
-                                        <span class="listing__value">production</span>
-                                    </div>
-                                    <div class="listing__item">
-                                        <span class="listing__key">app_api_url:</span>
-                                        <span class="listing__value">http://my-api.my-domain.com</span>
-                                    </div>
-                                    <div class="listing__item">
-                                        <span class="listing__key default">SECRET_CODE:</span>
-                                        <span class="listing__value">asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen</span>
-                                    </div>
-                                    <div class="listing__item deleted">
-                                        <span class="listing__key default">SECRET_CODE:</span>
-                                        <span class="listing__value default">asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen</span>
-                                    </div>
-                                    <div class="listing__item deleted">
-                                        <span class="listing__key default">SECRET_CODE:</span>
-                                        <div class="listing__placeholder"></div>
-                                        <div class="listing__spinner"></div>
-                                    </div>
-                                    <div class="listing__item">
-                                        <span class="listing__key default">INFO:</span>
-                                        <span class="listing__value default">New Project Staging</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Deployment overrides
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="listing listing--for-text listing--larger">
-                                    <div class="listing__item">
-                                        <b>ENVIRONENT:</b> production
-                                    </div>
-                                    <div class="listing__item">
-                                        <b>app_api_url:</b> http: //my-api.my-domain.com
-                                    </div>
-                                    <div class="listing__item">
-                                        <b>SECRET_CODE:</b> asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Actions
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="table table--actions">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>
-                                                    Action type
-                                                </th>
-                                                <th>
-                                                    App overrides
-                                                </th>
-                                                <th>
-                                                    Deployment overrides
-                                                </th>
-                                                <th>
-                                                    Exit code
-                                                </th>
-                                                <th>
-                                                    <button class="sort sort--active sort--asc" type="button">Created</button>
-                                                </th>
-                                                <th>
-                                                    Deployment duration
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>
-                                                    Create
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b>
-                                                            <div class="listing__placeholder listing__placeholder__value"></div>
-                                                            <div class="listing__spinner"></div>
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                        <button class="listing__more expander" type="button">
-                                                            Show all (5)
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                        <button class="listing__more expander" type="button">
-                                                            Show all (5)
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    0
-                                                </td>
-                                                <td>
-                                                    2020-05-13 08:06:00 313811+00
-                                                </td>
-                                                <td>
-                                                    1m 95s
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    Edit
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    1
-                                                </td>
-                                                <td>
-                                                    2020-05-13 08:06:00 313811+00
-                                                </td>
-                                                <td>
-                                                    1m 95s
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    Update
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    0
-                                                </td>
-                                                <td>
-                                                    2020-05-13 08:06:00 313811+00
-                                                </td>
-                                                <td>
-                                                    1m 95s
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    Delete
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="listing listing--for-text">
-                                                        <div class="listing__item">
-                                                            <b>ENVIRONENT:</b> production
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>app_api_url:</b> http://my-api.my-domain.com
-                                                        </div>
-                                                        <div class="listing__item">
-                                                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    1
-                                                </td>
-                                                <td>
-                                                    2020-05-13 08:06:00 313811+00
-                                                </td>
-                                                <td>
-                                                    1m 95s
-                                                </td>
-                                            </tr>
-                                            <tr class="no-table">
-                                                <td colspan="7">
-                                                    <div class="null null--data">
-                                                        <b class="null__heading">Cannot retrieve the data</b>
-                                                        <div class="null__message">Try to reload page</div>
-                                                    </div>
-                                                    <!-- temp -->
-                                                    &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
-                                                    <!--/temp -->
-                                                    <div class="loading loading--enlarged loading--alternate">
-                                                        Loading...
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                    <!-- temp -->
-                    или:
-                    <!--/temp -->
-                    <div class="no-deployment">
-                        <div class="null null--data">
-                            <div class="null__content">
-                                <b class="null__heading">Cannot retrieve the data</b>
-                                <div class="null__message">Try to reload page</div>
-                            </div>
-                        </div>
-                        или:
-                        <div class="loading loading--enlarged loading--alternate">
-                            Loading...
-                        </div>
-                    </div>
-                </div>
+              </div>
             </div>
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              App configuration
+            </h3>
+            <div class="deployment__widget">
+              <div class="listing listing--for-text listing--larger">
+                <div class="listing__item">
+                  <span class="listing__key">ENVIRONMENT:</span>
+                  <span class="listing__value">production</span>
+                </div>
+                <div class="listing__item">
+                  <span class="listing__key">app_api_url:</span>
+                  <span class="listing__value">http://my-api.my-domain.com</span>
+                </div>
+                <div class="listing__item">
+                  <span class="listing__key default">SECRET_CODE:</span>
+                  <span class="listing__value">asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen</span>
+                </div>
+                <div class="listing__item deleted">
+                  <span class="listing__key default">SECRET_CODE:</span>
+                  <span class="listing__value default">asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen</span>
+                </div>
+                <div class="listing__item deleted">
+                  <span class="listing__key default">SECRET_CODE:</span>
+                  <div class="listing__placeholder"></div>
+                  <div class="listing__spinner"></div>
+                </div>
+                <div class="listing__item">
+                  <span class="listing__key default">INFO:</span>
+                  <span class="listing__value default">New Project Staging</span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Deployment configuration
+            </h3>
+            <div class="deployment__widget">
+              <div class="listing listing--for-text listing--larger">
+                <div class="listing__item">
+                  <b>ENVIRONENT:</b> production
+                </div>
+                <div class="listing__item">
+                  <b>app_api_url:</b> http: //my-api.my-domain.com
+                </div>
+                <div class="listing__item">
+                  <b>SECRET_CODE:</b> asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Actions
+            </h3>
+            <div class="deployment__widget">
+              <div class="table table--actions">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>
+                        Action type
+                      </th>
+                      <th>
+                        App configuration
+                      </th>
+                      <th>
+                        Deployment configuration
+                      </th>
+                      <th>
+                        Exit code
+                      </th>
+                      <th>
+                        <button class="sort sort--active sort--asc" type="button">Created</button>
+                      </th>
+                      <th>
+                        Deployment duration
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        Create
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b>
+                            <div class="listing__placeholder listing__placeholder__value"></div>
+                            <div class="listing__spinner"></div>
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                          <button class="listing__more expander" type="button">
+                                                            Show all (5)
+                                                        </button>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                          <button class="listing__more expander" type="button">
+                                                            Show all (5)
+                                                        </button>
+                        </div>
+                      </td>
+                      <td>
+                        0
+                      </td>
+                      <td>
+                        2020-05-13 08:06:00 313811+00
+                      </td>
+                      <td>
+                        1m 95s
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Edit
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        1
+                      </td>
+                      <td>
+                        2020-05-13 08:06:00 313811+00
+                      </td>
+                      <td>
+                        1m 95s
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Update
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        0
+                      </td>
+                      <td>
+                        2020-05-13 08:06:00 313811+00
+                      </td>
+                      <td>
+                        1m 95s
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Delete
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="listing listing--for-text">
+                          <div class="listing__item">
+                            <b>ENVIRONENT:</b> production
+                          </div>
+                          <div class="listing__item">
+                            <b>app_api_url:</b> http://my-api.my-domain.com
+                          </div>
+                          <div class="listing__item">
+                            <b>SECRET_CODE:</b> asdfaisdjri235868ear7%lorem-ipsum-dolor-sit-amen
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        1
+                      </td>
+                      <td>
+                        2020-05-13 08:06:00 313811+00
+                      </td>
+                      <td>
+                        1m 95s
+                      </td>
+                    </tr>
+                    <tr class="no-table">
+                      <td colspan="7">
+                        <div class="null null--data">
+                          <b class="null__heading">Cannot retrieve the data</b>
+                          <div class="null__message">Try to reload page</div>
+                        </div>
+                        <!-- temp -->
+                        &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
+                        <!--/temp -->
+                        <div class="loading loading--enlarged loading--alternate">
+                          Loading...
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </div>
+        <!-- temp -->
+        или:
+        <!--/temp -->
+        <div class="no-deployment">
+          <div class="null null--data">
+            <div class="null__content">
+              <b class="null__heading">Cannot retrieve the data</b>
+              <div class="null__message">Try to reload page</div>
+            </div>
+          </div>
+          или:
+          <div class="loading loading--enlarged loading--alternate">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- или:
+  <!-- или:
         <div class="no-page">
             <div class="no-page__inner">
                 <div class="null null--data">
@@ -413,301 +415,324 @@
         </div>
         -->
 
-        <div class="popup" id="deployment">
-            <div class="popup__overlay" aria-hidden="true">
-                Close popup
-            </div>
-            <div class="popup__body">
-                <div class="popup__head">
-                    <button class="popup__close" type="button">
+  <div class="popup" id="deployment">
+    <div class="popup__overlay" aria-hidden="true">
+      Close popup
+    </div>
+    <div class="popup__body">
+      <div class="popup__head">
+        <button class="popup__close" type="button">
                         Close popup
                     </button>
-                    <h2 class="popup__project">
-                        Project name
-                    </h2>
-                    <div class="popup__operations">
-                        <button class="popup__action button button--save" type="button">Save</button>
-                        <button class="popup__action button button--secondary" type="button">Cancel</button>
-                    </div>
-                    <div class="popup__menu drop drop--actions">
-                        <button class="drop__handler" type="button">
+        <h2 class="popup__project">
+          Project name
+        </h2>
+        <div class="popup__operations">
+          <button class="popup__action button button--save" type="button">Save</button>
+          <button class="popup__action button button--secondary" type="button">Cancel</button>
+        </div>
+        <div class="popup__menu drop drop--actions">
+          <button class="drop__handler" type="button">
                             Actions
                         </button>
-                        <div class="drop__dropdown">
-                            <button class="action action--archive" type="button">Move to archive</button>
-                            <button class="action action--restore" type="button">Restore from archive</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="popup__content">
-
-                    <div class="deployment">
-                        <div class="deployment__output notification notification--danger">
-                            <b>System error.</b> Сan not move the deployment to the archive right now. Please try later.
-                            <button class="notification__close" type="button"></button>
-                        </div>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Tag
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="tag input">
-                                    <input class="input__widget" type="text" placeholder="key" value="H97HF384GKERP39740223">
-                                </div>
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                App overrides
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="overrides">
-                                    <button class="overrides__add dash dash--add" type="button">
-                                        Add an override
-                                    </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                        <section class="deployment__section">
-                            <h3 class="deployment__sub-heading">
-                                Deployment overrides
-                            </h3>
-                            <div class="deployment__widget">
-                                <div class="overrides">
-                                    <button class="overrides__add dash dash--add" type="button">
-                                        Add an override
-                                    </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                    <!-- temp -->
-                    или:
-                    <!--/temp -->
-                    <div class="no-deployment">
-                        <div class="null null--data">
-                            <div class="null__content">
-                                <b class="null__heading">Cannot retrieve the data</b>
-                                <div class="null__message">Try to reload page</div>
-                            </div>
-                        </div>
-                        <!-- temp -->
-                        &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
-                        <!--/temp -->
-                        <div class="loading loading--enlarged loading--alternate">
-                            Loading...
-                        </div>
-                    </div>
-                </div>
-            </div>
+          <div class="drop__dropdown">
+            <button class="action action--archive" type="button">Move to archive</button>
+            <button class="action action--restore" type="button">Restore from archive</button>
+          </div>
         </div>
+      </div>
+      <div class="popup__content">
 
-
-        <div class="popup" id="log">
-            <div class="popup__overlay" aria-hidden="true">
-                Close popup
+        <div class="deployment">
+          <div class="deployment__output notification notification--danger">
+            <b>System error.</b> Сan not move the deployment to the archive right now. Please try later.
+            <button class="notification__close" type="button"></button>
+          </div>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Tag
+            </h3>
+            <div class="deployment__widget">
+              <div class="tag input">
+                <input class="input__widget" type="text" placeholder="key" value="H97HF384GKERP39740223">
+              </div>
             </div>
-            <div class="popup__body">
-                <div class="popup__head">
-                    <button class="popup__close" type="button">
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              App configuration
+            </h3>
+            <div class="deployment__widget">
+              <div class="overrides">
+                <button class="overrides__add dash dash--add" type="button">
+                                        Add an override
+                                    </button>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="production">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="deployment__section">
+            <h3 class="deployment__sub-heading">
+              Deployment configuration
+            </h3>
+            <div class="deployment__widget">
+              <div class="overrides">
+                <button class="overrides__add dash dash--add" type="button">
+                                        Add an override
+                                    </button>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="production">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+                <div class="overrides__item">
+                  <div class="overrides__key input">
+                    <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
+                  </div>
+                  <div class="overrides__value input">
+                    <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                  </div>
+                  <button class="overrides__delete spot spot--cancel">
+                                            Delete
+                                        </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <!-- temp -->
+        или:
+        <!--/temp -->
+        <div class="no-deployment">
+          <div class="null null--data">
+            <div class="null__content">
+              <b class="null__heading">Cannot retrieve the data</b>
+              <div class="null__message">Try to reload page</div>
+            </div>
+          </div>
+          <!-- temp -->
+          &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
+          <!--/temp -->
+          <div class="loading loading--enlarged loading--alternate">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="popup" id="log">
+    <div class="popup__overlay" aria-hidden="true">
+      Close popup
+    </div>
+    <div class="popup__body">
+      <div class="popup__head">
+        <button class="popup__close" type="button">
                         Close popup
                     </button>
-                    <h2 class="popup__project">
-                        Project name, logs
-                    </h2>
-                </div>
-                <div class="popup__sub-head">
-                    <div class="nav">
-                        <button class="nav__link nav__link--current" type="button">stdout</button>
-                        <button class="nav__link" type="button">stderr</button>
-                    </div>
-                </div>
-                <div class="popup__content">
-                    <div class="log">
-                        DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/libiserv/dist-install/build:/Users/dr/workspace/ghc/libraries/ghci/dist-install/build:/Users/dr/workspace/ghc/libraries/transformers/dist-install/build:/Users/dr/workspace/ghc/libraries/template-haskell/dist-install/build:/Users/dr/workspace/ghc/libraries/pretty/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-heap/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-boot/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-boot-th/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/binary/dist-install/build:/Users/dr/workspace/ghc/libraries/containers/containers/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"' >> inplace/lib/bin/ghc-iserv-dyn
-                        <br>"rm" -f                                                     inplace/bin/runghc
-                        <br>echo 'exec "$executablename" ${1+"$@"}'                     >> inplace/lib/bin/ghc-iserv-dyn
-                        <br>echo '#!/bin/sh'                                                     >> inplace/bin/runghc
-                        <br>chmod +x                                                     inplace/lib/bin/ghc-iserv-dyn
-                        <br>echo 'executablename="/Users/dr/workspace/ghc/inplace/lib/bin/runghc"'                                  >> inplace/bin/runghc
-                        <br>echo 'datadir="/Users/dr/workspace/ghc/inplace/lib"'                             >> inplace/bin/runghc
-                        <br>/usr/local/bin/ginstall -c -m 755 utils/hpc/dist-install/build/tmp/hpc inplace/lib/bin/hpc
-                        <br>echo 'bindir="/Users/dr/workspace/ghc/inplace/bin"'                              >> inplace/bin/runghc
-                        <br>"rm" -f                                                     inplace/bin/hpc
-                        <br>echo 'topdir="/Users/dr/workspace/ghc/inplace/lib"'                           >> inplace/bin/runghc
-                        <br>echo 'pgmgcc="cc"'                                               >> inplace/bin/runghc
-                        <br>echo '#!/bin/sh'                                                     >> inplace/bin/hpc
-                        <br>echo 'ghcprog="ghc-stage2"' >> "inplace/bin/runghc"
-                        <br>echo 'executablename="/Users/dr/workspace/ghc/inplace/lib/bin/hpc"'                                  >> inplace/bin/hpc
-                        <br>echo 'export DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/process/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"' >> inplace/bin/runghc
-                        <br>echo 'datadir="/Users/dr/workspace/ghc/inplace/lib"'                             >> inplace/bin/hpc
-                        <br>cat utils/runghc/runghc.wrapper                                     >> inplace/bin/runghc
-                        <br>echo 'bindir="/Users/dr/workspace/ghc/inplace/bin"'                              >> inplace/bin/hpc
-                        <br>echo 'topdir="/Users/dr/workspace/ghc/inplace/lib"'                           >> inplace/bin/hpc
-                        <br>chmod +x                                                     inplace/bin/runghc
-                        <br>echo 'pgmgcc="cc"'                                               >> inplace/bin/hpc
-                        <br>"rm" -f                                                   utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
-                        <br>echo 'export DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/hpc/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/containers/containers/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"' >> inplace/bin/hpc
-                        <br>echo '#!/bin/sh'                                                   >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
-                        <br>cat utils/hpc/hpc.wrapper                                     >> inplace/bin/hpc
-                        <br>echo 'export DYLD_LIBRARY_PATH="libraries/Cabal/Cabal/dist-install/build:libraries/process/dist-install/build:libraries/parsec/dist-install/build:libraries/text/dist-install/build:libraries/template-haskell/dist-install/build:libraries/pretty/dist-install/build:libraries/ghc-boot-th/dist-install/build:libraries/mtl/dist-install/build:libraries/transformers/dist-install/build:libraries/directory/dist-install/build:libraries/unix/dist-install/build:libraries/time/dist-install/build:libraries/filepath/dist-install/build:libraries/binary/dist-install/build:libraries/containers/containers/dist-install/build:libraries/bytestring/dist-install/build:libraries/deepseq/dist-install/build:libraries/array/dist-install/build:libraries/base/dist-install/build:libraries/ghc-bignum/dist-install/build:libraries/ghc-prim/dist-install/build:rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"' >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
-                        <br>chmod +x                                                     inplace/bin/hpc
-                        <br>echo 'exec "utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" ${1+"$@"}'                                  >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
-                        <br>chmod +x                                                   utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
-                        <br><<ghc: 2787765536 bytes, 171 GCs, 20282449/67935792 avg/max bytes residency (8 samples), 144M in use, 0.000 INIT (0.003 elapsed), 1.738 MUT (2.286 elapsed), 0.567 GC (0.611 elapsed) :ghc>>
-                        <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf  o -hcsuf hc -static  -O0 -H64m -Wall   -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header   -this-unit-id ghc-8.11.0.20200619 -hide-all-packages -i -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompiler/stage2/build/../rts/dist/build -Icompiler/stage2/build/stage2   -optP-DHAVE_INTERNAL_INTERPRETER -optP-DCAN_LOAD_DLL -optP-Iincludes/dist-install/build -optP-include -optPcompiler/stage2/build/./autogen/cabal_macros.h -package-id array-0.5.4.0 -package-id base-4.15.0.0 -package-id binary-0.8.7.0 -package-id bytestring-0.10.10.0 -package-id containers-0.6.2.1 -package-id deepseq-1.4.4.0 -package-id directory-1.3.6.1 -package-id exceptions-0.10.4 -package-id filepath-1.4.2.1 -package-id ghc-boot-8.11.0.20200619 -package-id ghc-boot-th-8.11.0.20200619 -package-id ghc-heap-8.11.0.20200619 -package-id ghci-8.11.0.20200619 -package-id hpc-0.6.1.0 -package-id process-1.6.8.2 -package-id template-haskell-2.17.0.0 -package-id terminfo-0.4.1.4 -package-id time-1.9.3 -package-id transformers-0.5.6.2 -package-id unix-2.7.2.2 -Wall -Wno-name-shadowing -Wnoncanonical-monad-instances -Wnoncanonical-monoid-instances -this-unit-id ghc -XHaskell2010 -XNoImplicitPrelude -optc-DTHREADED_RTS -Iincludes/dist-install/build -Rghc-timing -O0 -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-updates  -no-user-package-db -rtsopts       -Wnoncanonical-monad-instances  -outputdir compiler/stage2/build  -dynamic-too -c compiler/./GHC/HsToCore.hs -o compiler/stage2/build/GHC/HsToCore.o -dyno compiler/stage2/build/GHC/HsToCore.dyn_o
-                        <br><<ghc: 766891168 bytes, 91 GCs, 14722329/42245856 avg/max bytes residency (6 samples), 91M in use, 0.000 INIT (0.003 elapsed), 0.361 MUT (0.510 elapsed), 0.236 GC (0.258 elapsed) :ghc>>
-                        <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf  o -hcsuf hc -static  -O0 -H64m -Wall   -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header   -this-unit-id ghc-8.11.0.20200619 -hide-all-packages -i -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompiler/stage2/build/../rts/dist/build -Icompiler/stage2/build/stage2   -optP-DHAVE_INTERNAL_INTERPRETER -optP-DCAN_LOAD_DLL -optP-Iincludes/dist-install/build -optP-include -optPcompiler/stage2/build/./autogen/cabal_macros.h -package-id array-0.5.4.0 -package-id base-4.15.0.0 -package-id binary-0.8.7.0 -package-id bytestring-0.10.10.0 -package-id containers-0.6.2.1 -package-id deepseq-1.4.4.0 -package-id directory-1.3.6.1 -package-id exceptions-0.10.4 -package-id filepath-1.4.2.1 -package-id ghc-boot-8.11.0.20200619 -package-id ghc-boot-th-8.11.0.20200619 -package-id ghc-heap-8.11.0.20200619 -package-id ghci-8.11.0.20200619 -package-id hpc-0.6.1.0 -package-id process-1.6.8.2 -package-id template-haskell-2.17.0.0 -package-id terminfo-0.4.1.4 -package-id time-1.9.3 -package-id transformers-0.5.6.2 -package-id unix-2.7.2.2 -Wall -Wno-name-shadowing -Wnoncanonical-monad-instances -Wnoncanonical-monoid-instances -this-unit-id ghc -XHaskell2010 -XNoImplicitPrelude -optc-DTHREADED_RTS -Iincludes/dist-install/build -Rghc-timing -O0 -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-updates  -no-user-package-db -rtsopts       -Wnoncanonical-monad-instances  -outputdir compiler/stage2/build  -dynamic-too -c compiler/./GHC/Iface/Ext/Ast.hs -o compiler/stage2/build/GHC/Iface/Ext/Ast.o -dyno compiler/stage2/build/GHC/Iface/Ext/Ast.dyn_o
-                        <br><<ghc: 3067019736 bytes, 347 GCs, 25353490/71392248 avg/max bytes residency (8 samples), 184M in use, 0.000 INIT (0.002 elapsed), 1.416 MUT (1.823 elapsed), 0.554 GC (0.595 elapsed) :ghc>>
-                        <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf  o -hcsuf hc -static  -O0 -H64m -Wall   -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header   -this-unit-id ghc-8.11.0.20200619 -hide-all-packages -i -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompil...
-                    </div>
-                    <!-- temp -->
-                    или:
-                    <!--/temp -->
-                    <div class="no-log">
-                        <div class="null null--data">
-                            <div class="null__content">
-                                <b class="null__heading">Cannot retrieve the data</b>
-                                <div class="null__message">Try to reload page</div>
-                            </div>
-                        </div>
-                        <!-- temp -->
-                        &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
-                        <!--/temp -->
-                        <div class="loading loading--enlarged loading--alternate">
-                            Loading...
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <h2 class="popup__project">
+          Project name, logs
+        </h2>
+      </div>
+      <div class="popup__sub-head">
+        <div class="nav">
+          <button class="nav__link nav__link--current" type="button">stdout</button>
+          <button class="nav__link" type="button">stderr</button>
         </div>
+      </div>
+      <div class="popup__content">
+        <div class="log">
+          DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/libiserv/dist-install/build:/Users/dr/workspace/ghc/libraries/ghci/dist-install/build:/Users/dr/workspace/ghc/libraries/transformers/dist-install/build:/Users/dr/workspace/ghc/libraries/template-haskell/dist-install/build:/Users/dr/workspace/ghc/libraries/pretty/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-heap/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-boot/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-boot-th/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/binary/dist-install/build:/Users/dr/workspace/ghc/libraries/containers/containers/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"'
+          >> inplace/lib/bin/ghc-iserv-dyn
+          <br>"rm" -f inplace/bin/runghc
+          <br>echo 'exec "$executablename" ${1+"$@"}' >> inplace/lib/bin/ghc-iserv-dyn
+          <br>echo '#!/bin/sh' >> inplace/bin/runghc
+          <br>chmod +x inplace/lib/bin/ghc-iserv-dyn
+          <br>echo 'executablename="/Users/dr/workspace/ghc/inplace/lib/bin/runghc"' >> inplace/bin/runghc
+          <br>echo 'datadir="/Users/dr/workspace/ghc/inplace/lib"' >> inplace/bin/runghc
+          <br>/usr/local/bin/ginstall -c -m 755 utils/hpc/dist-install/build/tmp/hpc inplace/lib/bin/hpc
+          <br>echo 'bindir="/Users/dr/workspace/ghc/inplace/bin"' >> inplace/bin/runghc
+          <br>"rm" -f inplace/bin/hpc
+          <br>echo 'topdir="/Users/dr/workspace/ghc/inplace/lib"' >> inplace/bin/runghc
+          <br>echo 'pgmgcc="cc"' >> inplace/bin/runghc
+          <br>echo '#!/bin/sh' >> inplace/bin/hpc
+          <br>echo 'ghcprog="ghc-stage2"' >> "inplace/bin/runghc"
+          <br>echo 'executablename="/Users/dr/workspace/ghc/inplace/lib/bin/hpc"' >> inplace/bin/hpc
+          <br>echo 'export DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/process/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"'
+          >> inplace/bin/runghc
+          <br>echo 'datadir="/Users/dr/workspace/ghc/inplace/lib"' >> inplace/bin/hpc
+          <br>cat utils/runghc/runghc.wrapper >> inplace/bin/runghc
+          <br>echo 'bindir="/Users/dr/workspace/ghc/inplace/bin"' >> inplace/bin/hpc
+          <br>echo 'topdir="/Users/dr/workspace/ghc/inplace/lib"' >> inplace/bin/hpc
+          <br>chmod +x inplace/bin/runghc
+          <br>echo 'pgmgcc="cc"' >> inplace/bin/hpc
+          <br>"rm" -f utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
+          <br>echo 'export DYLD_LIBRARY_PATH="/Users/dr/workspace/ghc/libraries/hpc/dist-install/build:/Users/dr/workspace/ghc/libraries/directory/dist-install/build:/Users/dr/workspace/ghc/libraries/unix/dist-install/build:/Users/dr/workspace/ghc/libraries/time/dist-install/build:/Users/dr/workspace/ghc/libraries/filepath/dist-install/build:/Users/dr/workspace/ghc/libraries/containers/containers/dist-install/build:/Users/dr/workspace/ghc/libraries/bytestring/dist-install/build:/Users/dr/workspace/ghc/libraries/deepseq/dist-install/build:/Users/dr/workspace/ghc/libraries/array/dist-install/build:/Users/dr/workspace/ghc/libraries/base/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-bignum/dist-install/build:/Users/dr/workspace/ghc/libraries/ghc-prim/dist-install/build:/Users/dr/workspace/ghc/rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"'
+          >> inplace/bin/hpc
+          <br>echo '#!/bin/sh' >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
+          <br>cat utils/hpc/hpc.wrapper >> inplace/bin/hpc
+          <br>echo 'export DYLD_LIBRARY_PATH="libraries/Cabal/Cabal/dist-install/build:libraries/process/dist-install/build:libraries/parsec/dist-install/build:libraries/text/dist-install/build:libraries/template-haskell/dist-install/build:libraries/pretty/dist-install/build:libraries/ghc-boot-th/dist-install/build:libraries/mtl/dist-install/build:libraries/transformers/dist-install/build:libraries/directory/dist-install/build:libraries/unix/dist-install/build:libraries/time/dist-install/build:libraries/filepath/dist-install/build:libraries/binary/dist-install/build:libraries/containers/containers/dist-install/build:libraries/bytestring/dist-install/build:libraries/deepseq/dist-install/build:libraries/array/dist-install/build:libraries/base/dist-install/build:libraries/ghc-bignum/dist-install/build:libraries/ghc-prim/dist-install/build:rts/dist/build${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"'
+          >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
+          <br>chmod +x inplace/bin/hpc
+          <br>echo 'exec "utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" ${1+"$@"}' >> utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
+          <br>chmod +x utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist
+          <br>
+          <<ghc: 2787765536 bytes, 171 GCs, 20282449/67935792 avg/max bytes residency (8 samples), 144M in use, 0.000 INIT (0.003 elapsed), 1.738 MUT (2.286 elapsed), 0.567 GC (0.611 elapsed) :ghc>>
+            <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf o -hcsuf hc -static -O0 -H64m -Wall -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header -this-unit-id ghc-8.11.0.20200619 -hide-all-packages -i
+            -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompiler/stage2/build/../rts/dist/build
+            -Icompiler/stage2/build/stage2 -optP-DHAVE_INTERNAL_INTERPRETER -optP-DCAN_LOAD_DLL -optP-Iincludes/dist-install/build -optP-include -optPcompiler/stage2/build/./autogen/cabal_macros.h -package-id array-0.5.4.0 -package-id base-4.15.0.0 -package-id
+            binary-0.8.7.0 -package-id bytestring-0.10.10.0 -package-id containers-0.6.2.1 -package-id deepseq-1.4.4.0 -package-id directory-1.3.6.1 -package-id exceptions-0.10.4 -package-id filepath-1.4.2.1 -package-id ghc-boot-8.11.0.20200619 -package-id
+            ghc-boot-th-8.11.0.20200619 -package-id ghc-heap-8.11.0.20200619 -package-id ghci-8.11.0.20200619 -package-id hpc-0.6.1.0 -package-id process-1.6.8.2 -package-id template-haskell-2.17.0.0 -package-id terminfo-0.4.1.4 -package-id time-1.9.3
+            -package-id transformers-0.5.6.2 -package-id unix-2.7.2.2 -Wall -Wno-name-shadowing -Wnoncanonical-monad-instances -Wnoncanonical-monoid-instances -this-unit-id ghc -XHaskell2010 -XNoImplicitPrelude -optc-DTHREADED_RTS -Iincludes/dist-install/build
+            -Rghc-timing -O0 -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-updates -no-user-package-db -rtsopts -Wnoncanonical-monad-instances -outputdir compiler/stage2/build -dynamic-too -c compiler/./GHC/HsToCore.hs -o compiler/stage2/build/GHC/HsToCore.o
+            -dyno compiler/stage2/build/GHC/HsToCore.dyn_o
+            <br>
+            <<ghc: 766891168 bytes, 91 GCs, 14722329/42245856 avg/max bytes residency (6 samples), 91M in use, 0.000 INIT (0.003 elapsed), 0.361 MUT (0.510 elapsed), 0.236 GC (0.258 elapsed) :ghc>>
+              <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf o -hcsuf hc -static -O0 -H64m -Wall -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header -this-unit-id ghc-8.11.0.20200619 -hide-all-packages
+              -i -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompiler/stage2/build/../rts/dist/build
+              -Icompiler/stage2/build/stage2 -optP-DHAVE_INTERNAL_INTERPRETER -optP-DCAN_LOAD_DLL -optP-Iincludes/dist-install/build -optP-include -optPcompiler/stage2/build/./autogen/cabal_macros.h -package-id array-0.5.4.0 -package-id base-4.15.0.0
+              -package-id binary-0.8.7.0 -package-id bytestring-0.10.10.0 -package-id containers-0.6.2.1 -package-id deepseq-1.4.4.0 -package-id directory-1.3.6.1 -package-id exceptions-0.10.4 -package-id filepath-1.4.2.1 -package-id ghc-boot-8.11.0.20200619
+              -package-id ghc-boot-th-8.11.0.20200619 -package-id ghc-heap-8.11.0.20200619 -package-id ghci-8.11.0.20200619 -package-id hpc-0.6.1.0 -package-id process-1.6.8.2 -package-id template-haskell-2.17.0.0 -package-id terminfo-0.4.1.4 -package-id
+              time-1.9.3 -package-id transformers-0.5.6.2 -package-id unix-2.7.2.2 -Wall -Wno-name-shadowing -Wnoncanonical-monad-instances -Wnoncanonical-monoid-instances -this-unit-id ghc -XHaskell2010 -XNoImplicitPrelude -optc-DTHREADED_RTS -Iincludes/dist-install/build
+              -Rghc-timing -O0 -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-updates -no-user-package-db -rtsopts -Wnoncanonical-monad-instances -outputdir compiler/stage2/build -dynamic-too -c compiler/./GHC/Iface/Ext/Ast.hs -o compiler/stage2/build/GHC/Iface/Ext/Ast.o
+              -dyno compiler/stage2/build/GHC/Iface/Ext/Ast.dyn_o
+              <br>
+              <<ghc: 3067019736 bytes, 347 GCs, 25353490/71392248 avg/max bytes residency (8 samples), 184M in use, 0.000 INIT (0.002 elapsed), 1.416 MUT (1.823 elapsed), 0.554 GC (0.595 elapsed) :ghc>>
+                <br>"inplace/bin/ghc-stage1" -hisuf hi -osuf o -hcsuf hc -static -O0 -H64m -Wall -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header -this-unit-id ghc-8.11.0.20200619 -hide-all-packages
+                -i -icompiler/. -icompiler/stage2/build -Icompiler/stage2/build -icompiler/stage2/build/./autogen -Icompiler/stage2/build/./autogen -Icompiler/. -Icompiler/../rts/dist/build -Icompiler/stage2 -Icompiler/stage2/build/. -Icompil...
+        </div>
+        <!-- temp -->
+        или:
+        <!--/temp -->
+        <div class="no-log">
+          <div class="null null--data">
+            <div class="null__content">
+              <b class="null__heading">Cannot retrieve the data</b>
+              <div class="null__message">Try to reload page</div>
+            </div>
+          </div>
+          <!-- temp -->
+          &nbsp;&nbsp;&nbsp;&nbsp;или&nbsp;&nbsp;&nbsp;&nbsp;
+          <!--/temp -->
+          <div class="loading loading--enlarged loading--alternate">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <div class="classic-popup" id="dialog">
-            <div class="classic-popup__container">
-                <div class="classic-popup__viewport">
-                    <div class="classic-popup__slot">
+  <div class="classic-popup" id="dialog">
+    <div class="classic-popup__container">
+      <div class="classic-popup__viewport">
+        <div class="classic-popup__slot">
 
-                        <div class="dialog dialog--archive">
-                            <div class="dialog__content">
-                                Are you sure you want to archive the
-                                <br>‘Feature name’ deployment?
-                            </div>
-                            <div class="dialog__footer">
-                                <button class="dialog__action button" type="submit">Archive</button>
-                                <button class="dialog__action button--secondary button" type="button">Cancel</button>
-                            </div>
-                        </div>
+          <div class="dialog dialog--archive">
+            <div class="dialog__content">
+              Are you sure you want to archive the
+              <br>‘Feature name’ deployment?
+            </div>
+            <div class="dialog__footer">
+              <button class="dialog__action button" type="submit">Archive</button>
+              <button class="dialog__action button--secondary button" type="button">Cancel</button>
+            </div>
+          </div>
 
-                        <button class="classic-popup__close" type="button">
+          <button class="classic-popup__close" type="button">
                             Close
                         </button>
-                    </div>
-                </div>
-            </div>
         </div>
+      </div>
+    </div>
+  </div>
 
 
-        <!-- jQuery -->
-        <script src="../vendors/jquery/jquery-3.2.1.min.js"></script>
+  <!-- jQuery -->
+  <script src="../vendors/jquery/jquery-3.2.1.min.js"></script>
 
-        <!-- Outline.js -->
-        <script src="../vendors/outline/outline.js"></script>
+  <!-- Outline.js -->
+  <script src="../vendors/outline/outline.js"></script>
 
-        <!-- Temp -->
-        <script src="../scripts/_expander.js"></script>
-        <script src="../scripts/_drop.js"></script>
-        <script src="../scripts/_sort.js"></script>
-        <script src="../scripts/_data.js"></script>
-        <script src="../scripts/_popup.js"></script>
-        <script src="../scripts/_classic-popup.js"></script>
+  <!-- Temp -->
+  <script src="../scripts/_expander.js"></script>
+  <script src="../scripts/_drop.js"></script>
+  <script src="../scripts/_sort.js"></script>
+  <script src="../scripts/_data.js"></script>
+  <script src="../scripts/_popup.js"></script>
+  <script src="../scripts/_classic-popup.js"></script>
 
-    </body>
+</body>
+
 </html>
