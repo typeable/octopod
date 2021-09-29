@@ -258,7 +258,7 @@ This script is used to get the set of keys that the deployment configuration can
 
 The keys are read from the _stdout_ stream of the script. It should be formatted as a CSV file with one column (a list separated by newlines).
 
-This script receives the same arguments as the [`deployment_config`](#-deployment-config) command.
+This script receives the same arguments as the [`deployment_config`](#-deployment_config) command.
 
 
 #### Sample implementation
@@ -277,7 +277,7 @@ This script is used to generate default application configuration key/value pair
 
 The key/value pairs are read from the _stdout_ stream of the script. It should be formatted as a CSV file with two columns.
 
-This script receives the same arguments as the [`deployment_config`](#-deployment-config) command.
+This script receives the same arguments as the [`deployment_config`](#-deployment_config) command.
 
 Additionally, the script receives the deployment configuration key/value pairs as described in the ["Deployment lifecycle scripts" section](#deployment-lifecycle-scripts): any number of `--deployment-config <KEY>=<VALUE>` arguments.
 
