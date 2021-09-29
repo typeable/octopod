@@ -4,28 +4,50 @@ fn main() {
     let mut log_builder = Builder::from_default_env();
     log_builder.target(Target::Stdout).filter(None, LevelFilter::Info).init();
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
-    let cli_opts = CliOpts::from_args();
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
-    let default_values: DefaultValues = serde_json::from_str(&envs.defaults).unwrap();
-    let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &default_values, &envs);
-    let helm_cmd = HelmCmd {
+    let cli_opts = CliOpts::from_args();
+    info!("Cli options received {:?}", &cli_opts);
+    let overrides = match overrides(&cli_opts, &envs) {
+        Some(inner) => inner,
+        None => vec![],
+    };
+
+    let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
+    let namespace = String::from(&cli_opts.namespace);
+    let release_name = match cli_opts.name {
+        Some(name) => name,
+        None => {
+            error!("mandatory name argument was not provided");
+            panic!();
+        }
+    };
+    let helm_template = HelmCmd {
         name: envs.helm_bin,
-        mode: HelmMode::Status,
-        release_name: cli_opts.name,
-        release_domain: String::from(""),
+        mode: HelmMode::Template,
+        release_name: release_name,
         namespace: cli_opts.namespace,
         deployment_parameters: deployment_parameters,
-        overrides: vec![],
-        default_values: vec![],
-        image_tag: String::from("")
+        overrides: overrides,
     };
-    info!("Generated Helm args: {:?}", &helm_cmd.args());
-    match helm_cmd.run() {
-        Ok(_status) => {
-            error!("Release is still present in cluster");
-            panic!();
-        },
-        Err(_status) => info!("Success!"),
+    info!("Generated Helm args: {:?}", &helm_template.args());
+    match helm_template.run_stdout() {
+        Ok(status) => {
+            let (deployments, statefulsets, _ingresses, _old_ingresses) = match parse_to_k8s(status) {
+                Ok((deployments, statefulsets, ingresses, old_ingresses)) => (deployments, statefulsets, ingresses, old_ingresses),
+                Err(err) => panic!("{}", err)
+            };
+            match check_all(deployments, statefulsets, namespace) {
+                Ok(status) => {
+                    error!("Deployment hasn't scaled down correctly");
+                    panic!("{:?}", status);
+                },
+                Err(_status) => info!("Success!")
+            }
+        }
+        Err(status) => {
+            error!("Error during helm execution");
+            panic!("{:?}", status);
+        }
     }
 }

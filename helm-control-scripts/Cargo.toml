@@ -1,6 +1,6 @@
 [package]
 name = "helm-control-scripts"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Aleksei Sizov <a.sizov@typeable.io>"]
 edition = "2018"
 
@@ -54,5 +54,25 @@ name = "init"
 path = "src/init.rs"
 
 [[bin]]
-name = "tag_check"
-path = "src/tag_check.rs"
+name = "config_check"
+path = "src/config_check.rs"
+
+[[bin]]
+name = "app_overrides"
+path = "src/app_overrides.rs"
+
+[[bin]]
+name = "deployment_overrides"
+path = "src/deployment_overrides.rs"
+
+[[bin]]
+name = "deployment_keys"
+path = "src/deployment_keys.rs"
+
+[[bin]]
+name = "app_keys"
+path = "src/app_keys.rs"
+
+[[bin]]
+name = "unarchive"
+path = "src/unarchive.rs"

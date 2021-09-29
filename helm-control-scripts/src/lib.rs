@@ -1,24 +1,28 @@
 pub mod lib {
     pub use std::io::prelude::*;
     pub use std::process::{Command, ExitStatus, Stdio};
+    pub use std::error::Error;
+    pub use std::fmt;
     pub use structopt::StructOpt;
     pub use env_logger::{Builder, Target};
     pub use log::{LevelFilter, info, warn, error};
     pub use serde::{Serialize, Deserialize};
+    pub use serde_json::json;
     pub use std::error;
-    pub use yaml_rust::{YamlLoader, YamlEmitter};
+    pub use yaml_rust::{YamlLoader, YamlEmitter, Yaml};
     pub use k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
         networking::v1::Ingress,
-        networking::v1beta1::Ingress as OldIngress
+        networking::v1beta1::Ingress as OldIngress,
+        core::v1::{PersistentVolumeClaim, Secret}
     };
     pub use kube::{
-        api::{Api, ListParams, ResourceExt},
+        api::{Api, ListParams, ResourceExt, Patch, PatchParams, DeleteParams},
         Client,
     };
     pub use dkregistry::{
         v2::Client as RegClient,
-        errors::Error
+        errors::Error as RegError,
     };
     pub use regex::Regex;
     
@@ -32,25 +36,25 @@ pub mod lib {
         #[structopt(long)]
         pub namespace: String,
         #[structopt(long)]
-        pub name: String,
+        pub name: Option<String>,
         #[structopt(long)]
         pub tag: Option<String>,
         #[structopt(long)]
-        pub app_env_override: Vec<String>,
+        pub application_config: Vec<String>,
         #[structopt(long)]
-        pub deployment_override: Vec<String>,
+        pub deployment_config: Vec<String>,
     }
     
     #[derive(Deserialize, Debug)]
     pub struct EnvVars {
         pub helm_bin: String,
-        pub kubectl_bin: String,
         pub defaults: String, //json of DefaultValues
         #[serde(default)]
         pub helm_user: String,
         #[serde(default)]
         pub helm_pass: String,
         pub helm_on_init_only: Option<bool>,
+        pub ingress_host_key: Option<String>,
     }
     
     impl EnvVars {
@@ -66,6 +70,12 @@ pub mod lib {
         }
     }
     
+    #[derive(Debug, Serialize, Deserialize)]
+    struct HelmRepo {
+        name: String,
+        url: String
+    }
+    
     #[derive(Deserialize, Debug)]
     pub struct DefaultValues {
         pub default_overrides: Vec<String>,
@@ -75,7 +85,42 @@ pub mod lib {
         pub chart_name: String,
     }
     
-    #[derive(Debug, Clone)]
+    impl DefaultValues {
+        pub fn app_overrides(&self) -> Option<Vec<(String,String)>> {
+            if self.default_overrides.is_empty() {
+                None
+            } else {
+                let mut overrides: Vec<(String,String)> = Vec::new();
+                for app_override in &self.default_overrides {
+                    let split_override = app_override.split('=').collect::<Vec<_>>();
+                    overrides.push((split_override.first().unwrap().to_string(), split_override.last().unwrap().to_string()));
+                }
+                Some(overrides)
+            }
+        }
+        pub fn deployment_overrides(&self) -> Vec<(String,String)> {
+            vec![
+                (String::from("chart_repo_url"), self.chart_repo_url.clone()),
+                (String::from("chart_repo_name"), self.chart_repo_name.clone()),
+                (String::from("chart_version"), self.chart_version.clone()),
+                (String::from("chart_name"), self.chart_name.clone()),
+            ]   
+        }
+        pub fn deployment_keys(&self) -> Vec<String> {
+            let mut keys: Vec<String> = vec![
+                String::from("chart_repo_url"),
+                String::from("chart_repo_name"),
+                String::from("chart_version"),
+                String::from("chart_name"),
+                String::from("chart_repo_user"),
+                String::from("chart_repo_pass"),
+            ];
+            keys.sort();
+            keys
+        }
+    }
+        
+    #[derive(Debug, Clone, Default)]
     pub struct HelmDeploymentParameters {
         pub chart_repo_url: String,
         pub chart_repo_name: String,
@@ -86,30 +131,23 @@ pub mod lib {
     }
     
     impl HelmDeploymentParameters {
-        pub fn new(cli_opts: &CliOpts, default_values: &DefaultValues, envs: &EnvVars) -> Self {
-            let mut default_parameters = Self {
-                chart_repo_url:  default_values.chart_repo_url.clone(),
-                chart_repo_name: default_values.chart_repo_name.clone(),
-                chart_repo_user: envs.helm_user.clone(),
-                chart_repo_pass: envs.helm_pass.clone(),
-                chart_version: default_values.chart_version.clone(),
-                chart_name: default_values.chart_name.clone(),
-            };
-            if cli_opts.deployment_override.is_empty() {
-                return default_parameters;
-            } else {
-                for deployment_override in cli_opts.deployment_override.clone().into_iter() {
-                    let split_override = deployment_override.split('=').collect::<Vec<_>>();
-                    match split_override.first().unwrap().as_ref() {
-                        "chart_repo_url" => default_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
-                        "chart_repo_name" => default_parameters.chart_repo_name = split_override.last().unwrap().to_string(),
-                        "chart_version" => default_parameters.chart_version = split_override.last().unwrap().to_string(),
-                        "chart_name" => default_parameters.chart_name = split_override.last().unwrap().to_string(),
-                        _ => continue,
-                    }
+        pub fn new(cli_opts: &CliOpts, envs: &EnvVars) -> Self {
+            let mut deployment_parameters = Self::default();
+            deployment_parameters.chart_repo_user = envs.helm_user.clone();
+            deployment_parameters.chart_repo_pass = envs.helm_pass.clone();
+            for deployment_override in cli_opts.deployment_config.clone().into_iter() {
+                let split_override = deployment_override.split('=').collect::<Vec<_>>();
+                match split_override.first().unwrap().as_ref() {
+                    "chart_repo_url" => deployment_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
+                    "chart_repo_name" => deployment_parameters.chart_repo_name = split_override.last().unwrap().to_string(),
+                    "chart_version" => deployment_parameters.chart_version = split_override.last().unwrap().to_string(),
+                    "chart_name" => deployment_parameters.chart_name = split_override.last().unwrap().to_string(),
+                    "chart_repo_user" => deployment_parameters.chart_repo_user = split_override.last().unwrap().to_string(),
+                    "chart_repo_pass" => deployment_parameters.chart_repo_pass = split_override.last().unwrap().to_string(),
+                    _ => continue,
                 }
-                return default_parameters;
             }
+            return deployment_parameters;
         }
         pub fn new_env_only(default_values: &DefaultValues, envs: &EnvVars) -> Self {
             Self {
@@ -126,12 +164,9 @@ pub mod lib {
         pub name: String,
         pub mode: HelmMode,
         pub release_name: String,
-        pub release_domain: String,
         pub namespace: String,
         pub deployment_parameters: HelmDeploymentParameters,
         pub overrides: Vec<String>,
-        pub default_values: Vec<String>,
-        pub image_tag: String,
     }
     
     impl HelmCmd {
@@ -167,6 +202,13 @@ pub mod lib {
                     args.extend(chart_version);
                     args.extend(self.set_flag_values());
                 },
+                HelmMode::ShowValues => {
+                    args.extend(namespace);
+                    args.push(String::from("show"));
+                    args.push(String::from("values"));
+                    args.push(chart_location);
+                    args.extend(chart_version);
+                },
                 HelmMode::RepoAdd => {
                     args.push(String::from("repo"));
                     args.push(String::from("add"));
@@ -180,12 +222,12 @@ pub mod lib {
                     args.push(String::from("repo"));
                     args.push(String::from("update"));
                 },
-                HelmMode::Status => {
-                    args.extend(namespace);
-                    args.push(String::from("status"));
-                    args.push(String::from(&self.release_name));
+                HelmMode::RepoList => {
+                    args.push(String::from("repo"));
+                    args.push(String::from("list"));
+                    args.push(String::from("-o"));
+                    args.push(String::from("json"));
                 },
-                _ => panic!("This helm mode is not expected"),
             }
     
             return args;
@@ -193,9 +235,6 @@ pub mod lib {
         fn set_flag_values(&self) -> Vec<String> {
             let mut values = Vec::new();
             let mut set_values = Vec::new();
-            values.push(format!("image.tag={}", &self.image_tag));
-            values.push(format!("ingress.host={}", &self.release_domain));
-            values.extend(self.default_values.clone());
             values.extend(self.overrides.clone());
             for value in values.into_iter() {
                 set_values.push(String::from("--set"));
@@ -236,58 +275,8 @@ pub mod lib {
         Template,
         RepoAdd,
         RepoUpdate,
-        Status,
-    }
-    
-    pub struct KubectlCmd {
-        pub name: String,
-        pub release_name: String,
-        pub namespace: String,
-        pub deployment_parameters: HelmDeploymentParameters,
-    }
-
-    impl KubectlCmd {
-        pub fn args(&self, cmd_type: &str) -> Vec<String> {
-            let mut args: Vec<String> = Vec::new();
-            let namespace = vec![String::from("-n"), String::from(&self.namespace),];
-            let cert_secret_name = format!("{}-{}-tls", &self.release_name, &self.deployment_parameters.chart_name);
-            let label = vec![String::from("-l"), format!("app.kubernetes.io/instance={}", &self.release_name)];
-            args.extend(namespace);
-            args.push(String::from("delete"));
-            match cmd_type {
-                "pvc" => {
-                    args.push(String::from("pvc"));
-                    args.extend(label);
-                    return args;
-                },
-                "cert" => {
-                    args.push(String::from("secret"));
-                    args.push(cert_secret_name);
-                    return args;
-                },
-                _ => unreachable!(),
-            }
-        }
-        pub fn run(&self) {
-            info!("Starting pvc cleanup");
-            info!("kubectl args: {:?}", &self.args("pvc"));
-            let kubectl_pvc = Command::new(&self.name)
-                .args(&self.args("pvc"))
-                .output()
-                .expect("Failed to run");
-            info!("kubectl stdout:\n {}", String::from_utf8(kubectl_pvc.stdout).unwrap());
-            info!("kubectl stderr:\n {}", String::from_utf8(kubectl_pvc.stderr).unwrap());
-            info!("Starting certificates cleanup");
-            info!("kubectl args: {:?}", &self.args("pvc"));
-            let kubectl_cert = Command::new(&self.name)
-                .args(&self.args("cert"))
-                .output()
-                .expect("Failed to run");
-            info!("kubectl stdout:\n {}", String::from_utf8(kubectl_cert.stdout).unwrap());
-            info!("kubectl stderr:\n {}", String::from_utf8(kubectl_cert.stderr).unwrap());
-            assert!(kubectl_pvc.status.success());
-            assert!(kubectl_cert.status.success());
-        }
+        RepoList,
+        ShowValues,
     }
     
     fn check_value(value: String) -> Result<String, String> {
@@ -298,9 +287,14 @@ pub mod lib {
             Err(format!("Override value {} is malformed", value))
         }
     }
-    pub fn overrides(cli_opts: &CliOpts) -> Option<Vec<String>> {
+    pub fn overrides(cli_opts: &CliOpts, envs: &EnvVars) -> Option<Vec<String>> {
         let mut overrides_opts = Vec::new();
-        overrides_opts.extend(&cli_opts.app_env_override);
+        overrides_opts.extend(&cli_opts.application_config);
+        let ingress_override = match &envs.ingress_host_key {
+            Some(key) => format!("{}={}", &key, domain_name(&cli_opts)),
+            None => format!("ingress.hostname={}", domain_name(&cli_opts)),
+        };
+        overrides_opts.push(&ingress_override);
         if overrides_opts.is_empty() {
             None
         } else {
@@ -311,8 +305,13 @@ pub mod lib {
                 )
         }
     }
-    pub fn domain_name(cli_opts: &CliOpts) -> String {
-        format!("{}.{}", &cli_opts.name, &cli_opts.base_domain)
+    fn domain_name(cli_opts: &CliOpts) -> String {
+        match &cli_opts.name {
+            Some(name) => {
+                return format!("{}.{}", name, &cli_opts.base_domain);
+            },
+            None => panic!("No name argument provided")
+        }
     }
     pub fn parse_to_k8s(yaml: String) -> Result<(Vec<Deployment>, Vec<StatefulSet>, Vec<Ingress>, Vec<OldIngress>), serde_yaml::Error> {
         let docs = YamlLoader::load_from_str(&yaml).unwrap();
@@ -356,8 +355,37 @@ pub mod lib {
         }
         return Ok((deployments, statefulsets, ingresses, old_ingresses));
     }
+    
+    #[derive(Debug)]
+    pub struct NoReplicasError(String);
+    
+    impl fmt::Display for NoReplicasError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Deployment {} doesn't have any replicas", self.0)
+        }
+    }
+    impl Error for NoReplicasError {}
+    
+    #[derive(Debug)]
+    pub enum KubeError {
+        NoReplicasError(NoReplicasError),
+        KubeApiError(kube::Error),
+    }
+    
+    impl From<NoReplicasError> for KubeError {
+        fn from(error: NoReplicasError) -> Self {
+            KubeError::NoReplicasError(error)
+        }
+    }
+
+    impl From<kube::Error> for KubeError {
+        fn from(error: kube::Error) -> Self {
+            KubeError::KubeApiError(error)
+        }
+    }
+    
     #[tokio::main]
-    async fn check_deployment(namespace: &str, name: &str) -> Result<(), kube::Error> {
+    async fn check_deployment(namespace: &str, name: &str) -> Result<(), KubeError> {
         let client = Client::try_default().await?;
         let api: Api<Deployment> = Api::namespaced(client, &namespace);
         let deployment = api.get(&name).await?;
@@ -366,22 +394,22 @@ pub mod lib {
                 match status.available_replicas {
                     Some(replicas) => {
                         if !replicas >= 1 {
-                            panic!("Deployment {} doesn't have any replicas", &name);
+                           return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                         }
                     },
                     None => {
-                        panic!("Deployment {} doesn't have any replicas", &name);
+                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                     }
                 }
             },
             None => {
-                panic!("Unable to get status for deployment {}", &name);
+                return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
             }
         }
         Ok(())
     }
     #[tokio::main]
-    async fn check_statefulset(namespace: &str, name: &str) -> Result<(), kube::Error> {
+    async fn check_statefulset(namespace: &str, name: &str) -> Result<(), KubeError> {
         let client = Client::try_default().await?;
         let api: Api<StatefulSet> = Api::namespaced(client, &namespace);
         let statefulset = api.get(&name).await?;
@@ -390,21 +418,21 @@ pub mod lib {
                 match status.current_replicas {
                     Some(replicas) => {
                         if !replicas >= 1 {
-                            panic!("StatefulSet {} doesn't have any replicas", &name);
+                            return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                         }
                     },
                     None => {
-                        panic!("StatefulSet {} doesn't have any replicas", &name);
+                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                     }
                 }
             },
             None => {
-                panic!("Unable to get status for StatefulSet {}", &name);
+                return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
             }
         }
         Ok(())
     }
-    pub fn check_all(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String) -> Result<(), Box<dyn error::Error>> {
+    pub fn check_all(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String) -> Result<(), KubeError> {
         if deployments.is_empty() {
             info!("No deployments to check");
         }else{
@@ -412,7 +440,7 @@ pub mod lib {
                 match check_deployment(&namespace, &deploy.name()) {
                     Ok(status) => status,
                     Err(err) => {
-                        return Err(Box::new(err));
+                        return Err(err);
                     }
                 }
             }
@@ -425,7 +453,7 @@ pub mod lib {
                 match check_statefulset(&namespace, &statefulset.name()) {
                     Ok(status) => status,
                     Err(err) => {
-                        return Err(Box::new(err));
+                        return Err(err);
                     }
                 }
             }
@@ -506,6 +534,18 @@ pub mod lib {
         }
         return out_string;
     }
+    pub fn print_keys(vals: Option<Vec<String>>) -> String {
+        let mut out_string = String::from("");
+        match vals {
+            Some(values) => {
+                for value in values {
+                    out_string.push_str(&format!("{}\n", value));
+                }
+            },
+            None => return out_string
+        }
+        return out_string;
+    }
     //TODO: Generics!!!
     pub fn deployments_statefulsets_to_images(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>) -> Option<Vec<String>> {
         let mut images: Vec<String> = Vec::new();
@@ -564,7 +604,7 @@ pub mod lib {
         }
     }
     #[tokio::main]
-    async fn check_image(registry: &str, repository: &str, tag: &str) -> Result<(), dkregistry::errors::Error> {
+    async fn check_image(registry: &str, repository: &str, tag: &str) -> Result<(), RegError> {
         let client = RegClient::configure()
             .insecure_registry(false)
             .registry(registry)
@@ -598,7 +638,7 @@ pub mod lib {
         info!("Checking image: {} {} {}", registry, repository, tag);
         (registry, repository, tag)
     }
-    pub fn check_images(images: Vec<String>) -> Result<(), dkregistry::errors::Error> {
+    pub fn check_images(images: Vec<String>) -> Result<(), RegError> {
         for image in images {
             let (registry, repository, tag) = parse_image_name(&image);
             match check_image(&registry, &repository, &tag) {
@@ -613,23 +653,17 @@ pub mod lib {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoAdd,
             release_name: String::from(""),
-            release_domain: String::from(""),
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
-            default_values: vec![],
-            image_tag: String::from(""),
         };
         let helm_repo_update = HelmCmd {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoUpdate,
             release_name: String::from(""),
-            release_domain: String::from(""),
             namespace: String::from(""),
             deployment_parameters: deployment_parameters.clone(),
             overrides: vec![],
-            default_values: vec![],
-            image_tag: String::from(""),
         };
         match helm_repo_add.run() {
             Ok(_status) => info!("Repo add success!"),
@@ -652,14 +686,215 @@ pub mod lib {
                 if *enabled {
                     info!("Skipping helm initialization, it must be initialied on init");
                 } else {
-                    info!("Starting helm initialization");
-                    helm_repo_add_update(&envs, &deployment_parameters);
+                    if helm_repo_exists(&envs, &deployment_parameters) {
+                        info!("Skipping helm initialization, because requested repo was already added");
+                    } else {
+                        info!("Starting helm initialization");
+                        helm_repo_add_update(&envs, &deployment_parameters);
+                    }
                 }
             },
             None => {
-                info!("Starting helm initialization");
-                helm_repo_add_update(&envs, &deployment_parameters);
+                if helm_repo_exists(&envs, &deployment_parameters) {
+                    info!("Skipping helm initialization, because requested repo was already added");
+                } else {
+                    info!("Starting helm initialization");
+                    helm_repo_add_update(&envs, &deployment_parameters);
+                }
             }
         }
+    }
+
+    fn helm_repo_exists(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) -> bool {
+        let chart_repo_url = String::from(&deployment_parameters.chart_repo_url);
+        let chart_repo_name = String::from(&deployment_parameters.chart_repo_name);
+        let helm_repo_list = HelmCmd {
+            name: String::from(&envs.helm_bin),
+            mode: HelmMode::RepoList,
+            release_name: String::from(""),
+            namespace: String::from(""),
+            deployment_parameters: deployment_parameters.clone(),
+            overrides: vec![],
+        };
+        match helm_repo_list.run_stdout() {
+            Ok(list) => {
+                let helm_repos: Vec<HelmRepo> = serde_json::from_str(&list).unwrap();
+                for repo in helm_repos {
+                    if repo.name == chart_repo_name && repo.url == chart_repo_url {
+                       return true;
+                    } else {
+                        continue
+                    }
+                }
+            },
+            Err(_err) => {
+                return false;
+            }
+        }
+        false
+    }
+    pub fn helm_values_as_keys(yaml: String) -> Option<Vec<String>> {
+        let mut keys: Vec<String> = Vec::new();
+        let docs = YamlLoader::load_from_str(&yaml).unwrap();
+        let docs_hash = &docs[0].clone().into_hash().unwrap();
+        for doc in docs_hash {
+            match doc.1.as_hash() {
+                Some(hash) => {
+                    if hash.is_empty() {
+                        keys.push(format!("{}", doc.0.as_str().unwrap()));
+                    }else{
+                        for doc_2 in hash {
+                            match doc_2.1.as_hash() {
+                                Some(hash_2) => {
+                                    if hash_2.is_empty() {
+                                        keys.push(format!("{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap()));
+                                    }else{
+                                        for key in hash_2.keys() {
+                                            keys.push(format!("{}.{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap(), key.as_str().unwrap()));
+                                        }
+                                    }
+                                },
+                                None => keys.push(format!("{}.{}", doc.0.as_str().unwrap(), doc_2.0.as_str().unwrap()))
+                            }
+                        }
+                    }
+                },
+                None => keys.push(format!("{}", doc.0.as_str().unwrap())),
+            }
+        }
+        if keys.is_empty() {
+            None
+        }else{
+            keys.sort();
+            Some(keys)
+        }
+    }
+    #[tokio::main]
+    async fn scale_deployment(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Deployment> = Api::namespaced(client, &namespace);
+        let deployment = api.get(&name).await?;
+        let mut spec = match deployment.spec {
+            Some(spec) => spec,
+            None => panic!("Deployment without any spec!")
+        };
+        spec.replicas = Some(replicas);
+        let patched_deployment = Deployment {
+            metadata: deployment.metadata,
+            spec: Some(spec),
+            status: None
+        };
+        let patch = Patch::Merge(patched_deployment);
+        let patch_params = PatchParams::apply("octopod");
+        api.patch(&name, &patch_params, &patch).await?;
+        Ok(())
+    }
+    #[tokio::main]
+    async fn scale_statefulset(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<StatefulSet> = Api::namespaced(client, &namespace);
+        let statefulset = api.get(&name).await?;
+        let mut spec = match statefulset.spec {
+            Some(spec) => spec,
+            None => panic!("StatefulSet without any spec!")
+        };
+        spec.replicas = Some(replicas);
+        let patched_statefulset = StatefulSet {
+            metadata: statefulset.metadata,
+            spec: Some(spec),
+            status: None
+        };
+        let patch = Patch::Merge(patched_statefulset);
+        let patch_params = PatchParams::apply("octopod");
+        api.patch(&name, &patch_params, &patch).await?;
+        Ok(())
+    }
+    pub fn scale(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String, replicas: i32) -> Result<(), Box<dyn error::Error>> {
+        if deployments.is_empty() {
+            info!("No deployments to check");
+        }else{
+            for deploy in deployments {
+                match scale_deployment(&namespace, &deploy.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        
+        if statefulsets.is_empty() {
+            info!("No statefulsets to check");
+        }else{
+            for statefulset in statefulsets {
+                match scale_statefulset(&namespace, &statefulset.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn ingresses_to_secrets(new_ingresses: Vec<Ingress>, old_ingresses: Vec<OldIngress>) -> Option<Vec<String>> {
+        let mut secrets: Vec<String> = Vec::new();
+        if new_ingresses.is_empty() {
+            for ingress in old_ingresses {
+                match &ingress.spec {
+                    Some(spec) => {
+                        if spec.tls.is_empty() {
+                            continue
+                        }else{
+                            for tls in &spec.tls {
+                                match &tls.secret_name {
+                                    Some(secret) => secrets.push(String::from(secret)),
+                                    None => continue
+                                }
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }else{
+            for ingress in new_ingresses {
+                match &ingress.spec {
+                    Some(spec) => {
+                        if spec.tls.is_empty() {
+                            continue
+                        }else{
+                            for tls in &spec.tls {
+                                match &tls.secret_name {
+                                    Some(secret) => secrets.push(String::from(secret)),
+                                    None => continue
+                                }
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }
+        if secrets.is_empty() {
+            None
+        }else{
+            Some(secrets)
+        }
+    }
+    #[tokio::main]
+    pub async fn delete_pvcs(namespace: &str, selector: &str) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<PersistentVolumeClaim> = Api::namespaced(client, &namespace);
+        let pvc_list = ListParams::default().labels(selector);
+        api.delete_collection(&DeleteParams::default(), &pvc_list).await?;
+        Ok(())
+    }
+    #[tokio::main]
+    pub async fn delete_secret(namespace: &str, secret: &str) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Secret> = Api::namespaced(client, &namespace);
+        api.delete(&secret, &DeleteParams::default()).await?;
+        Ok(())
     }
 }

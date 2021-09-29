@@ -2,7 +2,7 @@ use helm_control_scripts::lib::*;
 
 fn main() {
     let mut log_builder = Builder::from_default_env();
-    log_builder.target(Target::Stdout).filter(None, LevelFilter::Info).init();
+    log_builder.target(Target::Stderr).filter(None, LevelFilter::Info).init();
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
@@ -12,9 +12,9 @@ fn main() {
         Some(inner) => inner,
         None => vec![],
     };
-    
+
     let deployment_parameters = HelmDeploymentParameters::new(&cli_opts, &envs);
-    let namespace = String::from(&cli_opts.namespace);
+    helm_init(&envs, &deployment_parameters);
     let release_name = match cli_opts.name {
         Some(name) => name,
         None => {
@@ -30,18 +30,25 @@ fn main() {
         deployment_parameters: deployment_parameters,
         overrides: overrides,
     };
-    info!("Generated Helm args: {:?}", &helm_template.args());
     match helm_template.run_stdout() {
         Ok(status) => {
             let (deployments, statefulsets, _ingresses, _old_ingresses) = match parse_to_k8s(status) {
                 Ok((deployments, statefulsets, ingresses, old_ingresses)) => (deployments, statefulsets, ingresses, old_ingresses),
                 Err(err) => panic!("{}", err)
             };
-            match check_all(deployments, statefulsets, namespace) {
-                Ok(_status) => info!("Success!"),
-                Err(status) => {
-                    error!("Error checking statuses");
-                    panic!("{:?}", status);
+            match deployments_statefulsets_to_images(deployments, statefulsets) {
+                Some(images) => {
+                    match check_images(images) {
+                        Ok(_) => info!("Success!"),
+                        Err(err) => {
+                            println!("Error checking images. Are they present in the registry?");
+                            panic!("{}", err);
+                        }
+                    }
+                },
+                None => {
+                    println!("No images found in pods' declarations");
+                    panic!("No images found!");
                 }
             }
         }
