@@ -344,7 +344,7 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDyn
+  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
   defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
   defDep <- holdDynMaybe defDepEv
   depKeys <- deploymentOverrideKeys pb >>= hReq
@@ -356,23 +356,26 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
         Dynamic t [Text] ->
         Dynamic t (Maybe (DefaultConfig l)) ->
         Overrides l ->
-        m (Dynamic t (Overrides l), Dynamic t Bool)
+        m (Dynamic t (Overrides l), Dynamic t (Overrides l), Dynamic t Bool)
       holdDCfg values dCfgDyn ovs = mdo
         ovsDyn <- holdDyn ovs ovsEv
+        ovsDynDebounced <- holdDyn ovs ovsEvDebounced
         x <- attachDyn (current ovsDyn) dCfgDyn
         res <- dyn (x <&> \(ovs', dCfg) -> envVarsInput values dCfg ovs')
-        ovsEv <- switchHold never (fst <$> res) >>= debounce 0.5
+        ovsEv <- switchHold never (fst <$> res)
+        ovsEvDebounced <- debounce 2 ovsEv
         isValid <- join <$> holdDyn (pure True) (snd <$> res)
-        pure (ovsDyn, isValid)
+        pure (ovsDyn, ovsDynDebounced, isValid)
 
   depKeysDyn <- holdDyn [] depKeys
-  (deploymentOvsDyn, depValidDyn) <- deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
+  (deploymentOvsDyn, deploymentOvsDynDebounced, depValidDyn) <-
+    deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
 
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
-  (applicationOvsDyn, appValidDyn) <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
+  (applicationOvsDyn, _, appValidDyn) <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
 
   pure $ do
     depValid <- depValidDyn
@@ -388,6 +391,7 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
               , deploymentOverrides = depCfg
               }
       else pure Nothing
+
 deploymentConfigProgressiveComponents ::
   MonadWidget t m =>
   RequestErrorHandler t m ->

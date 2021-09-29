@@ -84,6 +84,7 @@ data OverrideField t = OverrideField
 data OverrideFieldType
   = DefaultOverrideFieldType
   | EditedOverrideFieldType
+  deriving stock (Show)
 
 overrideFieldTypeClasses :: OverrideFieldType -> Classes
 overrideFieldTypeClasses DefaultOverrideFieldType = "input--default"
@@ -109,7 +110,7 @@ overrideField overrideKeyValues keyDyn valueDyn = do
         (pure [])
         (valueDyn ^. #fieldDisabled)
         ( do
-            t <- keyDyn ^. #fieldType
+            t <- valueDyn ^. #fieldType
             pure $ "overrides__value" <> overrideFieldTypeClasses t
         )
         "value"
