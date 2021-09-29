@@ -97,9 +97,9 @@ in
       failScript = pkgs.writeScript "fail.sh" ''
         #!${pkgs.bash}/bin/bash
 
-        1>&2 echo "You did something wrong :("
+        echo "You did something wrong :("
 
-        echo "You did something wrong, but you shouldn't see this."
+        1>&2 echo "You did something wrong, but you shouldn't see this."
 
         exit 1
       '';

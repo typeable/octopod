@@ -1109,11 +1109,11 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, Stderr err, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
+  (ec, Stdout out, _, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
-      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 err}
+      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 out}
 
 -- | Helper to create an application-level error.
 appError :: Text -> BSL.ByteString
