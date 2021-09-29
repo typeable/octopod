@@ -21,7 +21,7 @@ fn main() {
     info!("Generated Helm args: {:?}", &helm_values.args());
     match helm_values.run_stdout() {
         Ok(status) => {
-          print!("{}", print_keys(helm_values_as_keys(status)));
+            print!("{}", print_keys(helm_values_as_keys(status)));
         }
         Err(status) => {
             error!("Error during helm execution");

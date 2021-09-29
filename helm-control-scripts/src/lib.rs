@@ -9,7 +9,7 @@ pub mod lib {
     pub use serde::{Serialize, Deserialize};
     pub use serde_json::json;
     pub use std::error;
-    pub use yaml_rust::{YamlLoader, YamlEmitter};
+    pub use yaml_rust::{YamlLoader, YamlEmitter, Yaml};
     pub use k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
         networking::v1::Ingress,
@@ -759,7 +759,7 @@ pub mod lib {
                         }
                     }
                 },
-                None => continue
+                None => keys.push(format!("{}", doc.0.as_str().unwrap())),
             }
         }
         if keys.is_empty() {
