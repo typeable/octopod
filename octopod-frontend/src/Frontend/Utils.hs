@@ -344,7 +344,7 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDyn
+  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
   defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
   defDep <- holdDynMaybe defDepEv
   depKeys <- deploymentOverrideKeys pb >>= hReq
@@ -356,23 +356,26 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
         Dynamic t [Text] ->
         Dynamic t (Maybe (DefaultConfig l)) ->
         Overrides l ->
-        m (Dynamic t (Overrides l), Dynamic t Bool)
+        m (Dynamic t (Overrides l), Dynamic t (Overrides l), Dynamic t Bool)
       holdDCfg values dCfgDyn ovs = mdo
         ovsDyn <- holdDyn ovs ovsEv
+        ovsDynDebounced <- holdDyn ovs ovsEvDebounced
         x <- attachDyn (current ovsDyn) dCfgDyn
         res <- dyn (x <&> \(ovs', dCfg) -> envVarsInput values dCfg ovs')
-        ovsEv <- switchHold never (fst <$> res) >>= debounce 0.5
+        ovsEv <- switchHold never (fst <$> res)
+        ovsEvDebounced <- debounce 2 ovsEv
         isValid <- join <$> holdDyn (pure True) (snd <$> res)
-        pure (ovsDyn, isValid)
+        pure (ovsDyn, ovsDynDebounced, isValid)
 
   depKeysDyn <- holdDyn [] depKeys
-  (deploymentOvsDyn, depValidDyn) <- deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
+  (deploymentOvsDyn, deploymentOvsDynDebounced, depValidDyn) <-
+    deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
 
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
-  (applicationOvsDyn, appValidDyn) <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
+  (applicationOvsDyn, _, appValidDyn) <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
 
   pure $ do
     depValid <- depValidDyn
@@ -388,6 +391,7 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
               , deploymentOverrides = depCfg
               }
       else pure Nothing
+
 deploymentConfigProgressiveComponents ::
   MonadWidget t m =>
   RequestErrorHandler t m ->
@@ -520,7 +524,9 @@ validateWorkingOverrides ::
 validateWorkingOverrides overrides =
   let (result, keyOccurrences :: MonoidalMap Text (Sum Int)) =
         flip runState mempty $ forM overrides \override@(WorkingOverrideKey _ key, value') -> do
-          modify (<> MM.singleton key (Sum 1))
+          case value' of
+            WorkingDeletedValue _ -> pure ()
+            _ -> modify (<> MM.singleton key (Sum 1))
           pure . (override,) . mconcat $
             [ case MM.lookup key keyOccurrences of
                 Just (Sum n)
@@ -623,19 +629,17 @@ performUserOverrideAction f i (UpdateValue v) = Endo $
         Just v' | v == v' -> WorkingDefaultValue v
         _ -> WorkingCustomValue v
     )
-performUserOverrideAction f i (UpdateKey k) = Endo $ updateUniq i $ \(_, v) -> (WorkingOverrideKey t k, v)
-  where
-    t = case f >>= ($ k) of
-      Nothing -> CustomWorkingOverrideKey
-      Just _ -> DefaultWorkingOverrideKey
+performUserOverrideAction _ i (UpdateKey k) = Endo $
+  updateUniq i $
+    \(_, v) -> (WorkingOverrideKey CustomWorkingOverrideKey k, v)
 performUserOverrideAction f i DeleteOverride = Endo $ \m ->
   case f of
     Nothing -> updateUniq i (\(k, _) -> (k, WorkingDeletedValue Nothing)) m
-    Just f' -> case lookupUniq i m of
+    Just _ -> case lookupUniq i m of
       Nothing -> m
-      Just (WorkingOverrideKey _ k, _) -> case f' k of
-        Nothing -> deleteUniq i m
-        Just v -> updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (Just v))) m
+      Just (WorkingOverrideKey DefaultWorkingOverrideKey k, _) ->
+        updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (f >>= ($ k)))) m
+      Just (WorkingOverrideKey CustomWorkingOverrideKey _, _) -> deleteUniq i m
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
