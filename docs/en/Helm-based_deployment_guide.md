@@ -21,7 +21,7 @@ Click on the _New Deployment_ button:
 
 ### The config
 
-As you can see we filled some parameters for you - it's very convinient, because you don't want fill URL to your private helm repo over and over again, right?
+As you can see we filled some parameters for you ― it's very convinient, because you don't want fill URL to your private helm repo over and over again, right?
 
 All these parameters can be modified at the chart level, [here](../../charts/octopod/values.yaml#L90) is an example. Or you can, of course, override them manually from the Octopod UI.
 
