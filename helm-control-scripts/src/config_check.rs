@@ -2,7 +2,7 @@ use helm_control_scripts::lib::*;
 
 fn main() {
     let mut log_builder = Builder::from_default_env();
-    log_builder.target(Target::Stdout).filter(None, LevelFilter::Info).init();
+    log_builder.target(Target::Stderr).filter(None, LevelFilter::Info).init();
     info!("Utils version {}", env!("CARGO_PKG_VERSION"));
     let envs = EnvVars::parse();
     info!("Env variables received {:?}", &envs);
@@ -40,10 +40,16 @@ fn main() {
                 Some(images) => {
                     match check_images(images) {
                         Ok(_) => info!("Success!"),
-                        Err(err) => panic!("{}", err),
+                        Err(err) => {
+                            println!("Error checking images. Are they present in the registry?");
+                            panic!("{}", err);
+                        }
                     }
                 },
-                None => panic!("No images found!"),
+                None => {
+                    println!("No images found in pods' declarations");
+                    panic!("No images found!");
+                }
             }
         }
         Err(status) => {
