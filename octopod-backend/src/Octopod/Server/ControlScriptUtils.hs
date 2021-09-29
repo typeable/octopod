@@ -86,9 +86,6 @@ type GenericDeploymentCommandArgsNoConfig m r =
   ) =>
   m ControlScriptArgs
 
-unarchiveCommandArgs :: GenericDeploymentCommandArgs m r
-unarchiveCommandArgs = genericDeploymentCommandArgs
-
 genericDeploymentCommandArgsNoConfig :: GenericDeploymentCommandArgsNoConfig m r
 genericDeploymentCommandArgsNoConfig = do
   (Namespace namespace) <- asks getTyped
@@ -106,6 +103,9 @@ genericDeploymentCommandArgsNoConfig = do
 
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
+
+unarchiveCommandArgs :: GenericDeploymentCommandArgs m r
+unarchiveCommandArgs = genericDeploymentCommandArgs
 
 createCommandArgs :: GenericDeploymentCommandArgs m r
 createCommandArgs = genericDeploymentCommandArgs
