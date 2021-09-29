@@ -78,7 +78,7 @@ We believe that there is a lot to be gained in programming in general by being a
 
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
-<p align="center"><a href="https://typeable.io"><img src="img/typeable.png" width="177px"></img></a></p>
+<p align="center"><a href="https://typeable.io"><img src="img/typeable_logo.svg" width="177px"></img></a></p>
 
 [cs]: docs/en/Control_scripts.md
 [octo]: docs/en/Octo_user_guide.md
