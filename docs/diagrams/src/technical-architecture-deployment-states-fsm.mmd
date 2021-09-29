@@ -14,3 +14,4 @@ stateDiagram-v2
     UpdatePending --> Failure: 5m passed and 'check' said "nok"
     ArchivePending --> Archived: 30s passed and 'archive_check' said "ok"
     ArchivePending --> ArchivePending: 30s passed and 'archive_check' said "nok"
+    Archived --> CleanupFailed

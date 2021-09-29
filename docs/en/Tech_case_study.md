@@ -1,20 +1,5 @@
 # Octopod technical case study
 
-<details>
-  <summary>Table of contents</summary>
-
-- [Single staging model](#single-staging-model)
-- [The multi-staging model](#the-multi-staging-model)
-- [Implications](#implications)
-  - [Isolation – separate configurations](#isolation--separate-configurations)
-  - [Isolation – more information](#isolation--more-information)
-  - [Isolation – independent state](#isolation--independent-state)
-  - [Isolation – freedom to experiment](#isolation--freedom-to-experiment)
-  - [Infrastructure reuse](#infrastructure-reuse)
-  - [Continuous staging deployment](#continuous-staging-deployment)
-
-</details>
-
 In this case study, we consider developing a system that is mostly comprised of a server.
 
 ## Single staging model
