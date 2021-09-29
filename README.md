@@ -23,13 +23,13 @@ We created _Octopod_ because we believe that everything we release should be rig
 - [🧑‍💻 Technical case study](docs/en/Tech_case_study.md)
 
 ### 🛠️ Technical documentation
-- [🏗 Technical architecture](docs/en/Technical_architecture.md) [[RU](docs/ru/Technical_architecture.md)]
-- [⚙️ Control script guide][cs] [[RU](docs/ru/Control_scripts.md)]
-- [🔧🐙 Octopod deployment guide](docs/en/Octopod_deployment_guide.md) [[RU](docs/ru/Octopod_deployment_with_K8S.md)]
-- [🔧🚀 Helm-based Octopod project setup](docs/en/Helm-based_deployment_guide.md) [[RU](docs/ru/Helm-based_deployment_guide.md)]
-- [🐙🎛 octo CLI user guide][octo]  [[RU](docs/ru/Octo_user_guide.md)]
+- [🏗 Technical architecture](docs/en/Technical_architecture.md)
+- [⚙️ Control script guide][cs]
+- [🔧🐙 Octopod deployment guide](docs/en/Octopod_deployment_guide.md)
+- [🔧🚀 Helm-based Octopod project setup](docs/en/Helm-based_deployment_guide.md)
+- [🐙🎛 octo CLI user guide][octo]
 - [🤖 CI integration](docs/en/Integration.md)
-- [🔒 Octopod security model](docs/en/Security_model.md)  [[RU](docs/ru/Security_model.md)]
+- [🔒 Octopod security model](docs/en/Security_model.md)
 
 ## ℹ️ FAQ
 
