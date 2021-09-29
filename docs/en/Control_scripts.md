@@ -229,7 +229,7 @@ The script might be called something like this:
 notification --project-name "Cactus store" --base-domain "cactus-store.com" --namespace "cactus" --name "orange-button" --old-status "UpdatePending" --new-status "Running"
 ```
 
-### 🎛🛠️ deployment_config
+### 🎛🔧 deployment_config
 
 #### Description
 
@@ -250,7 +250,7 @@ echo "image.tag,"
 echo "application_api_version,1.0"
 ```
 
-### 🎛🛠️🔑 deployment_config_keys
+### 🎛🔧🔑 deployment_config_keys
 
 #### Description
 

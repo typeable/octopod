@@ -105,7 +105,7 @@ helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
 
 _Update_ – updates an existing deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional configurations. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-update).
 
-[_configurations_](Overview.md#configurations) are read from the database and merged with the new changes. All arguments are forwarded to the [_update_](Control_scripts.md#-update) script which in turn updates the specified deployment with the new parameters in the _Kubernetes cluster_. It might call something like:
+_configurations_ are read from the database and merged with the new changes. All arguments are forwarded to the [_update_](Control_scripts.md#-update) script which in turn updates the specified deployment with the new parameters in the _Kubernetes cluster_. It might call something like:
 
 ```bash
 helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
@@ -192,7 +192,7 @@ _restore_ – restores an archived deployment in the state it was last in. Calls
 
 The main argument is the name that identifies the deployment. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create). It can only be called after [_archive_](#-archive) has been executed.
 
-All necessary setup information is read from the database: [_configurations_](Overview.md#configurations) and the _Docker Image tag_. The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn recreates the deployment. It might call something like:
+All necessary setup information is read from the database: _configurations_ and the _Docker Image tag_. The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn recreates the deployment. It might call something like:
 
 ```bash
 helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
