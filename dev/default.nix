@@ -97,9 +97,9 @@ in
       failScript = pkgs.writeScript "fail.sh" ''
         #!${pkgs.bash}/bin/bash
 
-        1>&2 echo "You did something wrong :("
+        echo "You did something wrong :("
 
-        echo "You did something wrong, but you shouldn't see this."
+        1>&2 echo "You did something wrong, but you shouldn't see this."
 
         exit 1
       '';
@@ -144,9 +144,9 @@ in
         export CONFIG_CHECKING_COMMAND=${echoScript}
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
-        export DEPLOYMENT_OVERRIDES_COMMAND=${infoScript}
+        export DEPLOYMENT_CONFIG_COMMAND=${infoScript}
         export DEPLOYMENT_KEYS_COMMAND=${infoScript}
-        export APPLICATION_OVERRIDES_COMMAND=${infoScript}
+        export APPLICATION_CONFIG_COMMAND=${infoScript}
         export APPLICATION_KEYS_COMMAND=${infoScript}
         export UNARCHIVE_COMMAND=${writeScript}
         export POWER_AUTHORIZATION_HEADER="123"

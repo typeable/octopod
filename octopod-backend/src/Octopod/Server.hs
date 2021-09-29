@@ -187,9 +187,9 @@ runOctopodServer sha = do
   archiveCheckingCmd <- Command . pack <$> getEnvOrDie "ARCHIVE_CHECKING_COMMAND"
   tagCheckingCmd <- Command . pack <$> getEnvOrDie "CONFIG_CHECKING_COMMAND"
   infoCmd <- Command . pack <$> getEnvOrDie "INFO_COMMAND"
-  dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_OVERRIDES_COMMAND"
+  dOverridesCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_CONFIG_COMMAND"
   dKeysCmd <- Command . pack <$> getEnvOrDie "DEPLOYMENT_KEYS_COMMAND"
-  aOverridesCmd <- Command . pack <$> getEnvOrDie "APPLICATION_OVERRIDES_COMMAND"
+  aOverridesCmd <- Command . pack <$> getEnvOrDie "APPLICATION_CONFIG_COMMAND"
   aKeysCmd <- Command . pack <$> getEnvOrDie "APPLICATION_KEYS_COMMAND"
   unarchiveCmd <- Command . pack <$> getEnvOrDie "UNARCHIVE_COMMAND"
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
@@ -1109,11 +1109,11 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, _, Stderr err, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
+  (ec, Stdout out, _, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
-      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 err}
+      throwError err400 {errBody = BSL.fromStrict $ T.encodeUtf8 out}
 
 -- | Helper to create an application-level error.
 appError :: Text -> BSL.ByteString
