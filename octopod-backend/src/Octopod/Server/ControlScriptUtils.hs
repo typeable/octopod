@@ -255,5 +255,5 @@ overridesArgs (Config cc) =
     $ cc
   where
     argumentName = case knownOverrideLevel @l of
-      ApplicationLevel -> "--app-env-override"
-      DeploymentLevel -> "--deployment-override"
+      ApplicationLevel -> "--application-config"
+      DeploymentLevel -> "--deployment-config"
