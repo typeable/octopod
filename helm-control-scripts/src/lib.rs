@@ -40,9 +40,9 @@ pub mod lib {
         #[structopt(long)]
         pub tag: Option<String>,
         #[structopt(long)]
-        pub app_env_override: Vec<String>,
+        pub application_config: Vec<String>,
         #[structopt(long)]
-        pub deployment_override: Vec<String>,
+        pub deployment_config: Vec<String>,
     }
     
     #[derive(Deserialize, Debug)]
@@ -135,7 +135,7 @@ pub mod lib {
             let mut deployment_parameters = Self::default();
             deployment_parameters.chart_repo_user = envs.helm_user.clone();
             deployment_parameters.chart_repo_pass = envs.helm_pass.clone();
-            for deployment_override in cli_opts.deployment_override.clone().into_iter() {
+            for deployment_override in cli_opts.deployment_config.clone().into_iter() {
                 let split_override = deployment_override.split('=').collect::<Vec<_>>();
                 match split_override.first().unwrap().as_ref() {
                     "chart_repo_url" => deployment_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
@@ -289,7 +289,7 @@ pub mod lib {
     }
     pub fn overrides(cli_opts: &CliOpts, envs: &EnvVars) -> Option<Vec<String>> {
         let mut overrides_opts = Vec::new();
-        overrides_opts.extend(&cli_opts.app_env_override);
+        overrides_opts.extend(&cli_opts.application_config);
         let ingress_override = match &envs.ingress_host_key {
             Some(key) => format!("{}={}", &key, domain_name(&cli_opts)),
             None => format!("ingress.hostname={}", domain_name(&cli_opts)),
