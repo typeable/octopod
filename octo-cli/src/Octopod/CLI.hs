@@ -265,10 +265,10 @@ printInfo :: DeploymentInfo -> IO ()
 printInfo (DeploymentInfo (Deployment _ dAppOvs dStOvs) (DeploymentMetadata dMeta) dLogs) = do
   T.putStrLn "Current settings:"
   T.putStrLn $
-    "application overrides: "
+    "application config: "
       <> formatOverrides dAppOvs
   T.putStrLn $
-    "deployment overrides: "
+    "deployment config: "
       <> formatOverrides dStOvs
   T.putStrLn $ "metadata: "
   forM_ dMeta $ \m ->
@@ -295,9 +295,8 @@ ppDeploymentLogs ds =
           [ "Created at"
           , "Action id"
           , "Action"
-          , "Tag"
-          , "App overrides"
-          , "Deployment overrides"
+          , "App config"
+          , "Deployment config"
           , "Exit code"
           ]
       )
