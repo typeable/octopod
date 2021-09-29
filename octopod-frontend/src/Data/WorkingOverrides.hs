@@ -47,7 +47,12 @@ data WorkingOverrideValue' te
 destructWorkingOverrides :: WorkingOverrides -> Overrides l
 destructWorkingOverrides =
   Overrides
-    . OM.fromList
+    . foldr
+      ( \pair@(k, v) m -> case OM.lookup k m of
+          Just _ | v == ValueDeleted -> m
+          _ -> m OM.|> pair
+      )
+      OM.empty
     . mapMaybe
       ( \case
           (WorkingOverrideKey CustomWorkingOverrideKey k, getWorkingOverrideValue -> v) -> Just (k, v)

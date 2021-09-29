@@ -115,6 +115,17 @@ in
         exit 0
       '';
 
+      keysScript = pkgs.writeScript "keys.sh" ''
+        #!${pkgs.bash}/bin/bash
+
+        sleep 4
+
+        echo "key"
+        echo "key2"
+
+        exit 0
+      '';
+
       writeScript = pkgs.writeScript "write.sh" ''
         #!${pkgs.bash}/bin/bash
 
@@ -145,9 +156,9 @@ in
         export INFO_COMMAND=${infoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_CONFIG_COMMAND=${infoScript}
-        export DEPLOYMENT_KEYS_COMMAND=${infoScript}
+        export DEPLOYMENT_KEYS_COMMAND=${keysScript}
         export APPLICATION_CONFIG_COMMAND=${infoScript}
-        export APPLICATION_KEYS_COMMAND=${infoScript}
+        export APPLICATION_KEYS_COMMAND=${keysScript}
         export UNARCHIVE_COMMAND=${writeScript}
         export POWER_AUTHORIZATION_HEADER="123"
         export CACHE_INVALIDATION_TIME="60"
