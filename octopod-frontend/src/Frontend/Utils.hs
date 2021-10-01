@@ -369,13 +369,13 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
 
   depKeysDyn <- holdDyn [] depKeys
   (deploymentOvsDyn, deploymentOvsDynDebounced, depValidDyn) <-
-    deploymentSection "Deployment overrides" $ holdDCfg depKeysDyn defDep defDepOv
+    deploymentSection "Deployment configuration" $ holdDCfg depKeysDyn defDep defDepOv
 
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
-  (applicationOvsDyn, _, appValidDyn) <- deploymentSection "App overrides" $ holdDCfg appKeysDyn defAppM defAppOv
+  (applicationOvsDyn, _, appValidDyn) <- deploymentSection "App configuration" $ holdDCfg appKeysDyn defAppM defAppOv
 
   pure $ do
     depValid <- depValidDyn

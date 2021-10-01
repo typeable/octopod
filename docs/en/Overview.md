@@ -1,22 +1,5 @@
 # Octopod overview
 
-<details>
-  <summary>Table of contents</summary>
-
-- [Intro](#intro)
-- [🎯 The aim of Octopod](#-the-aim-of-octopod)
-- [🔬 Example](#-example)
-  - [💽 The server](#-the-server)
-  - [🎨 Changing button colors](#-changing-button-colors)
-  - [😖 Why have such a complicated staging deployment?](#-why-have-such-a-complicated-staging-deployment)
-- [🛠 The way Octopod is set up](#-the-way-octopod-is-set-up)
-- [🎛️ CLI](#️-cli)
-- [🔒 Authentication in the UI](#-authentication-in-the-ui)
-- [🤖 Automatic deployment / CD](#-automatic-deployment--cd)
-- [📗 Glossary](#-glossary)
-
-</details>
-
 **NOTE: it is not recommended to use Octopod for managing production environments**
 
 ## Intro
@@ -95,4 +78,3 @@ Fot more information see the [integration guide](Integration.md).
 - _Octopod Server_ ― the server responsible for managing deployments
 - _deployment control scripts_ ― scripts used to interact with your specific environment setup
 - _web UI_ ― the interface developers, project managers, QA engineers, etc. use to manage stagings.
-- <a id="overrides"></a>_overrides_ ― a set of environment variable key-value pairs, which have precedence over the default pairs set up by DevOps engineer. These environment variables are passed to your system during deployment.

@@ -1,51 +1,5 @@
 # Octo CLI User Guide
 
-<details>
-  <summary>Table of contents</summary>
-
-- [Environment variables](#environment-variables)
-  - [`OCTOPOD_URL`](#octopod_url)
-  - [`TLS_CERT_PATH` and `TLS_KEY_PATH`](#tls_cert_path-and-tls_key_path)
-- [Commands](#commands)
-  - [create](#create)
-    - [Description](#description)
-    - [Options](#options)
-    - [Usage example](#usage-example)
-  - [list](#list)
-    - [Description](#description-1)
-    - [Options](#options-1)
-    - [Usage example](#usage-example-1)
-  - [archive](#archive)
-    - [Description](#description-2)
-    - [Options](#options-2)
-    - [Usage example](#usage-example-2)
-  - [update](#update)
-    - [Description](#description-3)
-    - [Options](#options-3)
-    - [Usage example](#usage-example-3)
-  - [info](#info)
-    - [Description](#description-4)
-    - [Options](#options-4)
-    - [Usage example](#usage-example-4)
-  - [cleanup](#cleanup)
-    - [Description](#description-5)
-    - [Options](#options-5)
-    - [Usage example](#usage-example-5)
-  - [restore](#restore)
-    - [Description](#description-6)
-    - [Options](#options-6)
-    - [Usage example](#usage-example-6)
-  - [clean-archive](#clean-archive)
-    - [Description](#description-7)
-    - [Options](#options-7)
-    - [Usage example](#usage-example-7)
-  - [logs](#logs)
-    - [Description](#description-8)
-    - [Options](#options-8)
-    - [Usage example](#usage-example-8)
-
-</details>
-
 ## Environment variables
 
 All commands _octo CLI_ executes require the executable to send authenticated requests to the _Octopod Server_. For this purpose _octo CLI_ needs both a way to reach your particular instance of _Octopod Server_, and a way for _Octopod Server_ to identify that you are allowed to make the given request.
@@ -76,8 +30,8 @@ Creates a new deployment.
 
 - `-n,--name ARG` – The name of the deployment to create
 - `-t,--tag ARG` – The _Docker tag_ to deploy
-- `-e,--set-app-env-override ARG` [⭐](#star) – Set an application-level override. Expects a string in the format `KEY=VALUE`.
-- `-o,--set-deployment-override ARG` [⭐](#star) – Set a deployment-level override. Expects a string in the format `KEY=VALUE`.
+- `-e,--set-app-config ARG` [⭐](#star) – Set an application-level configuration. Expects a string in the format `KEY=VALUE`.
+- `-o,--set-deployment-config ARG` [⭐](#star) – Set a deployment-level configuration. Expects a string in the format `KEY=VALUE`.
 
 #### Usage example
 
@@ -130,10 +84,10 @@ Updates the parameters of a given deployment.
 
 - `-n,--name ARG` – The name of the deployment to update
 - `-t,--tag ARG` – The new _Docker tag_ to update the deployment to
-- `-e,--set-app-env-override ARG` [⭐](#star) – Add a new or replace an existing application-level override. Expects a string in the format `KEY=VALUE`.
-- `-E,--unset-app-env-override ARG` [⭐](#star) – Removes an existing application-level override.
-- `-o,--set-deployment-override ARG` [⭐](#star) – Add a new or replace an existing deployment-level override. Expects a string in the format `KEY=VALUE`.
-- `-O,--unset-deployment-override` [⭐](#star) – Removes an existing deployment-level override.
+- `-e,--set-app-config ARG` [⭐](#star) – Add a new or replace an existing application-level configuration. Expects a string in the format `KEY=VALUE`.
+- `-E,--unset-app-env-configuration ARG` [⭐](#star) – Removes an existing application-level configuration.
+- `-o,--set-deployment-config ARG` [⭐](#star) – Add a new or replace an existing deployment-level configuration. Expects a string in the format `KEY=VALUE`.
+- `-O,--unset-deployment-configuration` [⭐](#star) – Removes an existing deployment-level configuration.
 
 #### Usage example
 
@@ -157,21 +111,21 @@ Gets detailed information about a deployment, including a log of all preformed a
 $ octo info -n hello-octopod
 Current settings:
 tag: v1
-application overrides: app=1 (Public)
+application configurations: app=1 (Public)
 
-deployment overrides: dep=2 (Public)
+deployment configurations: dep=2 (Public)
 
 metadata:
   app: https://ree.lvh.me
 
 Last logs:
-┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓
-┃     Created at      ┃ Action id ┃ Action ┃ Tag ┃ App overrides  ┃ Deployment overrides ┃ Exit code ┃
-┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩
-│ 2020-11-02T17:14:03 │     7     │ create │ v1  │ app=1 (Public) │ dep=2 (Public)       │     1     │
-├─────────────────────┼───────────┼────────┼─────┼────────────────┼──────────────────────┼───────────┤
-│ 2020-11-02T19:01:02 │     8     │ update │ v1  │ app=1 (Public) │ dep=2 (Public)       │     1     │
-└─────────────────────┴───────────┴────────┴─────┴────────────────┴──────────────────────┴───────────┘
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓
+┃     Created at      ┃ Action id ┃ Action ┃ App configurations  ┃ Deployment configurations ┃ Exit code ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩
+│ 2020-11-02T17:14:03 │     7     │ create │ app=1 (Public) │ dep=2 (Public)       │     1     │
+├─────────────────────┼───────────┼────────┼────────────────┼──────────────────────┼───────────┤
+│ 2020-11-02T19:01:02 │     8     │ update │ app=1 (Public) │ dep=2 (Public)       │     1     │
+└─────────────────────┴───────────┴────────┴────────────────┴──────────────────────┴───────────┘
 ```
 
 ### cleanup
@@ -205,13 +159,6 @@ Restores a previously archived deployment.
 ```bash
 $ octo restore -n hello-octopod
 ```
-
-### clean-archive
-
-#### Description
-
-Calls `octo cleanup` on all deployments that were archived more than two weeks ago. This command is used in a cronjob which is automatically set up when deploying _Octopod Server_.
-
 #### Options
 
 This command does not have any options.
@@ -242,10 +189,10 @@ $ octo logs -a 13
 
 		stderr:
 
-error: Found argument '--deployment-override' which wasn't expected, or isn't valid in this context
+error: Found argument '--deployment-configuration' which wasn't expected, or isn't valid in this context
 
 USAGE:
-    update --app-env-override <app-env-override>... --base-domain <base-domain> --name <name> --namespace <namespace> --project-name <project-name> --tag <tag>
+    update --app-env-configuration <app-env-configuration>... --base-domain <base-domain> --name <name> --namespace <namespace> --project-name <project-name> --tag <tag>
 
 For more information try --help
 ```

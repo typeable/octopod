@@ -5,6 +5,8 @@
 --This module contains control script utils.
 module Octopod.Server.ControlScriptUtils
   ( infoCommandArgs,
+    createCommandArgs,
+    updateCommandArgs,
     archiveCommandArgs,
     unarchiveCommandArgs,
     cleanupCommandArgs,
@@ -84,9 +86,6 @@ type GenericDeploymentCommandArgsNoConfig m r =
   ) =>
   m ControlScriptArgs
 
-unarchiveCommandArgs :: GenericDeploymentCommandArgs m r
-unarchiveCommandArgs = genericDeploymentCommandArgs
-
 genericDeploymentCommandArgsNoConfig :: GenericDeploymentCommandArgsNoConfig m r
 genericDeploymentCommandArgsNoConfig = do
   (Namespace namespace) <- asks getTyped
@@ -104,6 +103,15 @@ genericDeploymentCommandArgsNoConfig = do
 
 infoCommandArgs :: GenericDeploymentCommandArgs m r
 infoCommandArgs = genericDeploymentCommandArgs
+
+unarchiveCommandArgs :: GenericDeploymentCommandArgs m r
+unarchiveCommandArgs = genericDeploymentCommandArgs
+
+createCommandArgs :: GenericDeploymentCommandArgs m r
+createCommandArgs = genericDeploymentCommandArgs
+
+updateCommandArgs :: GenericDeploymentCommandArgs m r
+updateCommandArgs = genericDeploymentCommandArgs
 
 archiveCommandArgs :: GenericDeploymentCommandArgs m r
 archiveCommandArgs = genericDeploymentCommandArgs

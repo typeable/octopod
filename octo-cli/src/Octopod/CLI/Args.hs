@@ -90,14 +90,14 @@ createArgs =
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
     <*> many
       ( strOption
-          ( long "set-app-env-override"
+          ( long "set-app-config"
               <> short 'e'
               <> help "set application level override"
           )
       )
     <*> many
       ( strOption
-          ( long "set-deployment-override"
+          ( long "set-deployment-config"
               <> short 'o'
               <> help "set deployment level override"
           )
@@ -121,7 +121,7 @@ updateArgs =
     <$> strOption (long "name" <> short 'n' <> help "deployment name")
     <*> many
       ( strOption
-          ( long "set-app-env-override"
+          ( long "set-app-config"
               <> short 'e'
               <> help "set application level override"
           )
@@ -135,7 +135,7 @@ updateArgs =
       )
     <*> many
       ( strOption
-          ( long "set-deployment-override"
+          ( long "set-deployment-config"
               <> short 'o'
               <> help "set deployment level override"
           )

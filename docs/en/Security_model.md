@@ -1,16 +1,5 @@
 # Security model
 
-<details>
-  <summary>Table of contents</summary>
-
-- [Octopod roles](#octopod-roles)
-- [Kubernetes role-based access control](#kubernetes-role-based-access-control)
-- [Web UI authentication](#web-ui-authentication)
-- [Web UI OAuth](#web-ui-oauth)
-- [octo CLI authentication](#octo-cli-authentication)
-
-</details>
-
 ## Octopod roles
 
 There are two user roles in _Octopod_:
