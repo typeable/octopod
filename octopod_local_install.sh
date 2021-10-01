@@ -50,7 +50,7 @@ nodes:
     hostPort: 443
     protocol: TCP
 EOF
-cat <<EOF | kubectl apply -f -
+cat <<EOF | kubectl --context=kind-octopod apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -80,9 +80,9 @@ data:
     }
 EOF
 message "Installing ingress-nginx controller"
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.45.0/deploy/static/provider/kind/deploy.yaml
+kubectl --context=kind-octopod apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.45.0/deploy/static/provider/kind/deploy.yaml
 while true; do
-        if [ $(kubectl -n ingress-nginx get deploy | awk -F ' ' '$1 ~ /^ingress-nginx/ {print $4}') == '1' ]; then
+        if [ $(kubectl --context=kind-octopod -n ingress-nginx get deploy | awk -F ' ' '$1 ~ /^ingress-nginx/ {print $4}') == '1' ]; then
                 message 'ingress-controller is ready'
                 break;
         else
@@ -90,12 +90,12 @@ while true; do
         fi
 done
 message "Creating nessesary namespaces"
-kubectl create ns octopod
-kubectl create ns octopod-deployment
+kubectl --context=kind-octopod create ns octopod
+kubectl --context=kind-octopod create ns octopod-deployment
 message "Adding typeable helm repository"
 helm repo add typeable https://typeable.github.io/octopod
 helm repo update
 message "Installing octopod helm chart"
-helm -n octopod install octopod typeable/octopod --wait --timeout=5m --set octopod.baseDomain="lvh.me" --set ingress.tls.enabled=false
+helm --kube-context=kind-octopod -n octopod install octopod typeable/octopod --wait --timeout=5m --set octopod.baseDomain="lvh.me" --set ingress.tls.enabled=false
 message "Octopod was successfully installed! Use instruction above to connect to it."
 message "To uninstall octopod just run: kind delete cluster --name octopod"
