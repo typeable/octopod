@@ -80,7 +80,6 @@ pub mod lib {
     pub struct DefaultValues {
         pub default_overrides: Vec<String>,
         pub chart_repo_url: String,
-        pub chart_repo_name: String,
         pub chart_version: String,
         pub chart_name: String,
     }
@@ -101,7 +100,6 @@ pub mod lib {
         pub fn deployment_overrides(&self) -> Vec<(String,String)> {
             vec![
                 (String::from("chart_repo_url"), self.chart_repo_url.clone()),
-                (String::from("chart_repo_name"), self.chart_repo_name.clone()),
                 (String::from("chart_version"), self.chart_version.clone()),
                 (String::from("chart_name"), self.chart_name.clone()),
             ]   
@@ -109,7 +107,6 @@ pub mod lib {
         pub fn deployment_keys(&self) -> Vec<String> {
             let mut keys: Vec<String> = vec![
                 String::from("chart_repo_url"),
-                String::from("chart_repo_name"),
                 String::from("chart_version"),
                 String::from("chart_name"),
                 String::from("chart_repo_user"),
@@ -123,7 +120,6 @@ pub mod lib {
     #[derive(Debug, Clone, Default)]
     pub struct HelmDeploymentParameters {
         pub chart_repo_url: String,
-        pub chart_repo_name: String,
         pub chart_repo_user: String,
         pub chart_repo_pass: String,
         pub chart_version: String,
@@ -139,7 +135,6 @@ pub mod lib {
                 let split_override = deployment_override.split('=').collect::<Vec<_>>();
                 match split_override.first().unwrap().as_ref() {
                     "chart_repo_url" => deployment_parameters.chart_repo_url = split_override.last().unwrap().to_string(),
-                    "chart_repo_name" => deployment_parameters.chart_repo_name = split_override.last().unwrap().to_string(),
                     "chart_version" => deployment_parameters.chart_version = split_override.last().unwrap().to_string(),
                     "chart_name" => deployment_parameters.chart_name = split_override.last().unwrap().to_string(),
                     "chart_repo_user" => deployment_parameters.chart_repo_user = split_override.last().unwrap().to_string(),
@@ -152,7 +147,6 @@ pub mod lib {
         pub fn new_env_only(default_values: &DefaultValues, envs: &EnvVars) -> Self {
             Self {
                 chart_repo_url:  default_values.chart_repo_url.clone(),
-                chart_repo_name: default_values.chart_repo_name.clone(),
                 chart_repo_user: envs.helm_user.clone(),
                 chart_repo_pass: envs.helm_pass.clone(),
                 chart_version: default_values.chart_version.clone(),
@@ -171,66 +165,67 @@ pub mod lib {
     
     impl HelmCmd {
        pub fn args(&self) -> Vec<String> {
-            let mut args: Vec<String> = Vec::new();
-            let chart_location = format!("{}/{}", self.deployment_parameters.chart_repo_name, self.deployment_parameters.chart_name);
-            let chart_version = vec![String::from("--version"), self.deployment_parameters.chart_version.clone()];
-            let namespace = vec![String::from("-n"), String::from(&self.namespace),];
-            let common_args = vec![
-                String::from("--debug"),
-            ];
-            match self.mode {
-                HelmMode::Uninstall => {
-                    args.extend(namespace);
-                    args.push(String::from("uninstall"));
-                    args.push(String::from(&self.release_name));
-                },
-                HelmMode::UpgradeInstall => {
-                    args.extend(namespace);
-                    args.push(String::from("upgrade"));
-                    args.push(String::from("-i"));
-                    args.push(String::from(&self.release_name));
-                    args.push(chart_location);
-                    args.extend(chart_version);
-                    args.extend(self.set_flag_values());
-                    args.extend(common_args);
-                },
-                HelmMode::Template => {
-                    args.extend(namespace);
-                    args.push(String::from("template"));
-                    args.push(String::from(&self.release_name));
-                    args.push(chart_location);
-                    args.extend(chart_version);
-                    args.extend(self.set_flag_values());
-                },
-                HelmMode::ShowValues => {
-                    args.extend(namespace);
-                    args.push(String::from("show"));
-                    args.push(String::from("values"));
-                    args.push(chart_location);
-                    args.extend(chart_version);
-                },
-                HelmMode::RepoAdd => {
-                    args.push(String::from("repo"));
-                    args.push(String::from("add"));
-                    args.push(String::from("--force-update"));
-                    args.push(String::from(&self.deployment_parameters.chart_repo_name));
-                    args.push(String::from(&self.deployment_parameters.chart_repo_url));
-                    args.extend(vec![String::from("--username"), String::from(&self.deployment_parameters.chart_repo_user)]);
-                    args.extend(vec![String::from("--password"), String::from(&self.deployment_parameters.chart_repo_pass)]);
-                },
-                HelmMode::RepoUpdate => {
-                    args.push(String::from("repo"));
-                    args.push(String::from("update"));
-                },
-                HelmMode::RepoList => {
-                    args.push(String::from("repo"));
-                    args.push(String::from("list"));
-                    args.push(String::from("-o"));
-                    args.push(String::from("json"));
-                },
-            }
+           let mut args: Vec<String> = Vec::new();
+           let chart_repo_name = url_to_name(&self.deployment_parameters.chart_repo_url);
+           let chart_location = format!("{}/{}", chart_repo_name, self.deployment_parameters.chart_name);
+           let chart_version = vec![String::from("--version"), self.deployment_parameters.chart_version.clone()];
+           let namespace = vec![String::from("-n"), String::from(&self.namespace),];
+           let common_args = vec![
+               String::from("--debug"),
+           ];
+           match self.mode {
+               HelmMode::Uninstall => {
+                   args.extend(namespace);
+                   args.push(String::from("uninstall"));
+                   args.push(String::from(&self.release_name));
+               },
+               HelmMode::UpgradeInstall => {
+                   args.extend(namespace);
+                   args.push(String::from("upgrade"));
+                   args.push(String::from("-i"));
+                   args.push(String::from(&self.release_name));
+                   args.push(chart_location);
+                   args.extend(chart_version);
+                   args.extend(self.set_flag_values());
+                   args.extend(common_args);
+               },
+               HelmMode::Template => {
+                   args.extend(namespace);
+                   args.push(String::from("template"));
+                   args.push(String::from(&self.release_name));
+                   args.push(chart_location);
+                   args.extend(chart_version);
+                   args.extend(self.set_flag_values());
+               },
+               HelmMode::ShowValues => {
+                   args.extend(namespace);
+                   args.push(String::from("show"));
+                   args.push(String::from("values"));
+                   args.push(chart_location);
+                   args.extend(chart_version);
+               },
+               HelmMode::RepoAdd => {
+                   args.push(String::from("repo"));
+                   args.push(String::from("add"));
+                   args.push(String::from("--force-update"));
+                   args.push(String::from(&chart_repo_name));
+                   args.push(String::from(&self.deployment_parameters.chart_repo_url));
+                   args.extend(vec![String::from("--username"), String::from(&self.deployment_parameters.chart_repo_user)]);
+                   args.extend(vec![String::from("--password"), String::from(&self.deployment_parameters.chart_repo_pass)]);
+               },
+               HelmMode::RepoUpdate => {
+                   args.push(String::from("repo"));
+                   args.push(String::from("update"));
+               },
+               HelmMode::RepoList => {
+                   args.push(String::from("repo"));
+                   args.push(String::from("list"));
+                   args.push(String::from("-o"));
+                   args.push(String::from("json"));
+               },
+           }
     
-            return args;
+           return args;
         }
         fn set_flag_values(&self) -> Vec<String> {
             let mut values = Vec::new();
@@ -707,7 +702,7 @@ pub mod lib {
 
     fn helm_repo_exists(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) -> bool {
         let chart_repo_url = String::from(&deployment_parameters.chart_repo_url);
-        let chart_repo_name = String::from(&deployment_parameters.chart_repo_name);
+        let chart_repo_name = url_to_name(&deployment_parameters.chart_repo_url);
         let helm_repo_list = HelmCmd {
             name: String::from(&envs.helm_bin),
             mode: HelmMode::RepoList,
@@ -896,5 +891,10 @@ pub mod lib {
         let api: Api<Secret> = Api::namespaced(client, &namespace);
         api.delete(&secret, &DeleteParams::default()).await?;
         Ok(())
+    }
+    fn url_to_name(url: &str) -> String {
+        let re_not_letters = Regex::new(r"\W").unwrap();
+        let name: String = re_not_letters.replace_all(url, "-").to_string();
+        return name;
     }
 }
