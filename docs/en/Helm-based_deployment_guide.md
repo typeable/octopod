@@ -21,24 +21,21 @@ Click on the _New Deployment_ button:
 
 ### The config
 
-Here you can fill your deployment parameters. Let's have it filled up!
+As you can see we filled some parameters for you ― it's very convinient, because you don't want fill URL to your private helm repo over and over again, right?
+
+All these parameters can be modified at the chart level, [here](../../charts/octopod/values.yaml#L90) is an example. Or you can, of course, override them manually from the Octopod UI.
+
+One thing is left to fill, though.
 
 ![](../images/octopod_deployment_filled.png)
 
 **Name** ― we've chosen `wordpress`, but you can choose whatever name you like.
 
-**Tag** ― `5.8.0`. We took the tag name from [chart parameters](https://github.com/bitnami/charts/blob/master/bitnami/wordpress/Chart.yaml#L4)
+Octopod loads all overrides from the [chart values](https://github.com/bitnami/charts/blob/master/bitnami/wordpress/values.yaml) dynamically for each chart you want to deploy.
 
-**App Overrides:**
+Try to add new App override to see list of available keys for the wordpress chart.
 
-
-|                Key | Value              |
-| -----------------: | ------------------ |
-|  `ingress.enabled` | `true`             |
-| `ingress.hostname` | `wordpress.lvh.me` |
-
-
-We took these overrides from the [chart documentation](https://github.com/bitnami/charts/tree/master/bitnami/wordpress#traffic-exposure-parameters). Basically you can tweak any parameters from there.
+![](../images/octopod_app_keys_list.png)
 
 ### Deploy
 
@@ -52,9 +49,7 @@ So here you have it, your first Octopod deployment!
 
 ## Going further
 
-Right now you may be wondering, how did Octopod take wordpress from the bitnami repository when we haven't filled any repo information whatsoever? This is because we've set this up on the chart level [here](../../charts/octopod/values.yaml#L90).
-
-You can override all of this using deployment overrides. Let's dive right in!
+As we can said earlier you can override all default parameters using Octopod UI. Let's dive right in!
 
 First, let's archive our wordpress deployment:
 
@@ -67,8 +62,6 @@ And create one more deployment, this time using a different set of overrides:
 ![](../images/octopod_in_octopod_deployment.png)
 
 **Name:** octopod-internal
-
-**Tag:** 1.3.1
 
 **App Overrides:**
 
@@ -83,11 +76,15 @@ And create one more deployment, this time using a different set of overrides:
 |               Key | Value                                 |
 | ----------------: | ------------------------------------- |
 |      `chart_name` | `octopod`                             |
-| `chart_repo_name` | `typeable`                            |
 |  `chart_repo_url` | `https://typeable.github.io/octopod/` |
-|   `chart_version` | `0.5.1`                               |
+|   `chart_version` | `0.6.0`                               |
 
+## Where can I get these values?
 
-As in the previous example we took the _App Overrides_ from the [chart documentation](../../charts/octopod/README.md#Parameters), but the _Deployment Overrides_ are passed as configuration to the control scripts. You can read more about these parameters in the [control script docs](../../helm-control-scripts/README.md).
+As in the previous example Octopod parsed the _App Overrides_ from the [chart values](../../charts/octopod/values.yaml), but the _Deployment Overrides_ are passed as configuration to the control scripts. You can read more about these parameters in the [control script docs](../../helm-control-scripts/README.md).
 
-Now you have Octopod inside Octopod! Now you can install your own helm chart!
+`chart_repo_url`, `chart_name` parameters are usually provided by the chart developer. Version however is usually skipped and you encouraged to take the last one, but we think about this as a bad practice.
+
+If you not sure where to get the `chart_version` parameter you can add repo locally using `helm repo add` and then execute `helm search repo <CHART_NAME> -l` too see the whole list of available chart versions.
+
+Now you have Octopod inside Octopod! Try to install your own chart with Octopod!
