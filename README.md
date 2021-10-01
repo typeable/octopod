@@ -55,9 +55,9 @@ With Octopod we were able to reduce the reliance on our DevOps teams for testing
 
 ### How long does it take to set up _Octopod_?
 
-Deploying Octopod itself can be done in a metter of minutes if you have a Kubernetes cluster at hand. If you want to deploy it locally we have [a handy script](docs/en/Octopod_deployment_guide.md#if-you-want-to-try-it-locally) that sets everything up automatically.
+Deploying Octopod itself can be done in a matter of minutes if you have a Kubernetes cluster at hand. If you want to deploy it locally we have [a handy script](docs/en/Octopod_deployment_guide.md#if-you-want-to-try-it-locally) that sets everything up automatically.
 
-After you have Octopd up and running the only thing you need is a Helm Chart that your team might want to deploy. That's it.
+After you have Octopod up and running the only thing you need is a Helm Chart that your team might want to deploy. That's it.
 
 ### Will _Octopod_ work with my project if it uses X?
 
