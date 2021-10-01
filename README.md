@@ -11,7 +11,7 @@ _Octopod_ is a fully open-source self-service portal which empowers your team to
 
 Octopod is a way for you to provide a simple interface for managing instances of a service in your Kubernetes cluster. Anything you can describe in a Helm Chart, any member of team can deploy. No matter how complex the deployment process is.
 
-The recipe is simple: you provide a url to your Helm chart, Octopod then automatically extracts the possible configuration that the Chart can have, and automatically manages the lifecycle of the services. What users see is just a simple web interface:
+The recipe is simple: you provide a url to your Helm repo, Octopod then automatically extracts the possible configuration that the Chart can have, and automatically manages the lifecycle of the services. What users see is just a simple web interface:
 
 ## 🖥 Demo
 
