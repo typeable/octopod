@@ -36,7 +36,6 @@ Also, several environment variables are used to parametrize the default behavior
 #### Default parameters
 - default_overrides – an array with key-value pairs which will be passed as a `--set` flags for helm for each deployment
 - chart_repo_url – the url for a chart repo
-- chart_repo_name – the name of a chart repo (could be any string)
 - chart_version – the version of a chart you want to install
 - chart_name – the name of a chart you want to install
 

@@ -1,12 +1,5 @@
 # Integration into existing CI/CD pipelines
 
-<details>
-  <summary>Table of contents</summary>
-
-- [✨ Creating deployments](#-creating-deployments)
-- [🚀 Updating deployments](#-updating-deployments)
-
-</details>
 
 You likely already have some form of CI integration with your version control system, such as *GitHub Action* or *Travis CI*, to run various checks on your code. Most of these services are set up by providing what is essentially just a shell script that is run under specific conditions.
 

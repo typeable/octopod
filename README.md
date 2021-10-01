@@ -7,13 +7,33 @@
    <a href="https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster"><img src="https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master" alt="Documentation"></a>
 </p>
 
-_Octopod_ is a fully open-source self-hosted solution for managing multiple deployments in a _Kubernetes_ cluster with a user-friendly web interface. Managing deployments does not require any technical expertise.
+_Octopod_ is a fully open-source self-service portal which empowers your team to leverage the full power of Kubernetes without the need for technical expertise.
 
-We created _Octopod_ because we believe that everything we release should be rigorously tested, however, such desires greatly [complicate the development workflow](docs/en/PM_case_study.md) leading to longer release cycles. We use _Octopod_ to mitigate the downsides of rigorously testing each feature by deploying every single change we make to a separate staging environment allowing QA to investigate each feature independently and in parallel.
+Octopod is a way for you to provide a simple interface for managing instances of a service in your Kubernetes cluster. Anything you can describe in a Helm Chart, any member of team can deploy. No matter how complex the deployment process is.
+
+The recipe is simple: you provide a url to your Helm repo, Octopod then automatically extracts the possible configuration that the Chart can have, and automatically manages the lifecycle of the services. What users see is just a simple web interface:
 
 ## 🖥 Demo
 
 <p align="center"><img src="img/demo.gif"></img></p>
+
+## 🧑‍🔬 Try it out for yourself
+
+You can have the installation from the demo above running on your local machine in minutes by running the following command:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/typeable/octopod/master/octopod_local_install.sh)"
+```
+
+You can dive deeper into the installation process in our [deployment guide](docs/en/Octopod_deployment_guide.md).
+
+## Motivation
+
+We created _Octopod_ because we believe that everything we release should be rigorously tested, however, such desires greatly [complicate the development workflow](docs/en/PM_case_study.md) leading to longer release cycles.
+
+The members of our team that facilitate rigorously testing are also the member that require the most attention from our DevOps engineers to manage the many staging environments required for a proper testing cycle.
+
+With Octopod we were able to reduce the reliance on our DevOps teams for testing to practically zero, while increasing the DevOps maneuverability of our QA engineers and process.
 
 ## 📑 Documentation
 
@@ -23,19 +43,21 @@ We created _Octopod_ because we believe that everything we release should be rig
 - [🧑‍💻 Technical case study](docs/en/Tech_case_study.md)
 
 ### 🛠️ Technical documentation
-- [🏗 Technical architecture](docs/en/Technical_architecture.md) [[RU](docs/ru/Technical_architecture.md)]
-- [⚙️ Control script guide][cs] [[RU](docs/ru/Control_scripts.md)]
-- [🔧🐙 Octopod deployment guide](docs/en/Octopod_deployment_guide.md) [[RU](docs/ru/Octopod_deployment_with_K8S.md)]
-- [🔧🚀 Helm-based Octopod project setup](docs/en/Helm-based_deployment_guide.md) [[RU](docs/ru/Helm-based_deployment_guide.md)]
-- [🐙🎛 octo CLI user guide][octo]  [[RU](docs/ru/Octo_user_guide.md)]
+- [🏗 Technical architecture](docs/en/Technical_architecture.md)
+- [⚙️ Control script guide][cs]
+- [🔧🐙 Octopod deployment guide](docs/en/Octopod_deployment_guide.md)
+- [🔧🚀 Helm-based Octopod project setup](docs/en/Helm-based_deployment_guide.md)
+- [🐙🎛 octo CLI user guide][octo]
 - [🤖 CI integration](docs/en/Integration.md)
-- [🔒 Octopod security model](docs/en/Security_model.md)  [[RU](docs/ru/Security_model.md)]
+- [🔒 Octopod security model](docs/en/Security_model.md)
 
 ## ℹ️ FAQ
 
 ### How long does it take to set up _Octopod_?
 
-The longest part of setting up _Octopod_ for your project will probably be writing [_Control Scripts_][cs]. In total you should be able to get things running in about a day.
+Deploying Octopod itself can be done in a matter of minutes if you have a Kubernetes cluster at hand. If you want to deploy it locally we have [a handy script](docs/en/Octopod_deployment_guide.md#if-you-want-to-try-it-locally) that sets everything up automatically.
+
+After you have Octopod up and running the only thing you need is a Helm Chart that your team might want to deploy. That's it.
 
 ### Will _Octopod_ work with my project if it uses X?
 
@@ -43,7 +65,23 @@ Yes. _Octopod_ is project-agnostic. If you can run your project in a Docker cont
 
 ### What do I need to know to set up Octopod?
 
-You need to understand the basics of _Kubernetes_ and be familiar with whatever hosting provider you will be using. There is no need to know any special language – you can write [_Control Scripts_][cs] in whatever language you like.
+You need to understand the basics of _Kubernetes_ and be familiar with whatever hosting provider you will be using.
+
+### What separates Octopod from exiting solutions like Gitlab Dynamic Environments?
+
+Most existing solutions like Gitlab Dynamic Environments offer you an extension of CI/CD pipelines. All they do is allow you to run bash scripts.
+
+This has several drawback the main of which is the fact that you need to understand the under-the-hood details of the deployment process to use them. Existing solutions don't abstract the deployment process. They package up steps of deployment. The user is still responsible for coordinating the steps. You still need to manually manage the state of your deployed services.
+
+Observability and transparency of the deployment management process is another drawback. To inspect the state of a deployed system you need to drop down to the Kubernetes level. At that point you alienate anyone without DevOps expertise. This is the problem Octopod solves.
+
+Octopod _actually_ abstracts the under-the-hood detail like Helm, Kubernetes and Docker from the user into an intuitive and easy to understand model. This allows anyone to manage and deploy services.
+
+### Octopod is great, but my service deployment lifecycle is slightly different.
+
+Octopod was developed in a modular way from the very start. It offers specific extension points called _control scripts_ that allow you to modify the behavior of Octopod. The _control scripts_ can be implemented in any programming language, even Bash. You can read more about _control scripts_ in our [_control script guide_][cs].
+
+We have developed [a generic set of _control scripts_](helm-control-scripts/) that should work great with any Helm Chart. You can use them as a base for your custom _control scripts_.
 
 ### Does _Octopod_ work with my CI?
 
@@ -64,9 +102,6 @@ There are several places where things can go wrong:
 
    If you have supplied a [_Kubernetes Dashboard_](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) URL to _Octopod_ during deployment, then you will have a "Details" button in the _Web UI_. You can click that button to get a filtered view of the _Kubernetes Dashboard_ where you can see what could have gone wrong and diagnose the issue.
 
-### Why Haskell and Rust?
-
-We believe that there is a lot to be gained in programming in general by being able to statically ensure invariants in your code. One of the most practical ways of ensuring invariants is a good static type system. Haskell and Rust are both languages that have very strong type systems. This allows us to move fast without breaking things in the process.
 
 ## Quotations
 
@@ -78,7 +113,7 @@ We believe that there is a lot to be gained in programming in general by being a
 
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
-<p align="center"><a href="https://typeable.io"><img src="img/typeable.png" width="177px"></img></a></p>
+<p align="center"><a href="https://typeable.io"><img src="img/typeable_logo.svg" width="177px"></img></a></p>
 
 [cs]: docs/en/Control_scripts.md
 [octo]: docs/en/Octo_user_guide.md

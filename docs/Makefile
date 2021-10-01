@@ -20,12 +20,3 @@ plantuml:
 		name=`basename $$src .mmd`; \
 		plantuml -I $$src -o "../../diagrams/images" -tpng; \
 	done
-
-plantuml:
-	# to install plantuml go to https://plantuml.com/command-line
-	#
-	# plantuml takes output paths relative to input file
-	for src in `ls diagrams/src/*.puml`; do \
-		name=`basename $$src .mmd`; \
-		plantuml -I $$src -o "../../diagrams/images" -tpng; \
-	done

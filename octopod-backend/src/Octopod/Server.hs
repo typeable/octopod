@@ -584,19 +584,7 @@ createDeployment dep = do
   cfg <- getDeploymentConfig dep
   let log :: Text -> IO ()
       log = logInfo (logger st)
-      args =
-        ControlScriptArgs
-          [ "--project-name"
-          , T.unpack . coerce $ projectName st
-          , "--base-domain"
-          , T.unpack . coerce $ baseDomain st
-          , "--namespace"
-          , T.unpack . coerce $ namespace st
-          , "--name"
-          , T.unpack . coerce $ dep ^. #name
-          ]
-          <> fullConfigArgs cfg
-  res <- runCommandArgs creationCommand args
+  res <- runCommandArgs creationCommand =<< createCommandArgs cfg dep
   liftBase . log $ "deployment created, deployment: " <> (pack . show $ dep)
   pure res
 
@@ -854,19 +842,7 @@ updateH dName dUpdate = do
     updateDeploymentInfo dName
     liftBase $ sendReloadEvent st
     cfg <- getDeploymentConfig dep
-    let args =
-          ControlScriptArgs
-            [ "--project-name"
-            , T.unpack . coerce $ projectName st
-            , "--base-domain"
-            , T.unpack . coerce $ baseDomain st
-            , "--namespace"
-            , T.unpack . coerce $ namespace st
-            , "--name"
-            , T.unpack . coerce $ dName
-            ]
-            <> fullConfigArgs cfg
-    (ec, out, err, elTime) <- runCommandArgs updateCommand args
+    (ec, out, err, elTime) <- runCommandArgs updateCommand =<< updateCommandArgs cfg dep
     liftBase . log $
       "deployment updated, name: "
         <> coerce dName

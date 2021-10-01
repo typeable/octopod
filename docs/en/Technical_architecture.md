@@ -1,29 +1,5 @@
 # Technical architecture
 
-<details>
-  <summary>Table of contents</summary>
-
-- [⚒️ Used tools](#️-used-tools)
-- [📐 App architecture](#-app-architecture)
-  - [🖥 Web UI](#-web-ui)
-  - [🐙 Octopod Server](#-octopod-server)
-  - [🐘 PostgreSQL](#-postgresql)
-  - [🎛 octo CLI](#-octo-cli)
-  - [📑 Control scripts](#-control-scripts)
-  - [🚮⏲ Clean Archive CronJob](#-clean-archive-cronjob)
-  - [Kube API Server](#kube-api-server)
-- [📦 Octopod Distribution model](#-octopod-distribution-model)
-- [Process view](#process-view)
-  - [✨ Create](#-create)
-  - [🔧 Update](#-update)
-  - [🗃 Archive](#-archive)
-  - [🚮 Cleanup](#-cleanup)
-  - [🔁 Restore](#-restore)
-- [👨‍💻👩‍💻 How we use it](#-how-we-use-it)
-- [🗂️ Deployment state transitions](#️-deployment-state-transitions)
-
-</details>
-
 ## ⚒️ Used tools
 
 The main goal of _Octopod_ is to simplify deployment in [_Kubernetes_][kube].
@@ -77,11 +53,6 @@ When the [_Octopod Server_](#-octopod-server) _Pod_ starts, the contents of the 
 
 These [scripts need to be implemented](Control_scripts.md) to deploy _Octopod_.
 
-### 🚮⏲ Clean Archive CronJob
-
-_Clean Archive CronJob_ – a CronJob which is run every hour. It deletes archived deployments older than 14 days. It is done by calling [_octo CLI_](#-octo-cli).
-
-It is necessary because "deleting" (archiving) deployments should only free the occupied computational resources, _Persistent Volumes_ should not be freed when deleting a deployment. This gives us a window of time in which a deployment can be recovered in the state it was in before being archived.
 
 ### Kube API Server
 
@@ -101,7 +72,7 @@ Here we provide sequence diagrams for every basic operation that can be performe
 
 ### ✨ Create
 
-_Create_ – creates a new deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional overrides. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create).
+_Create_ – creates a new deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional configurations. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create).
 
 The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn creates the deployment in the _Kubernetes cluster_. It might call something like:
 
@@ -110,8 +81,8 @@ helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
     --set "global.project-name=$project_name" \
     --set "global.base-domain=$base-domain" \
     --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_override_1" \
-    --set "app.bar=$deployment_override_1" \
+    --set "app.env.foo=$app_env_configuration_1" \
+    --set "app.bar=$deployment_configuration_1" \
     --wait \
     --timeout 300
 ```
@@ -132,17 +103,17 @@ helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
 
 ### 🔧 Update
 
-_Update_ – updates an existing deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional overrides. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-update).
+_Update_ – updates an existing deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional configurations. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-update).
 
-[_Overrides_](Overview.md#overrides) are read from the database and merged with the new changes. All arguments are forwarded to the [_update_](Control_scripts.md#-update) script which in turn updates the specified deployment with the new parameters in the _Kubernetes cluster_. It might call something like:
+_configurations_ are read from the database and merged with the new changes. All arguments are forwarded to the [_update_](Control_scripts.md#-update) script which in turn updates the specified deployment with the new parameters in the _Kubernetes cluster_. It might call something like:
 
 ```bash
 helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
     --set "global.project-name=$project_name" \
     --set "global.base-domain=$base-domain" \
     --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_override_1" \
-    --set "app.bar=$deployment_override_1" \
+    --set "app.env.foo=$app_env_configuration_1" \
+    --set "app.bar=$deployment_configuration_1" \
     --wait \
     --timeout 300
 ```
@@ -221,15 +192,15 @@ _restore_ – restores an archived deployment in the state it was last in. Calls
 
 The main argument is the name that identifies the deployment. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create). It can only be called after [_archive_](#-archive) has been executed.
 
-All necessary setup information is read from the database: [_overrides_](Overview.md#overrides) and the _Docker Image tag_. The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn recreates the deployment. It might call something like:
+All necessary setup information is read from the database: _configurations_ and the _Docker Image tag_. The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn recreates the deployment. It might call something like:
 
 ```bash
 helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
     --set "global.project-name=$project_name" \
     --set "global.base-domain=$base-domain" \
     --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_override_1" \
-    --set "app.bar=$deployment_override_1" \
+    --set "app.env.foo=$app_env_configuration_1" \
+    --set "app.bar=$deployment_configuration_1" \
     --wait \
     --timeout 300
 ```
@@ -284,9 +255,6 @@ _Running_, _Failure_, _Archived_ states are "permanent", meaning the deployment 
 
 ![Deployment Statuses](../diagrams/images/technical-architecture-deployment-states-fsm.png)
 
-<!-- [kubectl]: https://kubernetes.io/docs/reference/kubectl/ -->
-<!-- [helm]: https://helm.sh -->
-<!-- [kubedog]: https://github.com/werf/kubedog -->
 [kube]: https://kubernetes.io
 [chart]: https://helm.sh/docs/topics/charts/
 [ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/
