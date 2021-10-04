@@ -22,7 +22,7 @@ It is sometimes the case that certain features need a "special" environment to b
 
 "Current" is used here to denote features that have been completed after the last time QA engineers had the opportunity to test the staging of the given project. It is assumed that the completed features are merged into something analogous to a `master` branch in git.
 
-A way to mitigate the issue might be to have fine-grained control over what features are allowed to be merged into the `master` branch so that when we deploy it, we will have only the one feature which needs the "special" environment, in a sense, batching features based on the environment they require. The main problem with this is that the payment processor is in all likelihood a tiny sliver, a single dimension of the whole space of possible environment setups. Trying to capture and institutionalize the whole breadth of a production environment in your development workflow seems like a futile endeavor.
+A way to mitigate the issue might be to have fine-grained control over what features are allowed to be merged into the `master` branch so that when we deploy it, we will have only the feature which needs the "special" environment, in a sense, batching features based on the environment they require. The main problem with this is that the payment processor is in all likelihood a tiny sliver, a single dimension of the whole space of possible environment setups. Trying to capture and institutionalize the whole breadth of a production environment in your development workflow seems like a futile endeavor.
 
 Having per-feature stagings allow you to have completely separate and independent configurations for every single feature you develop and test at no additional cost.
 

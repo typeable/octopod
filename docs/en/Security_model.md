@@ -22,7 +22,7 @@ There is currently no way to give someone access to _octo CLI_ without giving th
 _Octopod Server_ is deployed in the `octopod` _Kubernetes_ namespace. Deployments are deployed in the `deployments` namespace.
 _Octopod Server_ uses the `octopod` [_Service Account_][kubernetes-service-account].
 
-Octopod needs sufficient permissions to run helm inside kubernetes and create all resources described in helm chart it is installing. Thus permissions are quite extensive.
+Octopod needs sufficient permissions to run Helm inside Kubernetes and create all resources described in the Helm chart it is installing. Thus permissions are quite extensive.
 
 [RBAC][kubernetes-rbac] rules to describe permissions needed are added automatically by [the Octopod Helm Chart](../../charts/octopod/templates/rbac.yaml).
 
@@ -36,7 +36,7 @@ The [_Web UI_](Technical_architecture.md#-web-ui) on its own does not have any a
 
 ## octo CLI authentication
 
-Authentication between _octo CLI_ and _Octopod Server_ is done through special token which is generated automatically or specified by user in `octopod.cliAuthSecret` parameter, as described [here](../../charts/octopod/README.md#parameters)
+Authentication between _octo CLI_ and _Octopod Server_ is done through special token which is generated automatically or specified by user in `octopod.cliAuthSecret` parameter, as described [here](../../charts/octopod/README.md#parameters).
 
 [kubernetes-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account
 [kubernetes-ingress-nginx-external-auth]: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#external-authentication

@@ -51,7 +51,7 @@ This is necessary to make _Octopod_ itself independent from any particular deplo
 
 When the [_Octopod Server_](#-octopod-server) _Pod_ starts, the contents of the *control scripts* container are copied into the _Octopod Server_ container file system. This means that the executables need to be either statically linked or interpreted through _Bash_ since it needs to be executed in the _Octopod Server_ container environment.
 
-These [scripts need to be implemented](Control_scripts.md) to deploy _Octopod_.
+These [scripts need to be implemented](Control_scripts.md) to deploy _Octopod_ unless the set of generic scripts is used.
 
 
 ### Kube API Server

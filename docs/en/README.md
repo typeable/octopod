@@ -7,7 +7,7 @@
 
 ## 🛠️ Technical documentation
 - [🏗 Technical architecture](Technical_architecture.md)
-- [⚙️ Control script guide](Control_scripts.md)
+- [⚙️ Control scripts guide](Control_scripts.md)
 - [🔧🐙 Octopod deployment guide](Octopod_deployment_guide.md)
 - [🔧🚀 Helm-based Octopod project setup](Helm-based_deployment_guide.md)
 - [🐙🎛 octo CLI user guide](Octo_user_guide.md)

@@ -8,7 +8,7 @@ _Octopod_ is a tool which implements the multi-staging deployment model (MSDM) o
 
 _Octopod_ exists to reduce the overhead in deploying and maintaining per-feature staging environments. This responsibility may otherwise fall to:
 
-1. **DevOps engineers** – this might seem natural since deploying and updating systems in new environments is typically the task of a DevOps engineer who has experience in system administration. However, developers and QA engineers would be blocked for additional periods while DevOps engineers deal with the additional load.
+1. **DevOps engineers** – this might seem natural since deploying and updating systems in new environments is typically the task of a DevOps engineer who has experience in system administration. However, developers and QA engineers would be blocked for extended periods while DevOps engineers deal with the additional load.
 2. **Developers** – they might take on the responsibility for deploying and maintaining their feature stagings ― this would most likely waste a lot of time since developers might not have the required experience.
 
 The process of deploying and updating stagings is likely to be extremely similar across different developed features ― changing the behavior of a button and updating pricing calculations would probably be identical from the point of view of system administration ― a new version of the system needs to be deployed with the same default configuration (the staging configuration, as opposed to a production configuration).

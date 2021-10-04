@@ -11,7 +11,7 @@ Control scripts can be roughly split into two categories: (1) control scripts in
 
 _stdout_ and _stderr_ output from the most important scripts involved in the deployment lifecycle will be collected and stored. DevOps engineers can then view these logs from the _octo CLI_, should that be needed.
 
-All of the _scripts_ in this category receive the exact same exact same set of command line arguments.
+All of the _scripts_ in this category receive the exact same set of command line arguments.
 
 There are four "static" arguments that are passed to all *scripts* in this category. The first three arguments come from the [_Kubernetes ConfigMap_][configmap]:
 * `--project-name` – the name of the project. It is supplied mostly for informational purposes and can be useful for sending notifications if that is necessary.

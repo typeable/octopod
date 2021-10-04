@@ -56,7 +56,7 @@ guarantee that the feature won’t unexpectedly break someone else’s code.
 If a critical part of the application, like authentication, gets broken,
 this may block the testing process completely until the problem is
 resolved. And to top it off, when this happens, it might not be
-immediately clear who’s change is to blame. Thus, everyone who did
+immediately clear whose change is to blame. Thus, everyone who did
 recent merges begin looking into their code trying to see whether it was
 their check-in that broke the server. Of course, it takes time and
 blocks the development process as well until the culprit merge is found

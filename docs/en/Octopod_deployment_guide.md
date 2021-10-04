@@ -1,10 +1,10 @@
 # Octopod Server deployment guide
 
 ## Installation options
-There are several options to install octopod depending on your needs.
+There are several options to install Octopod depending on your needs.
 
-### If you have a kubernetes cluster
-You can install octopod in any kubernetes cluster using our [Helm chart](../../charts/octopod).
+### If you have a Kubernetes cluster
+You can install Octopod in any Kubernetes cluster using our [Helm chart](../../charts/octopod).
 
 
 Your cluster must satisfy following requirements:
