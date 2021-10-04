@@ -510,7 +510,7 @@ createH dep = do
                             , createdAt = now
                             , updatedAt = now
                             , archivedAt = litExpr Nothing
-                            , status = litExpr Running
+                            , status = litExpr CreatePending
                             , statusUpdatedAt = now
                             , checkedAt = now
                             , metadata = litExpr (DeploymentMetadata [])
@@ -719,6 +719,7 @@ transitionToStatus dName s = do
               dep
                 & #status .~ litExpr newS
                 & #updatedAt .~ now
+                & #statusUpdatedAt .~ now
                 & if newS == Archived then #archivedAt .~ nullify now else id
           , updateWhere = \() dep -> dep ^. #name ==. litExpr dName
           , returning = Projection id
