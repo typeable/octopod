@@ -39,7 +39,7 @@ This is **a lot** of overhead just to test the color of a button. Note that most
 
 _Octopod_ aims to factor out the common parts of creating and deploying a staging.
 
-If developers were using _Octopod_ to deploy stagings, literally the only thing needed from them would be to specify the git commit hash in the _Web UI_ of _Octopod_. The common infrastructure (shown in **blue**) which is the same across different stagings would not require any additional setup. The only difference between the two button feature staging would be the actual server that required changing the color. And that server is most likely also built in a uniform way, meaning it can be done automatically.
+If developers were using _Octopod_ to deploy stagings, literally the only thing needed from them would be to specify the git commit hash (if you use git commit hashes as tags for your docker images) in the _Web UI_ of _Octopod_. The common infrastructure (shown in **blue**) which is the same across different stagings would not require any additional setup. The only difference between the two button feature staging would be the actual server that required changing the color. And that server is most likely also built in a uniform way, meaning it can be done automatically.
 
 ![](../diagrams/images/sample_deployment.png)
 

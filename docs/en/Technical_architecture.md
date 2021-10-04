@@ -37,7 +37,7 @@ The server receives commands from the [_octo CLI_](#-octo-cli) and the [_Web UI_
 
 ### 🎛 octo CLI
 
-_octo CLI_ – a command-line interface used to manage deployments. It sends HTTP/1.1 requests to [_Octopod Server_](#-octopod-server). The requests are [authenticated through SSL certificates](Security_model.md#octo-cli-authentication).
+_octo CLI_ – a command-line interface used to manage deployments. It sends HTTP/1.1 requests to [_Octopod Server_](#-octopod-server). The requests are [authenticated through the `Authorization` header](Security_model.md#octo-cli-authentication).
 
 It can perform all actions available in the [_Web UI_](#-web-ui), but also has access to view deployment logs.
 
