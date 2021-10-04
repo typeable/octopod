@@ -30,6 +30,7 @@ import qualified Data.Csv as C
 import Data.Fixed
 import Data.Foldable
 import Data.Functor
+import Data.Functor.Contravariant
 import Data.Generics.Labels ()
 import Data.Generics.Product
 import Data.IORef
@@ -471,7 +472,9 @@ getFullInfo ::
   m [DeploymentFullInfo]
 getFullInfo = do
   AppState {logger = l} <- ask
-  deploymentsSchema <- runStatement . select $ each deploymentSchema
+  deploymentsSchema <-
+    runStatement . select . orderBy (view #updatedAt >$< desc) $
+      each deploymentSchema
   deployments <- forM deploymentsSchema extractDeploymentFullInfo
   liftBase . logInfo l $ "get deployments: " <> (pack . show $ deployments)
   return deployments
@@ -593,12 +596,14 @@ selectDeploymentLogs ::
   (MonadBaseControl IO m, MonadReader AppState m) =>
   DeploymentName ->
   m [DeploymentLog]
-selectDeploymentLogs dName = (fmap . fmap) extractDeploymentLog . runStatement . select $ do
-  dls <- each deploymentLogSchema
-  ds <- each deploymentSchema
-  where_ $ ds ^. #name ==. litExpr dName
-  where_ $ dls ^. #deploymentId ==. ds ^. #id_
-  pure dls
+selectDeploymentLogs dName = (fmap . fmap) extractDeploymentLog . runStatement . select
+  . orderBy (view #createdAt >$< desc)
+  $ do
+    dls <- each deploymentLogSchema
+    ds <- each deploymentSchema
+    where_ $ ds ^. #name ==. litExpr dName
+    where_ $ dls ^. #deploymentId ==. ds ^. #id_
+    pure dls
 
 data StatusTransitionProcessOutput = StatusTransitionProcessOutput
   { exitCode :: ExitCode
