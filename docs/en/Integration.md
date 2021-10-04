@@ -21,7 +21,7 @@ octo create -n $NAME -t $IMAGE_TAG
 
 ## 🚀 Updating deployments
 
-Updating deployments is done using the same arguments, but you need to call `create` command, instead of the `update` command:
+Updating deployments is done using the same arguments, but you need to call the `create` command, instead of the `update` command:
 
 ```bash
 octo update -n $NAME -t $IMAGE_TAG

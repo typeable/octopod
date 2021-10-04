@@ -49,7 +49,7 @@ So here you have it, your first Octopod deployment!
 
 ## Going further
 
-As we can said earlier you can override all default parameters using Octopod UI. Let's dive right in!
+As we said earlier you can override all default parameters using Octopod UI. Let's dive right in!
 
 First, let's archive our wordpress deployment:
 
@@ -85,6 +85,6 @@ As in the previous example Octopod parsed the _App Overrides_ from the [chart va
 
 `chart_repo_url`, `chart_name` parameters are usually provided by the chart developer. Version however is usually skipped and you encouraged to take the last one, but we think about this as a bad practice.
 
-If you not sure where to get the `chart_version` parameter you can add repo locally using `helm repo add` and then execute `helm search repo <CHART_NAME> -l` too see the whole list of available chart versions.
+If you're not sure where to get the `chart_version` parameter you can add repo locally using `helm repo add` and then execute `helm search repo <CHART_NAME> -l` too see the whole list of available chart versions.
 
 Now you have Octopod inside Octopod! Try to install your own chart with Octopod!
