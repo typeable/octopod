@@ -97,5 +97,9 @@ helm repo add typeable https://typeable.github.io/octopod
 helm repo update
 message "Installing octopod helm chart"
 helm --kube-context=kind-octopod -n octopod install octopod typeable/octopod --wait --timeout=5m --set octopod.baseDomain="lvh.me" --set ingress.tls.enabled=false
-message "Octopod was successfully installed! Use instruction above to connect to it."
-message "To uninstall octopod just run: kind delete cluster --name octopod"
+echo
+echo "    🌟  Don't forget to star Octopod on GitHub:"
+echo "          https://github.com/typeable/octopod"
+echo
+echo "    🗑️  To uninstall Octopod just run:"
+echo "          kind delete cluster --name octopod"
