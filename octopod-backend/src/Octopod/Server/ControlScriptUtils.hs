@@ -237,9 +237,10 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
-  katipAddContext (FilePayload "stdout" $ TL.toStrict out) $ katipAddContext (FilePayload "stderr" $ TL.toStrict err) $
-    logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
-      "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec
+  katipAddContext (FilePayload "stdout" $ TL.toStrict out) $
+    katipAddContext (FilePayload "stderr" $ TL.toStrict err) $
+      logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
+        "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out

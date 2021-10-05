@@ -15,17 +15,17 @@ module Octopod.Server.Logging
     LogItem (..),
     ToObject (..),
     PayloadSelection (..),
-    FilePayload (..)
+    FilePayload (..),
   )
 where
 
-import Data.Aeson
-import Data.ByteString (ByteString)
 import qualified Control.Exception.Lifted as L
 import Control.Lens hiding (scribe, (.=))
 import Control.Monad
 import Control.Monad.Base
 import Control.Monad.Trans.Control
+import Data.Aeson
+import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -46,7 +46,7 @@ data LogConfig = LogConfig
   deriving stock (Generic)
 
 newtype SingleLineify a = SingleLineify a
-  deriving newtype LogItem
+  deriving newtype (LogItem)
 
 instance ToObject a => ToObject (SingleLineify a) where
   toObject (SingleLineify x) = fmap go $ toObject x
@@ -56,18 +56,19 @@ instance ToObject a => ToObject (SingleLineify a) where
       go (String s) = String $ T.concat $ escape s
       go value = value
       escape s = case T.break (`elem` ("\a\b\f\n\r\t\v\\" :: String)) s of
-        (xs, ys) -> xs : case T.uncons ys of
-          Nothing -> []
-          Just (c, zs) -> case c of
-            '\a' -> "\\a" : escape zs
-            '\b' -> "\\b" : escape zs
-            '\f' -> "\\f" : escape zs
-            '\n' -> "\\n" : escape zs
-            '\r' -> "\\r" : escape zs
-            '\t' -> "\\t" : escape zs
-            '\v' -> "\\v" : escape zs
-            '\\' -> "\\\\" : escape zs
-            _ -> escape ys
+        (xs, ys) ->
+          xs : case T.uncons ys of
+            Nothing -> []
+            Just (c, zs) -> case c of
+              '\a' -> "\\a" : escape zs
+              '\b' -> "\\b" : escape zs
+              '\f' -> "\\f" : escape zs
+              '\n' -> "\\n" : escape zs
+              '\r' -> "\\r" : escape zs
+              '\t' -> "\\t" : escape zs
+              '\v' -> "\\v" : escape zs
+              '\\' -> "\\\\" : escape zs
+              _ -> escape ys
 
 makeLogEnv :: LogConfig -> IO LogEnv
 makeLogEnv conf = do
@@ -81,17 +82,19 @@ makeLogEnv conf = do
     formatter :: LogItem a => ItemFormatter a
     formatter =
       if not $ conf ^. #minimal
-        then \color verb item -> bracketFormat color verb item { _itemPayload = SingleLineify $ _itemPayload item }
+        then \color verb item -> bracketFormat color verb item {_itemPayload = SingleLineify $ _itemPayload item}
         else \color verb item ->
           brackets (fromText $ formatAsLogTime $ _itemTime item)
             <> brackets (fromText $ colorBySeverity color (_itemSeverity item) $ renderSeverity $ _itemSeverity item)
             <> mconcat (map brackets $ getKeys verb $ _itemPayload item)
-            <> " " <> unLogStr (_itemMessage item)
+            <> " "
+            <> unLogStr (_itemMessage item)
             <> mconcat (("\n" <>) <$> renderFiles (toObject $ _itemPayload item))
     renderFiles :: Object -> [Builder]
-    renderFiles obj = HM.toList obj >>= \(k, v) -> case (T.stripPrefix "file-" k, v) of
-      (Just fn, String text) | not $ T.null text -> pure $ fromText fn <> ":\n" <> fromText (tabulate text)
-      _ -> []
+    renderFiles obj =
+      HM.toList obj >>= \(k, v) -> case (T.stripPrefix "file-" k, v) of
+        (Just fn, String text) | not $ T.null text -> pure $ fromText fn <> ":\n" <> fromText (tabulate text)
+        _ -> []
     tabulate = T.unlines . map ("\t" <>) . T.lines
 
 destroyLogEnv :: LogEnv -> IO ()

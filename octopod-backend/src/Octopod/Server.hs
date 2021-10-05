@@ -240,44 +240,43 @@ runOctopodServer sha = do
           (unDBPoolSize $ octopodDBPoolSize opts)
     channel <- liftBase . atomically $ newBroadcastTChan
     lockedDs <- liftBase initLockedDeployments
-    let
-      appSt =
-        AppState
-          { dbPool = dbPool'
-          , eventSink = channel
-          , bgWorkersCounter = bgWorkersC
-          , gracefulShutdownActivated = gracefulShutdownAct
-          , shutdownSem = shutdownS
-          , projectName = projName
-          , baseDomain = domain
-          , namespace = ns
-          , statusUpdateTimeout = stUpdateTimeout
-          , creationCommand = creationCmd
-          , updateCommand = updateCmd
-          , archiveCommand = archiveCmd
-          , checkingCommand = checkingCmd
-          , cleanupCommand = cleanupCmd
-          , archiveCheckingCommand = archiveCheckingCmd
-          , configCheckingCommand = tagCheckingCmd
-          , infoCommand = infoCmd
-          , notificationCommand = notificationCmd
-          , deploymentOverridesCommand = dOverridesCmd
-          , deploymentOverrideKeysCommand = dKeysCmd
-          , applicationOverridesCommand = aOverridesCmd
-          , applicationOverrideKeysCommand = aKeysCmd
-          , unarchiveCommand = unarchiveCmd
-          , lockedDeployments = lockedDs
-          , depOverridesCache = depOverridesCache'
-          , depOverrideKeysCache = depOverrideKeysCache'
-          , appOverridesCache = appOverridesCache'
-          , appOverrideKeysCache = appOverrideKeysCache'
-          , gitSha = sha
-          , controlScriptTimeout = scriptTimeout
-          }
-      serverPort = octopodPort opts
-      powerServerPort = unServerPort serverPort
-      uiServerPort = unServerPort $ octopodUIPort opts
-      wsServerPort = unServerPort $ octopodWSPort opts
+    let appSt =
+          AppState
+            { dbPool = dbPool'
+            , eventSink = channel
+            , bgWorkersCounter = bgWorkersC
+            , gracefulShutdownActivated = gracefulShutdownAct
+            , shutdownSem = shutdownS
+            , projectName = projName
+            , baseDomain = domain
+            , namespace = ns
+            , statusUpdateTimeout = stUpdateTimeout
+            , creationCommand = creationCmd
+            , updateCommand = updateCmd
+            , archiveCommand = archiveCmd
+            , checkingCommand = checkingCmd
+            , cleanupCommand = cleanupCmd
+            , archiveCheckingCommand = archiveCheckingCmd
+            , configCheckingCommand = tagCheckingCmd
+            , infoCommand = infoCmd
+            , notificationCommand = notificationCmd
+            , deploymentOverridesCommand = dOverridesCmd
+            , deploymentOverrideKeysCommand = dKeysCmd
+            , applicationOverridesCommand = aOverridesCmd
+            , applicationOverrideKeysCommand = aKeysCmd
+            , unarchiveCommand = unarchiveCmd
+            , lockedDeployments = lockedDs
+            , depOverridesCache = depOverridesCache'
+            , depOverrideKeysCache = depOverrideKeysCache'
+            , appOverridesCache = appOverridesCache'
+            , appOverrideKeysCache = appOverrideKeysCache'
+            , gitSha = sha
+            , controlScriptTimeout = scriptTimeout
+            }
+        serverPort = octopodPort opts
+        powerServerPort = unServerPort serverPort
+        uiServerPort = unServerPort $ octopodUIPort opts
+        wsServerPort = unServerPort $ octopodWSPort opts
     (`runReaderT` appSt) $ do
       runServer uiServerPort
         `raceM_` runPowerServer powerServerPort powerAuthorizationHeader
@@ -860,9 +859,10 @@ updateH dName dUpdate = do
     sendReloadEvent
     cfg <- getDeploymentConfig dep
     (ec, out, err, elTime) <- runCommandArgs updateCommand =<< updateCommandArgs cfg dep
-    logLocM DebugS $ logStr $
-      "deployment updated, name: "
-        <> unDeploymentName dName
+    logLocM DebugS $
+      logStr $
+        "deployment updated, name: "
+          <> unDeploymentName dName
     transitionToStatusS dName $
       TransitionUpdatePending
         StatusTransitionProcessOutput
