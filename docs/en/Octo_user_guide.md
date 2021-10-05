@@ -6,15 +6,15 @@ All commands _octo CLI_ executes require the executable to send authenticated re
 
 ### `OCTOPOD_URL`
 
-> **_NOTE:_** this argument is **required** for _octo CLI_ to function.
-
 `OCTOPOD_URL` is an environment variable _octo CLI_ reads to find your particular _Octopod Server_ installation. For example, it could contain `https://octopod-power-app.example.com:443`.
 
-### `TLS_CERT_PATH` and `TLS_KEY_PATH`
+### `OCTO_AUTHORIZATION_HEADER`
 
-`TLS_CERT_PATH` should contain the path to the TLS certificate you generated when setting up _Octopod Server_ and `TLS_KEY_PATH` should contain the path to the TLS key you generated when setting up _Octopod Server_. These files are used to authenticate the requests to _Octopod Server_.
+`OCTO_AUTHORIZATION_HEADER` is an environment variable that should contain the `Authorization` header to use to authenticate requests to your Octopod server. You can obtain the header value by running the following command after installing Octopod:
 
-If these variables are not set, then _octo CLI_ tries to read the certificate from the path `./cert.pem`, and the key from the path `./key.pem`.
+```bash
+kubectl -n octopod get secret octopod-cli-auth-secret -o jsonpath='{.data.cli-secret}' | base64 -d
+```
 
 ## Commands
 
