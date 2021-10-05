@@ -7,9 +7,9 @@
    <a href="https://github.com/typeable/octopod/actions?query=workflow%3ADocumentation+branch%3Amaster"><img src="https://github.com/typeable/octopod/workflows/Documentation/badge.svg?branch=master" alt="Documentation"></a>
 </p>
 
-_Octopod_ is a fully open-source self-service portal which empowers your team to leverage the full power of Kubernetes without the need for technical expertise.
+_Octopod_ is a fully open-source self-service portal which empowers your team to leverage the full power of Helm without the need for technical expertise.
 
-Octopod is a way for you to provide a simple interface for managing instances of a service in your Kubernetes cluster. Anything you can describe in a Helm Chart, any member of team can deploy. No matter how complex the deployment process is.
+Octopod is a way for you to provide a self-service portal for managing instances of a service in your cluster. Anything you can describe in a Helm Chart, any member of team can deploy. No matter how complex the deployment process is.
 
 The recipe is simple: you provide a url to your Helm repo, Octopod then automatically extracts the possible configuration that the Chart can have, and automatically manages the lifecycle of the services. What users see is just a simple web interface:
 
@@ -26,6 +26,15 @@ You can have the installation from the demo above running on your local machine 
 ```
 
 You can dive deeper into the installation process in our [deployment guide](docs/en/Octopod_deployment_guide.md).
+
+<details>
+<summary>You can remove everything the command above installs by running the following command:</summary>
+
+```bash
+kind delete cluster --name octopod
+```
+
+</details>
 
 ## Motivation
 
@@ -62,6 +71,17 @@ After you have Octopod up and running the only thing you need is a Helm Chart th
 ### Will _Octopod_ work with my project if it uses X?
 
 Yes. _Octopod_ is project-agnostic. If you can run your project in a Docker container, then you can use _Octopod_ with that project.
+
+### Does _Octopod_ work with "vanilla" Kubernetes projects that don't use Helm?
+
+If you do not have Helm Charts for your projects, you will not be able to leverage the simple Octopod installation procedure we have developed.
+
+To use _Octopod_ with your project will need to either:
+
+- Write Helm Charts for your project
+- Write a set of [_control scripts_][cs] that deploy "vanilla" Kubernetes services
+
+You can always contact us if you need help. A good first place to ask questions is [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
 ### What do I need to know to set up Octopod?
 
