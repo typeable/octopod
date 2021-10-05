@@ -3,6 +3,12 @@ set -e
 message () {
     echo "==> $1"
 }
+
+echo
+echo "    🔖  If you encounter any issues during the installation please open an issue:"
+echo "          https://github.com/typeable/octopod/issues/new"
+echo
+
 for cmd in kind kubectl helm; do
    if ! command -v $cmd &> /dev/null; then
            message "$cmd is not installed. Please, install it!"
