@@ -114,6 +114,7 @@ library
     , hasql
     , hasql-transaction
     , ordered-containers
+    , unordered-containers
     , vector
     , process
   default-language: Haskell2010

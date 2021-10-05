@@ -164,13 +164,13 @@ in
         export CACHE_INVALIDATION_TIME="60"
         export CACHE_UPDATE_TIME="20"
         export CONTROL_SCRIPT_TIMEOUT="10"
+        export DEBUG=true
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
             --ui-port 3002 \
             --ws-port 4020 \
             --db "host='127.0.0.1' port=5432 user='octopod' password='octopod'" \
-            --db-pool-size 10 \
-            --debug --minimal
+            --db-pool-size 10
       '';
     in
     runBackend;
