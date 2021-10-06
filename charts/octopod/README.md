@@ -5,6 +5,7 @@
 ## TL;DR
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
+$ helm repo update
 $ kubectl create ns octopod-deployment
 $ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
@@ -31,13 +32,14 @@ You'll need to create 2 namespaces before installing:
    ```
 2. A namespace in which Octopod will deploy all your deployments (configured in `octopod.deploymentNamespace`):
    ```console
-   $ kubectl create namespace octopod-deployments
+   $ kubectl create namespace octopod-deployment
    ```
   
 To install the chart with the release name `my-release` execute:
 
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
+$ helm repo update
 $ helm -n octopod install my-release typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
@@ -155,7 +157,7 @@ $ helm install my-release -f values.yaml .
 ## Configuration and installation details
 
 If you want to have authentication for Octopod UI you can use project like [Oauth2-Proxy](https://github.com/oauth2-proxy/oauth2-proxy) or directly use your oauth provider.
-After that you can add following annotations to UI ingress (considering that your oauth provider installed on oath.example.com):
+After that you can add following annotations to UI ingress (considering that your oauth provider installed on oauth.example.com):
 ```yaml
 ingress:
   ui:
