@@ -95,7 +95,7 @@ makeLogEnv conf = do
       HM.toList obj >>= \(k, v) -> case (T.stripPrefix "file-" k, v) of
         (Just fn, String text) | not $ T.null text -> pure $ fromText fn <> ":\n" <> fromText (tabulate text)
         _ -> []
-    tabulate = T.unlines . map ("\t" <>) . T.lines
+    tabulate = ("\t" <>) . T.replace "\n" "\n\t"
 
 destroyLogEnv :: LogEnv -> IO ()
 destroyLogEnv = void . closeScribes
