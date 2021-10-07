@@ -1,5 +1,5 @@
 <p align="center">
-   <a href="#"><img src="img/logo.svg" width="550"></img></a>
+   <a href="#"><img src="img/logo.svg" width="500"></img></a>
 </p>
 
 <p align="center">
