@@ -134,8 +134,6 @@ There are several places where things can go wrong:
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
 
----
-
 <p align="center">
   <i>Star the project of you like it</i>
 </p>
