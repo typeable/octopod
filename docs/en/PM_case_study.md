@@ -120,3 +120,11 @@ that, once installed and set up, supports your multi-tier development
 workflow at a level that does not require deep technical knowledge. Octopod
 simplifies the procedure of creating new servers and allows the
 implementation of common CD solutions in just a few clicks.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

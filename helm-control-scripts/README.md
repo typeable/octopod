@@ -40,3 +40,11 @@ Also, several environment variables are used to parametrize the default behavior
 - chart_name – the name of a chart you want to install
 
 These parameters, if set up in the `DEFAULTS` variable, will be passed to every deployment unless overridden in the "deployment overrides" section of an Octopod deployment configuration.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../img/typeable_logo.svg" width="177px"></img></a></p>

@@ -42,3 +42,11 @@ Authentication between _octo CLI_ and _Octopod Server_ is done through special t
 [kubernetes-ingress-nginx-external-auth]: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#external-authentication
 [kubernetes-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac
 [oauth2-proxy]: https://oauth2-proxy.github.io/oauth2-proxy
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

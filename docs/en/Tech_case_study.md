@@ -57,3 +57,11 @@ When setting up Octopod you will need to implement the exact steps required to s
 It is easy to set up continuous deployment procedures with Octopod. (Continuous deployment here refers to the process of automatically deploying branches of your repository when they are updated.) This allows you to optimize your development workflow even further.
 
 A not-so-obvious usage might be to set up a staging to be automatically updated with the `master` branch of your project repository. This has the advantage that anyone can at any time easily test the behavior of the `master` branch.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>
