@@ -133,6 +133,13 @@ There are several places where things can go wrong:
 
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
 
+
+<center>
+
+##### Star the project of you like it
+
+</center>
+
 <p align="center"><a href="https://typeable.io"><img src="img/typeable_logo.svg" width="177px"></img></a></p>
 
 [cs]: docs/en/Control_scripts.md
