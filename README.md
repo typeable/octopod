@@ -136,11 +136,9 @@ If you still have questions, be sure to ask them in our [Octopod Discussions](ht
 
 ---
 
-<center>
-
-Star the project of you like it
-
-</center>
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
 
 <p align="center"><a href="https://typeable.io"><img src="img/typeable_logo.svg" width="177px"></img></a></p>
 
