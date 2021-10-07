@@ -26,3 +26,11 @@ Updating deployments is done using the same arguments, but you need to call the 
 ```bash
 octo update -n $NAME -t $IMAGE_TAG
 ```
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

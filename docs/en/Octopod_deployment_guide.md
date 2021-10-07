@@ -37,3 +37,11 @@ Script will expose octopod ui at `octopod.lvh.me`.
 ## What next?
 
 Now you may want to check how to [install helm charts](Helm-based_deployment_guide.md) with Octopod.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

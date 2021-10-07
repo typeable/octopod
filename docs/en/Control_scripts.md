@@ -306,4 +306,12 @@ echo "application_api_version"
 echo "database_version"
 ```
 
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>
+
 [configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/

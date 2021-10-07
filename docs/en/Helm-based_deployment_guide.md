@@ -73,11 +73,11 @@ And create one more deployment, this time using a different set of overrides:
 
 **Deployment Overrides:**
 
-|               Key | Value                                 |
-| ----------------: | ------------------------------------- |
-|      `chart_name` | `octopod`                             |
-|  `chart_repo_url` | `https://typeable.github.io/octopod/` |
-|   `chart_version` | `0.6.0`                               |
+|              Key | Value                                 |
+| ---------------: | ------------------------------------- |
+|     `chart_name` | `octopod`                             |
+| `chart_repo_url` | `https://typeable.github.io/octopod/` |
+|  `chart_version` | `0.6.0`                               |
 
 ## Where can I get these values?
 
@@ -88,3 +88,9 @@ As in the previous example Octopod parsed the _App Overrides_ from the [chart va
 If you're not sure where to get the `chart_version` parameter you can add repo locally using `helm repo add` and then execute `helm search repo <CHART_NAME> -l` too see the whole list of available chart versions.
 
 Now you have Octopod inside Octopod! Try to install your own chart with Octopod!
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+<a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

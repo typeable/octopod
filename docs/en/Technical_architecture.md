@@ -258,3 +258,11 @@ _Running_, _Failure_, _Archived_ states are "permanent", meaning the deployment 
 [kube]: https://kubernetes.io
 [chart]: https://helm.sh/docs/topics/charts/
 [ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>
