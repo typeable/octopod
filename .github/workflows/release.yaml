@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The number of the version to release
+        description: The version to release
         required: true
 
 jobs:
@@ -11,14 +11,15 @@ jobs:
     name: "Release"
     runs-on: "ubuntu-latest"
     steps:
+      - uses: actions/checkout@v2
       - name: Common setup
         uses: ./.github/actions/common_setup
         with:
           cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-      - name: Push Nightly Docker Images to DockerHub
+      - name: Push Docker Images to DockerHub
         uses: ./.github/actions/push_docker_images
         with:
-          tag: ${{ inputs.version }}
+          tag: ${{ github.event.inputs.version }}
           docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
           docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -37,7 +38,7 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
           prerelease: false
-          title: "${{ inputs.version }}"
+          title: "${{ github.event.inputs.version }}"
           files: |
             *.zip
             *.tar.gz
