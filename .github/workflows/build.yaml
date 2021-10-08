@@ -63,12 +63,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 600
     steps:
+      - uses: actions/checkout@v2
+
       - name: Common setup
         uses: ./.github/actions/common_setup
         with:
           cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-
-      - uses: actions/checkout@v2
 
       - name: Build Docker Images
         run: nix-build ./nix -j auto
