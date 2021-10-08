@@ -14,6 +14,7 @@ runs:
         sudo apt-get -y install skopeo
 
     - name: Increase swap
+      shell: bash
       run: |
         free -h
 
@@ -38,6 +39,7 @@ runs:
         signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
 
     - name: Allow kvm in Nix
+      shell: bash
       run: |
         # enable required features (see https://github.com/cachix/install-nix-action/issues/19)
         mkdir -p ~/.config/nix
