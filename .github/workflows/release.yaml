@@ -1,0 +1,43 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The number of the version to release
+        required: true
+
+jobs:
+  release:
+    name: "Release"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Common setup
+        uses: ./.github/actions/common_setup
+        with:
+          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - name: Push Nightly Docker Images to DockerHub
+        uses: ./.github/actions/push_docker_images
+        with:
+          tag: ${{ inputs.version }}
+          docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v2
+      - name: Zip and move
+        run: |
+          chmod +x octo-cli-macos/octo
+          zip octo-cli-macos octo-cli-macos/octo
+          chmod +x octo-cli-linux/octo
+          zip octo-cli-linux octo-cli-linux/octo
+
+          mv octo-cli-image/* .
+          mv octopod-server-image/* .
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: "${{ inputs.version }}"
+          files: |
+            *.zip
+            *.tar.gz
