@@ -6,20 +6,22 @@
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
 $ helm repo update
-$ kubectl create ns octopod-deployment
+$ kubectl create namespace octopod-deployment
 $ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 ## Introduction
 
-This chart bootstraps an Octopod deployment in a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
+This chart bootstraps Octopod deployment in a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
 ## Prerequisites
 
-- Kubernetes 1.12+
-- Helm 3.1.0
-- PV support (for postgresql persistense)
-- nginx-ingress controller
+- PVC support (for PostgreSQL persistence)
+- Ingress contoller version <= 0.49.3 ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed. Ingress controller v1 is not currently supported
+- Kubernetes version >= 1.19.0
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed
+- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created
+- DNS is configured either using [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) (recommended) or by creating a wildcard A record for your base domain that points to the Load Balancer IP-address
 
 ## Installing the Chart
 This chart will not create or delete any namespaces for you.
@@ -53,10 +55,10 @@ To uninstall/delete the `my-release` deployment:
 $ helm -n octopod delete my-release
 ```
 
-The command removes all the Kubernetes components but PVC's associated with the postgres chart and deletes the release.
+The command removes all the Kubernetes components except PVCs associated with the postgres chart, and deletes the release.
 
 ## Note about generated values
-Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [a limitation in helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must fix these values by providing them via `--set` flags or in the [values file](https://helm.sh/docs/chart_template_guide/values_files/).
+Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [the limitation in Helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must set these values explicitly by providing them via `--set` flags or in the [values file](https://helm.sh/docs/chart_template_guide/values_files/).
 
 These values are:
 - `postgresql.postgresqlPassword` ― main db password

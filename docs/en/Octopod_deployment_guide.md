@@ -7,10 +7,13 @@ There are several options to install Octopod depending on your needs.
 You can install Octopod in any Kubernetes cluster using our [Helm chart](../../charts/octopod).
 
 
-Your cluster must satisfy following requirements:
-- PVC support
-- Ingress contoller ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed
+Your cluster must satisfy the following requirements:
+- PVC support (for PostgreSQL persistence)
+- Ingress contoller version <= 0.49.3 ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed. Ingress controller v1 is not currently supported
 - Kubernetes version >= 1.19.0
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed
+- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created
+- DNS is configured either using [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) (recommended) or by creating a wildcard A record for your base domain that points to the Load Balancer IP-address
 
 After ensuring that your cluster satisfies the requirements you can follow [the Helm installation instruction](../../charts/octopod/README.md) provided with our helm chart.
 
