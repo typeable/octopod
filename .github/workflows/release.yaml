@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Common setup
         uses: ./.github/actions/common_setup
+        with:
+          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - name: Push Nightly Docker Images to DockerHub
         uses: ./.github/actions/push_docker_images
         with:

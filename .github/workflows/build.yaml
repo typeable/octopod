@@ -50,6 +50,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Common setup
         uses: ./.github/actions/common_setup
+        with:
+          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - name: Build
         run: nix-build -A projectCross.musl64.hsPkgs.octo-cli.components.exes.octo --arg prod true -j auto
       - uses: actions/upload-artifact@v2
@@ -63,6 +65,8 @@ jobs:
     steps:
       - name: Common setup
         uses: ./.github/actions/common_setup
+        with:
+          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
 
       - uses: actions/checkout@v2
 

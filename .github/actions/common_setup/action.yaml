@@ -1,8 +1,8 @@
 name: "Common setup"
 description: "Common setup steps"
 inputs:
-  tag:
-    description: "The docker image tag to push."
+  cachixSigningKey:
+    description: "Cachix signing key"
     required: true
 runs:
   using: "composite"
@@ -36,7 +36,7 @@ runs:
       uses: cachix/cachix-action@v8
       with:
         name: octopod
-        signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+        signingKey: ${{ inputs.cachixSigningKey }}
 
     - name: Allow kvm in Nix
       shell: bash
