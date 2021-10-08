@@ -77,6 +77,8 @@ jobs:
         uses: ./.github/actions/push_docker_images
         with:
           tag: nightly
+          docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Rename Docker image archives
         run: |
