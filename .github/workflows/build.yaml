@@ -117,10 +117,17 @@ jobs:
         uses: ./.github/actions/common_setup
         with:
           cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-      - name: Push Docker Images to DockerHub
+      - name: Push Docker Release Images to DockerHub
         uses: ./.github/actions/push_docker_images
         with:
           tag: ${{ github.event.inputs.version }}
+          docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker latest Images to DockerHub
+        uses: ./.github/actions/push_docker_images
+        with:
+          tag: latest
           docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
           docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
 
