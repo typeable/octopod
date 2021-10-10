@@ -1,4 +1,4 @@
-name: Build
+name: Build and release
 on:
   push:
     branches:
@@ -10,6 +10,15 @@ on:
       - master
       - develop
       - staging
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release the new version?
+        required: false
+        default: "true"
+      version:
+        description: The version to release
+        required: true
 
 jobs:
   check-formatting:
@@ -74,7 +83,7 @@ jobs:
         run: nix-build ./nix -j auto
 
       - name: Push Nightly Docker Images to DockerHub
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         uses: ./.github/actions/push_docker_images
         with:
           tag: nightly
@@ -83,8 +92,8 @@ jobs:
 
       - name: Rename Docker image archives
         run: |
-          cp $(nix-build ./nix -j auto -A octopod-server-container) octo-cli-image.tar.gz
-          cp $(nix-build ./nix -j auto -A octo-cli-container) octopod-server-image.tar.gz
+          cp $(nix-build ./nix -j auto -A octo-cli-container) octo-cli-image.tar.gz
+          cp $(nix-build ./nix -j auto -A octopod-server-container) octopod-server-image.tar.gz
 
       - name: Upload octo CLI Image
         uses: actions/upload-artifact@v2
@@ -97,3 +106,40 @@ jobs:
         with:
           name: octopod-server-image
           path: octopod-server-image.tar.gz
+  release:
+    name: Release
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true'
+    needs: [octo-macOS, octo-linux, docker-images]
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Common setup
+        uses: ./.github/actions/common_setup
+        with:
+          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - name: Push Docker Images to DockerHub
+        uses: ./.github/actions/push_docker_images
+        with:
+          tag: ${{ github.event.inputs.version }}
+          docker_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v2
+      - name: Zip and move
+        run: |
+          chmod +x octo-cli-macos/octo
+          zip octo-cli-macos octo-cli-macos/octo
+          chmod +x octo-cli-linux/octo
+          zip octo-cli-linux octo-cli-linux/octo
+
+          mv octo-cli-image/* .
+          mv octopod-server-image/* .
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: "${{ github.event.inputs.version }}"
+          files: |
+            *.zip
+            *.tar.gz
