@@ -22,5 +22,5 @@ runs:
     - name: Push Docker Images to DockerHub
       shell: bash
       run: |
-        skopeo copy docker-archive:$(nix-build ./nix -j auto -A octopod-server-container) docker://ilyakooo0/octopod:${{ inputs.tag }}
-        skopeo copy docker-archive:$(nix-build ./nix -j auto -A octo-cli-container) docker://ilyakooo0/octo:${{ inputs.tag }}
+        skopeo copy docker-archive:$(nix-build ./nix -j auto -A octopod-server-container) docker://typeable/octopod:${{ inputs.tag }}
+        skopeo copy docker-archive:$(nix-build ./nix -j auto -A octo-cli-container) docker://typeable/octo:${{ inputs.tag }}
