@@ -92,8 +92,8 @@ jobs:
 
       - name: Rename Docker image archives
         run: |
-          cp $(nix-build ./nix -j auto -A octopod-server-container) octo-cli-image.tar.gz
-          cp $(nix-build ./nix -j auto -A octo-cli-container) octopod-server-image.tar.gz
+          cp $(nix-build ./nix -j auto -A octo-cli-container) octo-cli-image.tar.gz
+          cp $(nix-build ./nix -j auto -A octopod-server-container) octopod-server-image.tar.gz
 
       - name: Upload octo CLI Image
         uses: actions/upload-artifact@v2
