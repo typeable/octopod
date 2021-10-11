@@ -24,7 +24,7 @@ This chart bootstraps Octopod deployment in a [Kubernetes](http://kubernetes.io)
 
 ### Optional
 
-- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed, if you want to automatically get SSL certificates from Let's Encrypt.
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed, if you want to get SSL certificates from Let's Encrypt automatically.
 - Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created. By default we assume that it would be named `letsencrypt`. You can change it by setting `ingress.tls.clusterIssuer` parameter.
 
 
