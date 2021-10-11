@@ -8,14 +8,39 @@ You can install Octopod in any Kubernetes cluster using our [Helm chart](../../c
 
 
 Your cluster must satisfy the following requirements:
+
+#### Mandatory requirements.
+
+- Kubernetes version >= 1.12.0 <= 1.22.0
 - PVC support (for PostgreSQL persistence)
-- Ingress contoller version <= 0.49.3 ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed. Ingress controller v1 is not currently supported
-- Kubernetes version >= 1.19.0
-- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed
-- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created
-- DNS is configured either using [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) (recommended) or by creating a wildcard A record for your base domain that points to the Load Balancer IP-address
+- [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/) contoller version <= 0.49.3 installed. NGINX Ingress controller v1.x.x is not currently supported
+
+#### Optional requirements.
+
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed, if you want to automatically get SSL certificates from Let's Encrypt.
 
 After ensuring that your cluster satisfies the requirements you can follow [the Helm installation instruction](../../charts/octopod/README.md) provided with our helm chart.
+
+### Running Ocopod in production considerations.
+
+You must consider several things before running Octopod in production and onboard your team to it.
+
+##### DNS records
+
+Octopod will create a lot of on-demand environments and they must reachable for your team. Usually it's implies creating a lot of DNS records, pointing to Octopod managed environments. This process must be automated.
+
+We highly recommend you to use [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) as very versatile solution for DNS records automation. 
+In certain cases, however it isn't possible to use ExternalDNS. In this cases you can use wildcard DNS record, pointing to your ingress controller's service endpoint. We are not recommend using wildcard DNS records, even though they are much easier to implement, they could lead to hard-to-trace errors and too implementation dependant.
+
+##### Certificates
+
+If you want to dynamically request SSL certificates from Let's Encrypt you must be aware of their [limits](https://letsencrypt.org/docs/rate-limits/). Because of this limits we recommend you to use wildcard certificate for all Octopod deployments. Wildcard certificate has it's limitations, like being valid only for one subdomain. This implies a need for planning your deployments DNS naming.
+
+##### Resources
+
+This is most obvious one of the three, but you need to plan your cluster capacity based on your team needs. Setting [resource limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) for your workloads is one of the best practices of using kubernetes, and must have done this already.
+Also consider using autoscaling it really helps to reduce costs in highly dynamic environments.
+
 
 ### If you want to try it locally
 

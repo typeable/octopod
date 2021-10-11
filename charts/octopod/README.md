@@ -16,12 +16,17 @@ This chart bootstraps Octopod deployment in a [Kubernetes](http://kubernetes.io)
 
 ## Prerequisites
 
+### Mandatory
+
+- Kubernetes version >= 1.12.0 <= 1.22.0
 - PVC support (for PostgreSQL persistence)
-- Ingress contoller version <= 0.49.3 ([ingress-nginx](https://kubernetes.github.io/ingress-nginx/)) installed. Ingress controller v1 is not currently supported
-- Kubernetes version >= 1.19.0
-- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed
-- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created
-- DNS is configured either using [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) (recommended) or by creating a wildcard A record for your base domain that points to the Load Balancer IP-address
+- [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/) contoller version <= 0.49.3 installed. NGINX Ingress controller v1.x.x is not currently supported
+
+### Optional
+
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed, if you want to automatically get SSL certificates from Let's Encrypt.
+- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created. By default we assume that it would be named `letsencrypt`. You can change it by setting `ingress.tls.clusterIssuer` parameter.
+
 
 ## Installing the Chart
 This chart will not create or delete any namespaces for you.
