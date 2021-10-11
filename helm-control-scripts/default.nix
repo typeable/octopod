@@ -20,9 +20,6 @@ let
 
     buildInputs = [ pkgs.openssl.dev ] ++
       pkgs.lib.optional pkgs.stdenv.isDarwin pkgs.darwin.apple_sdk.frameworks.Security;
-    dontStrip = false;
-    dontPatchELF = false;
-    enableDeadCodeElimination = true;
   };
 in
 scripts
