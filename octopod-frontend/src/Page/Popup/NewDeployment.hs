@@ -8,7 +8,6 @@ module Page.Popup.NewDeployment (newDeploymentPopup) where
 import Control.Lens
 import Control.Monad
 import Data.Functor
-import Data.Generics.Sum
 import Data.Monoid
 import qualified Data.Text as T
 import Reflex.Dom as R
@@ -30,21 +29,22 @@ newDeploymentPopup ::
   Event t () ->
   -- | \"Close\" event.
   Event t () ->
-  m ()
-newDeploymentPopup showEv hideEv = void $
+  m (Event t Deployment)
+newDeploymentPopup showEv hideEv =
   catchReturns $ \enterEv ->
     sidebar showEv hideEv $
       const $ mdo
         divClass "popup__body" $ mdo
           (closeEv', (enterEv <>) -> saveEv) <- newDeploymentPopupHeader enabledDyn sentDyn
-          deploymentMDyn <- newDeploymentPopupBody respEv
+          deploymentMDyn <- newDeploymentPopupBody (snd <$> respEv)
           respEv <-
             holdDyn (pure never) >=> networkView >=> switchHold never $
               tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
                 pb <- getPostBuild
-                createEndpoint
-                  (pure $ Right dep)
-                  pb
+                fmap (dep,)
+                  <$> createEndpoint
+                    (pure $ Right dep)
+                    pb
           sentDyn <-
             holdDyn False $
               leftmost
@@ -52,10 +52,12 @@ newDeploymentPopup showEv hideEv = void $
                 , False <$ respEv
                 ]
           let successEv =
-                fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
-              closeEv = leftmost [closeEv', successEv]
+                respEv `fforMaybe` \case
+                  (dep, commandResponse -> Just Success {}) -> Just dep
+                  _ -> Nothing
+              closeEv = leftmost [closeEv', successEv $> ()]
               enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
-          pure (never, closeEv)
+          pure (successEv, closeEv)
 
 -- | The header of sidebar contains control buttons: \"Save\" and \"Close\".
 newDeploymentPopupHeader ::

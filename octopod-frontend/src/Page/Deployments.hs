@@ -93,7 +93,9 @@ deploymentsWidget updAllEv dfis = do
       termDyn <- debounceDyn 0.3 termDyn'
       (okUpdEv, errUpdEv, editEv) <- deploymentsListWidget hReq updAllEv termDyn dfis
       pure (showNewDeploymentEv', deSearch <$> editEv)
-  void $ newDeploymentPopup showNewDeploymentEv never
+  newDepEv <- newDeploymentPopup showNewDeploymentEv never
+  setRoute $ newDepEv <&> \newDep -> DashboardRoute :/ Just (newDep ^. #name)
+
   void $ editDeploymentPopup editEv never
 
 -- | Div wrappers.
