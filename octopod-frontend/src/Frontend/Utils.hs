@@ -33,6 +33,7 @@ module Frontend.Utils
     applicationOverridesWidget,
     applicationOverridesWidgetSearched,
     debounceDyn,
+    catchReturns,
   )
 where
 
@@ -679,3 +680,8 @@ debounceDyn t d = do
   currD <- sample . current $ d
   ev <- debounce t (updated d)
   holdDyn currD ev
+
+catchReturns :: (DomBuilder t m, MonadFix m) => (Event t () -> m a) -> m a
+catchReturns f = mdo
+  (divEl, a) <- el' "div" $ f $ ($> ()) . ffilter (== 13) $ domEvent Keypress divEl
+  pure a

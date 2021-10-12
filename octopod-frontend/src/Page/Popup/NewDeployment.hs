@@ -32,29 +32,30 @@ newDeploymentPopup ::
   Event t () ->
   m ()
 newDeploymentPopup showEv hideEv = void $
-  sidebar showEv hideEv $
-    const $ mdo
-      divClass "popup__body" $ mdo
-        (closeEv', saveEv) <- newDeploymentPopupHeader enabledDyn sentDyn
-        deploymentMDyn <- newDeploymentPopupBody respEv
-        respEv <-
-          holdDyn (pure never) >=> networkView >=> switchHold never $
-            tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
-              pb <- getPostBuild
-              createEndpoint
-                (pure $ Right dep)
-                pb
-        sentDyn <-
-          holdDyn False $
-            leftmost
-              [ True <$ saveEv
-              , False <$ respEv
-              ]
-        let successEv =
-              fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
-            closeEv = leftmost [closeEv', successEv]
-            enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
-        pure (never, closeEv)
+  catchReturns $ \enterEv ->
+    sidebar showEv hideEv $
+      const $ mdo
+        divClass "popup__body" $ mdo
+          (closeEv', (enterEv <>) -> saveEv) <- newDeploymentPopupHeader enabledDyn sentDyn
+          deploymentMDyn <- newDeploymentPopupBody respEv
+          respEv <-
+            holdDyn (pure never) >=> networkView >=> switchHold never $
+              tagMaybe (current deploymentMDyn) saveEv <&> \dep -> do
+                pb <- getPostBuild
+                createEndpoint
+                  (pure $ Right dep)
+                  pb
+          sentDyn <-
+            holdDyn False $
+              leftmost
+                [ True <$ saveEv
+                , False <$ respEv
+                ]
+          let successEv =
+                fmapMaybe (preview (_Ctor @"Success") <=< commandResponse) respEv
+              closeEv = leftmost [closeEv', successEv]
+              enabledDyn = zipDynWith (&&) (not <$> sentDyn) (isJust <$> deploymentMDyn)
+          pure (never, closeEv)
 
 -- | The header of sidebar contains control buttons: \"Save\" and \"Close\".
 newDeploymentPopupHeader ::
