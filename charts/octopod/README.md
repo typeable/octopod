@@ -5,20 +5,28 @@
 ## TL;DR
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
-$ kubectl create ns octopod-deployment
+$ helm repo update
+$ kubectl create namespace octopod-deployment
 $ helm install octopod typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
 ## Introduction
 
-This chart bootstraps an Octopod deployment in a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
+This chart bootstraps Octopod deployment in a [Kubernetes](http://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager.
 
 ## Prerequisites
 
-- Kubernetes 1.12+
-- Helm 3.1.0
-- PV support (for postgresql persistense)
-- nginx-ingress controller
+### Mandatory
+
+- Kubernetes version >= 1.12.0 <= 1.22.0
+- PVC support (for PostgreSQL persistence)
+- [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/) contoller version <= 0.49.3 installed. NGINX Ingress controller v1.x.x is not currently supported
+
+### Optional
+
+- Cert Manager ([cert-manager](https://cert-manager.io/docs/installation/)) installed, if you want to get SSL certificates from Let's Encrypt automatically.
+- Cluster issuer ([ACME Issuer](https://cert-manager.io/docs/configuration/acme/#creating-a-basic-acme-issuer)) created. By default we assume that it would be named `letsencrypt`. You can change it by setting `ingress.tls.clusterIssuer` parameter.
+
 
 ## Installing the Chart
 This chart will not create or delete any namespaces for you.
@@ -31,13 +39,14 @@ You'll need to create 2 namespaces before installing:
    ```
 2. A namespace in which Octopod will deploy all your deployments (configured in `octopod.deploymentNamespace`):
    ```console
-   $ kubectl create namespace octopod-deployments
+   $ kubectl create namespace octopod-deployment
    ```
   
 To install the chart with the release name `my-release` execute:
 
 ```console
 $ helm repo add typeable https://typeable.github.io/octopod/
+$ helm repo update
 $ helm -n octopod install my-release typeable/octopod --set octopod.baseDomain="your-domain.com"
 ```
 
@@ -51,10 +60,10 @@ To uninstall/delete the `my-release` deployment:
 $ helm -n octopod delete my-release
 ```
 
-The command removes all the Kubernetes components but PVC's associated with the postgres chart and deletes the release.
+The command removes all the Kubernetes components except PVCs associated with the postgres chart, and deletes the release.
 
 ## Note about generated values
-Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [a limitation in helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must fix these values by providing them via `--set` flags or in the [values file](https://helm.sh/docs/chart_template_guide/values_files/).
+Some values (such as passwords) in this chart (and its dependencies) are generated automatically, but due to [the limitation in Helm](https://github.com/helm/charts/issues/5167) the values are changing on every upgrade. To prevent this you must set these values explicitly by providing them via `--set` flags or in the [values file](https://helm.sh/docs/chart_template_guide/values_files/).
 
 These values are:
 - `postgresql.postgresqlPassword` ― main db password
@@ -155,7 +164,7 @@ $ helm install my-release -f values.yaml .
 ## Configuration and installation details
 
 If you want to have authentication for Octopod UI you can use project like [Oauth2-Proxy](https://github.com/oauth2-proxy/oauth2-proxy) or directly use your oauth provider.
-After that you can add following annotations to UI ingress (considering that your oauth provider installed on oath.example.com):
+After that you can add following annotations to UI ingress (considering that your oauth provider installed on oauth.example.com):
 ```yaml
 ingress:
   ui:
@@ -163,3 +172,11 @@ ingress:
       nginx.ingress.kubernetes.io/auth-url: "https://oauth.example.com/oauth2/auth"
       nginx.ingress.kubernetes.io/auth-signin: "https://oauth.example.com/oauth2/start?rd=/redirect/$http_host$request_uri"
 ```
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

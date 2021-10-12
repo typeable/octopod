@@ -78,3 +78,11 @@ Fot more information see the [integration guide](Integration.md).
 - _Octopod Server_ ― the server responsible for managing deployments
 - _deployment control scripts_ ― scripts used to interact with your specific environment setup
 - _web UI_ ― the interface developers, project managers, QA engineers, etc. use to manage stagings.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../../img/typeable_logo.svg" width="177px"></img></a></p>

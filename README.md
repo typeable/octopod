@@ -1,5 +1,5 @@
 <p align="center">
-   <a href="#"><img src="img/logo.svg" width="400"></img></a>
+   <a href="#"><img src="img/logo.svg" width="500"></img></a>
 </p>
 
 <p align="center">
@@ -132,6 +132,13 @@ There are several places where things can go wrong:
 ## ❓ Still have questions?
 
 If you still have questions, be sure to ask them in our [Octopod Discussions](https://github.com/typeable/octopod/discussions).
+
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
 
 <p align="center"><a href="https://typeable.io"><img src="img/typeable_logo.svg" width="177px"></img></a></p>
 

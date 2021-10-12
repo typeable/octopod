@@ -1,7 +1,7 @@
 # Generic scripts
 
 This is a complete suite of Octopod control scripts to deploy helm charts.
-You can get pre-built docker images from [hub.docker.com/r/typeable/octopod-generic-utils](https://hub.docker.com/r/typeable/octopod-generic-utils).
+You can get pre-built docker images from [typeable/octopod-helm-control-scripts](https://hub.docker.com/repository/docker/typeable/octopod-helm-control-scripts).
 
 ### Contents
 
@@ -40,3 +40,11 @@ Also, several environment variables are used to parametrize the default behavior
 - chart_name – the name of a chart you want to install
 
 These parameters, if set up in the `DEFAULTS` variable, will be passed to every deployment unless overridden in the "deployment overrides" section of an Octopod deployment configuration.
+
+<br />
+
+<p align="center">
+  <i>Star the project of you like it</i>
+</p>
+
+<p align="center"><a href="https://typeable.io"><img src="../img/typeable_logo.svg" width="177px"></img></a></p>
