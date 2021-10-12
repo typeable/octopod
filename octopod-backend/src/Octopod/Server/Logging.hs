@@ -41,7 +41,7 @@ import Types hiding (stdout)
 data LogConfig = LogConfig
   { project :: ProjectName
   , debug :: Bool
-  , minimal :: Bool
+  , prodLogs :: Bool
   }
   deriving stock (Generic)
 
@@ -77,11 +77,11 @@ makeLogEnv conf = do
   env' <- registerScribe "stdout" scribe defaultScribeSettings env
   pure env'
   where
-    verbosity = if conf ^. #minimal then V0 else V3
+    verbosity = if conf ^. #prodLogs then V3 else V0
     severity = if conf ^. #debug then DebugS else InfoS
     formatter :: LogItem a => ItemFormatter a
     formatter =
-      if not $ conf ^. #minimal
+      if conf ^. #prodLogs
         then \color verb item -> bracketFormat color verb item {_itemPayload = SingleLineify $ _itemPayload item}
         else \color verb item ->
           brackets (fromText $ formatAsLogTime $ _itemTime item)
