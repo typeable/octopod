@@ -2,14 +2,7 @@
 
 ## Git flow
 
-`master` contains the latest "release version" only.
-
-All development should be done in the `develop` branch.
-
-Feature PRs are created to the `develop` branch and merged with all commits **squashed**. This leads to us having every commit in the `develop` branch corresponds to exactly one feature or bug fix.
-
-When a release is ready, the `develop` branch is merged into the `master` branch using **rebase and merge**. This makes the `master` branch have every commit be a feature or bug fix. Merging to master triggers a CI script that collects all commits since the last merge and creates a new release with a change log of all commits.
-
+Feature branches are merged into `master`. There is no `develop` branch.
 ## Building
 
 ### Nix Installation
@@ -22,13 +15,13 @@ curl https://nixos.org/nix/install | sh
 
 ### Nix cache
 
-#### Reflex platform cache
+#### Haskell.nix cache
 
-To speedup initial project builds you will want to set up the Reflex Platform binary nix cache – append the following to `/etc/nix/nix.conf`:
+To speedup initial project builds you will want to set up the haskell.nix binary nix cache – append the following to `/etc/nix/nix.conf`:
 
 ```
-binary-caches = https://cache.nixos.org https://nixcache.reflex-frp.org
-binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=
+binary-caches = https://hydra.iohk.io https://cache.nixos.org/
+binary-cache-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=
 binary-caches-parallel-connections = 40
 ```
 
