@@ -190,8 +190,8 @@ runOctopodServer sha = do
   powerAuthorizationHeader <- AuthHeader . BSC.pack <$> getEnvOrDie "POWER_AUTHORIZATION_HEADER"
   invalidationTime <- fromInteger . maybe (60 * 60 * 24) read <$> lookupEnv "CACHE_INVALIDATION_TIME"
   updateTime <- fromInteger . maybe (60 * 10) read <$> lookupEnv "CACHE_UPDATE_TIME"
-  isDebug <- isJust <$> lookupEnv "DEBUG"
-  isProdLogs <- isJust <$> lookupEnv "PROD_LOGS"
+  isDebug <- (== Just "true") <$> lookupEnv "DEBUG"
+  isProdLogs <- (/= Just "false") <$> lookupEnv "PROD_LOGS"
   let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppM' x a)
       cacheMap f = CM.initCacheMap invalidationTime updateTime $ \x -> AppM' $ f x
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
