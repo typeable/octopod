@@ -164,6 +164,8 @@ in
         export CACHE_INVALIDATION_TIME="60"
         export CACHE_UPDATE_TIME="20"
         export CONTROL_SCRIPT_TIMEOUT="10"
+        export DEBUG=true
+        export PROD_LOGS=false
         ${hsPkgs.octopod-backend.components.exes.octopod-exe}/bin/octopod-exe \
             --port 4443 \
             --ui-port 3002 \

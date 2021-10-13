@@ -43,9 +43,8 @@ import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
-import Octopod.Server.Logger
+import Octopod.Server.Logging
 import System.Exit
-import System.Log.FastLogger
 import System.Process (terminateProcess)
 import System.Process.Typed
 import Types
@@ -119,11 +118,11 @@ archiveCommandArgs = genericDeploymentCommandArgs
 cleanupCommandArgs :: GenericDeploymentCommandArgs m r
 cleanupCommandArgs = genericDeploymentCommandArgs
 
-archiveCheckArgs :: GenericDeploymentCommandArgs m r
-archiveCheckArgs = genericDeploymentCommandArgs
-
 checkCommandArgs :: GenericDeploymentCommandArgs m r
 checkCommandArgs = genericDeploymentCommandArgs
+
+archiveCheckArgs :: GenericDeploymentCommandArgs m r
+archiveCheckArgs = genericDeploymentCommandArgs
 
 configCheckCommandArgs :: GenericDeploymentCommandArgs m r
 configCheckCommandArgs = genericDeploymentCommandArgs
@@ -179,9 +178,9 @@ notificationCommandArgs dName old new = do
       ]
 
 runCommandArgs ::
-  ( MonadReader r m
+  ( KatipContext m
   , MonadBase IO m
-  , HasType TimedFastLogger r
+  , MonadReader r m
   , HasType ControlScriptTimeout r
   ) =>
   (r -> Command) ->
@@ -192,8 +191,8 @@ runCommandArgs f args = do
   runCommandArgs' cmd args
 
 runCommandArgs' ::
-  ( MonadBase IO m
-  , HasType TimedFastLogger r
+  ( KatipContext m
+  , MonadBase IO m
   , MonadReader r m
   , HasType ControlScriptTimeout r
   ) =>
@@ -202,14 +201,7 @@ runCommandArgs' ::
   m (ExitCode, Stdout, Stderr, Duration)
 runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
   t1 <- liftBase getCurrentTime
-
-  logger <- asks (getTyped @TimedFastLogger)
-  let logText = T.unwords (cmd : fmap T.pack args)
-  liftBase $ logInfo logger $ "calling: " <> logText
   (ec, out, err) <- runCommand (T.unpack cmd) args
-  liftBase $
-    logInfo logger $
-      "calling `" <> logText <> "` exited with: " <> show' ec
   t2 <- liftBase getCurrentTime
   let elTime = elapsedTime t2 t1
   return (ec, out, err, elTime)
@@ -220,7 +212,8 @@ elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime`
 
 -- | Helper to run command with pipes.
 runCommand ::
-  ( MonadBase IO m
+  ( KatipContext m
+  , MonadBase IO m
   , MonadReader r m
   , HasType ControlScriptTimeout r
   ) =>
@@ -228,6 +221,7 @@ runCommand ::
   [String] ->
   m (ExitCode, Stdout, Stderr)
 runCommand cmd args = do
+  logLocM DebugS $ "Calling control script: " <> logStr cmd <> " " <> show' args
   ControlScriptTimeout timeout <- asks getTyped
   let pc =
         proc cmd args
@@ -243,6 +237,10 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
+  katipAddContext (FilePayload "stdout" $ TL.toStrict out) $
+    katipAddContext (FilePayload "stderr" $ TL.toStrict err) $
+      logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
+        "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
