@@ -33,10 +33,10 @@ editDeploymentPopup ::
   Event t () ->
   -- | Event with a flag showing the current state of the request.
   m (Event t Bool)
-editDeploymentPopup showEv hideEv = sidebar showEv hideEv $ \dfi -> mdo
+editDeploymentPopup showEv hideEv = catchReturns $ \enterEv -> sidebar showEv hideEv $ \dfi -> mdo
   divClass "popup__body" $ mdo
     let dname = dfi ^. dfiName
-    (closeEv', saveEv) <- editDeploymentPopupHeader dname enabledDyn sentDyn
+    (closeEv', (enterEv <>) -> saveEv) <- editDeploymentPopupHeader dname enabledDyn sentDyn
     deploymentMDyn <- editDeploymentPopupBody dfi respEv
     respEv <-
       holdDyn (pure never) >=> networkView >=> switchHold never $

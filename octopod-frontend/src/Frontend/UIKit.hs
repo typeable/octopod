@@ -238,6 +238,7 @@ octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn =
             .~ ( "type" =: "text"
                   <> "class" =: "input__widget"
                   <> "placeholder" =: placeholder
+                  <> "spellcheck" =: "false"
                )
           & inputElementConfig_setValue .~ inValEv
           & inputElementConfig_initialValue .~ inVal
