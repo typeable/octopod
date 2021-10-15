@@ -41,6 +41,16 @@ Also, several environment variables are used to parametrize the default behavior
 
 These parameters, if set up in the `DEFAULTS` variable, will be passed to every deployment unless overridden in the "deployment overrides" section of an Octopod deployment configuration.
 
+### Authorization notes
+
+Most of the control scripts require that credentials are passed to them. Some credentials, like the Helm ones are quite obvious, but others are not.
+
+`config_check` in addition to the Helm credentials require access to the docker registry to check availability of the image tags. 
+
+Right now only plain docker registry and ECR are supported. ECR client needs to have a valid AWS credentials set via [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html), but if you are using EKS you don't need to add any additional configuration.
+
+Private registries, like Harbor with authorization haven't been tested with this set of scripts. If you are using private registry and have troubles with the `config_check` script, please file an issue.
+
 <br />
 
 <p align="center">
