@@ -3,7 +3,31 @@ entries:
   octopod:
   - apiVersion: v2
     appVersion: "1.4"
-    created: "2021-10-05T15:26:05.570057419+03:00"
+    created: "2021-10-15T15:57:58.095998237+03:00"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 10.5.3
+    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    digest: 7068cb55898b1e9fc54f303576221c93ed103edb6fa73c3525c48f08f775d75e
+    home: https://github.com/typeable/octopod
+    keywords:
+    - kubernetes
+    - octopod
+    maintainers:
+    - email: a.sizov@typeable.io
+      name: Alex Sizov
+    name: octopod
+    sources:
+    - https://github.com/typeable/octopod
+    type: application
+    urls:
+    - octopod-0.6.2.tgz
+    version: 0.6.2
+  - apiVersion: v2
+    appVersion: "1.4"
+    created: "2021-10-15T15:57:58.090147157+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -27,7 +51,7 @@ entries:
     version: 0.6.1
   - apiVersion: v2
     appVersion: "1.4"
-    created: "2021-10-05T15:26:05.566933804+03:00"
+    created: "2021-10-15T15:57:58.083520334+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -51,7 +75,7 @@ entries:
     version: 0.6.0
   - apiVersion: v2
     appVersion: 1.3.1
-    created: "2021-10-05T15:26:05.56319091+03:00"
+    created: "2021-10-15T15:57:58.078349048+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -75,7 +99,7 @@ entries:
     version: 0.5.1
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-10-05T15:26:05.55961597+03:00"
+    created: "2021-10-15T15:57:58.072278637+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -99,7 +123,7 @@ entries:
     version: 0.4.3
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-10-05T15:26:05.556410721+03:00"
+    created: "2021-10-15T15:57:58.068780247+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -123,7 +147,7 @@ entries:
     version: 0.4.2
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-10-05T15:26:05.552728583+03:00"
+    created: "2021-10-15T15:57:58.064514657+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -147,7 +171,7 @@ entries:
     version: 0.4.1
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-10-05T15:26:05.549223728+03:00"
+    created: "2021-10-15T15:57:58.060896963+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -171,7 +195,7 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: 1.2.1
-    created: "2021-10-05T15:26:05.544365567+03:00"
+    created: "2021-10-15T15:57:58.057607725+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -195,7 +219,7 @@ entries:
     version: 0.3.2
   - apiVersion: v2
     appVersion: "1.2"
-    created: "2021-10-05T15:26:05.540547222+03:00"
+    created: "2021-10-15T15:57:58.052609786+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -219,7 +243,7 @@ entries:
     version: 0.3.1
   - apiVersion: v2
     appVersion: "1.2"
-    created: "2021-10-05T15:26:05.537357318+03:00"
+    created: "2021-10-15T15:57:58.047954111+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -243,7 +267,7 @@ entries:
     version: 0.3.0
   - apiVersion: v2
     appVersion: "1.1"
-    created: "2021-10-05T15:26:05.533636682+03:00"
+    created: "2021-10-15T15:57:58.043867832+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -265,4 +289,4 @@ entries:
     urls:
     - octopod-0.2.0.tgz
     version: 0.2.0
-generated: "2021-10-05T15:26:05.529701682+03:00"
+generated: "2021-10-15T15:57:58.040329459+03:00"
