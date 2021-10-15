@@ -8,6 +8,9 @@ echo
 echo "    🔖  If you encounter any issues during the installation please open an issue:"
 echo "          https://github.com/typeable/octopod/issues/new"
 echo
+echo "    ℹ️  Please note that you might experience performance issues if you have low resouce limits:"
+echo "          https://github.com/typeable/octopod/blob/master/docs/en/Octopod_deployment_guide.md#if-you-want-to-try-it-locally"
+echo
 
 for cmd in kind kubectl helm; do
    if ! command -v $cmd &> /dev/null; then
