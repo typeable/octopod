@@ -68,156 +68,29 @@ A _Docker Image_ with [_control scripts_](#-control-scripts) should be provided 
 
 ## Process view
 
-Here we provide sequence diagrams for every basic operation that can be performed in _Octopod_. These operations call [_control scripts_](#-control-scripts). On the diagrams, they are labeled as _ControlScripts_.
+Here we provide sequence diagrams for every basic operation that can be performed in _Octopod_. These operations call [_control scripts_](#-control-scripts). On the diagrams, they are labeled as _Control Scripts_.
 
-### ✨ Create
+### ✨ Deployment creation
 
-_Create_ – creates a new deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional configurations. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create).
-
-The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn creates the deployment in the _Kubernetes cluster_. It might call something like:
-
-```bash
-helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
-    --set "global.project-name=$project_name" \
-    --set "global.base-domain=$base-domain" \
-    --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_configuration_1" \
-    --set "app.bar=$deployment_configuration_1" \
-    --wait \
-    --timeout 300
-```
-
-<details>
-  <summary>Create via CLI sequence diagram</summary>
-
-![Create](../diagrams/images/technical-architecture-create-via-cli.png)
-
-</details>
-
-<details>
-  <summary>Create via UI sequence diagram</summary>
-
-![Create](../diagrams/images/technical-architecture-create-via-ui.png)
-
-</details>
-
-### 🔧 Update
-
-_Update_ – updates an existing deployment. The main inputs include the name of the deployment, the _Docker Image tag_ and optional configurations. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-update).
-
-_configurations_ are read from the database and merged with the new changes. All arguments are forwarded to the [_update_](Control_scripts.md#-update) script which in turn updates the specified deployment with the new parameters in the _Kubernetes cluster_. It might call something like:
-
-```bash
-helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
-    --set "global.project-name=$project_name" \
-    --set "global.base-domain=$base-domain" \
-    --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_configuration_1" \
-    --set "app.bar=$deployment_configuration_1" \
-    --wait \
-    --timeout 300
-```
+![Create](../diagrams/images/technical-architecture-create.png)
 
 
-<details>
-  <summary>Update via CLI sequence diagram</summary>
+### 🔧 Deployment update
 
-![Update](../diagrams/images/technical-architecture-update-via-cli.png)
-
-</details>
-
-<details>
-  <summary>Update via UI sequence diagram</summary>
-
-![Update](../diagrams/images/technical-architecture-update-via-ui.png)
-
-</details>
+![Update](../diagrams/images/technical-architecture-update.png)
 
 ### 🗃 Archive
 
-_Delete_ – archives a deployment. It should only free the computational resources (_Pods_). _Persistent Volumes_ should not be deleted ― they are cleared in the [_cleanup_](#-cleanup) process. This operation can be undone with the [_restore_](#-restore) command.
-
-The main argument is the name that identifies the deployment. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-archive).
-
-The arguments are forwarded to the [_delete_](Control_scripts.md#-archive) script which in turn frees the computational resources. It might call something like:
-
-```bash
-helm delete "$name" --purge
-```
-
-<details>
-  <summary>Archive via CLI sequence diagram</summary>
-
-![Archive](../diagrams/images/technical-architecture-archive-via-cli.png)
-
-</details>
-
-<details>
-  <summary>Archive via UI sequence diagram</summary>
-
-![Archive](../diagrams/images/technical-architecture-archive-via-ui.png)
-
-</details>
+![Archive](../diagrams/images/technical-architecture-archive.png)
 
 ### 🚮 Cleanup
 
-_Cleanup_ – releases **all** resources captured by the deployment.
 
-The main argument is the name that identifies the deployment. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-cleanup). It can only be called after [_archive_](#-archive) has been executed.
-
-The arguments are forwarded to the [_cleanup_](Control_scripts.md#-cleanup) script which in turn frees all resources captured by the given deployment. It might call something like:
-
-```bash
-kubectl delete pvc -n "$namespace" "$name-postgres-pvc"
-kubectl delete certificate -n "$namespace"  "$name-postgres-cert"
-```
-
-<details>
-  <summary>Cleanup via CLI sequence diagram</summary>
-
-![Cleanup](../diagrams/images/technical-architecture-cleanup-via-cli.png)
-
-</details>
-
-<details>
-  <summary>Cleanup via UI sequence diagram</summary>
-
-![Cleanup](../diagrams/images/technical-architecture-cleanup-via-ui.png)
-
-</details>
+![Cleanup](../diagrams/images/technical-architecture-cleanup.png)
 
 ### 🔁 Restore
 
-_restore_ – restores an archived deployment in the state it was last in. Calls the same _script_ that is called in [_create_](#-create).
-
-The main argument is the name that identifies the deployment. A more detailed description can be found in the [control scripts documentation](Control_scripts.md#-create). It can only be called after [_archive_](#-archive) has been executed.
-
-All necessary setup information is read from the database: _configurations_ and the _Docker Image tag_. The arguments are forwarded to the [_create_](Control_scripts.md#-create) script which in turn recreates the deployment. It might call something like:
-
-```bash
-helm upgrade --install --namespace "$namespace" "$name" "$deployment_chart" \
-    --set "global.project-name=$project_name" \
-    --set "global.base-domain=$base-domain" \
-    --set "app.tag=$tag" \
-    --set "app.env.foo=$app_env_configuration_1" \
-    --set "app.bar=$deployment_configuration_1" \
-    --wait \
-    --timeout 300
-```
-
-<details>
-  <summary>Restore via CLI sequence diagram</summary>
-
-![Restore](../diagrams/images/technical-architecture-restore-via-cli.png)
-
-</details>
-
-<details>
-  <summary>Restore via UI sequence diagram</summary>
-
-![Restore](../diagrams/images/technical-architecture-restore-via-ui.png)
-
-</details>
+![Restore](../diagrams/images/technical-architecture-restore.png)
 
 ## 👨‍💻👩‍💻 How we use it
 

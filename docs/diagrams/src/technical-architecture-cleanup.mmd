@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Octopod Backend
+    participant Control Scipts
+    participant Octopod DB
+
+    activate Octopod Backend
+
+    Octopod Backend ->>+ Control Scipts: cleanup – Clean up deployment resouces
+    Control Scipts -->>- Octopod Backend: Deployment resouces cleaned up
+
+    Octopod Backend ->>+ Octopod DB: Delete everything related to the deployment
+    Octopod DB -->>- Octopod Backend: Everything deleted
+
+    deactivate Octopod Backend

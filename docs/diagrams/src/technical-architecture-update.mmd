@@ -1,0 +1,46 @@
+sequenceDiagram
+    participant User
+    participant Octopod Frontend
+    participant Octopod Backend
+    participant Control Scipts
+    participant Octopod DB
+
+    User ->>+ Octopod Frontend: Update deployment
+    activate Octopod Frontend
+
+    Octopod Frontend ->>+ Octopod Backend: Update deployment
+    Octopod Backend ->>+ Control Scipts: config_check – Check deployment config
+    Control Scipts ->>- Octopod Backend: Deployment config OK
+
+    Octopod Backend -->> Octopod Frontend: Delpoyment update started
+    Octopod Frontend -->>- User: Close deployment popup
+
+
+    Octopod Backend ->>+ Octopod DB: Update deployment config
+    Octopod DB -->>- Octopod Backend: Deployment config updated
+
+
+    Octopod Backend ->>+ Control Scipts: info – Get deployment metadata
+    Control Scipts -->>- Octopod Backend: Deployment metadata
+
+    Octopod Backend ->>+ Octopod DB: Set deployment metadata
+    Octopod DB -->>- Octopod Backend: Deployment metadata set
+
+    Octopod Backend ->>+ Control Scipts: update – Update the delpoyment
+    Control Scipts -->>- Octopod Backend: Deployment update started
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to UpdatePending
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    loop
+        Octopod Backend ->>+ Control Scipts: check – Is the deployment up?
+        Control Scipts -->>- Octopod Backend: deployment is not up
+    end
+
+    Octopod Backend ->>+ Control Scipts: check – Is the deployment up?
+    Control Scipts -->>- Octopod Backend: deployment is up!
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to Running
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    deactivate Octopod Backend

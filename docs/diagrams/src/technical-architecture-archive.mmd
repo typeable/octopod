@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant User
+    participant Octopod Frontend
+    participant Octopod Backend
+    participant Control Scipts
+    participant Octopod DB
+
+    User ->>+ Octopod Frontend: Archive deployment
+    activate Octopod Frontend
+
+    Octopod Frontend ->>+ Octopod Backend: Archive deployment
+
+
+    Octopod Backend ->>+ Control Scipts: archive – Archive the deployment
+    Control Scipts -->>- Octopod Backend: Deployment archive started
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to ArchivePending
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    loop
+        Octopod Backend ->>+ Control Scipts: archive_check – Is the deployment archived?
+        Control Scipts -->>- Octopod Backend: deployment is not archived
+    end
+
+    Octopod Backend ->>+ Control Scipts: archive_check – Is the deployment archived?
+    Control Scipts -->>- Octopod Backend: deployment is archived!
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to Archived
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    deactivate Octopod Backend
