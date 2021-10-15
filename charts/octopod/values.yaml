@@ -99,7 +99,7 @@ controlScripts:
   image:
     repository: typeable/octopod-helm-control-scripts
     pullPolicy: IfNotPresent
-    tag: 0.2.0
+    tag: 0.2.1
 sqitch:
   image:
     repository: typeable/sqitch
