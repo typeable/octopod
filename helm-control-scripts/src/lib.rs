@@ -17,15 +17,17 @@ pub mod lib {
         core::v1::{PersistentVolumeClaim, Secret}
     };
     pub use kube::{
-        api::{Api, ListParams, ResourceExt, Patch, PatchParams, DeleteParams},
-        Client,
+        api::{Api, ListParams, ResourceExt, Patch, PatchParams, DeleteParams, PostParams},
+        Client,CustomResource
     };
     pub use dkregistry::{
         v2::Client as RegClient,
         errors::Error as RegError,
     };
     pub use regex::Regex;
-    
+    pub use schemars::JsonSchema;
+    pub use tokio::task;
+
     #[derive(Debug,StructOpt)]
     #[structopt(rename_all = "kebab-case")]
     pub struct CliOpts {
@@ -273,7 +275,25 @@ pub mod lib {
         RepoList,
         ShowValues,
     }
-    
+    #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+    #[kube(group = "acid.zalan.do", version = "v1", kind = "Postgresql", namespaced)]
+    pub struct PosgresqlSpec {
+        numberOfInstances: i32
+    }
+    #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+    #[kube(group = "kafka.strimzi.io", version = "v1beta2", kind = "Kafka", namespaced)]
+    pub struct KafkaSpec {
+        kafka: KafkaConfig,
+        zookeeper: ZookeeperConfig
+    }
+    #[derive(Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+    struct KafkaConfig {
+        replicas: i32
+    }
+    #[derive(Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+    struct ZookeeperConfig {
+        replicas: i32
+    }    
     fn check_value(value: String) -> Result<String, String> {
         let split_value = value.split('=').collect::<Vec<_>>();
         if split_value.len() == 2 {
@@ -308,12 +328,14 @@ pub mod lib {
             None => panic!("No name argument provided")
         }
     }
-    pub fn parse_to_k8s(yaml: String) -> Result<(Vec<Deployment>, Vec<StatefulSet>, Vec<Ingress>, Vec<OldIngress>), serde_yaml::Error> {
+    pub fn parse_to_k8s(yaml: String) -> Result<(Vec<Deployment>, Vec<StatefulSet>, Vec<Ingress>, Vec<OldIngress>, Vec<Postgresql>, Vec<Kafka>), serde_yaml::Error> {
         let docs = YamlLoader::load_from_str(&yaml).unwrap();
         let mut deployments: Vec<Deployment> = Vec::new();
         let mut statefulsets: Vec<StatefulSet> = Vec::new();
         let mut ingresses: Vec<Ingress> = Vec::new();
         let mut old_ingresses: Vec<OldIngress> = Vec::new();
+        let mut postgresqls: Vec<Postgresql> = Vec::new();
+        let mut kafkas: Vec<Kafka> = Vec::new();
         for doc in docs {
             match doc["kind"].as_str().unwrap() {
                 "Deployment" => {
@@ -342,13 +364,27 @@ pub mod lib {
                         ingresses.push(ingress);
                     }
                 },
+                "postgresql" => {
+                    let mut postgresql_str = String::new();
+                    let mut emitter = YamlEmitter::new(&mut postgresql_str);
+                    emitter.dump(&doc).unwrap();
+                    let postgresql: Postgresql = serde_yaml::from_str(&postgresql_str)?;
+                    postgresqls.push(postgresql);
+                },
+                "Kafka" => {
+                    let mut kafka_str = String::new();
+                    let mut emitter = YamlEmitter::new(&mut kafka_str);
+                    emitter.dump(&doc).unwrap();
+                    let kafka: Kafka = serde_yaml::from_str(&kafka_str)?;
+                    kafkas.push(kafka);
+                },
                 _ => continue,
             }
         }
         if deployments.is_empty() && statefulsets.is_empty() {
             panic!("Got no deployment or stateful sets. Nothing to check");
         }
-        return Ok((deployments, statefulsets, ingresses, old_ingresses));
+        return Ok((deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas));
     }
     
     #[derive(Debug)]
@@ -804,7 +840,70 @@ pub mod lib {
         api.patch(&name, &patch_params, &patch).await?;
         Ok(())
     }
-    pub fn scale(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, namespace: String, replicas: i32) -> Result<(), Box<dyn error::Error>> {
+    #[tokio::main]
+    async fn scale_postgresql(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Postgresql> = Api::namespaced(client, &namespace);
+        let postgres = api.get(&name).await?;
+        println!("{:#?}", postgres);
+        let mut spec = postgres.spec;
+        spec.numberOfInstances = replicas;
+        let patched_postgres = Postgresql {
+            api_version: postgres.api_version,
+            kind: postgres.kind,
+            metadata: postgres.metadata,
+            spec: spec,
+        };
+        let patch = Patch::Merge(patched_postgres);
+        let patch_params = PatchParams::apply("octopod");
+        api.patch(&name, &patch_params, &patch).await?;
+        Ok(())
+    }
+    #[tokio::main]
+    async fn scale_kafka(namespace: &str, name: &str, replicas: i32) -> Result<(), kube::Error> {
+        let client = Client::try_default().await?;
+        let api: Api<Kafka> = Api::namespaced(client.clone(), &namespace);
+        let kafka = api.get(&name).await?;
+        let metadata = kafka.metadata;
+        if replicas > 0 {
+            if metadata.annotations.contains_key("strimzi.io/pause-reconciliation") {
+                println!("deleting pause-reconciliation annotation");
+                let remove_op = json_patch::RemoveOperation {
+                    path: String::from("/metadata/annotations/strimzi.io~1pause-reconciliation")
+                };
+                let patch_op = json_patch::PatchOperation::Remove(remove_op);
+                let json_patch = json_patch::Patch(vec![patch_op]);
+                let patch = Patch::Json::<()>(json_patch);
+                let patch_params = PatchParams::apply("octopod");
+                api.patch(&name, &patch_params, &patch).await?;
+            }
+        } else {
+            if !metadata.annotations.contains_key("strimzi.io/pause-reconciliation") {
+                println!("adding pause-reconciliation annotation");
+                let add_op = json_patch::AddOperation {
+                    path: String::from("/metadata/annotations/strimzi.io~1pause-reconciliation"),
+                    value: serde_json::value::Value::String("true".to_string())
+                };
+                let patch_op = json_patch::PatchOperation::Add(add_op);
+                let json_patch = json_patch::Patch(vec![patch_op]);
+                let patch = Patch::Json::<()>(json_patch);
+                let patch_params = PatchParams::apply("octopod");
+                api.patch(&name, &patch_params, &patch).await?;
+            }
+        }
+    
+        let kafka_sts: Api<StatefulSet> = Api::namespaced(client, &namespace);
+        let sts_list = ListParams::default().labels(&format!("strimzi.io/cluster={}", name));
+        for sts in kafka_sts.list(&sts_list).await? {
+            let sts_namespace = String::from(namespace);
+            let sts_replicas = replicas.clone();
+            task::spawn_blocking(move || {
+                scale_statefulset(&sts_namespace, &sts.name(), sts_replicas);
+            }).await.expect("Failed to run thread")
+        }
+        Ok(())
+    }
+    pub fn scale(deployments: Vec<Deployment>, statefulsets: Vec<StatefulSet>, postgresqls: Vec<Postgresql>, kafkas: Vec<Kafka>, namespace: String, replicas: i32) -> Result<(), Box<dyn error::Error>> {
         if deployments.is_empty() {
             info!("No deployments to check");
         }else{
@@ -823,6 +922,32 @@ pub mod lib {
         }else{
             for statefulset in statefulsets {
                 match scale_statefulset(&namespace, &statefulset.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        
+        if postgresqls.is_empty() {
+            info!("No postgresqls to check");
+        }else{
+            for postgres in postgresqls {
+                match scale_postgresql(&namespace, &postgres.name(), replicas) {
+                    Ok(status) => status,
+                    Err(err) => {
+                        return Err(Box::new(err));
+                    }
+                }
+            }
+        }
+        
+        if kafkas.is_empty() {
+            info!("No kafkas to check");
+        }else{
+            for kafka in kafkas {
+                match scale_kafka(&namespace, &kafka.name(), replicas) {
                     Ok(status) => status,
                     Err(err) => {
                         return Err(Box::new(err));
