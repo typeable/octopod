@@ -33,8 +33,8 @@ fn main() {
     };
     match helm_template.run_stdout() {
         Ok(status) => {
-            let (_deployments, _statefulsets, ingresses, old_ingresses) = match parse_to_k8s(status) {
-                Ok((deployments, statefulsets, ingresses, old_ingresses)) => (deployments, statefulsets, ingresses, old_ingresses),
+            let (_deployments, _statefulsets, ingresses, old_ingresses, _postgresqls, _kafkas) = match parse_to_k8s(status) {
+                Ok((deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas)) => (deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas),
                 Err(err) => panic!("{}", err)
             };
             print!("{}", print_kv(ingresses_to_hosts(ingresses, old_ingresses, default_name)));
