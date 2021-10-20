@@ -33,11 +33,11 @@ fn main() {
     info!("Generated Helm args: {:?}", &helm_template.args());
     match helm_template.run_stdout() {
         Ok(status) => {
-            let (deployments, statefulsets, _ingresses, _old_ingresses) = match parse_to_k8s(status) {
-                Ok((deployments, statefulsets, ingresses, old_ingresses)) => (deployments, statefulsets, ingresses, old_ingresses),
+            let (deployments, statefulsets, _ingresses, _old_ingresses, postgresqls, kafkas) = match parse_to_k8s(status) {
+                Ok((deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas)) => (deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas),
                 Err(err) => panic!("{}", err)
             };
-            match scale(deployments, statefulsets, namespace, 1) {
+            match scale(deployments, statefulsets, postgresqls, kafkas, namespace, 1) {
                 Ok(_status) => info!("Success!"),
                 Err(status) => {
                     error!("Error checking statuses");
