@@ -25,6 +25,8 @@ pub mod lib {
         errors::Error as RegError,
     };
     pub use regex::Regex;
+    pub use rusoto_core::{Region, RusotoError};
+    pub use rusoto_ecr::{Ecr, EcrClient, DescribeImagesRequest, ImageIdentifier, DescribeImagesError};    
     pub use schemars::JsonSchema;
     pub use tokio::task;
 
@@ -646,6 +648,30 @@ pub mod lib {
             None => panic!("Image not found: {} {} {}", registry, repository, tag),
         }
     }
+    #[tokio::main]
+    pub async fn check_ecr_image(registry: &str, repository: &str, tag: &str) -> Result<(), DescribeImagesError>{
+        let re = Regex::new(r"^[0-9]*.dkr.ecr.(.*).amazonaws.com$").unwrap();
+        let captures = re.captures(&registry).unwrap();
+        let region_string = String::from(&captures[1]);
+        let region: Region = region_string.parse().unwrap();
+        let client = EcrClient::new(region);
+        let image_id = ImageIdentifier {
+            image_tag: Some(String::from(tag)),
+            image_digest: None,
+        };
+        let describe_request = DescribeImagesRequest {
+            repository_name: String::from(repository),
+            image_ids: Some(vec![image_id]),
+            filter: None,
+            max_results: None,
+            next_token: None,
+            registry_id: None,
+        };
+        match client.describe_images(describe_request).await {
+            Ok(_) => return Ok(()),
+            Err(err) => panic!("Image not found in ECR: {} {} {}\n {}", registry, repository, tag, err),
+        }
+    }
     fn parse_image_name(image_name: &str) -> (String, String, String) {
         let mut registry = String::new();
         let mut repository = String::new();
@@ -656,8 +682,8 @@ pub mod lib {
             registry = String::from("registry-1.docker.io");
             repository = format!("library/{}", &captures[1])
         } else if &captures[2] == "" {
-            registry = String::from("registry-1.docker.io");
-            repository = format!("{}/{}", &captures[1], &captures[3]);
+            registry = String::from(&captures[1]);
+            repository = String::from(&captures[3]);
         } else {
             if &captures[1] == "docker.io" {
                 registry = String::from("registry-1.docker.io");
@@ -669,12 +695,19 @@ pub mod lib {
         info!("Checking image: {} {} {}", registry, repository, tag);
         (registry, repository, tag)
     }
-    pub fn check_images(images: Vec<String>) -> Result<(), RegError> {
+    pub fn check_images(images: Vec<String>) -> Result<(), Box<dyn error::Error>> {
         for image in images {
             let (registry, repository, tag) = parse_image_name(&image);
-            match check_image(&registry, &repository, &tag) {
-                Ok(_) => (),
-                Err(err) => return Err(err),
+            if registry.contains("dkr.ecr") {
+                match check_ecr_image(&registry, &repository, &tag) {
+                    Ok(_) => (),
+                    Err(err) => return Err(Box::new(err)),
+                }
+            } else {
+                match check_image(&registry, &repository, &tag) {
+                    Ok(_) => (),
+                    Err(err) => return Err(Box::new(err)),
+                }
             }
         }
         Ok(())

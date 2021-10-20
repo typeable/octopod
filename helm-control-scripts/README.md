@@ -41,6 +41,18 @@ Also, several environment variables are used to parametrize the default behavior
 
 These parameters, if set up in the `DEFAULTS` variable, will be passed to every deployment unless overridden in the "deployment overrides" section of an Octopod deployment configuration.
 
+### Authorization notes
+
+Most of the control scripts require that credentials for various services be passed to them to function properly. Some credentials, like the Helm ones, are quite obvious, but others are not.
+
+`config_check`, in addition to the Helm credentials, requires access to your docker registry to check the availability of the docker image tags. 
+
+Right now only plain docker registries and ECR are supported. ECR clients need to have valid AWS credentials set via [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html). You can provide any environment variables to Octopod by adding them to [env map](../charts/octopod/values.yaml#L86) in the Octopod helm chart.
+
+Note that if you are using EKS you don't need to add any additional configuration.
+
+Private registries, like Harbor with authorization haven't been tested with this set of scripts. If you are using a private registry and have troubles with the `config_check` script, please file an issue.
+
 #### Note about CRD support
 
 Right now these control scripts support `Posgresql` CRD from [postgres operator](https://github.com/zalando/postgres-operator) and `Kafka` CRD from [Strimzi](https://strimzi.io/). Explicit support is needed for the proper scaling of the resources, created by those CRDs. For example: just scaling stateful sets created by Kafka CRD won't work because the controller will keep scaling them back again.
