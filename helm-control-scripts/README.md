@@ -43,7 +43,9 @@ These parameters, if set up in the `DEFAULTS` variable, will be passed to every 
 
 #### Note about CRD support
 
-Right now these control scripts support `Posgresql` CRD from [postgres operator](https://github.com/zalando/postgres-operator) and `Kafka` CRD from [Strimzi](https://strimzi.io/). Explicit support is needed for propper scaling of the resources, created by thouse CRDs. For example: just scaling stateful sets created by Kafka CRD won't work because contorller will keep scaling them back again.
+Right now these control scripts support `Posgresql` CRD from [postgres operator](https://github.com/zalando/postgres-operator) and `Kafka` CRD from [Strimzi](https://strimzi.io/). Explicit support is needed for the proper scaling of the resources, created by those CRDs. For example: just scaling stateful sets created by Kafka CRD won't work because the controller will keep scaling them back again.
+
+Explicit support for every CRD is necessary because the configurations are not standardized, and every CRD is implemented slightly differently.
 
 We'll keep supporting those CRDs, because we're using them in-house. If you want to support another CRD, you can file an issue or even a PR.
 
