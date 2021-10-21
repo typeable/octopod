@@ -1,0 +1,42 @@
+sequenceDiagram
+    participant User
+    participant Octopod Frontend
+    participant Octopod Backend
+    participant Control Scipts
+    participant Octopod DB
+
+    User ->>+ Octopod Frontend: Restore deployment
+    activate Octopod Frontend
+
+    Octopod Frontend ->>+ Octopod Backend: Restore deployment
+    Octopod Backend ->>+ Control Scipts: config_check – Check deployment config
+    Control Scipts ->>- Octopod Backend: Deployment config OK
+
+    Octopod Backend -->> Octopod Frontend: Delpoyment restore started
+    Octopod Frontend -->>- User: Deployment restore started
+
+
+    Octopod Backend ->>+ Control Scipts: info – Get deployment metadata
+    Control Scipts -->>- Octopod Backend: Deployment metadata
+
+    Octopod Backend ->>+ Octopod DB: Set deployment metadata
+    Octopod DB -->>- Octopod Backend: Deployment metadata set
+
+    Octopod Backend ->>+ Control Scipts: unarchive – Unarchive the delpoyment
+    Control Scipts -->>- Octopod Backend: Deployment unarchiving started
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to CreatePending
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    loop
+        Octopod Backend ->>+ Control Scipts: check – Is the deployment up?
+        Control Scipts -->>- Octopod Backend: deployment is not up
+    end
+
+    Octopod Backend ->>+ Control Scipts: check – Is the deployment up?
+    Control Scipts -->>- Octopod Backend: deployment is up!
+
+    Octopod Backend ->>+ Octopod DB: Set deployment state to Running
+    Octopod DB -->>- Octopod Backend: Deployment status set
+
+    deactivate Octopod Backend
