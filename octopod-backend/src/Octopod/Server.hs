@@ -76,11 +76,8 @@ import Prelude hiding (lines, log, unlines, unwords)
 
 type AppM = ReaderT AppState (KatipContextT Handler)
 
-type AppMConstraints m = (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m)
-
--- | This is a polymorphic monad wrapper with the main constraints from 'AppM'.
--- Currently used only for CacheMap values.
-newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
+class (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) => AppMConstraints m
+instance (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) => AppMConstraints m
 
 -- | Octopod Server state definition.
 data AppState = AppState
@@ -126,10 +123,10 @@ data AppState = AppState
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: !LockedDeployments
-  , depOverridesCache :: !(CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel))
-  , depOverrideKeysCache :: !(CacheMap ServerError AppM' () [Text])
-  , appOverridesCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
-  , appOverrideKeysCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text])
+  , depOverridesCache :: !(CacheMap ServerError AppMConstraints () (DefaultConfig 'DeploymentLevel))
+  , depOverrideKeysCache :: !(CacheMap ServerError AppMConstraints () [Text])
+  , appOverridesCache :: !(CacheMap ServerError AppMConstraints (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
+  , appOverrideKeysCache :: !(CacheMap ServerError AppMConstraints (Config 'DeploymentLevel) [Text])
   , gitSha :: !Text
   , controlScriptTimeout :: !ControlScriptTimeout
   }
@@ -192,8 +189,8 @@ runOctopodServer sha = do
   updateTime <- fromInteger . maybe (60 * 10) read <$> lookupEnv "CACHE_UPDATE_TIME"
   isDebug <- (== Just "true") <$> lookupEnv "DEBUG"
   isProdLogs <- (/= Just "false") <$> lookupEnv "PROD_LOGS"
-  let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppM' x a)
-      cacheMap f = CM.initCacheMap invalidationTime updateTime $ \x -> AppM' $ f x
+  let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppMConstraints x a)
+      cacheMap = CM.initCacheMap invalidationTime updateTime
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
@@ -384,10 +381,10 @@ server =
     :<|> pingH
     :<|> projectNameH
 
-lookupCache :: (Ord x, AppMConstraints m) => (AppState -> CacheMap ServerError AppM' x y) -> x -> m y
+lookupCache :: (Ord x, AppMConstraints m) => (AppState -> CacheMap ServerError AppMConstraints x y) -> x -> m y
 lookupCache f x = do
   cm <- asks f
-  CM.lookupBlocking (CM.ntCacheMap runAppM' cm) x
+  CM.lookupBlocking cm x
 
 defaultDeploymentKeysH :: AppMConstraints m => m [Text]
 defaultDeploymentKeysH = lookupCache depOverrideKeysCache ()

@@ -38,7 +38,7 @@ withLockedDeployment dName conflict act = do
   LockedDeployments ref <- asks getTyped
   bracket
     (atomicModifyIORef' ref (S.insert dName &&& S.notMember dName))
-    (\ok -> when ok $ modifyIORef ref (S.delete dName))
+    (\ok -> when ok $ atomicModifyIORef' ref (S.delete dName &&& const ()))
     (\ok -> if ok then act else conflict)
 
 isDeploymentLocked ::
