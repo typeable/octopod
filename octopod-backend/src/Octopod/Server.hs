@@ -4,13 +4,10 @@ import Common.Validation
 import Control.Applicative
 import Control.CacheMap (CacheMap)
 import qualified Control.CacheMap as CM
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race)
-import qualified Control.Concurrent.Lifted as L
-import Control.Concurrent.MVar
+import Control.Concurrent.Lifted hiding (yield)
 import Control.Concurrent.STM
-import Control.Exception (Exception (displayException), throwIO)
-import qualified Control.Exception.Lifted as L
+import Control.Exception.Lifted hiding (Handler)
 import Control.Lens hiding (Context, each, pre, (<.))
 import Control.Lens.Extras
 import Control.Monad
@@ -33,7 +30,7 @@ import Data.Functor
 import Data.Functor.Contravariant
 import Data.Generics.Labels ()
 import Data.Generics.Product
-import Data.IORef
+import Data.IORef.Lifted
 import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
@@ -45,6 +42,7 @@ import Data.Time
 import Data.Traversable
 import qualified Data.Vector as V
 import GHC.Stack
+import GHC.Exception
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
 import Hasql.Statement
@@ -515,7 +513,7 @@ createH dep = do
     (dep ^. #name)
     ( do
         res <-
-          L.try $
+          try $
             runStatement $
               insert
                 Insert
@@ -1236,19 +1234,39 @@ runShutdownHandler = do
 -- if the background worker counter is 0
 -- and graceful shutdown is activated.
 runBgWorker :: (MonadBaseControl IO m, MonadReader AppState m) => m () -> m ()
-runBgWorker act = void $ L.forkFinally act' cleanup
+runBgWorker act = void $ forkFinally act' cleanup
   where
     act' = do
       state <- ask
-      liftBase (atomicModifyIORef' (bgWorkersCounter state) (\c -> (c + 1, c))) >> act
+      atomicModifyIORef' (bgWorkersCounter state) $ \c -> (c + 1, ())
+      act
     cleanup _ = do
       state <- ask
-      liftBase $ do
-        c <- atomicModifyIORef' (bgWorkersCounter state) (\c -> (c - 1, c - 1))
-        gracefulShutdown <- readIORef (gracefulShutdownActivated state)
-        if gracefulShutdown && c == 0
-          then putMVar (shutdownSem state) ()
-          else pure ()
+      c <- atomicModifyIORef' (bgWorkersCounter state) $ \c -> (c - 1, c - 1)
+      isShutdown <- readIORef (gracefulShutdownActivated state)
+      if isShutdown && c == 0
+        then putMVar (shutdownSem state) ()
+        else pure ()
+
+runBgWorkerSync ::
+  (MonadBaseControl IO m, MonadReader AppState m) =>
+  -- | The computation to run, takes a callback for returning a result (and monadic state)
+  ((a -> m ()) -> m ()) ->
+  m a
+runBgWorkerSync act = do
+  result <- newEmptyMVar
+  runBgWorker $ do
+    let respondSync res = do
+          state <- liftBaseWith $ \runInBase -> runInBase $ pure res
+          tryPutMVar result (Right state) >>= \case
+            True -> pure ()
+            False -> error "result already submitted by bg worker"
+    void $ try (liftBaseWith $ \runInBase -> runInBase $ act respondSync) >>= \case
+      Left e -> tryPutMVar result (Left e)
+      Right _ -> tryPutMVar result $ Left $ errorCallException "bg worker did not submit result"
+  takeMVar result >>= \case
+    Left exc -> throwIO exc
+    Right stm -> restoreM stm
 
 -- | Same as 'runBgWorker' but also locks the specified deployment.
 runDeploymentBgWorker ::
@@ -1262,34 +1280,22 @@ runDeploymentBgWorker ::
   m a ->
   -- | The computation to run asynchronously.
   (a -> m ()) ->
-  m ()
+  m a
 runDeploymentBgWorker newS dName pre post = do
-  mainThread <- L.myThreadId
-  (err :: MVar (Either ServerError (StM m a))) <- L.newEmptyMVar
-  runBgWorker $
-    withLockedDeployment
-      dName
-      (L.putMVar err $ Left err409 {errBody = "The deployment is currently being processed."})
-      ( do
-          L.try (liftBaseWith \runInBase -> runInBase pre) >>= \case
-            Left (e :: L.SomeException) -> L.throwTo mainThread e
-            Right x -> do
-              proceed <- flip L.finally (L.tryPutMVar err (Left err500)) $ case newS of
-                Just newS' -> do
-                  runExceptT (assertDeploymentTransitionPossibleS dName newS') >>= \case
-                    Left e -> L.putMVar err (Left e) $> False
-                    Right () -> L.putMVar err (Right x) $> True
-                Nothing -> L.putMVar err (Right x) $> True
+  liftEither =<< runBgWorkerSync worker
+  where
+    worker respondSync = do
+      withLockedDeployment
+        dName
+        (respondSync $ Left err409 {errBody = "The deployment is currently being processed."})
+        (do
+            let preWithAssert = pre <* forM newS (assertDeploymentTransitionPossibleS dName)
+            result <- catchError (Right <$> preWithAssert) (pure . Left)
+            respondSync result
+            liftEither result >>= \res -> do
               sendReloadEvent
-              when proceed $ restoreM x >>= post
-      )
-  L.readMVar err >>= \case
-    Left e -> throwError e
-    Right (stm :: StM m a) -> do
-      -- This might be a bad idea in general, but with just ReaderT and ExceptT
-      -- it should be fine.
-      _ :: a <- restoreM stm
-      return ()
+              post res
+        )
 
 extractDeploymentFullInfo ::
   (MonadReader AppState m, MonadBase IO m) =>
