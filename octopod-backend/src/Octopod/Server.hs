@@ -234,7 +234,7 @@ runOctopodServer sha = do
           30
           (unDBPoolSize $ octopodDBPoolSize opts)
     channel <- liftBase . atomically $ newBroadcastTChan
-    lockedDs <- liftBase initLockedDeployments
+    lockedDs <- initLockedDeployments
     let appSt =
           AppState
             { dbPool = dbPool'
@@ -292,14 +292,12 @@ runHasQL ::
   m a
 runHasQL s = do
   p <- asks dbPool
-  st <- liftBaseWith $ \runInBase -> do
-    withResource p $ \conn ->
-      HasQL.run s conn >>= \case
-        Right x -> runInBase $ pure x
+  liftBaseOp (withResource p) $ \conn ->
+      liftBase (HasQL.run s conn) >>= \case
+        Right x -> pure x
         Left err -> do
-          void $ runInBase $ logLocM ErrorS $ logStr $ displayException err
+          logLocM ErrorS $ logStr $ displayException err
           throwIO err
-  restoreM st
 
 runArchiveCleanup ::
   forall m.
@@ -323,7 +321,7 @@ runArchiveCleanup retention = do
       runArchiveCleanup retention
   where
     threadDelayMicro :: Micro -> m ()
-    threadDelayMicro (MkFixed i) = liftBase $ threadDelay (fromInteger i)
+    threadDelayMicro (MkFixed i) = threadDelay (fromInteger i)
 
 runTransaction ::
   (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
@@ -555,7 +553,7 @@ createH dep = do
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog dep CreateAction ec elTime out err
       sendReloadEvent
-      liftBase $ handleExitCode ec
+      handleExitCode ec
   pure Success
 
 -- | Updates deployment info.
@@ -932,7 +930,9 @@ cleanupDeployment dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
   (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
-  liftBase $ print out >> print err
+  katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStdout out) $
+    katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStderr err) $
+      logLocM DebugS "deployment destroyed"
   case ec of
     ExitSuccess -> do
       deleteDeploymentLogs dName
@@ -1020,7 +1020,7 @@ getActionInfoH aId = do
 -- | Helper to handle exit code.
 handleExitCode :: MonadBase IO m => ExitCode -> m ()
 handleExitCode ExitSuccess = return ()
-handleExitCode (ExitFailure c) = liftBase . throwIO $ DeploymentFailed c
+handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
 
 -- | Helper to log a deployment action.
 createDeploymentLog ::
@@ -1164,7 +1164,7 @@ runStatusUpdater = do
                       Left e -> logLocM ErrorS $ show' e
                       Right (Left e) -> logLocM ErrorS $ show' e
       when (Prelude.or updated) sendReloadEvent
-      liftBase $ threadDelay 2000000
+      threadDelay 2000000
 
 logLeft :: (HasCallStack, KatipContext m, Exception e) => Either e () -> m ()
 logLeft (Left err) = logLocM ErrorS $ logStr $ displayException err
@@ -1207,13 +1207,13 @@ failIfGracefulShutdownActivated = do
 isShuttingDown :: (MonadReader AppState m, MonadBase IO m) => m Bool
 isShuttingDown = do
   gracefulShutdownAct <- gracefulShutdownActivated <$> ask
-  liftBase . readIORef $ gracefulShutdownAct
+  readIORef $ gracefulShutdownAct
 
 -- | Handles the graceful shutdown signal.
 -- Sends a signal to the 'shutdownSem' semaphore
 -- if the background worker counter is 0.
 terminationHandler :: MonadBase IO m => IORef Int -> IORef Bool -> MVar () -> m ()
-terminationHandler bgWorkersC gracefulShudownAct shutdownS = liftBase $ do
+terminationHandler bgWorkersC gracefulShudownAct shutdownS = do
   atomicWriteIORef gracefulShudownAct True
   c <- readIORef bgWorkersC
   if c == 0
@@ -1225,7 +1225,7 @@ terminationHandler bgWorkersC gracefulShudownAct shutdownS = liftBase $ do
 runShutdownHandler :: (MonadBase IO m, MonadReader AppState m) => m ()
 runShutdownHandler = do
   sem <- asks shutdownSem
-  liftBase $ takeMVar sem
+  takeMVar sem
 
 -- | Runs background the worker and increases the background worker counter.
 -- Decreases background worker counter
