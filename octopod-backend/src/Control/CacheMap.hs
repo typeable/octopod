@@ -75,12 +75,14 @@ lookupBlocking (CacheMap ref createValue update) k = do
   -- and optionally the var where the recomputation should write to
   (rVar, mwVar) <- case mVar of
     Nothing -> pure (blank, Just blank)
-    Just (var, recompute) -> takeMVar var >>= \case
-      Left _ -> pure $ if recompute then (blank, Just blank) else (var, Just var)
-      res@(Right _) -> do
-        putMVar var res
-        pure $ (var, if recompute then Just blank else Nothing)
-  forM mwVar $ \wVar -> void $ fork $ do
-    v <- (Right <$> createValue k) `catchError` (pure . Left)
-    putMVar wVar v
+    Just (var, recompute) ->
+      takeMVar var >>= \case
+        Left _ -> pure $ if recompute then (blank, Just blank) else (var, Just var)
+        res@(Right _) -> do
+          putMVar var res
+          pure $ (var, if recompute then Just blank else Nothing)
+  forM_ mwVar $ \wVar -> do
+    fork $ do
+      v <- (Right <$> createValue k) `catchError` (pure . Left)
+      putMVar wVar v
   readMVar rVar >>= liftEither
