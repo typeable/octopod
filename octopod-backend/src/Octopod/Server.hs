@@ -41,8 +41,8 @@ import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Traversable
 import qualified Data.Vector as V
-import GHC.Stack
 import GHC.Exception
+import GHC.Stack
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
 import Hasql.Statement
@@ -293,11 +293,11 @@ runHasQL ::
 runHasQL s = do
   p <- asks dbPool
   liftBaseOp (withResource p) $ \conn ->
-      liftBase (HasQL.run s conn) >>= \case
-        Right x -> pure x
-        Left err -> do
-          logLocM ErrorS $ logStr $ displayException err
-          throwIO err
+    liftBase (HasQL.run s conn) >>= \case
+      Right x -> pure x
+      Left err -> do
+        logLocM ErrorS $ logStr $ displayException err
+        throwIO err
 
 runArchiveCleanup ::
   forall m.
@@ -1261,9 +1261,10 @@ runBgWorkerSync act = do
           tryPutMVar result (Right state) >>= \case
             True -> pure ()
             False -> error "result already submitted by bg worker"
-    void $ try (liftBaseWith $ \runInBase -> runInBase $ act respondSync) >>= \case
-      Left e -> tryPutMVar result (Left e)
-      Right _ -> tryPutMVar result $ Left $ errorCallException "bg worker did not submit result"
+    void $
+      try (liftBaseWith $ \runInBase -> runInBase $ act respondSync) >>= \case
+        Left e -> tryPutMVar result (Left e)
+        Right _ -> tryPutMVar result $ Left $ errorCallException "bg worker did not submit result"
   takeMVar result >>= \case
     Left exc -> throwIO exc
     Right stm -> restoreM stm
@@ -1288,7 +1289,7 @@ runDeploymentBgWorker newS dName pre post = do
       withLockedDeployment
         dName
         (respondSync $ Left err409 {errBody = "The deployment is currently being processed."})
-        (do
+        ( do
             let preWithAssert = pre <* forM newS (assertDeploymentTransitionPossibleS dName)
             result <- catchError (Right <$> preWithAssert) (pure . Left)
             respondSync result

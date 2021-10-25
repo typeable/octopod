@@ -11,8 +11,8 @@ import Control.Monad
 import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Trans.Control
-import Data.IORef.Lifted
 import Data.Fixed
+import Data.IORef.Lifted
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.Time
@@ -22,13 +22,13 @@ data CacheMap e c k v = CacheMap !(InternalCacheMap e k v) (forall m. c m => k -
 
 type InternalCacheMap e k v = IORef (Map k (UTCTime, MVar (Either e v)))
 
-initCacheMap :: forall c e k v m.
+initCacheMap ::
+  forall c e k v m.
   MonadBase IO m =>
-  -- | Time after which a value is considered invalid. Not exact.
+  -- | Time after which a value is considered "invalid" (removed from cache). Not exact.
   NominalDiffTime ->
-  -- | Time after which the value should be updated.
-  -- (A value can still be valid and need updating – the caller will get the
-  -- old valid value in that case.)
+  -- | Time after which the value should be updated: upon query the old value would be returned, but
+  -- a background computation for the new value would be started.
   NominalDiffTime ->
   (forall n. c n => k -> n v) ->
   m (CacheMap e c k v)
@@ -63,21 +63,24 @@ lookupBlocking ::
 lookupBlocking (CacheMap ref createValue update) k = do
   now <- liftBase getCurrentTime
   blank <- newEmptyMVar
-  -- Return the var with an error or result, or Nothing if the result needs to be computed and written to 'blank'
+  -- Return the var with an error or result and a bool indicating whether it needs to be updated
+  -- If there's no var or if needs to be updated, the update goes into 'blank'
   mVar <- atomicModifyIORef' ref $ \m -> case M.lookup k m of
     Nothing -> (M.insert k (now, blank) m, Nothing)
-    Just (timeCreated, var) -> if timeCreated < addUTCTime (negate update) now
-      then (M.insert k (now, blank) m, Nothing)
-      else (m, Just var)
-  -- Return cached result (if no error), or a var where the result needs to be computed and written to
-  result <- case mVar of
-    Nothing -> pure $ Right blank
-    Just var -> takeMVar var >>= \case
-      Left _ -> pure $ Right var
-      Right res -> pure $ Left res
-  case result of
-    Left res -> pure res
-    Right var -> do
-      v <- (Right <$> createValue k) `catchError` (pure . Left)
-      putMVar var v
-      liftEither v
+    Just (timeCreated, var) ->
+      if timeCreated < addUTCTime (negate update) now
+        then (M.insert k (now, blank) m, Just (var, True))
+        else (m, Just (var, False))
+  -- Return the var from where the *current* result should be read,
+  -- and optionally the var where the recomputation should write to
+  (rVar, mwVar) <- case mVar of
+    Nothing -> pure (blank, Just blank)
+    Just (var, recompute) -> takeMVar var >>= \case
+      Left _ -> pure $ if recompute then (blank, Just blank) else (var, Just var)
+      res@(Right _) -> do
+        putMVar var res
+        pure $ (var, if recompute then Just blank else Nothing)
+  forM mwVar $ \wVar -> void $ fork $ do
+    v <- (Right <$> createValue k) `catchError` (pure . Left)
+    putMVar wVar v
+  readMVar rVar >>= liftEither

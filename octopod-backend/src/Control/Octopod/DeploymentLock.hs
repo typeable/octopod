@@ -6,8 +6,8 @@ module Control.Octopod.DeploymentLock
   )
 where
 
-import Control.Arrow
 import Common.Types
+import Control.Arrow
 import Control.Exception.Lifted
 import Control.Monad.Base
 import Control.Monad.Reader
