@@ -297,11 +297,10 @@ pub mod lib {
         replicas: i32
     }    
     fn check_value(value: String) -> Result<String, String> {
-        let split_value = value.split('=').collect::<Vec<_>>();
-        if split_value.len() == 2 {
-            Ok(value)
-        } else {
-            Err(format!("Override value {} is malformed", value))
+        let re = Regex::new(r"^([^=]*)=(.*)$").unwrap();
+        match re.captures(&value) {
+            Some(_) => return Ok(value),
+            None => return Err(format!("Override value {} is malformed", value)),
         }
     }
     pub fn overrides(cli_opts: &CliOpts, envs: &EnvVars) -> Option<Vec<String>> {
