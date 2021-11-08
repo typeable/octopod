@@ -21,7 +21,7 @@ Your cluster must satisfy the following requirements:
 
 After ensuring that your cluster satisfies the requirements you can follow [the Helm installation instruction](../../charts/octopod/README.md) provided with our Helm chart.
 
-### Running Ocopod in production considerations.
+### Running Octopod in production considerations.
 
 You must consider several things before running Octopod in production and onboarding your team.
 
