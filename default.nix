@@ -56,8 +56,8 @@ let
       }
     ];
 
-    index-state = "2021-08-04T00:00:00Z";
-    compiler-nix-name = "ghc8105";
+    index-state = "2021-11-22T00:00:00Z";
+    compiler-nix-name = "ghc8107";
   };
 in
 hsPkgs // {
