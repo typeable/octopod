@@ -26,21 +26,15 @@ runs:
         free -h
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v12
+      uses: cachix/install-nix-action@v16
       with:
         extra_nix_config: |
           trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           substituters = https://hydra.iohk.io https://cache.nixos.org/
+          system-features = kvm
 
     - name: Login to Cachix
-      uses: cachix/cachix-action@v8
+      uses: cachix/cachix-action@v10
       with:
         name: octopod
         signingKey: ${{ inputs.cachixSigningKey }}
-
-    - name: Allow kvm in Nix
-      shell: bash
-      run: |
-        # enable required features (see https://github.com/cachix/install-nix-action/issues/19)
-        mkdir -p ~/.config/nix
-        echo "system-features = kvm" >> ~/.config/nix/nix.conf
