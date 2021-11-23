@@ -8,6 +8,7 @@ module Octopod.Server.Args
   )
 where
 
+import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Options.Generic
@@ -48,7 +49,7 @@ data OctopodOpts = OctopodOpts
   deriving stock (Show)
 
 -- | Parses Octopod Server arguments.
-parseArgs :: IO OctopodOpts
+parseArgs :: MonadIO m => m OctopodOpts
 parseArgs = do
   args <- getRecord "Octopod.Server"
   pure $

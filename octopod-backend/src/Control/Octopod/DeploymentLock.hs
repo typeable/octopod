@@ -7,19 +7,20 @@ module Control.Octopod.DeploymentLock
 where
 
 import Common.Types
-import Control.Concurrent.STM
+import Control.Arrow
 import Control.Exception.Lifted
 import Control.Monad.Base
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Generics.Product.Typed
+import Data.IORef.Lifted
 import Data.Set (Set)
 import qualified Data.Set as S
 
-newtype LockedDeployments = LockedDeployments (TVar (Set DeploymentName))
+newtype LockedDeployments = LockedDeployments (IORef (Set DeploymentName))
 
-initLockedDeployments :: IO LockedDeployments
-initLockedDeployments = LockedDeployments <$> newTVarIO S.empty
+initLockedDeployments :: MonadBase IO m => m LockedDeployments
+initLockedDeployments = LockedDeployments <$> newIORef S.empty
 
 withLockedDeployment ::
   ( MonadReader r m
@@ -33,24 +34,17 @@ withLockedDeployment ::
   -- | The actions to be performed when the deployment is locked.
   m a ->
   m a
-withLockedDeployment dName conflictHandler m = do
-  (LockedDeployments tvar) <- asks getTyped
-  proceed <- liftBase . atomically $ do
-    s <- readTVar tvar
-    if S.member dName s
-      then return False -- Do not proceed
-      else do
-        writeTVar tvar (S.insert dName s)
-        return True -- Proceed
-  if proceed
-    then finally m $ liftBase . atomically $ modifyTVar tvar (S.delete dName)
-    else conflictHandler
+withLockedDeployment dName conflict act = do
+  LockedDeployments ref <- asks getTyped
+  bracket
+    (atomicModifyIORef' ref (S.insert dName &&& S.notMember dName))
+    (\ok -> when ok $ atomicModifyIORef' ref (S.delete dName &&& const ()))
+    (\ok -> if ok then act else conflict)
 
 isDeploymentLocked ::
   (MonadReader r m, HasType LockedDeployments r, MonadBase IO m) =>
   DeploymentName ->
   m Bool
 isDeploymentLocked dName = do
-  (LockedDeployments tvar) <- asks getTyped
-  s <- liftBase $ readTVarIO tvar
-  return $ S.member dName s
+  LockedDeployments ref <- asks getTyped
+  S.member dName <$> readIORef ref

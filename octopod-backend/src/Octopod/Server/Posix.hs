@@ -16,13 +16,13 @@ instance LogItem SigContext where
 
 -- | Installs the given shutdown handler for the specified signals.
 installShutdownHandler ::
-  (KatipContext m, MonadBaseControl IO m) =>
+  (KatipContext m, MonadBaseControl IO m, StM m () ~ ()) =>
   [Signal] ->
   m () ->
   m [Handler]
 installShutdownHandler signals action =
   forM signals $ \signal -> liftBaseWith $ \run ->
-    installHandler signal (Catch $ void $ run $ handler signal) Nothing
+    installHandler signal (Catch $ run (handler signal)) Nothing
   where
     handler signal = katipAddNamespace "signal handler" $
       katipAddContext (SigContext signal) $ do

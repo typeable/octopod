@@ -4,13 +4,10 @@ import Common.Validation
 import Control.Applicative
 import Control.CacheMap (CacheMap)
 import qualified Control.CacheMap as CM
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race)
-import qualified Control.Concurrent.Lifted as L
-import Control.Concurrent.MVar
+import Control.Concurrent.Lifted hiding (yield)
 import Control.Concurrent.STM
-import Control.Exception (Exception (displayException), throwIO)
-import qualified Control.Exception.Lifted as L
+import Control.Exception.Lifted hiding (Handler)
 import Control.Lens hiding (Context, each, pre, (<.))
 import Control.Lens.Extras
 import Control.Monad
@@ -33,7 +30,7 @@ import Data.Functor
 import Data.Functor.Contravariant
 import Data.Generics.Labels ()
 import Data.Generics.Product
-import Data.IORef
+import Data.IORef.Lifted
 import Data.Int
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
@@ -44,6 +41,7 @@ import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Traversable
 import qualified Data.Vector as V
+import GHC.Exception
 import GHC.Stack
 import Hasql.Connection
 import qualified Hasql.Session as HasQL
@@ -76,11 +74,8 @@ import Prelude hiding (lines, log, unlines, unwords)
 
 type AppM = ReaderT AppState (KatipContextT Handler)
 
-type AppMConstraints m = (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m)
-
--- | This is a polymorphic monad wrapper with the main constraints from 'AppM'.
--- Currently used only for CacheMap values.
-newtype AppM' a = AppM' {runAppM' :: forall m. AppMConstraints m => m a}
+class (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) => AppMConstraints m
+instance (KatipContext m, MonadReader AppState m, MonadBaseControl IO m, MonadError ServerError m) => AppMConstraints m
 
 -- | Octopod Server state definition.
 data AppState = AppState
@@ -126,10 +121,10 @@ data AppState = AppState
   , -- | Deployments currently being processed which has not yet been
     -- recorded in the database.
     lockedDeployments :: !LockedDeployments
-  , depOverridesCache :: !(CacheMap ServerError AppM' () (DefaultConfig 'DeploymentLevel))
-  , depOverrideKeysCache :: !(CacheMap ServerError AppM' () [Text])
-  , appOverridesCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
-  , appOverrideKeysCache :: !(CacheMap ServerError AppM' (Config 'DeploymentLevel) [Text])
+  , depOverridesCache :: !(CacheMap ServerError AppMConstraints () (DefaultConfig 'DeploymentLevel))
+  , depOverrideKeysCache :: !(CacheMap ServerError AppMConstraints () [Text])
+  , appOverridesCache :: !(CacheMap ServerError AppMConstraints (Config 'DeploymentLevel) (DefaultConfig 'ApplicationLevel))
+  , appOverrideKeysCache :: !(CacheMap ServerError AppMConstraints (Config 'DeploymentLevel) [Text])
   , gitSha :: !Text
   , controlScriptTimeout :: !ControlScriptTimeout
   }
@@ -192,8 +187,8 @@ runOctopodServer sha = do
   updateTime <- fromInteger . maybe (60 * 10) read <$> lookupEnv "CACHE_UPDATE_TIME"
   isDebug <- (== Just "true") <$> lookupEnv "DEBUG"
   isProdLogs <- (/= Just "false") <$> lookupEnv "PROD_LOGS"
-  let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppM' x a)
-      cacheMap f = CM.initCacheMap invalidationTime updateTime $ \x -> AppM' $ f x
+  let cacheMap :: forall a x. (forall m. AppMConstraints m => x -> m a) -> IO (CacheMap ServerError AppMConstraints x a)
+      cacheMap = CM.initCacheMap invalidationTime updateTime
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
@@ -239,7 +234,7 @@ runOctopodServer sha = do
           30
           (unDBPoolSize $ octopodDBPoolSize opts)
     channel <- liftBase . atomically $ newBroadcastTChan
-    lockedDs <- liftBase initLockedDeployments
+    lockedDs <- initLockedDeployments
     let appSt =
           AppState
             { dbPool = dbPool'
@@ -297,14 +292,12 @@ runHasQL ::
   m a
 runHasQL s = do
   p <- asks dbPool
-  st <- liftBaseWith $ \runInBase -> do
-    withResource p $ \conn ->
-      HasQL.run s conn >>= \case
-        Right x -> runInBase $ pure x
-        Left err -> do
-          void $ runInBase $ logLocM ErrorS $ logStr $ displayException err
-          throwIO err
-  restoreM st
+  liftBaseOp (withResource p) $ \conn ->
+    liftBase (HasQL.run s conn) >>= \case
+      Right x -> pure x
+      Left err -> do
+        logLocM ErrorS $ logStr $ displayException err
+        throwIO err
 
 runArchiveCleanup ::
   forall m.
@@ -328,7 +321,7 @@ runArchiveCleanup retention = do
       runArchiveCleanup retention
   where
     threadDelayMicro :: Micro -> m ()
-    threadDelayMicro (MkFixed i) = liftBase $ threadDelay (fromInteger i)
+    threadDelayMicro (MkFixed i) = threadDelay (fromInteger i)
 
 runTransaction ::
   (KatipContext m, MonadReader AppState m, MonadBaseControl IO m) =>
@@ -384,10 +377,10 @@ server =
     :<|> pingH
     :<|> projectNameH
 
-lookupCache :: (Ord x, AppMConstraints m) => (AppState -> CacheMap ServerError AppM' x y) -> x -> m y
+lookupCache :: (Ord x, AppMConstraints m) => (AppState -> CacheMap ServerError AppMConstraints x y) -> x -> m y
 lookupCache f x = do
   cm <- asks f
-  CM.lookupBlocking (CM.ntCacheMap runAppM' cm) x
+  CM.lookupBlocking cm x
 
 defaultDeploymentKeysH :: AppMConstraints m => m [Text]
 defaultDeploymentKeysH = lookupCache depOverrideKeysCache ()
@@ -518,7 +511,7 @@ createH dep = do
     (dep ^. #name)
     ( do
         res <-
-          L.try $
+          try $
             runStatement $
               insert
                 Insert
@@ -560,7 +553,7 @@ createH dep = do
       -- calling it directly now is fine since there is no previous status.
       createDeploymentLog dep CreateAction ec elTime out err
       sendReloadEvent
-      liftBase $ handleExitCode ec
+      handleExitCode ec
   pure Success
 
 -- | Updates deployment info.
@@ -937,7 +930,9 @@ cleanupDeployment dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
   (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
-  liftBase $ print out >> print err
+  katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStdout out) $
+    katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStderr err) $
+      logLocM DebugS "deployment destroyed"
   case ec of
     ExitSuccess -> do
       deleteDeploymentLogs dName
@@ -1025,7 +1020,7 @@ getActionInfoH aId = do
 -- | Helper to handle exit code.
 handleExitCode :: MonadBase IO m => ExitCode -> m ()
 handleExitCode ExitSuccess = return ()
-handleExitCode (ExitFailure c) = liftBase . throwIO $ DeploymentFailed c
+handleExitCode (ExitFailure c) = throwIO $ DeploymentFailed c
 
 -- | Helper to log a deployment action.
 createDeploymentLog ::
@@ -1169,7 +1164,7 @@ runStatusUpdater = do
                       Left e -> logLocM ErrorS $ show' e
                       Right (Left e) -> logLocM ErrorS $ show' e
       when (Prelude.or updated) sendReloadEvent
-      liftBase $ threadDelay 2000000
+      threadDelay 2000000
 
 logLeft :: (HasCallStack, KatipContext m, Exception e) => Either e () -> m ()
 logLeft (Left err) = logLocM ErrorS $ logStr $ displayException err
@@ -1212,13 +1207,13 @@ failIfGracefulShutdownActivated = do
 isShuttingDown :: (MonadReader AppState m, MonadBase IO m) => m Bool
 isShuttingDown = do
   gracefulShutdownAct <- gracefulShutdownActivated <$> ask
-  liftBase . readIORef $ gracefulShutdownAct
+  readIORef $ gracefulShutdownAct
 
 -- | Handles the graceful shutdown signal.
 -- Sends a signal to the 'shutdownSem' semaphore
 -- if the background worker counter is 0.
 terminationHandler :: MonadBase IO m => IORef Int -> IORef Bool -> MVar () -> m ()
-terminationHandler bgWorkersC gracefulShudownAct shutdownS = liftBase $ do
+terminationHandler bgWorkersC gracefulShudownAct shutdownS = do
   atomicWriteIORef gracefulShudownAct True
   c <- readIORef bgWorkersC
   if c == 0
@@ -1230,7 +1225,7 @@ terminationHandler bgWorkersC gracefulShudownAct shutdownS = liftBase $ do
 runShutdownHandler :: (MonadBase IO m, MonadReader AppState m) => m ()
 runShutdownHandler = do
   sem <- asks shutdownSem
-  liftBase $ takeMVar sem
+  takeMVar sem
 
 -- | Runs background the worker and increases the background worker counter.
 -- Decreases background worker counter
@@ -1239,19 +1234,40 @@ runShutdownHandler = do
 -- if the background worker counter is 0
 -- and graceful shutdown is activated.
 runBgWorker :: (MonadBaseControl IO m, MonadReader AppState m) => m () -> m ()
-runBgWorker act = void $ L.forkFinally act' cleanup
+runBgWorker act = void $ forkFinally act' cleanup
   where
     act' = do
       state <- ask
-      liftBase (atomicModifyIORef' (bgWorkersCounter state) (\c -> (c + 1, c))) >> act
+      atomicModifyIORef' (bgWorkersCounter state) $ \c -> (c + 1, ())
+      act
     cleanup _ = do
       state <- ask
-      liftBase $ do
-        c <- atomicModifyIORef' (bgWorkersCounter state) (\c -> (c - 1, c - 1))
-        gracefulShutdown <- readIORef (gracefulShutdownActivated state)
-        if gracefulShutdown && c == 0
-          then putMVar (shutdownSem state) ()
-          else pure ()
+      c <- atomicModifyIORef' (bgWorkersCounter state) $ \c -> (c - 1, c - 1)
+      isShutdown <- readIORef (gracefulShutdownActivated state)
+      if isShutdown && c == 0
+        then putMVar (shutdownSem state) ()
+        else pure ()
+
+runBgWorkerSync ::
+  (MonadBaseControl IO m, MonadReader AppState m) =>
+  -- | The computation to run, takes a callback for returning a result (and monadic state)
+  ((a -> m ()) -> m ()) ->
+  m a
+runBgWorkerSync act = do
+  result <- newEmptyMVar
+  runBgWorker $ do
+    let respondSync res = do
+          state <- liftBaseWith $ \runInBase -> runInBase $ pure res
+          tryPutMVar result (Right state) >>= \case
+            True -> pure ()
+            False -> error "result already submitted by bg worker"
+    void $
+      try (liftBaseWith $ \runInBase -> runInBase $ act respondSync) >>= \case
+        Left e -> tryPutMVar result (Left e)
+        Right _ -> tryPutMVar result $ Left $ errorCallException "bg worker did not submit result"
+  takeMVar result >>= \case
+    Left exc -> throwIO exc
+    Right stm -> restoreM stm
 
 -- | Same as 'runBgWorker' but also locks the specified deployment.
 runDeploymentBgWorker ::
@@ -1265,34 +1281,22 @@ runDeploymentBgWorker ::
   m a ->
   -- | The computation to run asynchronously.
   (a -> m ()) ->
-  m ()
+  m a
 runDeploymentBgWorker newS dName pre post = do
-  mainThread <- L.myThreadId
-  (err :: MVar (Either ServerError (StM m a))) <- L.newEmptyMVar
-  runBgWorker $
-    withLockedDeployment
-      dName
-      (L.putMVar err $ Left err409 {errBody = "The deployment is currently being processed."})
-      ( do
-          L.try (liftBaseWith \runInBase -> runInBase pre) >>= \case
-            Left (e :: L.SomeException) -> L.throwTo mainThread e
-            Right x -> do
-              proceed <- flip L.finally (L.tryPutMVar err (Left err500)) $ case newS of
-                Just newS' -> do
-                  runExceptT (assertDeploymentTransitionPossibleS dName newS') >>= \case
-                    Left e -> L.putMVar err (Left e) $> False
-                    Right () -> L.putMVar err (Right x) $> True
-                Nothing -> L.putMVar err (Right x) $> True
+  liftEither =<< runBgWorkerSync worker
+  where
+    worker respondSync = do
+      withLockedDeployment
+        dName
+        (respondSync $ Left err409 {errBody = "The deployment is currently being processed."})
+        ( do
+            let preWithAssert = pre <* forM newS (assertDeploymentTransitionPossibleS dName)
+            result <- catchError (Right <$> preWithAssert) (pure . Left)
+            respondSync result
+            liftEither result >>= \res -> do
               sendReloadEvent
-              when proceed $ restoreM x >>= post
-      )
-  L.readMVar err >>= \case
-    Left e -> throwError e
-    Right (stm :: StM m a) -> do
-      -- This might be a bad idea in general, but with just ReaderT and ExceptT
-      -- it should be fine.
-      _ :: a <- restoreM stm
-      return ()
+              post res
+        )
 
 extractDeploymentFullInfo ::
   (MonadReader AppState m, MonadBase IO m) =>
