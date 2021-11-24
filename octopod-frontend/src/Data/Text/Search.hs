@@ -125,6 +125,7 @@ instance Searchable SearchResult SearchResult where
 instance Renderable SearchResult where
   rndr (SearchResult _ (Just cs)) = rndr cs
   rndr (SearchResult t Nothing) = rndr t
+  {-# INLINE rndr #-}
 
 data SearchF x where
   TextSearch :: Text -> [FuzzySearchStringChunk Text] -> !Int -> SearchF SearchResult
@@ -152,3 +153,4 @@ data FuzzySearchStringChunk a = NotMatched !a | Matched !a
 instance Renderable a => Renderable (FuzzySearchStringChunk a) where
   rndr (NotMatched a) = rndr a
   rndr (Matched a) = elAttr "span" ("style" =: "text-decoration: underline;") (rndr a)
+  {-# INLINE rndr #-}

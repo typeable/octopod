@@ -11,7 +11,9 @@ class Renderable a where
 
 instance Renderable Text where
   rndr = text
+  {-# INLINE rndr #-}
 
 instance Renderable a => Renderable [a] where
   rndr [] = pure ()
   rndr (a : aa) = rndr a >> rndr aa
+  {-# INLINE rndr #-}
