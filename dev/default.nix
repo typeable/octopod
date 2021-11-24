@@ -1,10 +1,11 @@
 { pkgs ? hsPkgs.pkgs
 , sources ? import ../nix/sources.nix
 , nix-filter ? import sources.nix-filter
-, hsPkgs ? import ./.. { }
+, hsPkgs ? import ./.. { inherit prod; }
 , migrations ? ../migrations
 , octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , pkgsSrc ? hsPkgs.pkgsSrc
+, prod ? false
 }:
 let frontendConfig = pkgs.writeTextDir "config.json" ''
   {
@@ -109,8 +110,10 @@ in
 
         sleep 4
 
-        echo "key,value"
-        echo "key2,value2"
+        for i in {1..50}
+        do
+          echo "key$i,value"
+        done
 
         exit 0
       '';
@@ -120,8 +123,10 @@ in
 
         sleep 4
 
-        echo "key"
-        echo "key2"
+        for i in {1..50}
+        do
+          echo "key$i"
+        done
 
         exit 0
       '';

@@ -9,7 +9,7 @@
 let
   octopod-css = import ./octopod-css { inherit pkgsSrc; };
   addLocalOptions = x:
-    if prod then x // { ghcOptions = [ "-Werror" ]; }
+    if prod then x // { ghcOptions = [ "-Werror" "-O2" ]; }
     else x // { ghcOptions = [ "-O0" ]; };
 
   hsPkgs = pkgs.haskell-nix.cabalProject {
