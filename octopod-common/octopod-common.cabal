@@ -54,6 +54,7 @@ library
                      , ApplicativeDo
                      , UndecidableInstances
                      , FunctionalDependencies
+                     , QuantifiedConstraints
   build-depends:       base
                      , aeson
                      , cassava

@@ -24,7 +24,6 @@ import Common.Utils
 import Control.Applicative
 import Control.Monad.Reader
 import Data.Align
-import Data.Char
 import Data.Functor
 import qualified Data.Semigroup as S
 import qualified Data.Text as T
@@ -191,7 +190,7 @@ deploymentsListWidget hReq updAllEv termDyn ds = dataWidgetWrapper $ mdo
       errUpdEv = fmapMaybe reqErrorBody updRespEv
   dsDyn <- holdDyn ds okUpdEv
   let searchedDyn = ffor2 termDyn dsDyn $ \term ds' ->
-        searchMany (T.filter (not . isSpace) term) ds'
+        searchMany (T.unpack <$> T.words term) ds'
       (archivedDsDyn, activeDsDyn) =
         splitDynPure $ L.partition isDeploymentArchived <$> searchedDyn
       searchSorting = termDyn $> Nothing

@@ -33,6 +33,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (isNothing, maybeToList)
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Text.Search
 import Data.These
 import Data.WorkingOverrides
@@ -263,13 +264,13 @@ octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn =
       case hasFocus of
         True | (_ : _) <- values -> do
           currVal <- valDyn
-          case fuzzySearchMany currVal values of
+          case fuzzySearchMany [T.unpack currVal] values of
             [] -> pure $ pure never
             ress ->
               pure $ do
                 elClass "ul" "overrides__search" $ do
                   fmap leftmost $
-                    forM ress $ \(initialText, res) -> do
+                    forM ress $ \(res, initialText) -> do
                       (resEl, ()) <- elClass' "li" "overrides__search-item" $
                         forM_ res $ \case
                           Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
