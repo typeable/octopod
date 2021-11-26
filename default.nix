@@ -8,8 +8,21 @@
 }:
 let
   octopod-css = import ./octopod-css { inherit pkgsSrc; };
+  insaneOptimizationFlags = [
+    "-O2"
+    "-fexpose-all-unfoldings"
+    "-fspecialise-aggressively"
+    "-fsimpl-tick-factor=200"
+    "-flate-specialise"
+    "-fstatic-argument-transformation"
+    "-fsimplifier-phases=4"
+    "-fmax-simplifier-iterations=20"
+    "-flate-dmd-anal"
+  ];
   addLocalOptions = x:
-    if prod then x // { ghcOptions = [ "-Werror" "-O2" ]; }
+    if prod then x // {
+      ghcOptions = [ "-Werror" ] ++ insaneOptimizationFlags;
+    }
     else x // { ghcOptions = [ "-O0" ]; };
 
   hsPkgs = pkgs.haskell-nix.cabalProject {
@@ -28,7 +41,7 @@ let
 
     modules = [
       {
-        ghcOptions = [ "-O2" ];
+        ghcOptions = insaneOptimizationFlags;
         dontStrip = false;
         dontPatchELF = false;
         enableDeadCodeElimination = true;
