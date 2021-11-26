@@ -38,6 +38,7 @@ import Page.ClassicPopup
 import Page.Elements.Links
 import Page.Popup.EditDeployment
 import Page.Popup.NewDeployment
+import Reflex.Dom.AsyncEvent
 import Reflex.Dom.Renderable
 import Reflex.MultiEventWriter.Class
 import Servant.Reflex.Extra
@@ -189,9 +190,11 @@ deploymentsListWidget hReq updAllEv termDyn ds = dataWidgetWrapper $ mdo
   let okUpdEv = fmapMaybe reqSuccess updRespEv
       errUpdEv = fmapMaybe reqErrorBody updRespEv
   dsDyn <- holdDyn ds okUpdEv
-  let searchedDyn = ffor2 termDyn dsDyn $ \term ds' ->
-        searchMany (T.unpack <$> T.words term) ds'
-      (archivedDsDyn, activeDsDyn) =
+  let searchInput = updated $ ffor2 termDyn dsDyn (,)
+  searchedEv <- asyncEventLast searchInput $ \(term, ds') ->
+    searchMany (T.unpack <$> T.words term) ds'
+  searchedDyn <- holdDyn (wrapResult <$> ds) searchedEv
+  let (archivedDsDyn, activeDsDyn) =
         splitDynPure $ L.partition isDeploymentArchived <$> searchedDyn
       searchSorting = termDyn $> Nothing
   clickedEv <- elementClick

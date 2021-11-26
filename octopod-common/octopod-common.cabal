@@ -20,6 +20,7 @@ library
                      , Common.Validation
                      , Data.Map.Ordered.Strict.Extra
                      , Control.Searchable
+                     , Common.Orphans
   -- other-modules:
   -- other-extensions:
   default-extensions:  BlockArguments
@@ -67,6 +68,7 @@ library
                      , containers
                      , time
                      , ordered-containers
+                     , deepseq
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:

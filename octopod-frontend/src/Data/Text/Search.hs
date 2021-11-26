@@ -13,16 +13,17 @@ module Data.Text.Search
 where
 
 import Control.Applicative.Free.Fast
+import Control.DeepSeq (NFData)
 import Control.Lens
-import Control.Parallel.Strategies
 import Control.Searchable
 import qualified Data.List as L
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Ord
 import Data.Semigroup
 import Data.Sequence (Seq (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Generics (Generic)
 import Reflex.Dom
 import Reflex.Dom.Renderable
 import Text.FuzzyFind
@@ -35,8 +36,10 @@ fuzzySearch [] h = Just (Alignment 0 $ Result $ pure $ Gap $ T.unpack h)
 fuzzySearch n h = listToMaybe $ fuzzyFind n [T.unpack h]
 
 fuzzySearchMany :: Needle -> [Haystack] -> [(Seq FuzzySearchStringChunk, Haystack)]
+fuzzySearchMany [] ts = ts <&> \t -> (pure $ NotMatched t, t)
 fuzzySearchMany n h =
-  (\(unAlignment -> (res, _), initial) -> (res, T.pack initial)) <$> fuzzyFindOn id n (T.unpack <$> h)
+  (\(unAlignment -> (res, _), initial) -> (res, T.pack initial))
+    <$> L.sortOn (Down . score . fst) (fuzzyFindOn id n (T.unpack <$> h))
 
 searchMany ::
   (Searchable Text x, SearchableConstraint Text x SearchResult) =>
@@ -44,10 +47,7 @@ searchMany ::
   [x] ->
   [Searched x SearchResult]
 searchMany [] = fmap wrapResult
-searchMany t =
-  fmap snd . L.sortOn (Down . fst) . catMaybes
-    . withStrategy (parListChunk 3 rpar)
-    . fmap (search t)
+searchMany t = fmap snd . L.sortOn (Down . fst) . mapMaybe (search t)
 {-# INLINE searchMany #-}
 
 -- | Extract initial structure from search result.
@@ -89,7 +89,8 @@ data SearchResult = SearchResult
   { initialSearchText :: !Text
   , searchResult :: !(Maybe (Seq FuzzySearchStringChunk))
   }
-  deriving stock (Eq, Ord)
+  deriving stock (Eq, Ord, Generic)
+  deriving anyclass (NFData)
 
 instance Searchable SearchResult SearchResult where
   type Searched SearchResult res = res
@@ -123,7 +124,8 @@ runSearchApplicative x = case findMaxResult x of
 {-# INLINE runSearchApplicative #-}
 
 data FuzzySearchStringChunk = NotMatched !Text | Matched !Text
-  deriving stock (Show, Eq, Ord)
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
 
 instance Renderable FuzzySearchStringChunk where
   rndr (NotMatched a) = rndr a

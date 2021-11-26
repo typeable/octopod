@@ -36,6 +36,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Search
 import Data.These
+import Data.Witherable
 import Data.WorkingOverrides
 import Frontend.Classes as X
 import Frontend.UIKit.Button.Action as X
@@ -46,6 +47,7 @@ import Frontend.UIKit.Button.Sort as X
 import Frontend.UIKit.Button.Static as X
 import GHC.Generics (Generic)
 import Reflex.Dom
+import Reflex.Dom.AsyncEvent
 import Reflex.Dom.Renderable
 import Reflex.Network
 
@@ -258,25 +260,30 @@ octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn =
         divClass "input__output" $ dynText err
 
     delayedFalseFocus <- delayFalse $ _inputElement_hasFocus inp'
-    selectedValue' <- networkView >=> switchHoldPromptly never $ do
-      hasFocus <- delayedFalseFocus
-      values <- valuesDyn
-      case hasFocus of
-        True | (_ : _) <- values -> do
+    let searchValuesEv = catMaybes . updated $ do
+          hasFocus <- delayedFalseFocus
+          values <- valuesDyn
           currVal <- valDyn
-          case fuzzySearchMany [T.unpack currVal] values of
-            [] -> pure $ pure never
-            ress ->
-              pure $ do
-                elClass "ul" "overrides__search" $ do
-                  fmap leftmost $
-                    forM ress $ \(res, initialText) -> do
-                      (resEl, ()) <- elClass' "li" "overrides__search-item" $
-                        forM_ res $ \case
-                          Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
-                          NotMatched t -> text t
-                      pure $ domEvent Click resEl $> initialText
-        _ -> pure $ pure never
+          pure $ case hasFocus of
+            True | (_ : _) <- values -> Just (values, currVal)
+            _ -> Nothing
+    searchResultEv <- asyncEventLast searchValuesEv $ \(values, currVal) ->
+      fuzzySearchMany [T.unpack currVal] values
+    searchResultDyn <- holdDyn [] searchResultEv
+    selectedValue' <- networkView >=> switchHoldPromptly never $ do
+      searchResult <- searchResultDyn
+      case searchResult of
+        [] -> pure $ pure never
+        ress ->
+          pure $ do
+            elClass "ul" "overrides__search" $ do
+              fmap leftmost $
+                forM ress $ \(res, initialText) -> do
+                  (resEl, ()) <- elClass' "li" "overrides__search-item" $
+                    forM_ res $ \case
+                      Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
+                      NotMatched t -> text t
+                  pure $ domEvent Click resEl $> initialText
     pure (inp', selectedValue')
   pure inp
 
