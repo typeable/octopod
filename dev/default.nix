@@ -1,11 +1,12 @@
 { pkgs ? hsPkgs.pkgs
 , sources ? import ../nix/sources.nix
 , nix-filter ? import sources.nix-filter
-, hsPkgs ? import ./.. { inherit prod; }
+, hsPkgs ? import ./.. { inherit prod system; }
 , migrations ? ../migrations
 , octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , pkgsSrc ? hsPkgs.pkgsSrc
 , prod ? false
+, system ? builtins.currentSystem
 }:
 let frontendConfig = pkgs.writeTextDir "config.json" ''
   {
