@@ -12,11 +12,11 @@ let
     "-O2"
     "-fexpose-all-unfoldings"
     "-fspecialise-aggressively"
-    "-fsimpl-tick-factor=200"
+    "-fsimpl-tick-factor=150"
     "-flate-specialise"
     "-fstatic-argument-transformation"
-    "-fsimplifier-phases=4"
-    "-fmax-simplifier-iterations=20"
+    "-fsimplifier-phases=3"
+    "-fmax-simplifier-iterations=10"
     "-flate-dmd-anal"
   ];
   addLocalOptions = x:
