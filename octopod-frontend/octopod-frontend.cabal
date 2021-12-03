@@ -23,7 +23,8 @@ flag development
 executable frontend
   if impl(ghcjs >= 0.2.1)
      ghcjs-options:     -dedupe
-  ghcjs-options: -DGHCJS_BUSY_YIELD=100
+  ghcjs-options: -DGHCJS_BUSY_YIELD=20
+                 -DGHCJS_GC_INTERVAL=60000
   if flag(development)
     cpp-options:       -DDEVELOPMENT
   main-is:             Main.hs
