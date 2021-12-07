@@ -25,6 +25,8 @@ in
       caddyConfig = pkgs.writeText "caddy-config" ''
         http://localhost:8000
 
+        header Cache-Control no-cache
+
         reverse_proxy /api/* localhost:3002
 
         file_server /config.json {
@@ -53,6 +55,8 @@ in
     let
       caddyConfig = pkgs.writeText "caddy-config" ''
         http://localhost:8000
+
+        header Cache-Control no-cache
 
         reverse_proxy /api/* localhost:3002
 

@@ -42,17 +42,23 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State.Strict
+import qualified Data.Bifunctor as Bi
 import qualified Data.Foldable as F
 import Data.Functor
+import Data.Functor.Misc
 import Data.Generics.Labels ()
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Map.Monoidal.Strict (MonoidalMap)
 import qualified Data.Map.Monoidal.Strict as MM
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Monoid
+import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Text as T (Text, null, pack)
 import Data.Text.Search
+import Data.These
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -362,10 +368,13 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
         ovsDyn <- holdDyn ovs ovsEv
         ovsDynDebounced <- holdDyn ovs ovsEvDebounced
         x <- attachDyn (current ovsDyn) dCfgDyn
-        res <- dyn (x <&> \(ovs', dCfg) -> envVarsInput values dCfg ovs')
-        ovsEv <- switchHold never (fst <$> res)
+        (splitE -> (ovsEvEv, isValidDynEv)) <-
+          (>>= joinEvM) $
+            runWithReplace' loadingOverrides $
+              updated x <&> \(ovs', dCfg) -> untilReady' loadingOverrides $ envVarsInput values dCfg ovs'
+        ovsEv <- joinEvM ovsEvEv
         ovsEvDebounced <- debounce 2 ovsEv
-        isValid <- join <$> holdDyn (pure True) (snd <$> res)
+        isValid <- join <$> holdDyn (pure False) isValidDynEv
         pure (ovsDyn, ovsDynDebounced, isValid)
 
   depKeysDyn <- holdDyn [] depKeys
@@ -494,8 +503,16 @@ envVarsInput ::
   -- | Updated deployment overrides.
   m (Event t (Overrides l), Dynamic t Bool)
 envVarsInput values dCfg ovs = mdo
-  envsDyn <- foldDyn appEndo (constructWorkingOverrides dCfg ovs) $ leftmost [addEv, updEv]
-  let addEv = clickEv $> Endo (fst . insertUniqStart newWorkingOverride)
+  let initialOverrides = constructWorkingOverrides dCfg ovs
+  (envsDyn, addedKeys) <-
+    mapAccumDyn
+      ( \prevOvs -> \case
+          Left () ->
+            Bi.second S.singleton $ insertUniqStart newWorkingOverride prevOvs
+          Right (Endo f) -> (f prevOvs, S.empty)
+      )
+      initialOverrides
+      $ leftmost [Left <$> clickEv, Right <$> updEv]
   clickEv <-
     dashButton
       DashButtonConfig
@@ -505,17 +522,57 @@ envVarsInput values dCfg ovs = mdo
         , buttonStyle = OverridesDashButtonStyle
         }
   let workingOverridesWithErrors = validateWorkingOverrides . uniqMap <$> envsDyn
-      isValid = all ((== mempty) . snd) <$> workingOverridesWithErrors
-  updEv <-
+      erroredOverride = M.filter ((/= mempty) . snd) <$> workingOverridesWithErrors
+      isValid = M.null <$> erroredOverride
+  (_, changedValues) <-
+    mapAccumDyn
+      ( \prev new ->
+          ( fmap (\(v, _) -> (v, mempty)) new
+          , new <> prev
+          )
+      )
+      mempty
+      (updated erroredOverride)
+  let updatedValues = restrictMapEv updatedKeys (updated workingOverridesWithErrors)
+      valChangedEvSelector = fanMap (clearedOvs <> changedValues <> updatedValues)
+      (splitE -> (clearedOvs, deletedOvs)) =
+        alignEventWithMaybe
+          ( \case
+              These keys m ->
+                Just $
+                  let cleared = M.restrictKeys m keys
+                   in (cleared, M.fromSet (const Nothing) (keys `S.difference` M.keysSet cleared))
+              _ -> Nothing
+          )
+          removedKeys
+          (updated workingOverridesWithErrors)
+      listChange =
+        deletedOvs <> (fmap . fmap) Just (restrictMapEv addedKeys (updated workingOverridesWithErrors))
+
+  (splitE3 -> (updEv, removedKeys, updatedKeys)) <-
     switchDyn . fmap F.fold
-      <$> listWithKey
-        workingOverridesWithErrors
-        (\i x -> fmap (performUserOverrideAction (lookupDefaultConfig <$> dCfg) i) <$> envVarInput values x)
+      <$> listHoldWithKey
+        (validateWorkingOverrides . uniqMap $ initialOverrides)
+        listChange
+        ( \i val -> do
+            valDyn <- holdDyn val $ select valChangedEvSelector $ Const2 i
+            userActionEv <- envVarInput values valDyn
+            pure $ performUserOverrideAction (lookupDefaultConfig <$> dCfg) i <$> userActionEv
+        )
   let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
   case dCfg of
     Just _ -> pure ()
     Nothing -> loadingOverrides
   pure (updated $ destructWorkingOverrides <$> envsDyn, isValid)
+
+restrictMapEv :: (Reflex t, Ord k) => Event t (Set k) -> Event t (Map k v) -> Event t (Map k v)
+restrictMapEv =
+  alignEventWithMaybe
+    ( \case
+        These keys _ | S.null keys -> Nothing
+        These keys m -> Just $ M.restrictKeys m keys
+        _ -> Nothing
+    )
 
 validateWorkingOverrides ::
   forall f.
@@ -567,7 +624,7 @@ envVarInput ::
   -- | Current variable key and value.
   Dynamic t (WorkingOverride, OverrideErrors) ->
   m (Event t UserOverrideAction)
-envVarInput values val = do
+envVarInput values val = untilReadyEv' loadingOverride $ do
   let kDyn = val <&> fst <&> \(WorkingOverrideKey _ x, _) -> x
   -- Either <override present> <override deleted>
   d <-
@@ -622,25 +679,29 @@ performUserOverrideAction ::
   Maybe (Text -> Maybe Text) ->
   Int ->
   UserOverrideAction ->
-  Endo WorkingOverrides
-performUserOverrideAction f i (UpdateValue v) = Endo $
-  updateUniq i $ \(k@(WorkingOverrideKey _ kt), _) ->
-    ( k
-    , case f >>= ($ kt) of
-        Just v' | v == v' -> WorkingDefaultValue v
-        _ -> WorkingCustomValue v
-    )
-performUserOverrideAction _ i (UpdateKey k) = Endo $
-  updateUniq i $
-    \(_, v) -> (WorkingOverrideKey CustomWorkingOverrideKey k, v)
-performUserOverrideAction f i DeleteOverride = Endo $ \m ->
-  case f of
-    Nothing -> updateUniq i (\(k, _) -> (k, WorkingDeletedValue Nothing)) m
-    Just _ -> case lookupUniq i m of
-      Nothing -> m
-      Just (WorkingOverrideKey DefaultWorkingOverrideKey k, _) ->
-        updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (f >>= ($ k)))) m
-      Just (WorkingOverrideKey CustomWorkingOverrideKey _, _) -> deleteUniq i m
+  -- | (endo, removed/cleared keys, updatedKeys)
+  (Endo WorkingOverrides, Set Int, Set Int)
+performUserOverrideAction f i (UpdateValue v) = (,S.empty,S.singleton i) $
+  Endo $
+    updateUniq i $ \(k@(WorkingOverrideKey _ kt), _) ->
+      ( k
+      , case f >>= ($ kt) of
+          Just v' | v == v' -> WorkingDefaultValue v
+          _ -> WorkingCustomValue v
+      )
+performUserOverrideAction _ i (UpdateKey k) = (,S.empty,S.singleton i) $
+  Endo $
+    updateUniq i $
+      \(_, v) -> (WorkingOverrideKey CustomWorkingOverrideKey k, v)
+performUserOverrideAction f i DeleteOverride = (,S.singleton i,S.empty) $
+  Endo $ \m ->
+    case f of
+      Nothing -> updateUniq i (\(k, _) -> (k, WorkingDeletedValue Nothing)) m
+      Just _ -> case lookupUniq i m of
+        Nothing -> m
+        Just (WorkingOverrideKey DefaultWorkingOverrideKey k, _) ->
+          updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (f >>= ($ k)))) m
+        Just (WorkingOverrideKey CustomWorkingOverrideKey _, _) -> deleteUniq i m
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
@@ -685,3 +746,32 @@ catchReturns :: (DomBuilder t m, MonadFix m) => (Event t () -> m a) -> m a
 catchReturns f = mdo
   (divEl, a) <- el' "div" $ f $ ($> ()) . ffilter (== 13) $ domEvent Keypress divEl
   pure a
+
+splitE3 :: Reflex t => Event t (a, b, c) -> (Event t a, Event t b, Event t c)
+splitE3 e = ((\(a, _, _) -> a) <$> e, (\(_, b, _) -> b) <$> e, (\(_, _, c) -> c) <$> e)
+
+untilReadyEv' ::
+  (Adjustable t m, PostBuild t m, MonadHold t m) =>
+  m a ->
+  m (Event t b) ->
+  m (Event t b)
+untilReadyEv' m m' = do
+  (_, bEvEv) <- untilReady m m'
+  switchHold never bEvEv
+
+untilReady' ::
+  (Adjustable t m, PostBuild t m) =>
+  m a ->
+  m b ->
+  m (Event t b)
+untilReady' m m' = do
+  (_, bEv) <- untilReady m m'
+  pure bEv
+
+runWithReplace' :: Adjustable t m => m a -> Event t (m b) -> m (Event t b)
+runWithReplace' ma mbEv = do
+  (_, bEv) <- runWithReplace ma mbEv
+  pure bEv
+
+joinEvM :: (MonadHold t m, Reflex t) => Event t (Event t a) -> m (Event t a)
+joinEvM = switchHold never
