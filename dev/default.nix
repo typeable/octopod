@@ -97,7 +97,7 @@ in
         #!${pkgs.bash}/bin/bash
 
         echo $0 $@
-        exit 0
+        exit 1
       '';
 
       failScript = pkgs.writeScript "fail.sh" ''
@@ -115,7 +115,7 @@ in
 
         sleep 4
 
-        for i in {1..50}
+        for i in {1..10}
         do
           echo "key$i,value"
         done
@@ -128,7 +128,7 @@ in
 
         sleep 4
 
-        for i in {1..50}
+        for i in {1..10}
         do
           echo "key$i"
         done

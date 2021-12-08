@@ -36,6 +36,9 @@ type StatusEndpoint c = c :> "status" :> Get '[JSON] CurrentDeploymentStatus
 type CleanupEndpoint c =
   c :> "cleanup" :> Delete '[JSON] CommandResponse
 
+type DeleteEndpoint c =
+  c :> "delete" :> Delete '[JSON] CommandResponse
+
 type RestoreEndpoint c =
   c :> "restore" :> Patch '[JSON] CommandResponse
 
@@ -63,6 +66,8 @@ type DeploymentAPI' c =
                 -- endpoint to clean up resources of an archived deployment
                 :<|> RestoreEndpoint c
                 -- endpoint to restore an archived deployment
+                :<|> DeleteEndpoint c
+                -- endpoint to clean up resources of an archived deployment
              )
           :<|> GetActionInfoEndpoint
           -- endpoint to get action logs

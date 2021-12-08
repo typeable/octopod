@@ -49,6 +49,9 @@ data Args
         name :: Text
       }
   | GetActionLogs ActionId LogOutput
+  | Delete
+      { name :: Text
+      }
   deriving stock (Show)
 
 data LogOutput = Err | Out | ErrOut
@@ -81,13 +84,14 @@ commandArgs =
         <> command
           "logs"
           (info actionLogsArgs (progDesc "get deployment logs of a given action"))
+        <> command "delete" (info deleteArgs (progDesc "delete the deployment from Octopod. Does no cleanup."))
     )
 
 -- | Parses arguments of 'create' subcommand.
 createArgs :: Parser Args
 createArgs =
   Create
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+    <$> deploymentNameArgument
     <*> many
       ( strOption
           ( long "set-app-config"
@@ -110,15 +114,13 @@ listArgs =
 
 -- | Parses arguments of 'archive' subcommand.
 archiveArgs :: Parser Args
-archiveArgs =
-  Archive
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+archiveArgs = Archive <$> deploymentNameArgument
 
 -- | Parses arguments of 'update' subcommand.
 updateArgs :: Parser Args
 updateArgs =
   Update
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+    <$> deploymentNameArgument
     <*> many
       ( strOption
           ( long "set-app-config"
@@ -150,21 +152,19 @@ updateArgs =
 
 -- | Parses arguments of 'info' subcommand.
 infoArgs :: Parser Args
-infoArgs =
-  Info
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+infoArgs = Info <$> deploymentNameArgument
 
 -- | Parses arguments of 'cleanup' subcommand.
 cleanupArgs :: Parser Args
-cleanupArgs =
-  Cleanup
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+cleanupArgs = Cleanup <$> deploymentNameArgument
+
+-- | Parses arguments of 'delete' subcommand.
+deleteArgs :: Parser Args
+deleteArgs = Delete <$> deploymentNameArgument
 
 -- | Parses arguments of 'restore' subcommand.
 restoreArgs :: Parser Args
-restoreArgs =
-  Restore
-    <$> strOption (long "name" <> short 'n' <> help "deployment name")
+restoreArgs = Restore <$> deploymentNameArgument
 
 actionLogsArgs :: Parser Args
 actionLogsArgs =
@@ -178,3 +178,6 @@ actionLogsArgs =
           <> value ErrOut
           <> completeWith ["stdout", "stderr", "all"]
       )
+
+deploymentNameArgument :: Parser Text
+deploymentNameArgument = strOption (long "name" <> short 'n' <> help "deployment name")

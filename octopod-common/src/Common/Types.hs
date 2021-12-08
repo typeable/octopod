@@ -397,12 +397,3 @@ parseSetOverrides texts = do
 
 parseUnsetOverrides :: [Text] -> Overrides l
 parseUnsetOverrides = Overrides . OM.fromList . fmap (,ValueDeleted)
-
-formatOverrides :: Overrides l -> Text
-formatOverrides = T.unlines . formatOverrides'
-
-formatOverrides' :: Overrides l -> [Text]
-formatOverrides' (Overrides m) = fmap (\(k, v) -> k <> "=" <> showValue v) . OM.assocs $ m
-  where
-    showValue (ValueAdded v) = v
-    showValue ValueDeleted = "<removed>"

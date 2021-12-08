@@ -82,6 +82,8 @@ runOcto = do
       Restore tName ->
         handleRestore auth . coerce $ tName
       GetActionLogs aId l -> handleGetActionInfo auth aId l
+      Delete tName ->
+        handleDelete auth . coerce $ tName
 
 -- | Returns BaseUrl from 'OCTOPOD_URL' environment variable
 -- or exit with exit_code=1.
@@ -181,6 +183,13 @@ handleCleanup auth dName = do
   liftIO $
     handleResponse (const $ pure ()) =<< runClientM (cleanupH auth dName) clientEnv
 
+-- | Handles the 'delete' subcommand.
+handleDelete :: AuthContext AuthHeaderAuth -> DeploymentName -> ReaderT ClientEnv IO ()
+handleDelete auth dName = do
+  clientEnv <- ask
+  liftIO $
+    handleResponse (const $ pure ()) =<< runClientM (deleteH auth dName) clientEnv
+
 -- | Handles the 'restore' subcommand.
 handleRestore :: AuthContext AuthHeaderAuth -> DeploymentName -> ReaderT ClientEnv IO ()
 handleRestore auth dName = do
@@ -214,6 +223,7 @@ _statusH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CurrentDeplo
 cleanupH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 restoreH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 getActionInfoH :: AuthContext AuthHeaderAuth -> ActionId -> ClientM ActionInfo
+deleteH :: AuthContext AuthHeaderAuth -> DeploymentName -> ClientM CommandResponse
 ( listH
     :<|> createH
     :<|> archiveH
@@ -223,6 +233,7 @@ getActionInfoH :: AuthContext AuthHeaderAuth -> ActionId -> ClientM ActionInfo
     :<|> _statusH
     :<|> cleanupH
     :<|> restoreH
+    :<|> deleteH
   )
   :<|> getActionInfoH = pushArrowIntoServantAlt $ client (Proxy @PowerAPI)
 
@@ -264,13 +275,13 @@ decodeError body =
 printInfo :: DeploymentInfo -> IO ()
 printInfo (DeploymentInfo (Deployment _ dAppOvs dStOvs) (DeploymentMetadata dMeta) dLogs) = do
   T.putStrLn "Current settings:"
-  T.putStrLn $
-    "application config: "
-      <> formatOverrides dAppOvs
-  T.putStrLn $
-    "deployment config: "
-      <> formatOverrides dStOvs
-  T.putStrLn $ "metadata: "
+  T.putStrLn "Application config:"
+  putStrLn $ unlines $ formatOverrides False dAppOvs
+  T.putStrLn ""
+  T.putStrLn "Deployment config: "
+  putStrLn $ unlines $ formatOverrides False dStOvs
+  T.putStrLn ""
+  T.putStrLn $ "Metadata: "
   forM_ dMeta $ \m ->
     T.putStrLn $
       "  " <> m ^. #name <> ": " <> m ^. #link
@@ -282,15 +293,14 @@ ppDeploymentLogs :: [DeploymentLog] -> IO ()
 ppDeploymentLogs ds =
   putStrLn
     . tableString
-      [ column expand right noAlign def
+      [ column expand center noAlign def
       , column expand center noAlign def
       , column expand center noAlign def
       , column expand center noAlign def
-      , column expand left (charAlign '=') def
-      , column expand left (charAlign '=') def
+      , column expand center noAlign def
       , column expand center noAlign def
       ]
-      unicodeBoldHeaderS
+      unicodeDoubleFrameS
       ( titlesH
           [ "Created at"
           , "Action id"
@@ -303,17 +313,35 @@ ppDeploymentLogs ds =
     $ ppDeploymentLogRow <$> ds
 
 -- | Pretty-prints the deployment log.
-ppDeploymentLogRow :: DeploymentLog -> RowGroup Text
+ppDeploymentLogRow :: DeploymentLog -> RowGroup String
 ppDeploymentLogRow dLog =
   colsAllG
     top
     [
-      [ T.pack . formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S")) $
+      [ formatTime defaultTimeLocale (iso8601DateFormat (Just "%H:%M:%S")) $
           dLog ^. field @"createdAt"
       ]
     , [dLog ^. field @"actionId" . to unActionId . re _Show . packed]
-    , [dLog ^. field @"action" . to actionToText]
-    , dLog ^. field @"deploymentAppOverrides" . to formatOverrides'
-    , dLog ^. field @"deploymentDepOverrides" . to formatOverrides'
+    , [dLog ^. field @"action" . to (T.unpack . actionToText)]
+    , dLog ^. field @"deploymentAppOverrides" . to (stripBorder . formatOverrides True)
+    , dLog ^. field @"deploymentDepOverrides" . to (stripBorder . formatOverrides True)
     , [dLog ^. field @"exitCode" . re _Show . packed]
     ]
+
+stripBorder :: [String] -> [String]
+stripBorder = fmap (init . tail) . init . tail
+
+formatOverrides :: Bool -> Overrides l -> [String]
+formatOverrides splitlines (Overrides m) =
+  tableLines
+    [ column expand right noAlign def
+    , column expand left noAlign def
+    ]
+    unicodeS
+    def
+    $ showOverride <$> (reverse . OM.assocs) m
+  where
+    showOverride (k, v) =
+      colsAllG top $ [if splitlines then T.chunksOf 15 k else [k], showValue v]
+    showValue (ValueAdded v) = if splitlines then T.chunksOf 25 v else [v]
+    showValue ValueDeleted = ["<<REMOVED>>"]
