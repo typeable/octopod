@@ -420,6 +420,7 @@ powerServer (Authenticated ()) =
       :<|> statusH
       :<|> cleanupH
       :<|> restoreH
+      :<|> deleteH
   )
     :<|> getActionInfoH
 powerServer _ = throwAll err401
@@ -921,6 +922,13 @@ cleanupH dName = do
   runDeploymentBgWorker Nothing dName (pure ()) $ \() -> cleanupDeployment dName
   pure Success
 
+-- | Deletes the deployment from the DB.
+deleteH :: DeploymentName -> AppM CommandResponse
+deleteH dName = do
+  failIfGracefulShutdownActivated
+  runDeploymentBgWorker Nothing dName (pure ()) $ \() -> deleteAllDeployment dName
+  pure Success
+
 -- | Helper to cleanup deployment.
 cleanupDeployment ::
   (KatipContext m, MonadBaseControl IO m, MonadReader AppState m, MonadError ServerError m) =>
@@ -950,6 +958,15 @@ cleanupDeployment dName = do
       pure ()
   sendReloadEvent
   handleExitCode ec
+
+deleteAllDeployment ::
+  (KatipContext m, MonadBaseControl IO m, MonadReader AppState m) =>
+  DeploymentName ->
+  m ()
+deleteAllDeployment dName = do
+  deleteDeploymentLogs dName
+  deleteDeployment dName
+  logLocM InfoS $ logStr $ "deployment destroyed, name: " <> unDeploymentName dName
 
 -- | Helper to delete deployment logs.
 deleteDeploymentLogs ::
