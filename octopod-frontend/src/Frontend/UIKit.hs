@@ -18,10 +18,20 @@ module Frontend.UIKit
     deletedOverride,
     showNonEditableWorkingOverride,
     NonEditableWorkingOverrideStyle (..),
+    untilReadyEv',
+    untilReady',
+    runWithReplace',
+    joinEvM,
   )
 where
 
 import Control.Lens
+  ( ASetter',
+    (%~),
+    (<>~),
+    (?~),
+    (^.),
+  )
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Align
@@ -32,6 +42,7 @@ import Data.List.NonEmpty
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (isNothing, maybeToList)
+import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Search
@@ -196,7 +207,7 @@ octopodTextInput' valuesDyn disabledDyn clssDyn placeholder inValDyn' errEv = md
 octopodTextInputDyn ::
   MonadWidget t m =>
   -- | Value to suggest
-  (Dynamic t [Text]) ->
+  Dynamic t [Text] ->
   -- | Disabled?
   Dynamic t Bool ->
   -- | Input field classes.
@@ -204,7 +215,7 @@ octopodTextInputDyn ::
   -- | Placeholder for input field.
   Text ->
   -- | Init value.
-  (Dynamic t Text) ->
+  Dynamic t Text ->
   -- | Event carrying the error message.
   Dynamic t (Maybe (NonEmpty Text)) ->
   m (InputElement EventResult GhcjsDomSpace t)
@@ -259,9 +270,8 @@ octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn =
       simpleList ((maybeToList >=> NE.toList) <$> errDyn) $ \err ->
         divClass "input__output" $ dynText err
 
-    delayedFalseFocus <- delayFalse $ _inputElement_hasFocus inp'
     let searchValuesEv = catMaybes . updated $ do
-          hasFocus <- delayedFalseFocus
+          hasFocus <- _inputElement_hasFocus inp'
           values <- valuesDyn
           currVal <- valDyn
           pure $ case hasFocus of
@@ -269,31 +279,30 @@ octopodTextInputDyn valuesDyn disabledDyn clssDyn placeholder inValDyn' errDyn =
             _ -> Nothing
     searchResultEv <- asyncEventLast searchValuesEv $ \(values, currVal) ->
       fuzzySearchMany [T.unpack currVal] values
-    searchResultDyn <- holdDyn [] searchResultEv
-    selectedValue' <- networkView >=> switchHoldPromptly never $ do
-      searchResult <- searchResultDyn
-      case searchResult of
-        [] -> pure $ pure never
-        ress ->
-          pure $ do
-            elClass "ul" "overrides__search" $ do
-              fmap leftmost $
-                forM ress $ \(res, initialText) -> do
-                  (resEl, ()) <- elClass' "li" "overrides__search-item" $
-                    forM_ res $ \case
-                      Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
-                      NotMatched t -> text t
-                  pure $ domEvent Click resEl $> initialText
-    pure (inp', selectedValue')
-  pure inp
+    selectedValueEv <-
+      (>>= joinEvM) $
+        runWithReplace' (pure ()) $
+          updated (_inputElement_hasFocus inp') <&> \case
+            False -> pure never
+            True ->
+              (>>= joinEvM) $
+                runWithReplace' (pure ()) $
+                  searchResultEv <&> \case
+                    [] -> pure never
+                    searchResult -> do
+                      elClass "ul" "overrides__search" $ do
+                        fmap leftmost $
+                          forM searchResult $ \(res, initialText) -> do
+                            (resEl, ()) <- elClass' "li" "overrides__search-item" $
+                              forM_ res $ \case
+                                Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
+                                NotMatched t -> text t
+                            -- Because 'Click' would fire after the text field loses
+                            -- focus and the popup disappears.
+                            pure $ domEvent Mousedown resEl $> initialText
 
-delayFalse :: (MonadHold t m, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m)) => Dynamic t Bool -> m (Dynamic t Bool)
-delayFalse x = do
-  initVal <- sample . current $ x
-  let trueEv = ffilter id $ updated x
-      falseEv = ffilter not $ updated x
-  delayedFalseEv <- delay 0.1 falseEv
-  holdDyn initVal $ leftmost [trueEv, delayedFalseEv]
+    pure (inp', selectedValueEv)
+  pure inp
 
 -- | Dark unclickable background for opened sidebar.
 popupOverlay :: DomBuilder t m => m ()
@@ -354,3 +363,29 @@ showNonEditableWorkingOverride loading loaded style cfg =
         divClass "listing__item" $ do
           elClass "div" "listing__placeholder" $ pure ()
           elClass "div" "listing__spinner" $ pure ()
+
+untilReadyEv' ::
+  (Adjustable t m, PostBuild t m, MonadHold t m) =>
+  m a ->
+  m (Event t b) ->
+  m (Event t b)
+untilReadyEv' m m' = do
+  (_, bEvEv) <- untilReady m m'
+  switchHold never bEvEv
+
+untilReady' ::
+  (Adjustable t m, PostBuild t m) =>
+  m a ->
+  m b ->
+  m (Event t b)
+untilReady' m m' = do
+  (_, bEv) <- untilReady m m'
+  pure bEv
+
+runWithReplace' :: Adjustable t m => m a -> Event t (m b) -> m (Event t b)
+runWithReplace' ma mbEv = do
+  (_, bEv) <- runWithReplace ma mbEv
+  pure bEv
+
+joinEvM :: (MonadHold t m, Reflex t) => Event t (Event t a) -> m (Event t a)
+joinEvM = switchHold never

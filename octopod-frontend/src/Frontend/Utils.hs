@@ -749,29 +749,3 @@ catchReturns f = mdo
 
 splitE3 :: Reflex t => Event t (a, b, c) -> (Event t a, Event t b, Event t c)
 splitE3 e = ((\(a, _, _) -> a) <$> e, (\(_, b, _) -> b) <$> e, (\(_, _, c) -> c) <$> e)
-
-untilReadyEv' ::
-  (Adjustable t m, PostBuild t m, MonadHold t m) =>
-  m a ->
-  m (Event t b) ->
-  m (Event t b)
-untilReadyEv' m m' = do
-  (_, bEvEv) <- untilReady m m'
-  switchHold never bEvEv
-
-untilReady' ::
-  (Adjustable t m, PostBuild t m) =>
-  m a ->
-  m b ->
-  m (Event t b)
-untilReady' m m' = do
-  (_, bEv) <- untilReady m m'
-  pure bEv
-
-runWithReplace' :: Adjustable t m => m a -> Event t (m b) -> m (Event t b)
-runWithReplace' ma mbEv = do
-  (_, bEv) <- runWithReplace ma mbEv
-  pure bEv
-
-joinEvM :: (MonadHold t m, Reflex t) => Event t (Event t a) -> m (Event t a)
-joinEvM = switchHold never
