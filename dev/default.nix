@@ -97,7 +97,7 @@ in
         #!${pkgs.bash}/bin/bash
 
         echo $0 $@
-        exit 1
+        exit 0
       '';
 
       failScript = pkgs.writeScript "fail.sh" ''
