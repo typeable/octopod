@@ -33,7 +33,6 @@ import Control.Lens
     (^.),
   )
 import Control.Monad
-import Control.Monad.IO.Class
 import Data.Align
 import Data.Default
 import Data.Functor
@@ -42,7 +41,6 @@ import Data.List.NonEmpty
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (isNothing, maybeToList)
-import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Search
