@@ -1,10 +1,12 @@
 { pkgs ? hsPkgs.pkgs
 , sources ? import ../nix/sources.nix
 , nix-filter ? import sources.nix-filter
-, hsPkgs ? import ./.. { }
+, hsPkgs ? import ./.. { inherit prod system; }
 , migrations ? ../migrations
 , octopod-css ? import ../octopod-css { inherit pkgsSrc; }
 , pkgsSrc ? hsPkgs.pkgsSrc
+, prod ? false
+, system ? builtins.currentSystem
 }:
 let frontendConfig = pkgs.writeTextDir "config.json" ''
   {
@@ -22,6 +24,8 @@ in
 
       caddyConfig = pkgs.writeText "caddy-config" ''
         http://localhost:8000
+
+        header Cache-Control no-cache
 
         reverse_proxy /api/* localhost:3002
 
@@ -51,6 +55,8 @@ in
     let
       caddyConfig = pkgs.writeText "caddy-config" ''
         http://localhost:8000
+
+        header Cache-Control no-cache
 
         reverse_proxy /api/* localhost:3002
 
@@ -109,8 +115,10 @@ in
 
         sleep 4
 
-        echo "key,value"
-        echo "key2,value2"
+        for i in {1..50}
+        do
+          echo "key$i,value"
+        done
 
         exit 0
       '';
@@ -120,8 +128,10 @@ in
 
         sleep 4
 
-        echo "key"
-        echo "key2"
+        for i in {1..50}
+        do
+          echo "key$i"
+        done
 
         exit 0
       '';

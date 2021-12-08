@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-orphans #-}
 
 module Data.Text.Search
   ( fuzzySearch,
@@ -12,75 +12,42 @@ module Data.Text.Search
   )
 where
 
-import Control.Applicative
 import Control.Applicative.Free.Fast
+import Control.DeepSeq (NFData)
 import Control.Lens
-import Control.Parallel.Strategies
 import Control.Searchable
-import Data.Bifunctor
-import Data.Char
-import Data.Function
 import qualified Data.List as L
-import Data.Maybe (catMaybes)
+import Data.Maybe (listToMaybe)
 import Data.Ord
 import Data.Semigroup
+import Data.Sequence (Seq (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Generics (Generic)
 import Reflex.Dom
 import Reflex.Dom.Renderable
+import Text.FuzzyFind
 
-type Needle = Text
+type Needle = [String]
 type Haystack = Text
-type Running = Int
-type Penalty = Int
 
-fuzzySearch' :: Needle -> Haystack -> Running -> Penalty -> [([FuzzySearchStringChunk String], Int)]
-fuzzySearch' needle haystack i p = case (T.uncons needle, T.uncons haystack) of
-  (Just _, Nothing) -> []
-  (Just (n, eedle), Just (h, aystack)) ->
-    bimap (prependNotMatched h) (+ (i - p)) <$> fuzzySearch' needle aystack 0 p
-      <|> if toLower n == toLower h
-        then first (prependMatched h) <$> fuzzySearch' eedle aystack (i * 2 + 1) 1
-        else empty
-  (Nothing, Nothing) -> [([], i)]
-  (Nothing, Just _) -> [([NotMatched $ T.unpack haystack], i)]
+fuzzySearch :: Needle -> Haystack -> Maybe Alignment
+fuzzySearch [] h = Just (Alignment 0 $ Result $ pure $ Gap $ T.unpack h)
+fuzzySearch n h = listToMaybe $ fuzzyFind n [T.unpack h]
 
-prependMatched :: Char -> [FuzzySearchStringChunk String] -> [FuzzySearchStringChunk String]
-prependMatched c xs@(NotMatched _ : _) = Matched [c] : xs
-prependMatched c (Matched cs : xs) = Matched (c : cs) : xs
-prependMatched c [] = [Matched [c]]
-
-prependNotMatched :: Char -> [FuzzySearchStringChunk String] -> [FuzzySearchStringChunk String]
-prependNotMatched c xs@(Matched _ : _) = NotMatched [c] : xs
-prependNotMatched c (NotMatched cs : xs) = NotMatched (c : cs) : xs
-prependNotMatched c [] = [NotMatched [c]]
-
-fuzzySearch :: Needle -> Haystack -> Maybe ([FuzzySearchStringChunk Text], Int)
-fuzzySearch "" h = Just ([NotMatched h], 0)
-fuzzySearch n h = case fuzzySearch' n h 0 0 of
-  [] -> Nothing
-  xs@(_ : _) -> Just . (first . fmap . fmap) T.pack $ L.maximumBy (compare `on` snd) xs
-
-fuzzySearchMany :: Needle -> [Haystack] -> [(Haystack, [FuzzySearchStringChunk Text])]
-fuzzySearchMany needle haystacks =
-  fmap fst . L.sortOn (Down . snd) $
-    mapMaybe
-      ( \haystack ->
-          fuzzySearch needle haystack
-            <&> \(res, score) -> ((haystack, res), score)
-      )
-      haystacks
+fuzzySearchMany :: Needle -> [Haystack] -> [(Seq FuzzySearchStringChunk, Haystack)]
+fuzzySearchMany [] ts = ts <&> \t -> (pure $ NotMatched t, t)
+fuzzySearchMany n h =
+  (\(unAlignment -> (res, _), initial) -> (res, T.pack initial))
+    <$> L.sortOn (Down . score . fst) (fuzzyFindOn id n (T.unpack <$> h))
 
 searchMany ::
   (Searchable Text x, SearchableConstraint Text x SearchResult) =>
-  Text ->
+  [String] ->
   [x] ->
   [Searched x SearchResult]
-searchMany "" = fmap wrapResult
-searchMany t =
-  fmap snd . L.sortOn (Down . fst) . catMaybes
-    . withStrategy (parListChunk 3 rpar)
-    . fmap (search t)
+searchMany [] = fmap wrapResult
+searchMany t = fmap snd . L.sortOn (Down . fst) . mapMaybe (search t)
 {-# INLINE searchMany #-}
 
 -- | Extract initial structure from search result.
@@ -100,7 +67,7 @@ wrapResult =
 
 search ::
   (Searchable Text x, SearchableConstraint Text x SearchResult) =>
-  Text ->
+  Needle ->
   x ->
   Maybe (Int, Searched x SearchResult)
 search needle x = runSearchApplicative $ searchWith searchSingle x
@@ -108,14 +75,22 @@ search needle x = runSearchApplicative $ searchWith searchSingle x
     searchSingle :: Text -> SearchApplicative SearchResult
     searchSingle t = case fuzzySearch needle t of
       Nothing -> pure $ SearchResult t Nothing
-      Just (res, score) -> liftAp $ TextSearch t res score
+      Just (unAlignment -> (res, score)) -> liftAp $ TextSearch t res score
 {-# INLINE search #-}
+
+unAlignment :: Alignment -> (Seq FuzzySearchStringChunk, Score)
+unAlignment (Alignment score (Result res)) = (unResultSegment <$> res, score)
+
+unResultSegment :: ResultSegment -> FuzzySearchStringChunk
+unResultSegment (Gap x) = NotMatched $ T.pack x
+unResultSegment (Match x) = Matched $ T.pack x
 
 data SearchResult = SearchResult
   { initialSearchText :: !Text
-  , searchResult :: !(Maybe [FuzzySearchStringChunk Text])
+  , searchResult :: !(Maybe (Seq FuzzySearchStringChunk))
   }
-  deriving stock (Eq, Ord)
+  deriving stock (Eq, Ord, Generic)
+  deriving anyclass (NFData)
 
 instance Searchable SearchResult SearchResult where
   type Searched SearchResult res = res
@@ -125,9 +100,10 @@ instance Searchable SearchResult SearchResult where
 instance Renderable SearchResult where
   rndr (SearchResult _ (Just cs)) = rndr cs
   rndr (SearchResult t Nothing) = rndr t
+  {-# INLINE rndr #-}
 
 data SearchF x where
-  TextSearch :: Text -> [FuzzySearchStringChunk Text] -> !Int -> SearchF SearchResult
+  TextSearch :: Text -> Seq FuzzySearchStringChunk -> !Int -> SearchF SearchResult
 
 type SearchApplicative = Ap SearchF
 
@@ -145,10 +121,13 @@ runSearchApplicative x = case findMaxResult x of
   where
     findMaxResult :: SearchApplicative a -> Maybe Int
     findMaxResult = fmap getMax . runAp_ (\(TextSearch _ _ i) -> Just $ Max i)
+{-# INLINE runSearchApplicative #-}
 
-data FuzzySearchStringChunk a = NotMatched !a | Matched !a
-  deriving stock (Show, Eq, Ord, Functor)
+data FuzzySearchStringChunk = NotMatched !Text | Matched !Text
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
 
-instance Renderable a => Renderable (FuzzySearchStringChunk a) where
+instance Renderable FuzzySearchStringChunk where
   rndr (NotMatched a) = rndr a
   rndr (Matched a) = elAttr "span" ("style" =: "text-decoration: underline;") (rndr a)
+  {-# INLINE rndr #-}

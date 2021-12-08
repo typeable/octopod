@@ -7,6 +7,8 @@
 -- This module contains common types between the backend and the frontend.
 module Common.Types where
 
+import Common.Orphans ()
+import Control.DeepSeq (NFData)
 import Control.Lens
 import Control.Searchable
 import Data.Aeson hiding (Result)
@@ -46,6 +48,7 @@ instance Searchable needle t => Searchable needle (OverrideValue' t) where
 data OverrideValue' t = ValueAdded t | ValueDeleted
   deriving (ToJSON, FromJSON) via Snake (OverrideValue' t)
   deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData)
 
 type OverrideValue = OverrideValue' Text
 
@@ -108,7 +111,7 @@ instance Searchable t x => Searchable t (Overrides' x l) where
   {-# INLINE searchWith #-}
 
 newtype Overrides' t (l :: OverrideLevel) = Overrides {unOverrides :: OMap t (OverrideValue' t)}
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
 
 type Overrides = Overrides' Text
 
@@ -153,7 +156,7 @@ instance Searchable needle t => Searchable needle (DeploymentName' t) where
 
 newtype DeploymentName' t = DeploymentName {unDeploymentName :: t}
   deriving newtype
-    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq, Ord)
+    (Show, Read, FromJSON, ToJSON, ToHttpApiData, FromHttpApiData, Eq, Ord, NFData)
 
 type DeploymentName = DeploymentName' Text
 
@@ -210,6 +213,7 @@ data DeploymentStatus
   | CleanupFailed
   deriving stock (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake DeploymentStatus
+  deriving anyclass (NFData)
 
 data FailureType
   = GenericFailure
@@ -217,6 +221,7 @@ data FailureType
   | PartialAvailability
   deriving stock (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake FailureType
+  deriving anyclass (NFData)
 
 data PreciseDeploymentStatus
   = -- | The deployment is currently being processed by the server
@@ -224,6 +229,7 @@ data PreciseDeploymentStatus
   | DeploymentNotPending {recordedStatus :: DeploymentStatus}
   deriving stock (Generic, Read, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake PreciseDeploymentStatus
+  deriving anyclass (NFData)
 
 archivedStatuses :: [DeploymentStatus]
 archivedStatuses = [ArchivePending, Archived]
@@ -238,6 +244,7 @@ data Deployment' t = Deployment
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake (Deployment' t)
+  deriving anyclass (NFData)
 
 instance (Searchable needle t) => Searchable needle (Deployment' t) where
   type
@@ -271,7 +278,7 @@ data DeploymentLog = DeploymentLog
   deriving (ToJSON, FromJSON) via Snake DeploymentLog
 
 newtype DeploymentMetadata = DeploymentMetadata {unDeploymentMetadata :: [DeploymentMetadatum]}
-  deriving newtype (Eq, Show, Ord, FromJSON, ToJSON)
+  deriving newtype (Eq, Show, Ord, FromJSON, ToJSON, NFData)
 
 data DeploymentMetadatum = DeploymentMetadatum
   { -- | The name of the link
@@ -282,6 +289,7 @@ data DeploymentMetadatum = DeploymentMetadatum
   deriving stock (Generic, Show, Eq, Ord)
   deriving (FromJSON, ToJSON) via Snake DeploymentMetadatum
   deriving anyclass (FromRecord)
+  deriving anyclass (NFData)
 
 data DeploymentInfo = DeploymentInfo
   { deployment :: Deployment
@@ -310,6 +318,7 @@ data DeploymentFullInfo' t = DeploymentFullInfo
   }
   deriving stock (Generic, Show, Eq)
   deriving (FromJSON, ToJSON) via Snake (DeploymentFullInfo' t)
+  deriving anyclass (NFData)
 
 type DeploymentFullInfo = DeploymentFullInfo' Text
 
