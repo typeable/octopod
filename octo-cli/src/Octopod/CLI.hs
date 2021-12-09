@@ -2,7 +2,7 @@
 
 module Octopod.CLI (runOcto) where
 
-import Common.Types
+import Common.Types hiding (stderr)
 import Common.Utils (dfiName)
 import Control.Exception
 import Control.Lens hiding (List)
@@ -10,6 +10,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Data.Aeson (decode)
+import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy.Char8 as LBSC
 import Data.Coerce
 import Data.Generics.Labels ()
@@ -24,26 +25,15 @@ import Data.Text.Lens
 import Data.Time
 import GHC.IO.Encoding
 import Network.HTTP.Client.TLS
+import Network.HTTP.Types.Status
 import Octopod.CLI.Args
 import Octopod.PowerAPI
 import Octopod.PowerAPI.Auth.Client
 import Servant.API
 import Servant.Client
-  ( BaseUrl (..),
-    ClientEnv,
-    ClientError,
-    ClientM,
-    client,
-    mkClientEnv,
-    runClientM,
-  )
-import Servant.Client.Core
-  ( ClientError (FailureResponse),
-    ResponseF (..),
-    parseBaseUrl,
-  )
 import System.Environment (lookupEnv)
 import System.Exit
+import System.IO
 import Text.Layout.Table
 import Text.Layout.Table.Extras ()
 import Prelude as P
@@ -60,8 +50,8 @@ runOcto = do
       >>= maybe (die "OCTO_AUTHORIZATION_HEADER is not set") pure
   args <- parseArgs
   env <- getBaseUrl
-  manager <- newTlsManager
-  let clientEnv = mkClientEnv manager env
+  mngr <- newTlsManager
+  let clientEnv = mkClientEnv mngr env
   flip runReaderT clientEnv $
     case args of
       Create tName tSetAp tSetDep -> do
@@ -172,9 +162,9 @@ handleInfo auth dName = do
     case res of
       Right (i : _) -> printInfo i
       Right [] -> putStrLn notFoundMsg
-      Left err -> putStrLn $ "request failed, reason: " ++ show err
+      other -> handleResponse (const $ pure ()) other
   where
-    notFoundMsg = "deployment " ++ T.unpack (coerce dName) ++ " not found"
+    notFoundMsg = "Deployment " ++ T.unpack (coerce dName) ++ " not found"
 
 -- | Handles the 'cleanup' subcommand.
 handleCleanup :: AuthContext AuthHeaderAuth -> DeploymentName -> ReaderT ClientEnv IO ()
@@ -202,16 +192,14 @@ handleGetActionInfo :: AuthContext AuthHeaderAuth -> ActionId -> LogOutput -> Re
 handleGetActionInfo auth aId l = do
   clientEnv <- ask
   liftIO $ do
-    runClientM (getActionInfoH auth aId) clientEnv >>= \case
-      Left err -> print err
-      Right x -> case l of
-        Out -> T.putStrLn . unStdout $ x ^. #stdout
-        Err -> T.putStrLn . unStderr $ x ^. #stderr
-        ErrOut -> do
-          T.putStrLn "\t\tstdout:\n"
-          T.putStrLn . unStdout $ x ^. #stdout
-          T.putStrLn "\t\tstderr:\n"
-          T.putStrLn . unStderr $ x ^. #stderr
+    runClientM (getActionInfoH auth aId) clientEnv >>= handleResponse \x -> case l of
+      Out -> T.putStrLn . unStdout $ x ^. #stdout
+      Err -> T.putStrLn . unStderr $ x ^. #stderr
+      ErrOut -> do
+        T.putStrLn "\t\tstdout:\n"
+        T.putStrLn . unStdout $ x ^. #stdout
+        T.putStrLn "\t\tstderr:\n"
+        T.putStrLn . unStderr $ x ^. #stderr
 
 listH :: AuthContext AuthHeaderAuth -> ClientM [DeploymentFullInfo]
 createH :: AuthContext AuthHeaderAuth -> Deployment -> ClientM CommandResponse
@@ -257,19 +245,44 @@ instance CanPushArrow (x -> y) ~ 'False => PushArrowIntoServantAlt' (x -> y) (x 
 -- | Handles response from Octopod Server.
 handleResponse :: (a -> IO ()) -> Either ClientError a -> IO ()
 handleResponse f (Right result) = f result
-handleResponse _ (Left (FailureResponse _req res)) =
-  T.putStrLn . decodeError $ responseBody res
-handleResponse _ (Left err) =
-  T.putStrLn $ "command failed due to unknown reason: " <> T.pack (show err)
+handleResponse _ (Left cErr) = do
+  case cErr of
+    (ConnectionError exc) -> do
+      hPutStrLn stderr "Connection error"
+      hPutStrLn stderr $ displayException exc
+    (FailureResponse _ res) -> do
+      showResponseStatus res
+      case decodeError $ responseBody res of
+        Just errT -> do T.hPutStrLn stderr errT
+        Nothing | not . LBSC.null $ responseBody res -> do
+          LBSC.hPutStrLn stderr $ responseBody res
+          pure ()
+        Nothing -> pure ()
+    (InvalidContentTypeHeader res) -> do
+      showResponseStatus res
+      hPutStrLn stderr "Invalid content type header received"
+    (UnsupportedContentType ctype res) -> do
+      showResponseStatus res
+      hPutStrLn stderr $ "Unsupported content type header received: " <> show ctype
+    (DecodeFailure err res) -> do
+      showResponseStatus res
+      hPutStrLn stderr $ "The response body could not be decoded: "
+      T.hPutStrLn stderr err
+  exitFailure
 
-decodeError :: LBSC.ByteString -> Text
+showResponseStatus :: Response -> IO ()
+showResponseStatus Response {responseStatusCode = (Status code body)} = do
+  hPutStr stderr $ show code <> " "
+  BSC.hPutStrLn stderr body
+  pure ()
+
+decodeError :: LBSC.ByteString -> Maybe Text
 decodeError body =
-  case decode body of
-    Just (ValidationError nameErrors) ->
+  decode body <&> \case
+    (ValidationError nameErrors) ->
       T.concat ((<> "\n") <$> nameErrors)
-    Just (AppError errorMsg) -> errorMsg
-    Just Success -> "ok"
-    _ -> "error: " <> (T.pack . LBSC.unpack $ body)
+    (AppError errorMsg) -> errorMsg
+    Success -> "ok"
 
 -- | Pretty-prints the 'info' subcommand result.
 printInfo :: DeploymentInfo -> IO ()

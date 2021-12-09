@@ -60,6 +60,7 @@ executable octo
     table-layout ^>= 0.9.0.0,
     servant-auth,
     ordered-containers,
+    http-types,
   hs-source-dirs: src
   default-language: Haskell2010
   ghc-options:
