@@ -56,7 +56,7 @@ import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Text as T (Text, null, pack)
+import Data.Text as T (Text, null, pack, strip)
 import Data.Text.Search
 import Data.These
 import Data.Time
@@ -477,9 +477,14 @@ wrapRequestErrors f = mdo
   (x, ev :: Event t (PatchMap Unique Text)) <- runEventWriterT $
     f $ \reqEv -> do
       k <- liftIO newUnique
-      tellEvent $ fmapCheap (PatchMap . M.singleton k . reqErrorBody) reqEv
+      tellEvent $ fmap (PatchMap . M.singleton k . fmap catchEmptyErrors . reqErrorBody) reqEv
       pure $ fmapMaybeCheap reqSuccess reqEv
   pure x
+  where
+    catchEmptyErrors t
+      | (T.null . T.strip) t =
+        "Something went wrong, but no explanation was provided."
+    catchEmptyErrors t = t
 
 -- | The widget used to display errors.
 errorHeader ::
