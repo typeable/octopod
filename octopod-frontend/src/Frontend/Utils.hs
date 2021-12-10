@@ -539,7 +539,7 @@ envVarsInput values dCfg ovs = mdo
       mempty
       (updated erroredOverride)
   let updatedValues = restrictMapEv updatedKeys (updated workingOverridesWithErrors)
-      valChangedEvSelector = fanMap (clearedOvs <> changedValues <> updatedValues)
+      valChangedEvSelector = fanMap (clearedOvs <> updatedValues <> changedValues)
       (splitE -> (clearedOvs, deletedOvs)) =
         alignEventWithMaybe
           ( \case
@@ -602,6 +602,7 @@ validateWorkingOverrides overrides =
             , case value' of
                 WorkingCustomValue "" -> overrideValueErrors "Values can not be empty."
                 WorkingCustomValue _ -> mempty
+                WorkingDefaultValue "" -> overrideValueErrors "Values can not be empty."
                 WorkingDefaultValue _ -> mempty
                 WorkingDeletedValue _ -> mempty
             ]
@@ -611,7 +612,7 @@ data OverrideErrors = OverrideErrors
   { keyErrors :: Maybe (NonEmpty Text)
   , valueErrors :: Maybe (NonEmpty Text)
   }
-  deriving stock (Generic, Eq)
+  deriving stock (Generic, Eq, Show)
   deriving (Semigroup, Monoid) via Generically OverrideErrors
 
 overrideKeyErrors :: Text -> OverrideErrors
@@ -620,8 +621,7 @@ overrideKeyErrors x = mempty {keyErrors = Just $ pure x}
 overrideValueErrors :: Text -> OverrideErrors
 overrideValueErrors x = mempty {valueErrors = Just $ pure x}
 
--- | Widget for entering a key-value pair. The updated overrides list is
--- written to the 'EventWriter'.
+-- | Widget for entering a key-value pair.
 envVarInput ::
   (MonadWidget t m) =>
   -- | The key values to suggest to the user
