@@ -37,4 +37,4 @@ runs:
       uses: cachix/cachix-action@v10
       with:
         name: typeable
-        signingKey: ${{ inputs.cachixSigningKey }}
+        authToken: ${{ inputs.authToken }}
