@@ -1,8 +1,8 @@
 name: "Common setup"
 description: "Common setup steps"
 inputs:
-  cachixSigningKey:
-    description: "Cachix signing key"
+  authToken:
+    description: "Cachix auth token"
     required: true
 runs:
   using: "composite"
@@ -36,5 +36,5 @@ runs:
     - name: Login to Cachix
       uses: cachix/cachix-action@v10
       with:
-        name: octopod
+        name: typeable
         signingKey: ${{ inputs.cachixSigningKey }}
