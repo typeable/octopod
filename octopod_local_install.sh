@@ -90,8 +90,25 @@ data:
 EOF
 message "Installing ingress-nginx controller"
 kubectl --context=kind-octopod apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.45.0/deploy/static/provider/kind/deploy.yaml
+has_error=0
 while true; do
-        if [ $(kubectl --context=kind-octopod -n ingress-nginx get deploy | awk -F ' ' '$1 ~ /^ingress-nginx/ {print $4}') == '1' ]; then
+        set +e
+        kube_out=`kubectl --context=kind-octopod -n ingress-nginx get deploy 2>&1`
+        err_code=$?
+        set -e
+        if [ $err_code != 0 ] && [ $has_error == 0 ]; then
+                echo "kubectl returned: $kube_out"
+                echo "Do you want to continue installation? [y/n] "
+                read confirm
+                if [ "$confirm" != 'y' ]; then
+                        message "Deleting cluster..."
+                        kind delete cluster --name octopod
+                        exit 0;
+                else
+                        has_error=1
+                fi
+        fi
+        if [ $err_code == 0 ] && [ $( echo -n "$kube_out" | awk -F ' ' '$1 ~ /^ingress-nginx/ {print $4}') == '1' ]; then
                 message 'ingress-controller is ready'
                 break;
         else
