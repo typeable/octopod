@@ -30,6 +30,7 @@ fn main() {
         deployment_parameters: deployment_parameters,
         overrides: overrides,
     };
+    info!("Generated Helm args: {:?}", &helm_template.args());
     match helm_template.run_stdout() {
         Ok(status) => {
             let (deployments, statefulsets, _ingresses, _old_ingresses, _postgresqls, _kafkas) = match parse_to_k8s(status) {

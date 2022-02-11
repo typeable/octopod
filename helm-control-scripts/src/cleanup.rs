@@ -55,17 +55,6 @@ fn main() {
                             panic!("{:?}", err);
                         }
                     }
-                    match ingresses_to_secrets(ingresses, old_ingresses) {
-                        Some(secrets) => {
-                            for secret in secrets {
-                                match delete_secret(&namespace, &secret) {
-                                    Ok(_status) => info!("Successfully deleted secret {}", &secret),
-                                    Err(error) => error!("Can't delete secret {}\n {}", &secret, error)
-                                }
-                            }
-                        },
-                        None => info!("No secrets to delete")
-                    }
                     info!("Success!");
                 },
                 Err(status) => {

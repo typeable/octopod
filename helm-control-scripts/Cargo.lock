@@ -525,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "helm-control-scripts"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "dkregistry",
  "env_logger",
