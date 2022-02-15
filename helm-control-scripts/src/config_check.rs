@@ -35,7 +35,10 @@ fn main() {
         Ok(status) => {
             let (deployments, statefulsets, _ingresses, _old_ingresses, _postgresqls, _kafkas) = match parse_to_k8s(status) {
                 Ok((deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas)) => (deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas),
-                Err(err) => panic!("{}", err)
+                Err(err) => {
+                    println!("Something went wrong: {}", err);
+                    panic!("{}", err);
+                }
             };
             match deployments_statefulsets_to_images(deployments, statefulsets) {
                 Some(images) => {
@@ -53,7 +56,8 @@ fn main() {
                 }
             }
         }
-        Err(status) => {
+        Err((status, err)) => {
+            println!("{:#}", err);
             error!("Error during helm execution");
             panic!("{:?}", status);
         }
