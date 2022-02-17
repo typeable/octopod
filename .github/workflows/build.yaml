@@ -60,7 +60,7 @@ jobs:
       - name: Common setup
         uses: ./.github/actions/common_setup
         with:
-          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Build
         run: nix-build -A projectCross.musl64.hsPkgs.octo-cli.components.exes.octo --arg prod true -j auto
       - uses: actions/upload-artifact@v2
@@ -77,7 +77,7 @@ jobs:
       - name: Common setup
         uses: ./.github/actions/common_setup
         with:
-          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build Docker Images
         run: nix-build ./nix -j auto
@@ -116,7 +116,7 @@ jobs:
       - name: Common setup
         uses: ./.github/actions/common_setup
         with:
-          cachixSigningKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Push Docker Release Images to DockerHub
         uses: ./.github/actions/push_docker_images
         with:

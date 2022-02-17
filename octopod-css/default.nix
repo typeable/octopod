@@ -1,10 +1,12 @@
 { pkgsSrc ? (import ./.. { }).pkgsSrc
 , sources ? import ../nix/sources.nix
 , nix-filter ? import sources.nix-filter
+, system ? builtins.currentSystem
 }:
 let
   pkgs = pkgsSrc {
     overlays = [ (self: super: { nodejs = self.nodejs-10_x; }) ];
+    inherit system;
   };
   production-css = pkgs.mkYarnPackage {
     name = "octopod-css";
