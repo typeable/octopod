@@ -28,7 +28,6 @@
 .collapse--project {
     margin-top: 8px;
 }
-
     .collapse--project > .collapse__head {
         position: relative;
         display: inline-block;
@@ -42,8 +41,13 @@
         color: var(--dark-grey);
     }
 
-    .collapse--project > .collapse__head:hover {
+    .collapse--project > .collapse__head--has-changes {
+        text-decoration: underline;
+    }
 
+    .collapse--project > .collapse__head:hover {
+        background-color: #E2E2E2;
+        color: var(--primary);
     }
         .collapse--project > .collapse__head::after {
             content: "";
