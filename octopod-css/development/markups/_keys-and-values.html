@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>Keys and values</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!--<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">-->
+        <link rel="stylesheet" href="../styles/style.css">
+    </head>
+    <body>
+
+
+
+        <div style="width: 800px; margin: 0 auto;">
+            <br>
+            <br>
+            <br>
+            <br>
+            <h1>Keys and values</h1>
+
+
+            <span class="key-default-pristine">
+                air.vaultEngineName:
+            </span>
+
+
+            <br>
+            <br>
+            <br>
+            <h2>Классы</h2>
+
+            <div class="table">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение не изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-pristine">key-default-pristine</span>
+                            </td>
+                            <td>
+                                <span class="value-pristine">value-pristine</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-edited">key-default-edited</span>
+                            </td>
+                            <td>
+                                <span class="value-edited">value-edited</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ кастомный, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-custom-edited">key-custom-edited</span>
+                            </td>
+                            <td>
+                                <span class="value-edited">value-edited</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+            <br>
+            <br>
+            <h2>Примеры</h2>
+
+            <div class="table">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение не изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-pristine">air.vaultEngineName:</span>
+                            </td>
+                            <td>
+                                <span class="value-pristine">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-edited">air.vaultEngineName:</span>
+                            </td>
+                            <td>
+                                <span class="value-edited">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ кастомный, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-custom-edited">app_api_url:</span>
+                            </td>
+                            <td>
+                                <span class="value-edited">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <br>
+            <br>
+            <p>
+                Для экономии узлов в DOM-дереве можно не создавать отдельную обёртку &lt;span&gt;...&lt;/span&gt;
+                а вешать эти классы прям на ячейки таблицы, или на любого другого родителя:
+            </p>
+
+            <div class="table">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение не изменено:
+                            </td>
+                            <td class="key-default-pristine">
+                                air.vaultEngineName:
+                            </td>
+                            <td class="value-pristine">
+                                staging
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение изменено:
+                            </td>
+                            <td class="key-default-edited">
+                                air.vaultEngineName:
+                            </td>
+                            <td class="value-edited">
+                                staging
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ кастомный, значение изменено:
+                            </td>
+                            <td class="key-custom-edited">
+                                app_api_url:
+                            </td>
+                            <td class="value-edited">
+                                http://my-api.my-domain.com
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+            <br>
+            <br>
+            <h2>
+                Запись в строку
+            </h2>
+            <p>
+                Прост пишем одно за другим, разделяем пробелом:
+            </p>
+
+            <div class="table">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение не изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-pristine">air.vaultEngineName:</span> <span class="value-pristine">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-edited">air.vaultEngineName:</span> <span class="value-edited">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ кастомный, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-custom-edited">app_api_url:</span> <span class="value-edited">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <br>
+            <br>
+            <p>
+                Пробел можно положить не между тегами, а внутрь ключа, и тогда подчёркивания сомкнуться
+            </p>
+
+            <div class="table">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение не изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-pristine">air.vaultEngineName: </span><span class="value-pristine">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ по умолчанию, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-default-edited">air.vaultEngineName: </span><span class="value-edited">staging</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ кастомный, значение изменено:
+                            </td>
+                            <td>
+                                <span class="key-custom-edited">app_api_url: </span><span class="value-edited">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+        </div>
+
+
+
+        <!-- jQuery -->
+        <script src="../vendors/jquery/jquery-3.2.1.min.js"></script>
+
+        <!-- Outline.js -->
+        <script src="../vendors/outline/outline.js"></script>
+
+        <!-- Temp -->
+        <script src="../scripts/_expander.js"></script>
+        <script src="../scripts/_drop.js"></script>
+        <script src="../scripts/_sort.js"></script>
+        <script src="../scripts/_data.js"></script>
+        <script src="../scripts/_popup.js"></script>
+        <script src="../scripts/_classic-popup.js"></script>
+
+    </body>
+</html>
