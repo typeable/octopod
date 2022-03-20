@@ -113,7 +113,7 @@
                         </section>
                         <section class="deployment__section">
                             <h3 class="deployment__sub-heading">
-                                App configuration
+                                App overrides
                             </h3>
                             <div class="deployment__widget">
                                 <div class="listing listing--for-text listing--larger">
@@ -141,6 +141,75 @@
                                     <div class="listing__item">
                                         <span class="listing__key default">INFO:</span>
                                         <span class="listing__value default">New Project Staging</span>
+                                    </div>
+                                </div>
+                                <div class="collapse collapse--project">
+                                    <button class="collapse__head" type="button">
+                                        air
+                                    </button>
+                                    <div class="collapse__body">
+                                        <div class="collapse__inner">
+                                            <div class="row">
+                                                <span class="key-default-pristine">vaultEngineName: </span><span class="value-pristine">staging</span>
+                                            </div>
+                                            <div class="collapse collapse--project">
+                                                <button class="collapse__head" type="button">
+                                                    vaultEnv
+                                                </button>
+                                                <div class="collapse__body">
+                                                    <div class="collapse__inner">
+                                                        <div class="row">
+                                                            <span class="key-default-pristine">air-sso.engineOverride: </span><span class="value-pristine">staging</span>
+                                                        </div>
+                                                        <div class="collapse collapse--project">
+                                                            <button class="collapse__head" type="button">
+                                                                air-sso.mapping[0]
+                                                            </button>
+                                                            <div class="collapse__body">
+                                                                <div class="collapse__inner">
+                                                                    <div class="row">
+                                                                        <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                                    </div>
+                                                                    <div class="row">
+                                                                        <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="collapse collapse--project">
+                                                            <button class="collapse__head" type="button">
+                                                                travolutionary.mapping[0]
+                                                            </button>
+                                                            <div class="collapse__body">
+                                                                <div class="collapse__inner">
+                                                                    <div class="row">
+                                                                        <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                                    </div>
+                                                                    <div class="row">
+                                                                        <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="collapse collapse--project">
+                                                            <button class="collapse__head" type="button">
+                                                                travolutionary.mapping[1]
+                                                            </button>
+                                                            <div class="collapse__body">
+                                                                <div class="collapse__inner">
+                                                                    <div class="row">
+                                                                        <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                                    </div>
+                                                                    <div class="row">
+                                                                        <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -738,6 +807,7 @@
         <script src="../scripts/_data.js"></script>
         <script src="../scripts/_popup.js"></script>
         <script src="../scripts/_classic-popup.js"></script>
+        <script src="../scripts/_collapse.js"></script>
 
     </body>
 
