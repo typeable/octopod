@@ -62,44 +62,187 @@
             <br>
             <br>
             <br>
-            <h2>Скины</h2>
-
-
-
-            <br>
-            <br>
-            <br>
-            <h3>.collapse--project</h3>
+            <h2>.collapse--project</h2>
             <p>
-                Под страницу с документами
+                Внутри обычно используется <b>.row</b>
             </p>
 
             <div class="collapse collapse--project">
                 <button class="collapse__head" type="button">
-                    air-sso.mapping[0]
+                    travolutionary.mapping[1]
                 </button>
                 <div class="collapse__body">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla sed sollicitudin eros. Curabitur at mauris imperdiet nulla malesuada interdum. Nulla facilisi. Donec eu eros vel diam iaculis pulvinar. In ex eros, consequat vitae venenatis quis, tempus sit amet sapien. Proin faucibus tellus id ex sollicitudin, in laoreet ante vehicula. Donec ultrices dictum ante eu efficitur. Sed nec placerat turpis. Nullam sed lectus nunc. Nullam ultrices consequat lectus, id posuere augue tempor nec. Donec molestie malesuada nisl, eu lacinia dui volutpat ac. Donec laoreet erat at quam posuere iaculis.
-
-                    <div class="collapse collapse--project">
-                        <button class="collapse__head" type="button">
-                            air-sso.mapping[0]
-                        </button>
-                        <div class="collapse__body">
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla sed sollicitudin eros. Curabitur at mauris imperdiet nulla malesuada interdum. Nulla facilisi. Donec eu eros vel diam iaculis pulvinar. In ex eros, consequat vitae venenatis quis, tempus sit amet sapien. Proin faucibus tellus id ex sollicitudin, in laoreet ante vehicula. Donec ultrices dictum ante eu efficitur. Sed nec placerat turpis. Nullam sed lectus nunc. Nullam ultrices consequat lectus, id posuere augue tempor nec. Donec molestie malesuada nisl, eu lacinia dui volutpat ac. Donec laoreet erat at quam posuere iaculis.
-
-                            <div class="collapse collapse--project">
-                                <button class="collapse__head" type="button">
-                                    air-sso.mapping[0]
-                                </button>
-                                <div class="collapse__body">
-                                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla sed sollicitudin eros. Curabitur at mauris imperdiet nulla malesuada interdum. Nulla facilisi. Donec eu eros vel diam iaculis pulvinar. In ex eros, consequat vitae venenatis quis, tempus sit amet sapien. Proin faucibus tellus id ex sollicitudin, in laoreet ante vehicula. Donec ultrices dictum ante eu efficitur. Sed nec placerat turpis. Nullam sed lectus nunc. Nullam ultrices consequat lectus, id posuere augue tempor nec. Donec molestie malesuada nisl, eu lacinia dui volutpat ac. Donec laoreet erat at quam posuere iaculis.
-                                </div>
-                            </div>
-
+                    <div class="collapse__inner">
+                        <div class="row">
+                            <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                        </div>
+                        <div class="row">
+                            <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
                         </div>
                     </div>
+                </div>
+            </div>
 
+
+            <p>
+                Можно вкладывать любое количество <b>.collapse</b> и <b>.row</b> друг в друга,
+                в любом порядке, в любых комбинациях:
+            </p>
+
+            <div class="collapse collapse--project">
+                <button class="collapse__head has-changes" type="button">
+                    air
+                </button>
+                <div class="collapse__body">
+                    <div class="collapse__inner">
+                        <div class="row">
+                            <span class="key-default-pristine">vaultEngineName: </span><span class="value-pristine">staging</span>
+                        </div>
+                        <div class="collapse collapse--project">
+                            <button class="collapse__head" type="button">
+                                vaultEnv
+                            </button>
+                            <div class="collapse__body">
+                                <div class="collapse__inner">
+                                    <div class="row">
+                                        <span class="key-default-pristine">air-sso.engineOverride: </span><span class="value-pristine">staging</span>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head has-changes" type="button">
+                                            air-sso.mapping[0]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <span class="key-default-edited">air-sso.mapping[1].name: </span><span class="value-edited">SSO_CLIENT_SECRET</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head" type="button">
+                                            travolutionary.mapping[0]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head has-changes" type="button">
+                                            travolutionary.mapping[1]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <span class="key-default-edited">air-sso.mapping[1].name: </span><span class="value-edited">SSO_CLIENT_SECRET</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <span class="key-custom-edited">app_api_url: </span><span class="value-edited">http: //my-api.my-domain.com</span>
+                    </div>
+                </div>
+            </div>
+            <div class="collapse collapse--project">
+                <button class="collapse__head" type="button">
+                    sso
+                </button>
+                <div class="collapse__body">
+                    <div class="collapse__inner">
+                        <div class="row">
+                            <span class="key-default-pristine">vaultEngineName: </span><span class="value-pristine">staging</span>
+                        </div>
+                        <div class="collapse collapse--project">
+                            <button class="collapse__head" type="button">
+                                vaultEnv
+                            </button>
+                            <div class="collapse__body">
+                                <div class="collapse__inner">
+                                    <div class="row">
+                                        <span class="key-default-pristine">air-sso.engineOverride: </span><span class="value-pristine">staging</span>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head" type="button">
+                                            air-sso.mapping[0]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <span class="key-default-edited">air-sso.mapping[1].name: </span><span class="value-edited">SSO_CLIENT_SECRET</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head" type="button">
+                                            travolutionary.mapping[0]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="collapse collapse--project">
+                                        <button class="collapse__head" type="button">
+                                            travolutionary.mapping[1]
+                                        </button>
+                                        <div class="collapse__body">
+                                            <div class="collapse__inner">
+                                                <div class="row">
+                                                    <span class="key-default-edited">name: </span><span class="value-edited">SSO_CLIENT_ID</span>
+                                                </div>
+                                                <div class="row">
+                                                    <span class="key-default-pristine">key: </span><span class="value-pristine">clientId</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <span class="key-default-edited">air-sso.mapping[1].name: </span><span class="value-edited">SSO_CLIENT_SECRET</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <span class="key-custom-edited">app_api_url: </span><span class="value-edited">http: //my-api.my-domain.com</span>
+                    </div>
                 </div>
             </div>
 
