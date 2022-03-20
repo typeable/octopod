@@ -43,7 +43,7 @@
     }
 
     .collapse--project > .collapse__head:hover {
-        text-decoration: underline;
+
     }
         .collapse--project > .collapse__head::after {
             content: "";
