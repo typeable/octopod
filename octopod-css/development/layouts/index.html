@@ -643,105 +643,107 @@
                                     <button class="overrides__add dash dash--add" type="button">
                                         Add an override
                                     </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
+                                    <div class="overrides__list">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key" value="ENVIRONMENT">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONMENT">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--default">
+                                                <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
+                                            </div>
+                                            <div class="editable-row__value input input--default">
+                                                <input class="input__widget" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--deleted">
+                                                <input class="input__widget" type="text" placeholder="key" value="APP_URL" disabled>
+                                            </div>
+                                            <div class="editable-row__value input input--deleted">
+                                                <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com" disabled>
+                                            </div>
+                                            <button class="editable-row__delete spot spot--undo">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--disable">
+                                                <input class="input__widget" type="text" placeholder="key" disabled>
+                                            </div>
+                                            <div class="editable-row__value input input--disable">
+                                                <input class="input__widget" type="text" placeholder="value" value="production" disabled>
+                                            </div>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--default">
-                                            <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key" value="LiveSearch">
+                                                <ul class="input__dropdown">
+                                                    <li class="input__suggest"><b>S</b>ECRET_PASSWORD</li>
+                                                    <li class="input__suggest"><b>S</b>ECRET_INFO</li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                    <li class="input__suggest"><b>S</b>oviet Socialist Republics
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="Value">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input input--default">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--deleted">
-                                            <input class="input__widget" type="text" placeholder="key" value="APP_URL" disabled>
-                                        </div>
-                                        <div class="overrides__value input input--deleted">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com" disabled>
-                                        </div>
-                                        <button class="overrides__delete spot spot--undo">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--disable">
-                                            <input class="input__widget" type="text" placeholder="key" disabled>
-                                        </div>
-                                        <div class="overrides__value input input--disable">
-                                            <input class="input__widget" type="text" placeholder="value" value="production" disabled>
-                                        </div>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="LiveSearch">
-                                            <ul class="overrides__search">
-                                                <li class="overrides__search-item"><b>S</b>ECRET_PASSWORD</li>
-                                                <li class="overrides__search-item"><b>S</b>ECRET_INFO</li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                                <li class="overrides__search-item"><b>S</b>oviet Socialist Republics
-                                                </li>
-                                            </ul>
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="Value">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -755,100 +757,102 @@
                                     <button class="overrides__add dash dash--add" type="button">
                                         Add an override
                                     </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
+                                    <div class="overrides__list">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget input--default" type="text" placeholder="key" value="SECRET_CODE">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
+                                        <div class="editable-row loader">
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__delete spot spot--loader"></div>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                        <div class="editable-row loader">
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__delete spot spot--loader"></div>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget input--default" type="text" placeholder="key" value="SECRET_CODE">
+                                        <div class="editable-row loader">
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__placeholder"></div>
+                                            <div class="editable-row__delete spot spot--loader"></div>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--error">
+                                                <input class="input__widget input--default" type="text" placeholder="key" value="SECRET_CODE">
+                                                <div class="input__output">Duplicate key values</div>
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item loader">
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__delete spot spot--loader"></div>
-                                    </div>
-                                    <div class="overrides__item loader">
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__delete spot spot--loader"></div>
-                                    </div>
-                                    <div class="overrides__item loader">
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__placeholder"></div>
-                                        <div class="overrides__delete spot spot--loader"></div>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--error">
-                                            <input class="input__widget input--default" type="text" placeholder="key" value="SECRET_CODE">
-                                            <div class="input__output">Duplicate key values</div>
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--error">
+                                                <input class="input__widget" type="text" placeholder="key" value="ENVIRONMENT">
+                                                <div class="input__output">Duplicate key values</div>
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input input--error">
+                                                <input class="input__widget" type="text" placeholder="key" value="">
+                                                <div class="input__output">Empty key value</div>
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--error">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONMENT">
-                                            <div class="input__output">Duplicate key values</div>
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input input--error">
-                                            <input class="input__widget" type="text" placeholder="key" value="">
-                                            <div class="input__output">Empty key value</div>
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
                                     </div>
                                 </div>
                             </div>

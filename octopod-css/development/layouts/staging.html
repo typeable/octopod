@@ -607,49 +607,385 @@
                                     <button class="overrides__add dash dash--add" type="button">
                                         Add an override
                                     </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
+                                    <div class="overrides__list">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-custom-edited" type="text" placeholder="key" value="ENVIRONENT">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-custom-edited" type="text" placeholder="key" value="app_api_url">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
+                                        </div>
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                                    <div class="overrides__tree">
+                                        <div class="collapse collapse--project">
+                                            <button class="collapse__head" type="button">
+                                                air
+                                            </button>
+                                            <div class="collapse__body">
+                                                <div class="collapse__inner">
+                                                    <div class="editable-row">
+                                                        <div class="editable-row__key input">
+                                                            <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                        </div>
+                                                        <div class="editable-row__value input">
+                                                            <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                        </div>
+                                                        <button class="editable-row__delete spot spot--cancel">
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                    <div class="collapse collapse--project">
+                                                        <button class="collapse__head" type="button">
+                                                            vaultEnv
+                                                        </button>
+                                                        <div class="collapse__body">
+                                                            <div class="collapse__inner">
+                                                                <div class="editable-row">
+                                                                    <div class="editable-row__key input">
+                                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                    </div>
+                                                                    <div class="editable-row__value input">
+                                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                    </div>
+                                                                    <button class="editable-row__delete spot spot--cancel">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        air-sso.mapping[0]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="editable-row">
+                                                                            <div class="editable-row__key input">
+                                                                                <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                            </div>
+                                                                            <div class="editable-row__value input">
+                                                                                <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                            </div>
+                                                                            <button class="editable-row__delete spot spot--cancel">
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        travolutionary.mapping[0]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        travolutionary.mapping[1]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="editable-row">
+                                                                    <div class="editable-row__key input">
+                                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                    </div>
+                                                                    <div class="editable-row__value input">
+                                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                    </div>
+                                                                    <button class="editable-row__delete spot spot--cancel">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="editable-row">
+                                                    <div class="editable-row__key input">
+                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                    </div>
+                                                    <div class="editable-row__value input">
+                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                    </div>
+                                                    <button class="editable-row__delete spot spot--cancel">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
+                                        <div class="collapse collapse--project">
+                                            <button class="collapse__head" type="button">
+                                                sso
+                                            </button>
+                                            <div class="collapse__body">
+                                                <div class="collapse__inner">
+                                                    <div class="editable-row">
+                                                        <div class="editable-row__key input">
+                                                            <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                        </div>
+                                                        <div class="editable-row__value input">
+                                                            <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                        </div>
+                                                        <button class="editable-row__delete spot spot--cancel">
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                    <div class="collapse collapse--project">
+                                                        <button class="collapse__head" type="button">
+                                                            vaultEnv
+                                                        </button>
+                                                        <div class="collapse__body">
+                                                            <div class="collapse__inner">
+                                                                <div class="editable-row">
+                                                                    <div class="editable-row__key input">
+                                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                    </div>
+                                                                    <div class="editable-row__value input">
+                                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                    </div>
+                                                                    <button class="editable-row__delete spot spot--cancel">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        air-sso.mapping[0]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="editable-row">
+                                                                            <div class="editable-row__key input">
+                                                                                <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                            </div>
+                                                                            <div class="editable-row__value input">
+                                                                                <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                            </div>
+                                                                            <button class="editable-row__delete spot spot--cancel">
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        travolutionary.mapping[0]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="collapse collapse--project">
+                                                                    <button class="collapse__head" type="button">
+                                                                        travolutionary.mapping[1]
+                                                                    </button>
+                                                                    <div class="collapse__body">
+                                                                        <div class="collapse__inner">
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="editable-row">
+                                                                                <div class="editable-row__key input">
+                                                                                    <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                                </div>
+                                                                                <div class="editable-row__value input">
+                                                                                    <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                                </div>
+                                                                                <button class="editable-row__delete spot spot--cancel">
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="editable-row">
+                                                                    <div class="editable-row__key input">
+                                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                                    </div>
+                                                                    <div class="editable-row__value input">
+                                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                                    </div>
+                                                                    <button class="editable-row__delete spot spot--cancel">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="editable-row">
+                                                    <div class="editable-row__key input">
+                                                        <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                                    </div>
+                                                    <div class="editable-row__value input">
+                                                        <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                                    </div>
+                                                    <button class="editable-row__delete spot spot--cancel">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -663,49 +999,51 @@
                                     <button class="overrides__add dash dash--add" type="button">
                                         Add an override
                                     </button>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key">
+                                    <div class="overrides__list">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget" type="text" placeholder="key">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget" type="text" placeholder="value">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-custom-edited" type="text" placeholder="key" value="ENVIRONENT">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="production">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="ENVIRONENT">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-custom-edited" type="text" placeholder="key" value="app_api_url">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="http://my-api.my-domain.com">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="production">
+                                        <div class="editable-row">
+                                            <div class="editable-row__key input">
+                                                <input class="input__widget key-default-pristine" type="text" placeholder="key" value="SECRET_CODE">
+                                            </div>
+                                            <div class="editable-row__value input">
+                                                <input class="input__widget value-edited" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
+                                            </div>
+                                            <button class="editable-row__delete spot spot--cancel">
+                                                Delete
+                                            </button>
                                         </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="app_api_url">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="http://my-api.my-domain.com">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
-                                    </div>
-                                    <div class="overrides__item">
-                                        <div class="overrides__key input">
-                                            <input class="input__widget" type="text" placeholder="key" value="SECRET_CODE">
-                                        </div>
-                                        <div class="overrides__value input">
-                                            <input class="input__widget" type="text" placeholder="value" value="asdfaisdjri235868ear7%^&IUAK$^%&asdfasdfij">
-                                        </div>
-                                        <button class="overrides__delete spot spot--cancel">
-                                            Delete
-                                        </button>
                                     </div>
                                 </div>
                             </div>

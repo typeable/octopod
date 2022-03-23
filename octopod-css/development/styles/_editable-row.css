@@ -1,0 +1,49 @@
+.editable-row {
+    position: relative;
+    margin-top: 8px;
+    display: flex;
+    align-self: flex-start;
+}
+
+.editable-row:first-child {
+    margin-top: 0;
+}
+    .editable-row__key {
+        width: 400px;
+    }
+
+    .editable-row__value {
+        margin-left: 16px;
+        flex-grow: 1;
+    }
+
+    .editable-row__delete {
+        margin-left: 2px;
+    }
+
+
+    .editable-row__placeholder {
+        position: relative;
+        width: 400px;
+        height: 40px;
+        padding: 14px 0;
+        box-shadow: inset 0 -1px 0 rgba(176, 176, 176, 0.2);
+    }
+
+    .editable-row__placeholder::before {
+        position: relative;
+        content: "";
+        display: block;
+        height: 12px;
+        width: 350px;
+        border-radius: 2px;
+        background: rgba(238, 238, 238, 0.5);
+    }
+
+    .editable-row__placeholder:first-child {
+        margin-right: 16px;
+    }
+
+    .editable-row__placeholder:first-child::before {
+        width: 200px;
+    }
