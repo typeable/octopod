@@ -1,0 +1,4 @@
+{
+  "env-generator" : "nix-shell --run env",
+  "haskell.checkProject" : true
+}
