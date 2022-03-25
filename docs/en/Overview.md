@@ -21,7 +21,7 @@ Octopod aims to extract the mentioned similarity between deploying different sta
 
 ### 💽 The server
 
-You are developing a server, which is accessed through [_nginx_](https://www.nginx.com), and the server needs access to a [*Postgres*](https://www.postgresql.org) database and a [*Redis*](https://redis.io) database
+You are developing a server, which is accessed through _nginx_, and the server needs access to a [*Postgres*](https://www.postgresql.org) database and a [*Redis*](https://redis.io) database
 
 ![](../diagrams/images/sample_architecture.png)
 
@@ -33,7 +33,7 @@ Now imagine that two different developers each completed one of the tasks, and y
 
 A way to mitigate this situation is to test each feature separately, in its own staging deployment, and verify which change made the page background pink, and ideally, you would check each feature before merging them into the final product (merging it into the `master` branch, for example).
 
-To check each feature before merging would require every developer to build the new version of the server, and set up all required services: [_nginx_](https://www.nginx.com), [*Postgres*](https://www.postgresql.org), [*Redis*](https://redis.io). Developers would also have to manage access to the set up environments ― set up SSL certificates, set up subdomains, make sure databases are not exposed, and make sure the connection between every component is secure and authenticated.
+To check each feature before merging would require every developer to build the new version of the server, and set up all required services: _nginx_, [*Postgres*](https://www.postgresql.org), [*Redis*](https://redis.io). Developers would also have to manage access to the set up environments ― set up SSL certificates, set up subdomains, make sure databases are not exposed, and make sure the connection between every component is secure and authenticated.
 
 This is **a lot** of overhead just to test the color of a button. Note that most of the described work would be identical across the vast majority of features ― changing the deployment architecture is a relatively rare task in most projects. Databases, load balancing, caching, and proxying would be set up in much the same way for the majority of feature-specific stagings. The server itself is probably also compiled in exactly the same way for most features.
 
