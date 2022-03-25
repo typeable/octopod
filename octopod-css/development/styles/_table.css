@@ -23,6 +23,10 @@
         .table tbody tr {
             border-top: 1px solid #E0E0E0;
         }
+
+        .table tbody tr:first-child {
+            border-top: none;
+        }
             .table th {
                 vertical-align: middle;
                 height: 48px;
