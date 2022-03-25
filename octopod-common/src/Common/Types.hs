@@ -12,10 +12,11 @@ import Control.DeepSeq (NFData)
 import Control.Lens
 import Control.Searchable
 import Data.Aeson hiding (Result)
+import Data.ConfigTree (ConfigTree)
+import qualified Data.ConfigTree as CT
 import Data.Csv
 import Data.Generics.Labels ()
 import Data.Int
-import qualified Data.Map.Ordered.Strict as OM
 import Data.Map.Ordered.Strict.Extra ()
 import Data.Maybe
 import Data.Text (Text)
@@ -25,8 +26,6 @@ import Data.Traversable
 import Deriving.Aeson
 import Deriving.Aeson.Stock
 import Web.HttpApiData
-import Data.Map.Config (ConfigTree)
-import qualified Data.Map.Config as CT
 
 data OverrideLevel = ApplicationLevel | DeploymentLevel
 
@@ -56,9 +55,16 @@ type OverrideValue = OverrideValue' Text
 type DefaultConfig = DefaultConfig' Text
 
 newtype DefaultConfig' te (l :: OverrideLevel) = DefaultConfig (ConfigTree te te)
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+  deriving newtype (Eq, Ord, Show)
 
-deriving newtype instance Searchable t (DefaultConfig' x l)
+deriving newtype instance FromJSON (DefaultConfig' Text l)
+deriving newtype instance ToJSON (DefaultConfig' Text l)
+
+instance Searchable t x => Searchable t (DefaultConfig' x l) where
+  type SearchableConstraint t (DefaultConfig' x l) res = (Ord (Searched x res), SearchableConstraint t x res)
+  type Searched (DefaultConfig' x l) res = DefaultConfig' (Searched x res) l
+  searchWith f (DefaultConfig ct) = DefaultConfig <$> searchWith f ct
+  {-# INLINE searchWith #-}
 
 type ConfigKey = [Text]
 
@@ -66,15 +72,15 @@ newtype Config (l :: OverrideLevel) = Config {unConfig :: ConfigTree Text Text}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
 data FullDefaultConfig = FullDefaultConfig
-  { appDefaultConfig :: DefaultConfig 'ApplicationLevel,
-    depDefaultConfig :: DefaultConfig 'DeploymentLevel
+  { appDefaultConfig :: DefaultConfig 'ApplicationLevel
+  , depDefaultConfig :: DefaultConfig 'DeploymentLevel
   }
   deriving stock (Show, Ord, Eq, Generic)
   deriving (ToJSON, FromJSON) via Snake FullDefaultConfig
 
 data FullConfig = FullConfig
-  { appConfig :: Config 'ApplicationLevel,
-    depConfig :: Config 'DeploymentLevel
+  { appConfig :: Config 'ApplicationLevel
+  , depConfig :: Config 'DeploymentLevel
   }
   deriving stock (Show, Ord, Eq, Generic)
   deriving (ToJSON, FromJSON) via Snake FullConfig
@@ -97,41 +103,42 @@ applyOverrides (Overrides oo) (DefaultConfig dd) =
           )
 
 newtype Overrides' t (l :: OverrideLevel) = Overrides {unOverrides :: ConfigTree t (OverrideValue' t)}
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
+  deriving newtype (Eq, Ord, Show, NFData, Semigroup, Monoid)
 
-deriving newtype instance Searchable t (Overrides' x l)
+deriving newtype instance FromJSON (Overrides' Text l)
+deriving newtype instance ToJSON (Overrides' Text l)
+
+instance Searchable t x => Searchable t (Overrides' x l) where
+  type SearchableConstraint t (Overrides' x l) res = (Ord (Searched x res), SearchableConstraint t x res)
+  type Searched (Overrides' x l) res = Overrides' (Searched x res) l
+  searchWith f (Overrides ct) = Overrides <$> searchWith f ct
+  {-# INLINE searchWith #-}
 
 type Overrides = Overrides' Text
 
 extractOverrides :: DefaultConfig l -> Config l -> Overrides l
 extractOverrides (DefaultConfig dCfg) (Config cfg) =
-  Overrides . OM.fromList $ removed <> present
+  Overrides . CT.fromList $ removed <> present
   where
-    present :: [(Text, OverrideValue)]
-    present = mapMaybe processPresent . OM.assocs $ cfg
+    present :: [([Text], OverrideValue)]
+    present = mapMaybe processPresent . CT.toList $ cfg
 
-    processPresent :: (Text, Text) -> Maybe (Text, OverrideValue)
-    processPresent (k, v) = case OM.lookup k dCfg of
+    processPresent :: ([Text], Text) -> Maybe ([Text], OverrideValue)
+    processPresent (k, v) = case CT.lookup k dCfg of
       Just v' | v == v' -> Nothing
       _ -> Just (k, ValueAdded v)
 
-    processRemoved :: (Text, Text) -> Maybe (Text, OverrideValue)
+    processRemoved :: ([Text], Text) -> Maybe ([Text], OverrideValue)
     processRemoved (k, _) =
-      if OM.member k cfg
+      if CT.member k cfg
         then Nothing
         else Just (k, ValueDeleted)
 
-    removed :: [(Text, OverrideValue)]
-    removed = mapMaybe processRemoved . OM.assocs $ dCfg
+    removed :: [([Text], OverrideValue)]
+    removed = mapMaybe processRemoved . CT.toList $ dCfg
 
-ov :: Text -> OverrideValue -> Overrides l
-ov k v = Overrides $ OM.singleton (k, v)
-
-instance Semigroup (Overrides l) where
-  (Overrides lhs) <> (Overrides rhs) = Overrides $ rhs <>| lhs
-
-instance Monoid (Overrides l) where
-  mempty = Overrides OM.empty
+ov :: [Text] -> OverrideValue -> Overrides l
+ov k v = Overrides $ CT.singleton k v
 
 newtype DeploymentId = DeploymentId {unDeploymentId :: Int64}
   deriving stock (Show)
@@ -154,10 +161,10 @@ data Action = RestoreAction | ArchiveAction | UpdateAction | CreateAction | Clea
 
 actionText :: [(Action, Text)]
 actionText =
-  [ (RestoreAction, "restore"),
-    (ArchiveAction, "archive"),
-    (UpdateAction, "update"),
-    (CreateAction, "create")
+  [ (RestoreAction, "restore")
+  , (ArchiveAction, "archive")
+  , (UpdateAction, "update")
+  , (CreateAction, "create")
   ]
 
 actionToText :: Action -> Text
@@ -177,15 +184,15 @@ newtype ProjectName = ProjectName {uProjectName :: Text}
 
 deploymentStatusText :: [(DeploymentStatus, Text)]
 deploymentStatusText =
-  [ (Running, "Running"),
-    (Failure GenericFailure, "GenericFailure"),
-    (Failure TagMismatch, "TagMismatch"),
-    (Failure PartialAvailability, "PartialAvailability"),
-    (CreatePending, "CreatePending"),
-    (UpdatePending, "UpdatePending"),
-    (ArchivePending, "ArchivePending"),
-    (Archived, "Archived"),
-    (CleanupFailed, "CleanupFailed")
+  [ (Running, "Running")
+  , (Failure GenericFailure, "GenericFailure")
+  , (Failure TagMismatch, "TagMismatch")
+  , (Failure PartialAvailability, "PartialAvailability")
+  , (CreatePending, "CreatePending")
+  , (UpdatePending, "UpdatePending")
+  , (ArchivePending, "ArchivePending")
+  , (Archived, "Archived")
+  , (CleanupFailed, "CleanupFailed")
   ]
 
 deploymentStatusToText :: DeploymentStatus -> Text
@@ -226,13 +233,15 @@ isArchivedStatus :: DeploymentStatus -> Bool
 isArchivedStatus = (`elem` archivedStatuses)
 
 data Deployment' t = Deployment
-  { name :: DeploymentName' t,
-    appOverrides :: Overrides' t 'ApplicationLevel,
-    deploymentOverrides :: Overrides' t 'DeploymentLevel
+  { name :: DeploymentName' t
+  , appOverrides :: Overrides' t 'ApplicationLevel
+  , deploymentOverrides :: Overrides' t 'DeploymentLevel
   }
   deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake (Deployment' t)
   deriving anyclass (NFData)
+
+deriving via Snake (Deployment' Text) instance FromJSON (Deployment' Text)
+deriving via Snake (Deployment' Text) instance ToJSON (Deployment' Text)
 
 instance (Searchable needle t) => Searchable needle (Deployment' t) where
   type
@@ -245,22 +254,22 @@ instance (Searchable needle t) => Searchable needle (Deployment' t) where
     deploymentOverrides' <- searchWith f $ d ^. #deploymentOverrides
     pure
       Deployment
-        { name = name',
-          appOverrides = appOverrides',
-          deploymentOverrides = deploymentOverrides'
+        { name = name'
+        , appOverrides = appOverrides'
+        , deploymentOverrides = deploymentOverrides'
         }
   {-# INLINE searchWith #-}
 
 type Deployment = Deployment' Text
 
 data DeploymentLog = DeploymentLog
-  { actionId :: ActionId,
-    action :: Action,
-    deploymentAppOverrides :: Overrides 'ApplicationLevel,
-    deploymentDepOverrides :: Overrides 'DeploymentLevel,
-    exitCode :: Int64,
-    duration :: Duration,
-    createdAt :: UTCTime
+  { actionId :: ActionId
+  , action :: Action
+  , deploymentAppOverrides :: Overrides 'ApplicationLevel
+  , deploymentDepOverrides :: Overrides 'DeploymentLevel
+  , exitCode :: Int64
+  , duration :: Duration
+  , createdAt :: UTCTime
   }
   deriving stock (Generic, Show, Eq)
   deriving (ToJSON, FromJSON) via Snake DeploymentLog
@@ -270,8 +279,8 @@ newtype DeploymentMetadata = DeploymentMetadata {unDeploymentMetadata :: [Deploy
 
 data DeploymentMetadatum = DeploymentMetadatum
   { -- | The name of the link
-    name :: Text,
-    -- | The URL
+    name :: Text
+  , -- | The URL
     link :: Text
   }
   deriving stock (Generic, Show, Eq, Ord)
@@ -280,9 +289,9 @@ data DeploymentMetadatum = DeploymentMetadatum
   deriving anyclass (NFData)
 
 data DeploymentInfo = DeploymentInfo
-  { deployment :: Deployment,
-    metadata :: DeploymentMetadata,
-    logs :: [DeploymentLog]
+  { deployment :: Deployment
+  , metadata :: DeploymentMetadata
+  , logs :: [DeploymentLog]
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentInfo
@@ -298,15 +307,17 @@ instance (Searchable needle t) => Searchable needle (DeploymentFullInfo' t) wher
   {-# INLINE searchWith #-}
 
 data DeploymentFullInfo' t = DeploymentFullInfo
-  { deployment :: Deployment' t,
-    status :: PreciseDeploymentStatus,
-    metadata :: DeploymentMetadata,
-    createdAt :: UTCTime,
-    updatedAt :: UTCTime
+  { deployment :: Deployment' t
+  , status :: PreciseDeploymentStatus
+  , metadata :: DeploymentMetadata
+  , createdAt :: UTCTime
+  , updatedAt :: UTCTime
   }
   deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake (DeploymentFullInfo' t)
   deriving anyclass (NFData)
+
+deriving via Snake (DeploymentFullInfo' Text) instance FromJSON (DeploymentFullInfo' Text)
+deriving via Snake (DeploymentFullInfo' Text) instance ToJSON (DeploymentFullInfo' Text)
 
 type DeploymentFullInfo = DeploymentFullInfo' Text
 
@@ -318,8 +329,8 @@ isDeploymentArchived DeploymentFullInfo {status = s} = case s of
   DeploymentPending _ -> False
 
 data DeploymentUpdate = DeploymentUpdate
-  { appOverrides :: Overrides 'ApplicationLevel,
-    deploymentOverrides :: Overrides 'DeploymentLevel
+  { appOverrides :: Overrides 'ApplicationLevel
+  , deploymentOverrides :: Overrides 'DeploymentLevel
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake DeploymentUpdate
@@ -361,8 +372,8 @@ newtype Stderr = Stderr {unStderr :: Text}
   deriving (FromJSON, ToJSON) via Snake Stderr
 
 data ActionInfo = ActionInfo
-  { stdout :: Stdout,
-    stderr :: Stderr
+  { stdout :: Stdout
+  , stderr :: Stderr
   }
   deriving stock (Generic, Show)
   deriving (FromJSON, ToJSON) via Snake ActionInfo
@@ -374,14 +385,14 @@ parseSetOverrides texts = do
     Just x -> Right x
     Nothing ->
       Left $ "Malformed override key-value pair " <> text <> ", should be similar to FOO=bar"
-  return . Overrides $ OM.fromList pairs'
+  return . Overrides $ CT.fromList pairs'
   where
-    parseSingleOverride :: Text -> Maybe (Text, OverrideValue)
+    parseSingleOverride :: Text -> Maybe ([Text], OverrideValue)
     parseSingleOverride t
       | Just i <- T.findIndex (== '=') t =
-        let (key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
+        let (CT.deconstructConfigKey -> key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
          in Just (key, ValueAdded value)
     parseSingleOverride _ = Nothing
 
 parseUnsetOverrides :: [Text] -> Overrides l
-parseUnsetOverrides = Overrides . OM.fromList . fmap (,ValueDeleted)
+parseUnsetOverrides = Overrides . CT.fromList . fmap ((,ValueDeleted) . CT.deconstructConfigKey)

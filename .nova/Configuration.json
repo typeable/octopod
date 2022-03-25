@@ -1,4 +1,5 @@
 {
   "env-generator" : "nix-shell --run env",
-  "haskell.checkProject" : true
+  "haskell.checkProject" : true,
+  "haskell.formattingProvider" : "fourmolu"
 }

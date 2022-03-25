@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
+import qualified Data.ConfigTree as CT
 import qualified Data.Csv as C
 import Data.Fixed
 import Data.Foldable
@@ -32,7 +33,6 @@ import Data.Generics.Labels ()
 import Data.Generics.Product
 import Data.IORef.Lifted
 import Data.Int
-import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
 import Data.Text (pack)
@@ -192,7 +192,7 @@ runOctopodServer sha = do
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
-        pure $ DefaultConfig . OM.fromList . V.toList $ x
+        pure $ DefaultConfig . CT.fromFlatList . V.toList $ x
       either500S :: (KatipContext m, MonadError ServerError m) => Either String x -> m x
       either500S (Right x) = pure x
       either500S (Left err) = do

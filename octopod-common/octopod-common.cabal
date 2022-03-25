@@ -19,7 +19,7 @@ library
                      , Common.Utils
                      , Common.Validation
                      , Data.Map.Ordered.Strict.Extra
-                     , Data.Map.Config
+                     , Data.ConfigTree
                      , Control.Searchable
                      , Common.Orphans
   -- other-modules:

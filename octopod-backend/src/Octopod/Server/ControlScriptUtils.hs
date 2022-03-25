@@ -37,9 +37,9 @@ import Control.Monad.Base
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as TL
 import Data.Coerce
+import qualified Data.ConfigTree as CT
 import Data.Fixed
 import Data.Generics.Product.Typed
-import qualified Data.Map.Ordered.Strict as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
@@ -257,7 +257,7 @@ overridesArgs :: forall l. KnownOverrideLevel l => Config l -> ControlScriptArgs
 overridesArgs (Config cc) =
   ControlScriptArgs
     . concatMap (\(T.unpack -> k, T.unpack -> v) -> [argumentName, k <> "=" <> v])
-    . MO.assocs
+    . CT.toFlatList
     $ cc
   where
     argumentName = case knownOverrideLevel @l of
