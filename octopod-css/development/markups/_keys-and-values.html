@@ -66,6 +66,28 @@
                                 <span class="value-edited">value-edited</span>
                             </td>
                         </tr>
+                        <tr>
+                            <td>
+                                Ключ и значение удалены:
+                            </td>
+                            <td>
+                                <span class="key-deleted">key-deleted</span>
+                            </td>
+                            <td>
+                                <span class="value-deleted">value-deleted</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ удалён, значение неизвестно:
+                            </td>
+                            <td>
+                                <span class="key-deleted">key-deleted</span>
+                            </td>
+                            <td>
+                                <span class="value-unknown">unknown</span> (value-unknown)
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -111,6 +133,28 @@
                                 <span class="value-edited">http://my-api.my-domain.com</span>
                             </td>
                         </tr>
+                        <tr>
+                            <td>
+                                Ключ и значение удалены:
+                            </td>
+                            <td>
+                                <span class="key-deleted">sso.vaultEnv.hotels-sso.mapping[0].APP_URL</span>
+                            </td>
+                            <td>
+                                <span class="value-deleted">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ удалён, значение неизвестно:
+                            </td>
+                            <td>
+                                <span class="key-deleted">air.vaultEnv.air-sso:</span>
+                            </td>
+                            <td>
+                                <span class="value-unknown">unknown</span>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -119,7 +163,8 @@
             <br>
             <p>
                 Для экономии узлов в DOM-дереве можно не создавать отдельную обёртку &lt;span&gt;...&lt;/span&gt;
-                а вешать эти классы прям на ячейки таблицы, или на любого другого родителя:
+                а вешать эти классы прям на ячейки таблицы, или на любого другого родителя.
+                Работает со всеми классами кроме <b>.value-unknown</b> -- это отдельный компонент.
             </p>
 
             <div class="table">
@@ -156,6 +201,28 @@
                             </td>
                             <td class="value-edited">
                                 http://my-api.my-domain.com
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ и значение удалены:
+                            </td>
+                            <td class="key-deleted">
+                                sso.vaultEnv.hotels-sso.mapping[0].APP_URL
+                            </td>
+                            <td class="value-deleted">
+                                http://my-api.my-domain.com
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ удалён, значение неизвестно:
+                            </td>
+                            <td class="key-deleted">
+                                air.vaultEnv.air-sso:
+                            </td>
+                            <td>
+                                <span class="value-unknown">unknown</span>
                             </td>
                         </tr>
                     </tbody>
@@ -199,6 +266,22 @@
                                 <span class="key-custom-edited">app_api_url:</span> <span class="value-edited">http://my-api.my-domain.com</span>
                             </td>
                         </tr>
+                        <tr>
+                            <td>
+                                Ключ и значение удалены:
+                            </td>
+                            <td>
+                                <span class="key-deleted">sso.vaultEnv.hotels-sso.mapping[0].APP_URL</span> <span class="value-deleted">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ удалён, значение неизвестно:
+                            </td>
+                            <td>
+                                <span class="key-deleted">air.vaultEnv.air-sso:</span> <span class="value-unknown">unknown</span>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -234,6 +317,22 @@
                             </td>
                             <td>
                                 <span class="key-custom-edited">app_api_url: </span><span class="value-edited">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ и значение удалены:
+                            </td>
+                            <td>
+                                <span class="key-deleted">sso.vaultEnv.hotels-sso.mapping[0].APP_URL </span><span class="value-deleted">http://my-api.my-domain.com</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Ключ удалён, значение неизвестно:
+                            </td>
+                            <td>
+                                <span class="key-deleted">air.vaultEnv.air-sso: </span><span class="value-unknown">unknown</span>
                             </td>
                         </tr>
                     </tbody>

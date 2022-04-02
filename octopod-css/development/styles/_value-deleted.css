@@ -1,0 +1,5 @@
+.value-deleted {
+    font-weight: 300 !important;
+    text-decoration: line-through;
+    color: #D3D3D3;
+}
