@@ -1,8 +1,8 @@
 module Octopod.Server.Posix (installShutdownHandler) where
 
-import Control.Monad
 import Control.Monad.Trans.Control
 import Data.Aeson
+import Data.Traversable
 import Octopod.Server.Logging
 import System.Posix.Signals
 
@@ -21,7 +21,7 @@ installShutdownHandler ::
   m () ->
   m [Handler]
 installShutdownHandler signals action =
-  forM signals $ \signal -> liftBaseWith $ \run ->
+  for signals $ \signal -> liftBaseWith $ \run ->
     installHandler signal (Catch $ run (handler signal)) Nothing
   where
     handler signal = katipAddNamespace "signal handler" $

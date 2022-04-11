@@ -117,7 +117,15 @@ in
 
         for i in {1..10}
         do
-          echo "key$i,value"
+        for j in {1..10}
+        do
+          echo "foo.vat$i.fjij.key$j,value"
+        done
+        done
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i,value"
         done
 
         exit 0
@@ -130,7 +138,16 @@ in
 
         for i in {1..10}
         do
-          echo "key$i"
+          echo "foo.vat.fkijf.fjij.key$i"
+        done
+        for i in {1..10}
+        do
+          echo "foo.vat.fjij.key$i"
+        done
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i"
         done
 
         exit 0

@@ -5,20 +5,17 @@
 --This module contains the definition of a deployment page.
 module Page.Deployment (deploymentPage) where
 
-import Control.Lens
-import Control.Monad
-import Data.Coerce
-import Data.Generics.Product (field)
-import Data.Text as T (Text, pack)
-import Obelisk.Route.Frontend
-import Reflex.Dom as R
-import Servant.Reflex
-
 import Common.Types as CT
 import Common.Utils
+import Control.Lens
+import Control.Monad
 import Control.Monad.Reader
 import Data.Align
+import Data.Coerce
+import Data.Functor
 import Data.Generics.Labels ()
+import Data.Generics.Product (field)
+import Data.Text as T (Text, pack)
 import Data.Time
 import Data.UniqMap
 import Frontend.API
@@ -26,10 +23,13 @@ import Frontend.GHCJS
 import Frontend.Route
 import Frontend.UIKit
 import Frontend.Utils
+import Obelisk.Route.Frontend
 import Page.ClassicPopup
 import Page.Elements.Links
 import Page.Popup.EditDeployment
+import Reflex.Dom as R
 import Reflex.Network
+import Servant.Reflex
 import Servant.Reflex.Extra
 
 -- | The root widget of a deployment page. It requests the deployment data.
@@ -125,7 +125,7 @@ deploymentHead dfiDyn sentEv =
                     & #buttonStyle .~~ PageActionLargeButtonStyle
                     & #buttonText .~~ "Recover from archive"
                     & #buttonEnabled .~~ btnEnabledDyn
-              void $ restoreEndpoint (Right . coerce <$> dname) btnEv
+              void $ restoreEndpoint (Right . coerce <$> dname) $ btnEv $> ()
               pure (never, never)
             else mdo
               let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
@@ -162,7 +162,7 @@ deploymentHead dfiDyn sentEv =
                     , buttonBaseTag = ATag url
                     }
           )
-    delEv <- confirmArchivePopup archEv $ do
+    delEv <- confirmArchivePopup (archEv $> ()) $ do
       text "Are you sure you want to archive the"
       el "br" blank
       dynText dname
@@ -213,15 +213,13 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
       divClass "deployment__widget" $
         divClass "listing" $
           void $ simpleList urlsDyn renderMetadataLink
-    void $
-      networkView $
-        cfgDyn <&> \cfg -> do
-          let showVars bL l =
-                divClass "deployment__widget" $
-                  showNonEditableWorkingOverride (cfg ^. bL) (not $ cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
-                    elemsUniq (cfg ^. l)
-          deploymentSection "Deployment configuration" $ showVars #depConfigLoading #depConfig
-          deploymentSection "App configuration" $ showVars #appConfigLoading #appConfig
+    let showVars bL l =
+          divClass "deployment__widget" $ do
+            loadingBoolDyn <- holdUniqDyn (cfgDyn <^.> bL)
+            configDyn <- holdUniqDyn (cfgDyn <^.> l)
+            showNonEditableWorkingOverrideTree loadingBoolDyn configDyn
+    deploymentSection "Deployment configuration" $ showVars #depConfigLoading #depConfig
+    deploymentSection "App configuration" $ showVars #appConfigLoading #appConfig
     deploymentSection "Actions" $
       divClass "table table--actions" $
         actionsTable hReq updEv nameDyn
@@ -311,8 +309,8 @@ actinRow hReq DeploymentLog {..} = do
             "status "
               <> if exitCode == 0 then "status--success" else "status--failure"
       divClass statusClass blank
-    el "td" $ deploymentOverridesWidget hReq deploymentDepOverrides
-    el "td" $ applicationOverridesWidget hReq deploymentDepOverrides deploymentAppOverrides
+    el "td" $ overridesWidget deploymentDepOverrides
+    el "td" $ overridesWidget deploymentAppOverrides
     el "td" $ text $ showT $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration

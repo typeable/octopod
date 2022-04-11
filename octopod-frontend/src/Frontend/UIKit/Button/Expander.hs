@@ -10,6 +10,7 @@ where
 import Control.Lens
 import Control.Monad.Fix
 import Data.Default
+import Data.Functor
 import Data.Generics.Labels ()
 import Data.Text (Text)
 import Frontend.Classes
@@ -65,7 +66,7 @@ expanderButton ::
   ExpanderButtonConfig t ->
   m (Dynamic t ExpanderState)
 expanderButton cfg = mdo
-  stateDyn <- foldDyn (\() -> toggleState) (cfg ^. #buttonInitialState) toggleEv
+  stateDyn <- foldDyn (\() -> toggleState) (cfg ^. #buttonInitialState) (toggleEv $> ())
   let constantClasses =
         "expander"
           <> maybe mempty buttonTypeClasses (cfg ^. #buttonType)
@@ -79,7 +80,7 @@ expanderButton cfg = mdo
         , enabledClasses = mempty
         , disabledClasses = mempty
         , buttonEnabled = pure True
-        , buttonText = cfg ^. #buttonText
+        , buttonText = TextBuilder $ dynText $ cfg ^. #buttonText
         , buttonBaseTag = ButtonTag
         }
   pure stateDyn

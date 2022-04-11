@@ -17,7 +17,6 @@ import qualified Data.ConfigTree as CT
 import Data.Csv
 import Data.Generics.Labels ()
 import Data.Int
-import Data.Map.Ordered.Strict.Extra ()
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -26,6 +25,7 @@ import Data.Traversable
 import Deriving.Aeson
 import Deriving.Aeson.Stock
 import Web.HttpApiData
+import Data.List.NonEmpty (NonEmpty)
 
 data OverrideLevel = ApplicationLevel | DeploymentLevel
 
@@ -120,24 +120,24 @@ extractOverrides :: DefaultConfig l -> Config l -> Overrides l
 extractOverrides (DefaultConfig dCfg) (Config cfg) =
   Overrides . CT.fromList $ removed <> present
   where
-    present :: [([Text], OverrideValue)]
+    present :: [(NonEmpty Text, OverrideValue)]
     present = mapMaybe processPresent . CT.toList $ cfg
 
-    processPresent :: ([Text], Text) -> Maybe ([Text], OverrideValue)
+    processPresent :: (NonEmpty Text, Text) -> Maybe (NonEmpty Text, OverrideValue)
     processPresent (k, v) = case CT.lookup k dCfg of
       Just v' | v == v' -> Nothing
       _ -> Just (k, ValueAdded v)
 
-    processRemoved :: ([Text], Text) -> Maybe ([Text], OverrideValue)
+    processRemoved :: (NonEmpty Text, Text) -> Maybe (NonEmpty Text, OverrideValue)
     processRemoved (k, _) =
       if CT.member k cfg
         then Nothing
         else Just (k, ValueDeleted)
 
-    removed :: [([Text], OverrideValue)]
+    removed :: [(NonEmpty Text, OverrideValue)]
     removed = mapMaybe processRemoved . CT.toList $ dCfg
 
-ov :: [Text] -> OverrideValue -> Overrides l
+ov :: NonEmpty Text -> OverrideValue -> Overrides l
 ov k v = Overrides $ CT.singleton k v
 
 newtype DeploymentId = DeploymentId {unDeploymentId :: Int64}
@@ -387,7 +387,7 @@ parseSetOverrides texts = do
       Left $ "Malformed override key-value pair " <> text <> ", should be similar to FOO=bar"
   return . Overrides $ CT.fromList pairs'
   where
-    parseSingleOverride :: Text -> Maybe ([Text], OverrideValue)
+    parseSingleOverride :: Text -> Maybe (NonEmpty Text, OverrideValue)
     parseSingleOverride t
       | Just i <- T.findIndex (== '=') t =
         let (CT.deconstructConfigKey -> key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t

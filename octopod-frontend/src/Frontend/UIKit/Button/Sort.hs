@@ -41,7 +41,7 @@ buttonSortStateClasses = \case
 sortButton ::
   (DomBuilder t m, PostBuild t m) =>
   SortButtonConfig t ->
-  m (Event t ())
+  m (Event t (Either () ()))
 sortButton cfg =
   buttonEl
     CommonButtonConfig
@@ -53,6 +53,6 @@ sortButton cfg =
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = cfg ^. #buttonEnabled
-      , buttonText = pure $ cfg ^. #buttonText
+      , buttonText = textBuilder $ cfg ^. #buttonText
       , buttonBaseTag = ButtonTag
       }

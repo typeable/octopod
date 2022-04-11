@@ -31,5 +31,11 @@ source-repository-package
     subdir: lib/executable-config/lookup
     --sha256: 0dlk8y6rxc87crw7764zq2py7nqn38lw496ca1y893m9gdq8qdkz
 
+source-repository-package
+    type: git
+    location: https://github.com/typeable/ordered-containers.git
+    tag: 3eb05fb2f44fe482e9092aff447e9c68fbd6a7f6
+    --sha256: 0q3cp3nar41bqh2ldl1ykzaycf0bjxh0n58za5g19x4g7ab8h9gm
+
 package reflex-dom
   flags: +use-warp

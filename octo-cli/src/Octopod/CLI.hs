@@ -13,6 +13,7 @@ import Data.Aeson (decode)
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy.Char8 as LBSC
 import Data.Coerce
+import Data.Foldable
 import Data.Generics.Labels ()
 import Data.Generics.Product
 import qualified Data.Map.Ordered.Strict as OM
@@ -295,7 +296,7 @@ printInfo (DeploymentInfo (Deployment _ dAppOvs dStOvs) (DeploymentMetadata dMet
   putStrLn $ unlines $ formatOverrides False dStOvs
   T.putStrLn ""
   T.putStrLn $ "Metadata: "
-  forM_ dMeta $ \m ->
+  for_ dMeta $ \m ->
     T.putStrLn $
       "  " <> m ^. #name <> ": " <> m ^. #link
   T.putStrLn ""

@@ -24,6 +24,7 @@ import Common.Utils
 import Control.Applicative
 import Control.Monad.Reader
 import Data.Align
+import Data.Foldable
 import Data.Functor
 import qualified Data.Semigroup as S
 import qualified Data.Text as T
@@ -270,14 +271,11 @@ activeDeploymentWidget hReq clickedEv dDyn' = do
           statusWidget $ constDyn status
         el "td" $
           divClass "listing" $
-            forM_ (unDeploymentMetadata metadata) (renderMetadataLink . pure)
+            for_ (unDeploymentMetadata metadata) (renderMetadataLink . pure)
         el "td" $
-          deploymentOverridesWidgetSearched hReq (deployment ^. field @"deploymentOverrides" . coerced)
+          overridesWidget (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          applicationOverridesWidgetSearched
-            hReq
-            (deployment ^. field @"deploymentOverrides" . coerced)
-            (deployment ^. field @"appOverrides" . coerced)
+          overridesWidget (deployment ^. field @"appOverrides" . coerced)
         el "td" $
           text $ formatPosixToDate createdAt
         el "td" $
@@ -330,7 +328,7 @@ activeDeploymentWidget hReq clickedEv dDyn' = do
         text $ unDeploymentName dName <> " deployment?"
       void $ archiveEndpoint (constDyn . Right $ dName) delEv
       let route = DashboardRoute :/ Just dName
-      setRoute $ route <$ domEvent Dblclick linkEl
+      setRoute $ route <$ domEvent Click linkEl
       pure editEv
   switchHold never editEvEv
 
@@ -388,12 +386,9 @@ archivedDeploymentWidget hReq clickedEv dDyn' = do
           statusWidget (pure status)
         el "td" $ text "..."
         el "td" $
-          deploymentOverridesWidgetSearched hReq (deployment ^. field @"deploymentOverrides" . coerced)
+          overridesWidget (deployment ^. field @"deploymentOverrides" . coerced)
         el "td" $
-          applicationOverridesWidgetSearched
-            hReq
-            (deployment ^. field @"deploymentOverrides" . coerced)
-            (deployment ^. field @"appOverrides" . coerced)
+          overridesWidget (deployment ^. field @"appOverrides" . coerced)
         el "td" $
           text $ formatPosixToDate createdAt
         el "td" $
@@ -413,7 +408,7 @@ archivedDeploymentWidget hReq clickedEv dDyn' = do
                     , buttonType = Just ArchiveActionButtonType
                     }
           btnEv <- dropdownWidget' clickedEv btn body
-          void $ restoreEndpoint (constDyn $ Right $ dName) btnEv
+          void $ restoreEndpoint (constDyn $ Right $ dName) (btnEv $> ())
       let route = DashboardRoute :/ Just dName
       setRoute $ route <$ domEvent Dblclick linkEl
 
@@ -561,7 +556,7 @@ tableWrapper ::
   (Dynamic t (Maybe (SortDir DeploymentFullInfo)) -> m a) ->
   m a
 tableWrapper sChanged ma =
-  divClass "table table--deployments table--clickable table--double-click" $
+  divClass "table table--deployments table--clickable" $
     el "table" $ mdo
       ((), sDyn') <- runSortableTableGroup sChanged tableHeader
       sDyn <- holdDyn Nothing $ Just <$> sDyn'
