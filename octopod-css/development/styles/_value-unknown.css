@@ -1,0 +1,12 @@
+.value-unknown {
+    display: inline-block;
+    vertical-align: baseline;
+    width: 92px;
+    height: 0.5715em;
+    background-color: #F3F3F3;
+    border-radius: 2px;
+    margin-right: 4px;
+    text-indent: 200%;
+    white-space: nowrap;
+    overflow: hidden;
+}
