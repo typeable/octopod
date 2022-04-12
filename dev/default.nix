@@ -130,6 +130,18 @@ in
 
         exit 0
       '';
+      smallInfoScript = pkgs.writeScript "info.sh" ''
+        #!${pkgs.bash}/bin/bash
+
+        sleep 4
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i,value"
+        done
+
+        exit 0
+      '';
 
       keysScript = pkgs.writeScript "keys.sh" ''
         #!${pkgs.bash}/bin/bash
@@ -180,7 +192,7 @@ in
         export CLEANUP_COMMAND=${echoScript}
         export ARCHIVE_CHECKING_COMMAND=${echoScript}
         export CONFIG_CHECKING_COMMAND=${echoScript}
-        export INFO_COMMAND=${infoScript}
+        export INFO_COMMAND=${smallInfoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_CONFIG_COMMAND=${infoScript}
         export DEPLOYMENT_KEYS_COMMAND=${keysScript}

@@ -22,7 +22,6 @@ where
 
 import Common.Orphans ()
 import Common.Types
-import qualified Data.Bifunctor as Bi
 import Data.ConfigTree (ConfigTree)
 import qualified Data.ConfigTree as CT
 import Data.Functor
@@ -108,18 +107,10 @@ unConfigValue (CustomConfigValue (Right (DeletedValue _))) = Just ValueDeleted
 
 constructWorkingOverrides ::
   Ord te =>
-  Maybe (DefaultConfig' te l) ->
+  DefaultConfig' te l ->
   Overrides' te l ->
   WorkingOverrides' te
-constructWorkingOverrides Nothing (Overrides x) = go x
-  where
-    go :: ConfigTree _ (OverrideValue' _) -> _
-    go (CT.ConfigTree ct) = CT.ConfigTree $ fmap (Bi.bimap (fmap mapValue) go) ct
-
-    mapValue :: OverrideValue' t -> ConfigValue t
-    mapValue (ValueAdded v) = CustomConfigValue (Right (CustomValue v))
-    mapValue ValueDeleted = CustomConfigValue (Right (DeletedValue Nothing))
-constructWorkingOverrides (Just (DefaultConfig defCT)) (Overrides newCT) =
+constructWorkingOverrides (DefaultConfig defCT) (Overrides newCT) =
   CT.catMaybes $
     CT.zip newCT defCT <&> \case
       That x -> Just $ DefaultConfigValue x

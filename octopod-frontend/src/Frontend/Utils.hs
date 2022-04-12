@@ -22,14 +22,15 @@ module Frontend.Utils
     dropdownWidget,
     dropdownWidget',
     deploymentConfigProgressiveComponents,
-    deploymentConfigProgressive,
+    -- deploymentConfigProgressive,
     holdClearingWith,
     unitEv,
     (<&&>),
-    ProgressiveFullConfig (..),
     RequestErrorHandler,
     debounceDyn,
     catchReturns,
+    holdDynMaybe,
+    constructWorkingOverridesEv,
   )
 where
 
@@ -305,9 +306,11 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  (R.traceEvent "defDepEv" -> defDepEv, R.traceEvent "defApp" -> defApp, R.traceEvent "depCfgEv" -> depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
-  defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
-  (traceDyn "defDep" -> defDep) <- holdDynMaybe defDepEv
+  (defDepEv, defAppEv, depCfgEv) <-
+    deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
+
+  defAppEvM <- holdClearingWith defAppEv (unitEv deploymentOvsDyn)
+
   depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
@@ -315,42 +318,42 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
 
   let holdDCfg ::
         Dynamic t [Text] ->
-        Dynamic t (Maybe (DefaultConfig l)) ->
+        (DefaultConfig l) ->
         Overrides l ->
         m (Dynamic t (Overrides l), Dynamic t (Overrides l))
-      holdDCfg (traceDyn "values" -> values) (traceDyn "dCfgDyn" -> dCfgDyn) ovs = mdo
-        (fmap fst &&& fmap snd -> (ovsDynListDynEv :: Event t (Dynamic t [Dynamic t WorkingOverride]), ovsDynListDynEvDebounced)) <-
-          networkView $
-            dCfgDyn <&> \cfgDyn -> do
-              let ovs' = constructWorkingOverrides cfgDyn ovs
-                  lookupOverride = case cfgDyn of
-                    Nothing -> const Nothing
-                    Just (DefaultConfig ct) -> \k -> CT.lookup (CT.deconstructConfigKey k) ct
-              (resCfgDyn :: Dynamic t [Dynamic t WorkingOverride]) <- envVarsInput values lookupOverride ovs'
-              (resEvDebounced :: Event t [Dynamic t WorkingOverride]) <- debounce 2 $ updated resCfgDyn
-              ovsInitial <- sample $ current resCfgDyn
-              debouncedResDyn <- holdDyn ovsInitial resEvDebounced
-              pure (resCfgDyn, debouncedResDyn)
-        let getOverrides = fmap (join . join) . holdDyn (pure (pure ovs)) . (fmap . fmap) destructWorkingOverridesDyn
-        resDyn' <- getOverrides ovsDynListDynEv
-        debouncedResDyn' <- getOverrides ovsDynListDynEvDebounced
-        pure (resDyn', debouncedResDyn')
+      holdDCfg (traceDyn "values" -> values) cfgDyn@(DefaultConfig ct) ovs = mdo
+        let ovs' = constructWorkingOverrides cfgDyn ovs
+            lookupOverride k = CT.lookup (CT.deconstructConfigKey k) ct
+        (resCfgDyn :: Dynamic t [Dynamic t WorkingOverride]) <- envVarsInput values lookupOverride ovs'
+        (resEvDebounced :: Event t [Dynamic t WorkingOverride]) <- debounce 2 $ updated resCfgDyn
+        let resDyn' = join . fmap destructWorkingOverridesDyn $ resCfgDyn
+        debouncedResDyn <- fmap join . holdDyn (pure ovs) . fmap destructWorkingOverridesDyn $ resEvDebounced
+        pure (resDyn', debouncedResDyn)
 
   depKeysDyn <- holdDyn [] depKeys
-  (traceDyn "deploymentOvsDyn" -> deploymentOvsDyn, deploymentOvsDynDebounced) <-
+
+  (join . fmap fst &&& join . fmap snd -> (deploymentOvsDyn, deploymentOvsDynDebounced)) <-
     deploymentSection "Deployment configuration" $
-      holdDCfg depKeysDyn defDep defDepOv
+      networkHold (loadingOverrides $> (pure defDepOv, pure defDepOv)) $
+        defDepEv <&> \defDep -> holdDCfg depKeysDyn defDep defDepOv
 
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
+
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
-  (applicationOvsDyn, _) <- deploymentSection "App configuration" $ holdDCfg appKeysDyn defAppM defAppOv
+  (join -> applicationOvsMDyn) <-
+    deploymentSection "App configuration" >=> holdDyn (pure Nothing) . fmap sequenceA $
+      networkView $
+        defAppEvM <&> \case
+          Nothing -> loadingOverrides $> Nothing
+          Just defApp -> Just . fst <$> holdDCfg appKeysDyn defApp defAppOv
 
   pure $ do
     depCfg <- deploymentOvsDyn
-    appOvs <- applicationOvsDyn
-    pure $
+    appOvsM <- applicationOvsMDyn
+    pure $ do
+      appOvs <- appOvsM
       Just $
         DeploymentUpdate
           { appOverrides = appOvs
@@ -382,36 +385,17 @@ deploymentConfigProgressiveComponents hReq depOvsDyn = do
           defaultApplicationOverrides (pure $ Right depCfg) pb' >>= hReq
   pure (defDepEv, defAppEv, depCfgEv)
 
-deploymentConfigProgressive ::
-  MonadWidget t m =>
-  RequestErrorHandler t m ->
-  Dynamic t (Overrides 'DeploymentLevel) ->
-  Dynamic t (Overrides 'ApplicationLevel) ->
-  m (Dynamic t ProgressiveFullConfig)
-deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
-  (depCfgEv, defAppEv, _) <- deploymentConfigProgressiveComponents hReq depOvsDyn
-  defAppMDyn <- holdDynMaybe defAppEv
-  defCfgMDyn <- holdDynMaybe depCfgEv
-  pure $ do
-    defAppM <- defAppMDyn
-    appOvs <- appOvsDyn
-    defDepM <- defCfgMDyn
-    depOvs <- depOvsDyn
-    pure
-      ProgressiveFullConfig
-        { appConfig = constructWorkingOverrides defAppM appOvs
-        , appConfigLoading = isNothing defAppM
-        , depConfig = constructWorkingOverrides defDepM depOvs
-        , depConfigLoading = isNothing defDepM
-        }
-
-data ProgressiveFullConfig = ProgressiveFullConfig
-  { appConfig :: WorkingOverrides
-  , appConfigLoading :: Bool
-  , depConfig :: WorkingOverrides
-  , depConfigLoading :: Bool
-  }
-  deriving stock (Generic, Show)
+constructWorkingOverridesEv ::
+  MonadWidget t m => Event t (DefaultConfig l) -> Dynamic t (Overrides l) -> m (Event t WorkingOverrides)
+constructWorkingOverridesEv defCfgEv ovsDyn = do
+  defCfgMDyn <- holdDynMaybe defCfgEv
+  pure $
+    catMaybes . updated $ do
+      defCfgM <- defCfgMDyn
+      ovs <- ovsDyn
+      pure $ do
+        defCfg <- defCfgM
+        pure $ constructWorkingOverrides defCfg ovs
 
 waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
 waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev
@@ -538,7 +522,7 @@ envVarInput ::
   m (Dynamic t WorkingOverride)
 envVarInput f keys val = mdo
   value' <- holdDyn val (leftmost [buttonValue, updated inputValue])
-  (keyTextDyn, valTextDyn, R.traceEvent "buttonPressEv" -> buttonPressEv) <- configField keys value'
+  (keyTextDyn, valTextDyn, buttonPressEv) <- configField keys value'
   let inputValue = do
         v <- valTextDyn
         k <- keyTextDyn

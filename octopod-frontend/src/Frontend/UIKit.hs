@@ -22,6 +22,7 @@ module Frontend.UIKit
     showFlatConfig,
     ConfigFieldButtonAction (..),
     showOverrideTree,
+    nonEditableLoading,
   )
 where
 
@@ -124,9 +125,9 @@ configField overrideKeyValues (splitDynPure -> (k, v')) = do
           CustomConfigValue (Right (CustomValue v)) -> v
           CustomConfigValue (Right (DeletedValue v)) -> fromMaybe "DELETED_NOT_IMPLEMENTED" v
           CustomConfigValue (Left (CustomKey v)) -> v
-      deletedDyn = (is (_Ctor' @"CustomConfigValue" . _Right . _Ctor' @"DeletedValue")) <$> v'
-      customDyn = (is (_Ctor' @"CustomConfigValue" . _Left)) <$> v'
-      extraDivClasses =
+      deletedDyn' = (is (_Ctor' @"CustomConfigValue" . _Right . _Ctor' @"DeletedValue")) <$> v'
+  deletedDyn <- holdUniqDyn deletedDyn'
+  let extraDivClasses =
         deletedDyn <&> \case
           True -> "input--deleted"
           False -> mempty
@@ -134,7 +135,7 @@ configField overrideKeyValues (splitDynPure -> (k, v')) = do
     (value -> keyTextDyn) <-
       octopodTextInputDyn
         overrideKeyValues
-        ((||) <$> deletedDyn <*> (not <$> customDyn))
+        deletedDyn
         (mappend "editable-row__key" <$> extraDivClasses)
         keyClass
         "key"
@@ -193,7 +194,7 @@ loadingOverride = do
     loadingOverrideSpinner
 
 loadingOverrides :: MonadWidget t m => m ()
-loadingOverrides = do
+loadingOverrides = divClass "padded" $ do
   loadingOverride
   loadingOverride
   loadingOverride
@@ -364,32 +365,31 @@ showFlatConfig l =
 
 showNonEditableWorkingOverrideTree ::
   (MonadWidget t m, Renderable tk, Renderable tv, Ord tk, Ord (ConfigValue tv)) =>
-  -- | Loading
-  Dynamic t Bool ->
   Dynamic t (WorkingConfigTree tk tv) ->
   m ()
-showNonEditableWorkingOverrideTree isLoadingDyn treeDyn = do
+showNonEditableWorkingOverrideTree treeDyn = do
   memoRef <- newRef mempty
-  let loading =
-        divClass "row" $ do
-          elClass "div" "listing__placeholder" $ pure ()
-          elClass "div" "listing__spinner" $ pure ()
-  void $
-    divClass "padded" $ do
-      flip runReaderT memoRef $
-        untilReady (lift loading) $
-          networkView $
-            treeDyn <&> \tree ->
-              untilReady (lift loading) $
-                showWorkingOverrideTree'
-                  (is (_Ctor' @"CustomConfigValue"))
-                  (\_ _ -> ())
-                  (\_ k v -> renderRow k v $> pure ())
-                  tree
-                  (pure True)
-                  never
-      networkView $ isLoadingDyn <&> \isLoading -> when isLoading loading
-      pure ()
+  flip runReaderT memoRef $
+    untilReady (lift nonEditableLoading) $
+      networkView $
+        treeDyn <&> \tree ->
+          untilReady (lift nonEditableLoading) $
+            divClass "padded" $
+              showWorkingOverrideTree'
+                (is (_Ctor' @"CustomConfigValue"))
+                (\_ _ -> ())
+                (\_ k v -> renderRow k v $> pure ())
+                tree
+                (pure True)
+                never
+  pure ()
+
+nonEditableLoading :: DomBuilder t m => m ()
+nonEditableLoading = for_ [1 :: Int .. 3] $ \_ ->
+  divClass "padded" $
+    divClass "row" $ do
+      elClass "div" "listing__placeholder" $ pure ()
+      elClass "div" "listing__spinner" $ pure ()
 
 showOverrideTree ::
   forall m t tv tk x.
@@ -433,7 +433,8 @@ showWorkingOverrideTree' ::
   -- | Force open/close all subtrees
   Event t Bool ->
   m [Dynamic t x]
-showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shouldRenderDyn forceSubtreesEv = do
+showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shouldRenderDyn' forceSubtreesEv = do
+  shouldRenderDyn <- holdUniqDyn shouldRenderDyn'
   (appEndo . fold -> f) <- for (OM.assocs m) $ \(k, (mv, _)) -> do
     xMaybe <- for mv $ \v -> mdo
       let initialData = prepareData k v
@@ -506,23 +507,31 @@ renderRow ::
 renderRow k v = do
   case v of
     DefaultConfigValue v' -> do
-      elClass "span" "key-default-pristine" $ rndr k
-      text ": "
+      elClass "span" "key-default-pristine" $ do
+        rndr k
+        text ": "
+        pure ()
       elClass "span" "value-pristine" $ rndr v'
       pure ()
     CustomConfigValue (Left (CustomKey v')) -> do
-      elClass "span" "key-custom-edited" $ rndr k
-      text ": "
+      elClass "span" "key-custom-edited" $ do
+        rndr k
+        text ": "
+        pure ()
       elClass "span" "value-edited" $ rndr v'
       pure ()
     CustomConfigValue (Right (CustomValue v')) -> do
-      elClass "span" "key-default-edited" $ rndr k
-      text ": "
+      elClass "span" "key-default-edited" $ do
+        rndr k
+        text ": "
+        pure ()
       elClass "span" "value-edited" $ rndr v'
       pure ()
     CustomConfigValue (Right (DeletedValue mv)) -> do
-      elClass "span" "key-default-edited" $ rndr k
-      text ": "
+      elClass "span" "key-default-edited" $ do
+        rndr k
+        text ": "
+        pure ()
       elClass "span" "value-edited" $ rndr `traverse_` mv
       pure ()
 

@@ -18,6 +18,7 @@ import Data.Generics.Product (field)
 import Data.Text as T (Text, pack)
 import Data.Time
 import Data.UniqMap
+import Data.Witherable
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
@@ -192,7 +193,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
   wrapRequestErrors $ \hReq -> do
     let nameDyn = dfiDyn <^.> dfiName
         depDyn = dfiDyn <^.> #deployment
-    cfgDyn <- deploymentConfigProgressive hReq (depDyn <^.> #deploymentOverrides) (depDyn <^.> #appOverrides)
+    (defDepCfgEv, defAppCfgEv, _) <- deploymentConfigProgressiveComponents hReq (depDyn <^.> #deploymentOverrides)
     divClass "deployment__summary" $ do
       divClass "deployment__stat" $ do
         elClass "b" "deployment__param" $ text "Status"
@@ -213,16 +214,31 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
       divClass "deployment__widget" $
         divClass "listing" $
           void $ simpleList urlsDyn renderMetadataLink
-    let showVars bL l =
-          divClass "deployment__widget" $ do
-            loadingBoolDyn <- holdUniqDyn (cfgDyn <^.> bL)
-            configDyn <- holdUniqDyn (cfgDyn <^.> l)
-            showNonEditableWorkingOverrideTree loadingBoolDyn configDyn
-    deploymentSection "Deployment configuration" $ showVars #depConfigLoading #depConfig
-    deploymentSection "App configuration" $ showVars #appConfigLoading #appConfig
+    deploymentSection "Deployment configuration" $ showVars defDepCfgEv $ depDyn <^.> #deploymentOverrides
+    defAppMDyn <- holdDynMaybe defAppCfgEv
+    let appCfgEv = catMaybes . updated $ do
+          defAppM <- defAppMDyn
+          appOvs <- depDyn <^.> #appOverrides
+          pure $ defAppM <&> applyOverrides appOvs
+    deploymentSection "App configuration" $ showVars defAppCfgEv $ depDyn <^.> #appOverrides
     deploymentSection "Actions" $
       divClass "table table--actions" $
         actionsTable hReq updEv nameDyn
+
+showVars ::
+  MonadWidget t m =>
+  Event t (DefaultConfig l) ->
+  Dynamic t (Overrides l) ->
+  m ()
+showVars defCfgEv ovsDyn = do
+  workingOvsEv <- constructWorkingOverridesEv defCfgEv ovsDyn
+  _ <-
+    divClass "deployment__widget" $
+      networkHold nonEditableLoading $
+        workingOvsEv <&> \x -> do
+          showNonEditableWorkingOverrideTree (pure x)
+          pure ()
+  pure ()
 
 -- | Widget with a table of actions that can be performed on a deployment.
 -- It requests deployment data.
