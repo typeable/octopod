@@ -1,13 +1,10 @@
 module Data.WorkingOverrides
   ( WorkingOverrides,
-    -- WorkingOverride,
-    -- WorkingOverride',
     WorkingOverrideKey' (..),
     WorkingOverrideKey,
     WorkingOverrideKeyType (..),
     destructWorkingOverrides,
     constructWorkingOverrides,
-    -- newWorkingOverride,
     ConfigValue (..),
     CustomKey (..),
     CustomConfigValue (..),

@@ -104,6 +104,7 @@ in
         #!${pkgs.bash}/bin/bash
 
         echo "You did something wrong :("
+        echo "You did something wrong twice :("
 
         1>&2 echo "You did something wrong, but you shouldn't see this."
 
@@ -191,7 +192,7 @@ in
         export CHECKING_COMMAND=${echoScript}
         export CLEANUP_COMMAND=${echoScript}
         export ARCHIVE_CHECKING_COMMAND=${echoScript}
-        export CONFIG_CHECKING_COMMAND=${echoScript}
+        export CONFIG_CHECKING_COMMAND=${failScript}
         export INFO_COMMAND=${smallInfoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_CONFIG_COMMAND=${infoScript}

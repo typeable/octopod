@@ -17,8 +17,6 @@ import Data.Generics.Labels ()
 import Data.Generics.Product (field)
 import Data.Text as T (Text, pack)
 import Data.Time
-import Data.UniqMap
-import Data.Witherable
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
@@ -215,15 +213,10 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
         divClass "listing" $
           void $ simpleList urlsDyn renderMetadataLink
     deploymentSection "Deployment configuration" $ showVars defDepCfgEv $ depDyn <^.> #deploymentOverrides
-    defAppMDyn <- holdDynMaybe defAppCfgEv
-    let appCfgEv = catMaybes . updated $ do
-          defAppM <- defAppMDyn
-          appOvs <- depDyn <^.> #appOverrides
-          pure $ defAppM <&> applyOverrides appOvs
     deploymentSection "App configuration" $ showVars defAppCfgEv $ depDyn <^.> #appOverrides
     deploymentSection "Actions" $
       divClass "table table--actions" $
-        actionsTable hReq updEv nameDyn
+        actionsTable updEv nameDyn
 
 showVars ::
   MonadWidget t m =>
@@ -246,12 +239,11 @@ showVars defCfgEv ovsDyn = do
 -- otherwise it calls 'actionsTableData', passing the received data.
 actionsTable ::
   MonadWidget t m =>
-  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   m ()
-actionsTable hReq updEv nameDyn = do
+actionsTable updEv nameDyn = do
   pb <- getPostBuild
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
@@ -261,7 +253,7 @@ actionsTable hReq updEv nameDyn = do
     widgetHold_ actionsTableLoading $
       leftmost
         [ actionsTableError <$ errEv
-        , actionsTableData hReq updEv nameDyn <$> okEv
+        , actionsTableData updEv nameDyn <$> okEv
         ]
 
 -- | Header of the actions table.
@@ -299,25 +291,24 @@ actionsTableError = do
 -- It updates data every time when the supplied event fires.
 actionsTableData ::
   MonadWidget t m =>
-  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   -- | Initial logs.
   [DeploymentLog] ->
   m ()
-actionsTableData hReq updEv nameDyn initLogs = do
+actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
   let okEv = (>>= logs) <$> fmapMaybe reqSuccess respEv
   logsDyn <- holdDyn initLogs okEv
   el "tbody" $
     void $
       simpleList logsDyn $ \logDyn -> do
-        dyn_ $ actinRow hReq <$> logDyn
+        dyn_ $ actionRow <$> logDyn
 
 -- | Data row of the actions table.
-actinRow :: RequestErrorHandler t m -> MonadWidget t m => DeploymentLog -> m ()
-actinRow hReq DeploymentLog {..} = do
+actionRow :: MonadWidget t m => DeploymentLog -> m ()
+actionRow DeploymentLog {..} = do
   el "tr" $ do
     el "td" $ do
       text $ actionToText action

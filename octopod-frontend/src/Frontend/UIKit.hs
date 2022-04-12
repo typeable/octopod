@@ -117,13 +117,14 @@ configField overrideKeyValues (splitDynPure -> (k, v')) = do
         v' <&> \case
           DefaultConfigValue _ -> ("key-default-pristine", "value-pristine")
           CustomConfigValue (Right (CustomValue _)) -> ("key-default-edited", "value-edited")
-          CustomConfigValue (Right (DeletedValue _)) -> ("key-default-pristine", "value-pristine")
+          CustomConfigValue (Right (DeletedValue Just {})) -> ("key-deleted", "value-deleted")
+          CustomConfigValue (Right (DeletedValue Nothing)) -> ("key-deleted", "value-unknown")
           CustomConfigValue (Left _) -> ("key-custom-edited", "value-edited")
       valDyn =
         v' <&> \case
           DefaultConfigValue v -> v
           CustomConfigValue (Right (CustomValue v)) -> v
-          CustomConfigValue (Right (DeletedValue v)) -> fromMaybe "DELETED_NOT_IMPLEMENTED" v
+          CustomConfigValue (Right (DeletedValue v)) -> fromMaybe "UNKNOWN" v
           CustomConfigValue (Left (CustomKey v)) -> v
       deletedDyn' = (is (_Ctor' @"CustomConfigValue" . _Right . _Ctor' @"DeletedValue")) <$> v'
   deletedDyn <- holdUniqDyn deletedDyn'
@@ -327,10 +328,10 @@ octopodTextInputDyn valuesDyn disabledDyn divClasses inpClassesDyn placeholder i
                   searchResultEv <&> \case
                     [] -> pure never
                     searchResult -> do
-                      elClass "ul" "overrides__search" $ do
+                      elClass "ul" "input__dropdown" $ do
                         fmap leftmost $
                           for searchResult $ \(res, initialText) -> do
-                            (resEl, ()) <- elClass' "li" "overrides__search-item" $
+                            (resEl, ()) <- elClass' "li" "input__suggest" $
                               for_ res $ \case
                                 Matched t -> elAttr "span" ("style" =: "font-weight: bold;") $ text t
                                 NotMatched t -> text t
@@ -352,9 +353,9 @@ showFlatConfig ::
   m ()
 showFlatConfig l =
   for_ l $ \(k, v) ->
-    let rowClasses = "row" <> if is (_Ctor' @"ValueDeleted") v then "deleted" else mempty
-     in divClass (destructClasses rowClasses) $ do
-          elClass "span" "key-default-pristine" $ do
+    let keyClasses = if is (_Ctor' @"ValueDeleted") v then "key-deleted" else "key-default-pristine"
+     in divClass "row" $ do
+          elClass "span" (destructClasses keyClasses) $ do
             rndr k
             text ": "
             pure ()
@@ -528,11 +529,11 @@ renderRow k v = do
       elClass "span" "value-edited" $ rndr v'
       pure ()
     CustomConfigValue (Right (DeletedValue mv)) -> do
-      elClass "span" "key-default-edited" $ do
+      elClass "span" "key-deleted" $ do
         rndr k
         text ": "
         pure ()
-      elClass "span" "value-edited" $ rndr `traverse_` mv
+      elClass "span" "value-deleted" $ rndr `traverse_` mv
       pure ()
 
 untilReadyEv' ::

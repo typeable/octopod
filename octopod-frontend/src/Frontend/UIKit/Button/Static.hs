@@ -4,6 +4,7 @@ module Frontend.UIKit.Button.Static
     closePopupButton,
     deleteOverrideButton,
     undoOverrideButton,
+    dropButton,
   )
 where
 
@@ -67,5 +68,17 @@ undoOverrideButton =
       , disabledClasses = mempty
       , buttonEnabled = pure True
       , buttonText = ""
+      , buttonBaseTag = ButtonTag
+      }
+
+dropButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
+dropButton =
+  buttonEl
+    CommonButtonConfig
+      { constantClasses = pure "drop__handler"
+      , enabledClasses = mempty
+      , disabledClasses = mempty
+      , buttonEnabled = pure True
+      , buttonText = "Actions"
       , buttonBaseTag = ButtonTag
       }

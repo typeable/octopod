@@ -20,7 +20,6 @@ module Frontend.Utils
     DeploymentPageNotification (..),
     formatPosixToDateTime,
     dropdownWidget,
-    dropdownWidget',
     deploymentConfigProgressiveComponents,
     -- deploymentConfigProgressive,
     holdClearingWith,
@@ -35,28 +34,18 @@ module Frontend.Utils
 where
 
 import Common.Types as CT
-import Control.Applicative
 import Control.Arrow
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import qualified Data.Bifunctor as Bi
 import qualified Data.ConfigTree as CT
-import qualified Data.Foldable as F
 import Data.Functor
-import Data.Functor.Misc
 import Data.Generics.Labels ()
 import Data.Generics.Sum
-import Data.List.NonEmpty (NonEmpty)
-import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, isNothing)
-import Data.Monoid
-import Data.Set (Set)
-import qualified Data.Set as S
+import Data.Maybe (fromMaybe)
 import Data.String
 import Data.Text as T (Text, null, pack, strip)
-import Data.These
 import Data.Time
 import Data.UniqMap
 import Data.Unique
@@ -66,13 +55,10 @@ import Debug.Trace
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.UIKit
-import GHC.Generics (Generic)
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
-import GHCJS.DOM.Node as DOM
-import Generic.Data (Generically (..))
 import Reflex.Dom as R
 import Reflex.Dom.Renderable
 import Reflex.Network
@@ -89,49 +75,30 @@ elementClick = do
   doc <- currentDocumentUnchecked
   wrapDomEvent doc (`on` Events.click) $ ClickedElement <$> target
 
--- | Dropdown widget which binds its own @document click@ event.
-dropdownWidget ::
-  MonadWidget t m =>
-  -- | Button widget which opens the dropdown widget.
-  m () ->
-  -- | Widget with the dropdown list.
-  -- Returns an event carrying the user's selection.
-  m (Event t a) ->
-  m (Event t a)
-dropdownWidget btn body = mdo
-  clickedEl <- elementClick
-  dropdownWidget' clickedEl btn body
-
 -- | Similar to 'dropdownWidget' but uses @document click@ event that may be
 -- shared between other widgets.
-dropdownWidget' ::
+dropdownWidget ::
   MonadWidget t m =>
-  -- | Document click event that may be shared between other widgets.
-  Event t ClickedElement ->
-  -- | Button widget which opens the dropdown widget.
-  m () ->
   -- | Widget with the dropdown list.
   -- Returns an event carrying the user's selection.
   m (Event t a) ->
   m (Event t a)
-dropdownWidget' clickedEl btn body = mdo
-  clickInsideEv <- performEvent $
-    ffor clickedEl $ \(ClickedElement clicked) ->
-      DOM.contains (_element_raw btnEl) clicked
-  openedDyn <- foldDyn switchState False $ clickInsideEv
-  let switchState ev cur = ev && not cur
-      wrapperClassDyn = ffor openedDyn $ \case
+dropdownWidget body = mdo
+  openedDyn <- toggle False $ btnEl
+  let wrapperClassDyn = ffor openedDyn $ \case
         True -> "class" =: "drop drop--actions drop--expanded"
         False -> "class" =: "drop drop--actions"
-  (btnEl, (_, wEv)) <- elDynAttr'
+  (btnEl, wEv) <- elDynAttr
     "div"
     wrapperClassDyn
     $ do
-      btn
-      elDynAttr'
-        "div"
-        (constDyn $ "class" =: "drop__dropdown")
-        body
+      clickedEv <- dropButton
+      aEv <-
+        elDynAttr
+          "div"
+          (constDyn $ "class" =: "drop__dropdown")
+          body
+      pure (clickedEv, aEv)
   pure wEv
 
 showT :: Show a => a -> Text
@@ -432,13 +399,14 @@ errorHeader ::
   Dynamic t Text ->
   m ()
 errorHeader appErr = do
-  divClass "deployment__output notification notification--danger" $ do
-    dynText appErr
+  divClass "deployment__output notification notification--danger" $
+    el "pre" $
+      dynText appErr
 
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.
 envVarsInput ::
-  forall l t m.
+  forall t m.
   MonadWidget t m =>
   Dynamic t [Text] ->
   (Text -> Maybe Text) ->
@@ -472,15 +440,6 @@ envVarsInput (traceDyn "values" -> values) lookupOverride ovs = divClass "padded
       resCfg = (<> treeResCfg) <$> addedOvsListDyn
       addingIsEnabled = join $ fmap and . sequenceA . (fmap . fmap) (not . T.null . fst) <$> resCfg
   pure resCfg
-
-restrictMapEv :: (Reflex t, Ord k) => Event t (Set k) -> Event t (Map k v) -> Event t (Map k v)
-restrictMapEv =
-  alignEventWithMaybe
-    ( \case
-        These keys _ | S.null keys -> Nothing
-        These keys m -> Just $ M.restrictKeys m keys
-        _ -> Nothing
-    )
 
 -- validateWorkingOverrides ::
 --   forall f.
