@@ -1,4 +1,4 @@
-resolver: lts-18.2
+resolver: lts-18.28
 
 packages:
   - octo-cli
@@ -10,3 +10,5 @@ extra-deps:
   - servant-websockets-2.0.0
   - table-layout-0.9.1.0
   - data-default-instances-base-0.1.0.1
+  - git: https://github.com/typeable/ordered-containers.git
+    commit: 3eb05fb2f44fe482e9092aff447e9c68fbd6a7f6
