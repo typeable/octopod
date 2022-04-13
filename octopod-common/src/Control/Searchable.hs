@@ -41,8 +41,9 @@ instance Searchable needle x => Searchable needle [x] where
   {-# INLINE searchWith #-}
 
 instance (Searchable needle a, Searchable needle b) => Searchable needle (a, b) where
-  type SearchableConstraint needle (a, b) res =
-    (SearchableConstraint needle a res, SearchableConstraint needle b res)
+  type
+    SearchableConstraint needle (a, b) res =
+      (SearchableConstraint needle a res, SearchableConstraint needle b res)
   type Searched (a, b) res = (Searched a res, Searched b res)
   searchWith f (a, b) = do
     a' <- searchWith f a
@@ -57,8 +58,9 @@ instance Searchable needle haystack => Searchable needle (Maybe haystack) where
   searchWith f (Just h) = Just <$> searchWith f h
   {-# INLINE searchWith #-}
 
-traverseOMap :: forall h k x y. Ord k =>
+traverseOMap ::
+  forall h k x y.
+  Ord k =>
   (forall f. Applicative f => (h -> f k) -> (x -> f y) -> OMap h x -> f (OMap k y))
 traverseOMap kf vf (OM.assocs -> l) =
   fmap OM.fromList $ (\(h, x) -> (,) <$> kf h <*> vf x) `traverse` l
-

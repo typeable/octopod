@@ -1,3 +1,4 @@
+{- ORMOLU_DISABLE -}
 {-# LANGUAGE CPP #-}
 
 module Octopod.API.WebSocket
