@@ -254,7 +254,7 @@ pub mod lib {
                Err(helm.status)
            }
        }
-       pub fn run_stdout(&self) -> Result<String, ExitStatus> {
+       pub fn run_stdout(&self) -> Result<String, (ExitStatus, String)> {
            let helm = Command::new(&self.name)
                .args(&self.args())
                .output()
@@ -262,9 +262,11 @@ pub mod lib {
            if helm.status.success() {
                Ok(String::from_utf8(helm.stdout).unwrap())
            } else {
-               info!("helm stdout:\n {}", String::from_utf8(helm.stdout).unwrap());
-               info!("helm stderr:\n {}", String::from_utf8(helm.stderr).unwrap());
-               Err(helm.status)
+               let stdout = String::from_utf8(helm.stdout).unwrap();
+               let stderr = String::from_utf8(helm.stderr).unwrap();
+               info!("helm stdout:\n {}", stdout);
+               info!("helm stderr:\n {}", stderr);
+               Err((helm.status, stderr))
            }
         }
     }
@@ -731,6 +733,7 @@ pub mod lib {
         match helm_repo_add.run() {
             Ok(_status) => info!("Repo add success!"),
             Err(status) => {
+                println!("Couldn't add repo.");
                 error!("Error during helm execution");
                 panic!("{:?}", status);
             }
@@ -738,6 +741,7 @@ pub mod lib {
         match helm_repo_update.run() {
             Ok(_status) => info!("Repo update success!"),
             Err(status) => {
+                println!("Couldn't update repo.");
                 error!("Error during helm execution");
                 panic!("{:?}", status);
             }
