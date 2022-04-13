@@ -8,7 +8,6 @@ module Data.WorkingOverrides
     ConfigValue (..),
     CustomKey (..),
     CustomConfigValue (..),
-    HasTrie,
     WorkingConfigTree,
     WorkingOverride,
     WorkingOverride',
@@ -19,12 +18,16 @@ where
 
 import Common.Orphans ()
 import Common.Types
+import Control.Monad.Reader
+import Control.Monad.Ref
 import Data.ConfigTree (ConfigTree)
 import qualified Data.ConfigTree as CT
+import Data.Foldable
 import Data.Functor
+import Data.Map (Map)
+import qualified Data.Map as M
 import Data.Maybe (catMaybes)
 import qualified Data.Maybe as M
-import Data.MemoTrie
 import Data.Text (Text)
 import Data.These
 import GHC.Generics (Generic)
@@ -37,41 +40,48 @@ data ConfigValue te
   | CustomConfigValue !(Either (CustomKey te) (CustomConfigValue te))
   deriving stock (Show, Generic, Eq, Ord)
 
-instance (HasTrie te) => HasTrie (ConfigValue te) where
-  newtype ConfigValue te :->: b = ConfigValueTrie {unConfigValueTrie :: Reg (ConfigValue te) :->: b}
-  trie = trieGeneric ConfigValueTrie
-  untrie = untrieGeneric unConfigValueTrie
-  enumerate = enumerateGeneric unConfigValueTrie
-
 newtype CustomKey v = CustomKey v
   deriving stock (Show, Generic, Eq, Ord)
-
-instance HasTrie te => HasTrie (CustomKey te) where
-  newtype CustomKey te :->: b = CustomKeyTrie {unCustomKeyTrie :: Reg (CustomKey te) :->: b}
-  trie = trieGeneric CustomKeyTrie
-  untrie = untrieGeneric unCustomKeyTrie
-  enumerate = enumerateGeneric unCustomKeyTrie
-
 data CustomConfigValue te
   = CustomValue !te
   | DeletedValue !(Maybe te)
   deriving stock (Show, Generic, Eq, Ord)
 
-instance (HasTrie te) => HasTrie (CustomConfigValue te) where
-  newtype CustomConfigValue te :->: b = CustomConfigValueTrie {unCustomConfigValueTrie :: Reg (CustomConfigValue te) :->: b}
-  trie = trieGeneric CustomConfigValueTrie
-  untrie = untrieGeneric unCustomConfigValueTrie
-  enumerate = enumerateGeneric unCustomConfigValueTrie
-
 -- Super inefficient but i dont care
 configTreeHasLeaf ::
+  forall m kv te.
+  ( MonadReader (Ref m (Map (ConfigTree kv te) Bool)) m
+  , MonadRef m
+  , Ord kv
+  , Ord te
+  ) =>
   (te -> Bool) ->
   ConfigTree kv te ->
-  Bool
-configTreeHasLeaf f (CT.ConfigTree x) = flip any x $ \case
-  (Just y, _) | f y -> True
-  (_, ct) -> configTreeHasLeaf f ct
+  m Bool
+configTreeHasLeaf f = memo $ \(CT.ConfigTree x) -> go $ toList x
+  where
+    go :: [(Maybe te, ConfigTree kv te)] -> m Bool
+    go [] = pure False
+    go ((Just y, _) : _) | f y = pure True
+    go ((_, ct) : rest) =
+      configTreeHasLeaf f ct >>= \case
+        True -> pure True
+        False -> go rest
 
+memo ::
+  (MonadReader (Ref m (Map x y)) m, Ord x, MonadRef m) =>
+  (x -> m y) ->
+  x ->
+  m y
+memo f x = do
+  memoRef <- ask
+  m <- readRef memoRef
+  case M.lookup x m of
+    Just y -> pure y
+    Nothing -> do
+      y <- f x
+      modifyRef memoRef $ M.insert x y
+      pure y
 type WorkingOverrides = WorkingOverrides' Text
 
 type WorkingOverrides' te = ConfigTree te (ConfigValue te)

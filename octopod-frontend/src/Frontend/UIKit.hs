@@ -462,7 +462,7 @@ showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shoul
                       then "collapse--expanded"
                       else mempty
         (ovs, openDyn) <- elDynClass "div" wrapperClass $ do
-          modified <- memo (configTreeHasLeaf isModified) subtree
+          modified <- configTreeHasLeaf isModified subtree
           (traceEvent "clickEv" -> clickEv) <-
             treeButton
               TreeButtonConfig
@@ -484,21 +484,6 @@ showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shoul
                 (leftmost [selfForceSubtrees, forceSubtreesEv])
           pure (ovs', buttonIsOpen)
         pure ovs
-
-memo ::
-  (MonadReader (Ref m (Map x y)) m, Ord x, MonadRef m) =>
-  (x -> y) ->
-  x ->
-  m y
-memo f x = do
-  memoRef <- ask
-  m <- readRef memoRef
-  case M.lookup x m of
-    Just y -> pure y
-    Nothing -> do
-      let y = f x
-      modifyRef memoRef $ M.insert x y
-      pure y
 
 renderRow ::
   (DomBuilder t m, Renderable te, Renderable k) =>

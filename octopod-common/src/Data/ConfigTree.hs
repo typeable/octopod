@@ -31,7 +31,6 @@ import qualified Data.List.NonEmpty as NE
 import Data.Map.Ordered.Strict (OMap)
 import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.MemoTrie
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -61,12 +60,6 @@ zip (ConfigTree m) (ConfigTree w) =
 newtype ConfigTree k v = ConfigTree (OMap k (Maybe v, ConfigTree k v))
   deriving newtype (Eq, Ord, Show, NFData)
   deriving stock (Functor, Generic)
-
-instance (HasTrie k, HasTrie v) => HasTrie (ConfigTree k v) where
-  newtype ConfigTree k v :->: b = ConfigTreeTrie {unConfigTreeTrie :: Reg (ConfigTree k v) :->: b}
-  trie = trieGeneric ConfigTreeTrie
-  untrie = untrieGeneric unConfigTreeTrie
-  enumerate = enumerateGeneric unConfigTreeTrie
 
 instance ToJSON v => ToJSON (ConfigTree Text v) where
   toJSON = toJSON . toFlatList

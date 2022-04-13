@@ -398,10 +398,9 @@ errorHeader ::
   -- | Message text.
   Dynamic t Text ->
   m ()
-errorHeader appErr = do
-  divClass "deployment__output notification notification--danger" $
-    el "pre" $
-      dynText appErr
+errorHeader appErr =
+  elClass "pre" "deployment__output notification notification--danger" $
+    dynText appErr
 
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.

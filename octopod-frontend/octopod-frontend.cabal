@@ -137,7 +137,6 @@ executable frontend
                      , deepseq
                      , patch
                      , reflex-dom-core
-                     , MemoTrie
                      , these
                      , ref-tf
   hs-source-dirs:      src

@@ -17,6 +17,7 @@ import qualified Data.ConfigTree as CT
 import Data.Csv
 import Data.Generics.Labels ()
 import Data.Int
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,7 +26,6 @@ import Data.Traversable
 import Deriving.Aeson
 import Deriving.Aeson.Stock
 import Web.HttpApiData
-import Data.List.NonEmpty (NonEmpty)
 
 data OverrideLevel = ApplicationLevel | DeploymentLevel
 
