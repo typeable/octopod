@@ -1,32 +1,94 @@
 module Data.WorkingOverrides
   ( WorkingOverrides,
-    WorkingOverride,
-    WorkingOverride',
     WorkingOverrideKey' (..),
     WorkingOverrideKey,
     WorkingOverrideKeyType (..),
-    WorkingOverrideValue' (..),
-    WorkingOverrideValue,
     destructWorkingOverrides,
     constructWorkingOverrides,
-    newWorkingOverride,
+    ConfigValue (..),
+    CustomKey (..),
+    CustomConfigValue (..),
+    WorkingConfigTree,
+    WorkingOverride,
+    WorkingOverride',
+    configTreeHasLeaf,
+    destructWorkingOverridesDyn,
   )
 where
 
+import Common.Orphans ()
 import Common.Types
-import qualified Data.List as L
-import qualified Data.Map.Ordered.Strict as OM
-import Data.Maybe
+import Control.Monad.Reader
+import Control.Monad.Ref
+import Data.ConfigTree (ConfigTree)
+import qualified Data.ConfigTree as CT
+import Data.Foldable
+import Data.Functor
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Maybe (catMaybes)
+import qualified Data.Maybe as M
 import Data.Text (Text)
-import Data.UniqMap
+import Data.These
+import GHC.Generics (Generic)
+import Reflex
 
+type WorkingConfigTree k v = ConfigTree k (ConfigValue v)
+
+data ConfigValue te
+  = DefaultConfigValue !te
+  | CustomConfigValue !(Either (CustomKey te) (CustomConfigValue te))
+  deriving stock (Show, Generic, Eq, Ord)
+
+newtype CustomKey v = CustomKey v
+  deriving stock (Show, Generic, Eq, Ord)
+data CustomConfigValue te
+  = CustomValue !te
+  | DeletedValue !(Maybe te)
+  deriving stock (Show, Generic, Eq, Ord)
+
+-- Super inefficient but i dont care
+configTreeHasLeaf ::
+  forall m kv te.
+  ( MonadReader (Ref m (Map (ConfigTree kv te) Bool)) m
+  , MonadRef m
+  , Ord kv
+  , Ord te
+  ) =>
+  (te -> Bool) ->
+  ConfigTree kv te ->
+  m Bool
+configTreeHasLeaf f = memo $ \(CT.ConfigTree x) -> go $ toList x
+  where
+    go :: [(Maybe te, ConfigTree kv te)] -> m Bool
+    go [] = pure False
+    go ((Just y, _) : _) | f y = pure True
+    go ((_, ct) : rest) =
+      configTreeHasLeaf f ct >>= \case
+        True -> pure True
+        False -> go rest
+
+memo ::
+  (MonadReader (Ref m (Map x y)) m, Ord x, MonadRef m) =>
+  (x -> m y) ->
+  x ->
+  m y
+memo f x = do
+  memoRef <- ask
+  m <- readRef memoRef
+  case M.lookup x m of
+    Just y -> pure y
+    Nothing -> do
+      y <- f x
+      modifyRef memoRef $ M.insert x y
+      pure y
 type WorkingOverrides = WorkingOverrides' Text
 
-type WorkingOverrides' te = UniqKeyMap (WorkingOverride' te)
+type WorkingOverrides' te = ConfigTree te (ConfigValue te)
 
 type WorkingOverride = WorkingOverride' Text
 
-type WorkingOverride' te = (WorkingOverrideKey' te, WorkingOverrideValue' te)
+type WorkingOverride' te = (te, ConfigValue te)
 
 type WorkingOverrideKey = WorkingOverrideKey' Text
 
@@ -36,75 +98,31 @@ data WorkingOverrideKey' te = WorkingOverrideKey !WorkingOverrideKeyType !te
 data WorkingOverrideKeyType = CustomWorkingOverrideKey | DefaultWorkingOverrideKey
   deriving stock (Show, Eq)
 
-type WorkingOverrideValue = WorkingOverrideValue' Text
+destructWorkingOverridesDyn :: Reflex t => [Dynamic t WorkingOverride] -> Dynamic t (Overrides l)
+destructWorkingOverridesDyn =
+  fmap (Overrides . CT.fromFlatList . catMaybes) . sequenceA . (fmap . fmap) (\(k, v) -> (k,) <$> unConfigValue v)
 
-data WorkingOverrideValue' te
-  = WorkingCustomValue !te
-  | WorkingDefaultValue !te
-  | WorkingDeletedValue !(Maybe te)
-  deriving stock (Show)
-
-destructWorkingOverrides :: WorkingOverrides -> Overrides l
+destructWorkingOverrides :: [WorkingOverride] -> Overrides l
 destructWorkingOverrides =
-  Overrides
-    . foldr
-      ( \pair@(k, v) m -> case OM.lookup k m of
-          Just _ | v == ValueDeleted -> m
-          _ -> m OM.|> pair
-      )
-      OM.empty
-    . mapMaybe
-      ( \case
-          (WorkingOverrideKey CustomWorkingOverrideKey k, getWorkingOverrideValue -> v) -> Just (k, v)
-          (WorkingOverrideKey _ k, WorkingCustomValue v) -> Just (k, ValueAdded v)
-          (WorkingOverrideKey _ k, WorkingDeletedValue _) -> Just (k, ValueDeleted)
-          (WorkingOverrideKey DefaultWorkingOverrideKey _, WorkingDefaultValue _) -> Nothing
-      )
-    . elemsUniq
-  where
-    getWorkingOverrideValue :: WorkingOverrideValue -> OverrideValue
-    getWorkingOverrideValue (WorkingCustomValue x) = ValueAdded x
-    getWorkingOverrideValue (WorkingDefaultValue x) = ValueAdded x
-    getWorkingOverrideValue (WorkingDeletedValue _) = ValueDeleted
+  Overrides . CT.fromFlatList . M.catMaybes . fmap (\(k, v) -> (k,) <$> unConfigValue v)
+
+unConfigValue :: ConfigValue te -> Maybe (OverrideValue' te)
+unConfigValue (DefaultConfigValue _) = Nothing
+unConfigValue (CustomConfigValue (Left (CustomKey te))) = Just $ ValueAdded te
+unConfigValue (CustomConfigValue (Right (CustomValue te))) = Just $ ValueAdded te
+unConfigValue (CustomConfigValue (Right (DeletedValue _))) = Just ValueDeleted
 
 constructWorkingOverrides ::
   Ord te =>
-  Maybe (DefaultConfig' te l) ->
+  DefaultConfig' te l ->
   Overrides' te l ->
   WorkingOverrides' te
-constructWorkingOverrides (Just (DefaultConfig dCfg)) (Overrides ovsM) =
-  let custom =
-        uniqMapFromList
-          . mapMaybe
-            ( \(k, v) ->
-                let k' = WorkingOverrideKey (if OM.member k dCfg then DefaultWorkingOverrideKey else CustomWorkingOverrideKey) k
-                 in case v of
-                      ValueAdded x -> Just (k', WorkingCustomValue x)
-                      ValueDeleted -> (k',) . WorkingDeletedValue . Just <$> OM.lookup k dCfg
-            )
-          . OM.assocs
-          $ ovsM
-   in L.foldl'
-        ( \m (k, v) ->
-            if OM.member k ovsM
-              then m
-              else
-                fst $
-                  insertUniqEnd (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDefaultValue v) m
-        )
-        custom
-        (OM.assocs dCfg)
-constructWorkingOverrides Nothing (Overrides ovsM) =
-  uniqMapFromList
-    . fmap
-      ( \(k, v) ->
-          let k' = WorkingOverrideKey CustomWorkingOverrideKey k
-           in case v of
-                ValueAdded x -> (k', WorkingCustomValue x)
-                ValueDeleted -> (k', WorkingDeletedValue Nothing)
-      )
-    . OM.assocs
-    $ ovsM
-
-newWorkingOverride :: WorkingOverride
-newWorkingOverride = (WorkingOverrideKey CustomWorkingOverrideKey "", WorkingCustomValue "")
+constructWorkingOverrides (DefaultConfig defCT) (Overrides newCT) =
+  CT.catMaybes $
+    CT.zip newCT defCT <&> \case
+      That x -> Just $ DefaultConfigValue x
+      This x -> case x of
+        ValueDeleted -> Nothing
+        ValueAdded v -> Just $ CustomConfigValue $ Left $ CustomKey v
+      These ValueDeleted v -> Just $ CustomConfigValue $ Right $ DeletedValue $ Just v
+      These (ValueAdded v) _ -> Just $ CustomConfigValue $ Right $ CustomValue v

@@ -2,23 +2,43 @@ module Frontend.UIKit.Button.Common
   ( CommonButtonConfig (..),
     BaseButtonTag (..),
     buttonEl,
+    TextBuilder (..),
+    textBuilder,
   )
 where
 
-import Control.Lens
+import Control.Lens hiding (element)
 import Data.Generics.Labels ()
 import Data.Map (Map)
+import Data.Proxy
+import Data.String
 import Data.Text (Text)
+import qualified Data.Text as T
 import Frontend.Classes
 import GHC.Generics (Generic)
 import Reflex.Dom
+
+textBuilder :: Text -> TextBuilder t
+textBuilder t = TextBuilder $ text t
+
+newtype TextBuilder t = TextBuilder
+  { unTextBuilder ::
+      forall m.
+      ( DomBuilder t m
+      , PostBuild t m
+      ) =>
+      m ()
+  }
+
+instance IsString (TextBuilder t) where
+  fromString t = TextBuilder (text . T.pack $ t)
 
 data CommonButtonConfig t = CommonButtonConfig
   { constantClasses :: Dynamic t Classes
   , enabledClasses :: Classes
   , disabledClasses :: Classes
   , buttonEnabled :: Dynamic t Bool
-  , buttonText :: Dynamic t Text
+  , buttonText :: TextBuilder t
   , buttonBaseTag :: BaseButtonTag
   }
   deriving stock (Generic)
@@ -30,9 +50,10 @@ baseTag ButtonTag = ("button", "type" =: "button")
 baseTag (ATag url) = ("a", "href" =: url <> "target" =: "_blank")
 
 buttonEl ::
+  forall m t.
   (DomBuilder t m, PostBuild t m) =>
   CommonButtonConfig t ->
-  m (Event t ())
+  m (Event t (Either () ()))
 buttonEl cfg = do
   let (t, staticAttrs) = baseTag (cfg ^. #buttonBaseTag)
       attrsDyn = do
@@ -45,5 +66,32 @@ buttonEl cfg = do
           staticAttrs
             <> "class" =: destructClasses (enabledClasses <> cs)
             <> enabledAttrs
-  (bEl, _) <- elDynAttr' t attrsDyn $ dynText $ cfg ^. #buttonText
-  pure $ domEvent Click bEl
+  modAttrs <- dynamicAttributesToModifyAttributes attrsDyn
+  let elCfg =
+        (def @(ElementConfig EventResult t (DomBuilderSpace m)))
+          & elementConfig_modifyAttributes .~ fmapCheap mapKeysToAttributeName modAttrs
+          & elementConfig_eventSpec
+            %~~ addEventSpecFlags
+              (Proxy @(DomBuilderSpace m))
+              Contextmenu
+              ( const
+                  EventFlags
+                    { _eventFlags_propagation = Propagation_StopImmediate
+                    , _eventFlags_preventDefault = True
+                    }
+              )
+          & elementConfig_eventSpec
+            %~~ addEventSpecFlags
+              (Proxy @(DomBuilderSpace m))
+              Click
+              ( const
+                  EventFlags
+                    { _eventFlags_propagation = Propagation_StopImmediate
+                    , _eventFlags_preventDefault = True
+                    }
+              )
+  (bEl, _) <- element t elCfg (unTextBuilder (cfg ^. #buttonText))
+  pure $ leftmost [Left <$> domEvent Click bEl, Right <$> domEvent Contextmenu bEl]
+
+(%~~) :: ASetter' s a -> (a -> a) -> s -> s
+(%~~) = (%~)

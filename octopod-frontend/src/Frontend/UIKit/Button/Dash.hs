@@ -54,7 +54,7 @@ buttonTypeClasses = \case
 dashButton ::
   (DomBuilder t m, PostBuild t m) =>
   DashButtonConfig t ->
-  m (Event t ())
+  m (Event t (Either () ()))
 dashButton cfg =
   buttonEl
     CommonButtonConfig
@@ -66,6 +66,6 @@ dashButton cfg =
       , enabledClasses = mempty
       , disabledClasses = "dash--disabled"
       , buttonEnabled = cfg ^. #buttonEnabled
-      , buttonText = pure $ cfg ^. #buttonText
+      , buttonText = textBuilder $ cfg ^. #buttonText
       , buttonBaseTag = ButtonTag
       }

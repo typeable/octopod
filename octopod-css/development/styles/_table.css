@@ -61,7 +61,7 @@
 
 }
     .table--clickable tbody tr {
-        cursor: default;
+        cursor: pointer;
     }
 
     .table--clickable tbody tr:hover {

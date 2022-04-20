@@ -12,6 +12,7 @@ import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Trans.Control
 import Data.Fixed
+import Data.Foldable
 import Data.IORef.Lifted
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -81,7 +82,7 @@ lookupBlocking (CacheMap ref createValue update) k = do
         res@(Right _) -> do
           putMVar var res
           pure $ (var, if recompute then Just blank else Nothing)
-  forM_ mwVar $ \wVar -> do
+  for_ mwVar $ \wVar -> do
     fork $ do
       v <- (Right <$> createValue k) `catchError` (pure . Left)
       putMVar wVar v

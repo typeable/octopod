@@ -12,6 +12,7 @@ where
 
 import Reflex.Dom
 
+import Data.Functor
 import Data.Generics.Labels ()
 import Frontend.UIKit
 
@@ -53,7 +54,7 @@ popupWidget m =
           divClass "classic-popup__slot" $ do
             (okEv, cancelEv) <- m
             closeEv <- closeClassicPopupButton
-            pure $ (okEv, leftmost [cancelEv, closeEv])
+            pure $ (okEv, leftmost [cancelEv, closeEv $> ()])
 
 -- | Popup that requires confirmation of deployment deletion.
 confirmArchivePopup ::
@@ -77,5 +78,5 @@ confirmArchivePopup showEv txt = do
                   & #buttonStyle .~~ DialogActionLargeButtonStyle
                   & #buttonPriority .~~ SecondaryLargeButton
                   & #buttonText .~~ "Cancel"
-            pure (okEv, cancelEv)
+            pure (okEv $> (), cancelEv $> ())
   classicPopup showEv body

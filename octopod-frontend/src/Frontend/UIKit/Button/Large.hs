@@ -77,7 +77,7 @@ buttonTypeClasses LoadingLargeButtonType = "button--save-loading"
 largeButton ::
   (DomBuilder t m, PostBuild t m) =>
   LargeButtonConfig t ->
-  m (Event t ())
+  m (Event t (Either () ()))
 largeButton cfg =
   buttonEl
     CommonButtonConfig
@@ -91,6 +91,6 @@ largeButton cfg =
       , enabledClasses = mempty
       , disabledClasses = "button--disabled"
       , buttonEnabled = cfg ^. #buttonEnabled
-      , buttonText = pure $ cfg ^. #buttonText
+      , buttonText = textBuilder $ cfg ^. #buttonText
       , buttonBaseTag = cfg ^. #buttonBaseTag
       }

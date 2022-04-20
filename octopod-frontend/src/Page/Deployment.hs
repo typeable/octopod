@@ -5,31 +5,30 @@
 --This module contains the definition of a deployment page.
 module Page.Deployment (deploymentPage) where
 
-import Control.Lens
-import Control.Monad
-import Data.Coerce
-import Data.Generics.Product (field)
-import Data.Text as T (Text, pack)
-import Obelisk.Route.Frontend
-import Reflex.Dom as R
-import Servant.Reflex
-
 import Common.Types as CT
 import Common.Utils
+import Control.Lens
+import Control.Monad
 import Control.Monad.Reader
 import Data.Align
+import Data.Coerce
+import Data.Functor
 import Data.Generics.Labels ()
+import Data.Generics.Product (field)
+import Data.Text as T (Text, pack)
 import Data.Time
-import Data.UniqMap
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.Route
 import Frontend.UIKit
 import Frontend.Utils
+import Obelisk.Route.Frontend
 import Page.ClassicPopup
 import Page.Elements.Links
 import Page.Popup.EditDeployment
+import Reflex.Dom as R
 import Reflex.Network
+import Servant.Reflex
 import Servant.Reflex.Extra
 
 -- | The root widget of a deployment page. It requests the deployment data.
@@ -125,7 +124,7 @@ deploymentHead dfiDyn sentEv =
                     & #buttonStyle .~~ PageActionLargeButtonStyle
                     & #buttonText .~~ "Recover from archive"
                     & #buttonEnabled .~~ btnEnabledDyn
-              void $ restoreEndpoint (Right . coerce <$> dname) btnEv
+              void $ restoreEndpoint (Right . coerce <$> dname) $ btnEv $> ()
               pure (never, never)
             else mdo
               let btnState = not $ isPending . recordedStatus $ dfi ^. field @"status"
@@ -162,7 +161,7 @@ deploymentHead dfiDyn sentEv =
                     , buttonBaseTag = ATag url
                     }
           )
-    delEv <- confirmArchivePopup archEv $ do
+    delEv <- confirmArchivePopup (archEv $> ()) $ do
       text "Are you sure you want to archive the"
       el "br" blank
       dynText dname
@@ -192,7 +191,7 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
   wrapRequestErrors $ \hReq -> do
     let nameDyn = dfiDyn <^.> dfiName
         depDyn = dfiDyn <^.> #deployment
-    cfgDyn <- deploymentConfigProgressive hReq (depDyn <^.> #deploymentOverrides) (depDyn <^.> #appOverrides)
+    (defDepCfgEv, defAppCfgEv, _) <- deploymentConfigProgressiveComponents hReq (depDyn <^.> #deploymentOverrides)
     divClass "deployment__summary" $ do
       divClass "deployment__stat" $ do
         elClass "b" "deployment__param" $ text "Status"
@@ -213,18 +212,26 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
       divClass "deployment__widget" $
         divClass "listing" $
           void $ simpleList urlsDyn renderMetadataLink
-    void $
-      networkView $
-        cfgDyn <&> \cfg -> do
-          let showVars bL l =
-                divClass "deployment__widget" $
-                  showNonEditableWorkingOverride (cfg ^. bL) (not $ cfg ^. bL) LargeNonEditableWorkingOverrideStyle $
-                    elemsUniq (cfg ^. l)
-          deploymentSection "Deployment configuration" $ showVars #depConfigLoading #depConfig
-          deploymentSection "App configuration" $ showVars #appConfigLoading #appConfig
+    deploymentSection "Deployment configuration" $ showVars defDepCfgEv $ depDyn <^.> #deploymentOverrides
+    deploymentSection "App configuration" $ showVars defAppCfgEv $ depDyn <^.> #appOverrides
     deploymentSection "Actions" $
       divClass "table table--actions" $
-        actionsTable hReq updEv nameDyn
+        actionsTable updEv nameDyn
+
+showVars ::
+  MonadWidget t m =>
+  Event t (DefaultConfig l) ->
+  Dynamic t (Overrides l) ->
+  m ()
+showVars defCfgEv ovsDyn = do
+  workingOvsEv <- constructWorkingOverridesEv defCfgEv ovsDyn
+  _ <-
+    divClass "deployment__widget" $
+      networkHold nonEditableLoading $
+        workingOvsEv <&> \x -> do
+          showNonEditableWorkingOverrideTree (pure x)
+          pure ()
+  pure ()
 
 -- | Widget with a table of actions that can be performed on a deployment.
 -- It requests deployment data.
@@ -232,12 +239,11 @@ deploymentBody updEv dfiDyn = deploymentBodyWrapper $
 -- otherwise it calls 'actionsTableData', passing the received data.
 actionsTable ::
   MonadWidget t m =>
-  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   m ()
-actionsTable hReq updEv nameDyn = do
+actionsTable updEv nameDyn = do
   pb <- getPostBuild
   respEv <- infoEndpoint (Right <$> nameDyn) pb
   let okEv = join . fmap logs <$> fmapMaybe reqSuccess respEv
@@ -247,7 +253,7 @@ actionsTable hReq updEv nameDyn = do
     widgetHold_ actionsTableLoading $
       leftmost
         [ actionsTableError <$ errEv
-        , actionsTableData hReq updEv nameDyn <$> okEv
+        , actionsTableData updEv nameDyn <$> okEv
         ]
 
 -- | Header of the actions table.
@@ -285,25 +291,24 @@ actionsTableError = do
 -- It updates data every time when the supplied event fires.
 actionsTableData ::
   MonadWidget t m =>
-  RequestErrorHandler t m ->
   -- | Event notifying about the need to update data.
   Event t () ->
   Dynamic t DeploymentName ->
   -- | Initial logs.
   [DeploymentLog] ->
   m ()
-actionsTableData hReq updEv nameDyn initLogs = do
+actionsTableData updEv nameDyn initLogs = do
   respEv <- infoEndpoint (Right <$> nameDyn) updEv
   let okEv = (>>= logs) <$> fmapMaybe reqSuccess respEv
   logsDyn <- holdDyn initLogs okEv
   el "tbody" $
     void $
       simpleList logsDyn $ \logDyn -> do
-        dyn_ $ actinRow hReq <$> logDyn
+        dyn_ $ actionRow <$> logDyn
 
 -- | Data row of the actions table.
-actinRow :: RequestErrorHandler t m -> MonadWidget t m => DeploymentLog -> m ()
-actinRow hReq DeploymentLog {..} = do
+actionRow :: MonadWidget t m => DeploymentLog -> m ()
+actionRow DeploymentLog {..} = do
   el "tr" $ do
     el "td" $ do
       text $ actionToText action
@@ -311,8 +316,8 @@ actinRow hReq DeploymentLog {..} = do
             "status "
               <> if exitCode == 0 then "status--success" else "status--failure"
       divClass statusClass blank
-    el "td" $ deploymentOverridesWidget hReq deploymentDepOverrides
-    el "td" $ applicationOverridesWidget hReq deploymentDepOverrides deploymentAppOverrides
+    el "td" $ overridesWidget deploymentDepOverrides
+    el "td" $ overridesWidget deploymentAppOverrides
     el "td" $ text $ showT $ exitCode
     el "td" $ text $ formatPosixToDateTime createdAt
     el "td" $ text $ formatDuration duration

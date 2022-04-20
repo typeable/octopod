@@ -13,9 +13,10 @@ import Data.Aeson (decode)
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy.Char8 as LBSC
 import Data.Coerce
+import qualified Data.ConfigTree as CT
+import Data.Foldable
 import Data.Generics.Labels ()
 import Data.Generics.Product
-import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Proxy
 import Data.Text (Text)
@@ -123,24 +124,10 @@ handleUpdate ::
 handleUpdate auth dName dNewAppOvs removedAppOvs dNewDepOvs removedDepOvs = do
   clientEnv <- ask
   dep <- runClientM' (_fullInfoH auth dName) clientEnv
-  let removeAll :: Ord k => [k] -> OM.OMap k v -> Either k (OM.OMap k v)
-      removeAll [] m = Right m
-      removeAll (k : kk) m =
-        if k `OM.member` m
-          then removeAll kk $ OM.delete k m
-          else Left k
-      removeAllM :: MonadIO m => [Text] -> Overrides l -> m (Overrides l)
-      removeAllM ks (Overrides m) =
-        either
-          (\k -> dieT $ "Override " <> k <> " not present in deployment.")
-          (pure . Overrides)
-          $ removeAll ks m
-  appOverrides' <-
-    fmap (<> dNewAppOvs) $
-      removeAllM removedAppOvs $ dep ^. #deployment . #appOverrides
-  deploymentOverrides' <-
-    fmap (<> dNewDepOvs) $
-      removeAllM removedDepOvs $ dep ^. #deployment . #deploymentOverrides
+  let removeAll :: [Text] -> Overrides l -> (Overrides l)
+      removeAll ks (Overrides (CT.toFlatList -> m)) = Overrides $ CT.fromFlatList $ filter (flip elem ks . fst) m
+      appOverrides' = dNewAppOvs <> (removeAll removedAppOvs $ dep ^. #deployment . #appOverrides)
+      deploymentOverrides' = dNewDepOvs <> (removeAll removedDepOvs $ dep ^. #deployment . #deploymentOverrides)
   liftIO $ do
     let dUpdate =
           DeploymentUpdate
@@ -295,7 +282,7 @@ printInfo (DeploymentInfo (Deployment _ dAppOvs dStOvs) (DeploymentMetadata dMet
   putStrLn $ unlines $ formatOverrides False dStOvs
   T.putStrLn ""
   T.putStrLn $ "Metadata: "
-  forM_ dMeta $ \m ->
+  for_ dMeta $ \m ->
     T.putStrLn $
       "  " <> m ^. #name <> ": " <> m ^. #link
   T.putStrLn ""
@@ -352,7 +339,7 @@ formatOverrides splitlines (Overrides m) =
     ]
     unicodeS
     def
-    $ showOverride <$> (reverse . OM.assocs) m
+    $ showOverride <$> (reverse . CT.toFlatList) m
   where
     showOverride (k, v) =
       colsAllG top $ [if splitlines then T.chunksOf 15 k else [k], showValue v]

@@ -18,7 +18,7 @@ library
   exposed-modules:     Common.Types
                      , Common.Utils
                      , Common.Validation
-                     , Data.Map.Ordered.Strict.Extra
+                     , Data.ConfigTree
                      , Control.Searchable
                      , Common.Orphans
   -- other-modules:
@@ -56,6 +56,7 @@ library
                      , UndecidableInstances
                      , FunctionalDependencies
                      , QuantifiedConstraints
+                     , PatternSynonyms
   build-depends:       base
                      , aeson
                      , cassava
@@ -69,6 +70,7 @@ library
                      , time
                      , ordered-containers
                      , deepseq
+                     , these
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:

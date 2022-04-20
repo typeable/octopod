@@ -9,6 +9,12 @@
         font-family: inherit;
         text-align: left;
         cursor: pointer;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
     }
 
     .collapse__body {
@@ -87,7 +93,3 @@
             padding-left: 32px;
             border-left: 1px solid #C4C4C4;
         }
-
-
-
-

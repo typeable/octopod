@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Coerce
 import Data.Conduit (ConduitT, yield)
+import qualified Data.ConfigTree as CT
 import qualified Data.Csv as C
 import Data.Fixed
 import Data.Foldable
@@ -32,7 +33,6 @@ import Data.Generics.Labels ()
 import Data.Generics.Product
 import Data.IORef.Lifted
 import Data.Int
-import qualified Data.Map.Ordered.Strict as OM
 import Data.Maybe
 import Data.Pool
 import Data.Text (pack)
@@ -192,7 +192,7 @@ runOctopodServer sha = do
       decodeCSVDefaultConfig :: BSL.ByteString -> Either String (DefaultConfig l)
       decodeCSVDefaultConfig bs = do
         x <- C.decode C.NoHeader bs
-        pure $ DefaultConfig . OM.fromList . V.toList $ x
+        pure $ DefaultConfig . CT.fromFlatList . V.toList $ x
       either500S :: (KatipContext m, MonadError ServerError m) => Either String x -> m x
       either500S (Right x) = pure x
       either500S (Left err) = do
@@ -478,7 +478,7 @@ getSingleFullInfo dName = do
     d <- each deploymentSchema
     where_ $ d ^. #name ==. litExpr dName
     pure d
-  deployments <- forM deploymentsSchema extractDeploymentFullInfo
+  deployments <- for deploymentsSchema extractDeploymentFullInfo
   logLocM DebugS $ "get deployments: " <> show' deployments
   return $ listToMaybe deployments
 
@@ -489,7 +489,7 @@ getFullInfo = do
   deploymentsSchema <-
     runStatement . select . orderBy (view #updatedAt >$< desc) $
       each deploymentSchema
-  deployments <- forM deploymentsSchema extractDeploymentFullInfo
+  deployments <- for deploymentsSchema extractDeploymentFullInfo
   logLocM DebugS $ "get deployments: " <> show' deployments
   return deployments
 
@@ -739,7 +739,7 @@ transitionToStatus dName s = do
   (deps, oldS) <- either throwError pure res
   dep <- lift $ ensureOne deps
   lift $
-    forM_ (processOutput s) $ \(output, act) ->
+    for_ (processOutput s) $ \(output, act) ->
       createDeploymentLog
         dep
         act
@@ -748,7 +748,7 @@ transitionToStatus dName s = do
         (output ^. #stdout)
         (output ^. #stderr)
   notificationCmd <- asks notificationCommand
-  forM_ notificationCmd $ \nCmd ->
+  for_ notificationCmd $ \nCmd ->
     runBgWorker . void $
       runCommandArgs' nCmd
         =<< notificationCommandArgs dName oldS newS
@@ -1307,7 +1307,7 @@ runDeploymentBgWorker newS dName pre post = do
         dName
         (respondSync $ Left err409 {errBody = "The deployment is currently being processed."})
         ( do
-            let preWithAssert = pre <* forM newS (assertDeploymentTransitionPossibleS dName)
+            let preWithAssert = pre <* for newS (assertDeploymentTransitionPossibleS dName)
             result <- catchError (Right <$> preWithAssert) (pure . Left)
             respondSync result
             liftEither result >>= \res -> do

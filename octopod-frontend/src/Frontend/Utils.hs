@@ -20,60 +20,45 @@ module Frontend.Utils
     DeploymentPageNotification (..),
     formatPosixToDateTime,
     dropdownWidget,
-    dropdownWidget',
     deploymentConfigProgressiveComponents,
-    deploymentConfigProgressive,
+    -- deploymentConfigProgressive,
     holdClearingWith,
     unitEv,
     (<&&>),
-    ProgressiveFullConfig (..),
     RequestErrorHandler,
-    deploymentOverridesWidget,
-    deploymentOverridesWidgetSearched,
-    applicationOverridesWidget,
-    applicationOverridesWidgetSearched,
     debounceDyn,
     catchReturns,
+    holdDynMaybe,
+    constructWorkingOverridesEv,
   )
 where
 
 import Common.Types as CT
+import Control.Arrow
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import Control.Monad.State.Strict
-import qualified Data.Bifunctor as Bi
-import qualified Data.Foldable as F
+import qualified Data.ConfigTree as CT
 import Data.Functor
-import Data.Functor.Misc
 import Data.Generics.Labels ()
-import Data.List.NonEmpty (NonEmpty)
-import Data.Map (Map)
+import Data.Generics.Sum
 import qualified Data.Map as M
-import Data.Map.Monoidal.Strict (MonoidalMap)
-import qualified Data.Map.Monoidal.Strict as MM
-import Data.Maybe (fromMaybe, isJust, isNothing)
-import Data.Monoid
-import Data.Set (Set)
-import qualified Data.Set as S
+import Data.Maybe (fromMaybe)
+import Data.String
 import Data.Text as T (Text, null, pack, strip)
-import Data.Text.Search
-import Data.These
 import Data.Time
 import Data.UniqMap
 import Data.Unique
 import Data.Witherable
 import Data.WorkingOverrides
+import Debug.Trace
 import Frontend.API
 import Frontend.GHCJS
 import Frontend.UIKit
-import GHC.Generics (Generic)
 import GHCJS.DOM
 import GHCJS.DOM.Element as DOM
 import GHCJS.DOM.EventM (on, target)
 import GHCJS.DOM.GlobalEventHandlers as Events (click)
-import GHCJS.DOM.Node as DOM
-import Generic.Data (Generically (..))
 import Reflex.Dom as R
 import Reflex.Dom.Renderable
 import Reflex.Network
@@ -90,49 +75,30 @@ elementClick = do
   doc <- currentDocumentUnchecked
   wrapDomEvent doc (`on` Events.click) $ ClickedElement <$> target
 
--- | Dropdown widget which binds its own @document click@ event.
-dropdownWidget ::
-  MonadWidget t m =>
-  -- | Button widget which opens the dropdown widget.
-  m () ->
-  -- | Widget with the dropdown list.
-  -- Returns an event carrying the user's selection.
-  m (Event t a) ->
-  m (Event t a)
-dropdownWidget btn body = mdo
-  clickedEl <- elementClick
-  dropdownWidget' clickedEl btn body
-
 -- | Similar to 'dropdownWidget' but uses @document click@ event that may be
 -- shared between other widgets.
-dropdownWidget' ::
+dropdownWidget ::
   MonadWidget t m =>
-  -- | Document click event that may be shared between other widgets.
-  Event t ClickedElement ->
-  -- | Button widget which opens the dropdown widget.
-  m () ->
   -- | Widget with the dropdown list.
   -- Returns an event carrying the user's selection.
   m (Event t a) ->
   m (Event t a)
-dropdownWidget' clickedEl btn body = mdo
-  clickInsideEv <- performEvent $
-    ffor clickedEl $ \(ClickedElement clicked) ->
-      DOM.contains (_element_raw btnEl) clicked
-  openedDyn <- foldDyn switchState False $ clickInsideEv
-  let switchState ev cur = ev && not cur
-      wrapperClassDyn = ffor openedDyn $ \case
+dropdownWidget body = mdo
+  openedDyn <- toggle False $ btnEl
+  let wrapperClassDyn = ffor openedDyn $ \case
         True -> "class" =: "drop drop--actions drop--expanded"
         False -> "class" =: "drop drop--actions"
-  (btnEl, (_, wEv)) <- elDynAttr'
+  (btnEl, wEv) <- elDynAttr
     "div"
     wrapperClassDyn
     $ do
-      btn
-      elDynAttr'
-        "div"
-        (constDyn $ "class" =: "drop__dropdown")
-        body
+      clickedEv <- dropButton
+      aEv <-
+        elDynAttr
+          "div"
+          (constDyn $ "class" =: "drop__dropdown")
+          body
+      pure (clickedEv, aEv)
   pure wEv
 
 showT :: Show a => a -> Text
@@ -214,89 +180,45 @@ octopodTextInput clss lbl placeholder val errEv =
   elClass "section" "deployment__section" $ do
     elClass "h3" "deployment__sub-heading" $ text lbl
     elClass "div" "deployment__widget" $ do
-      (value -> valDyn, validDyn) <- octopodTextInput' (pure []) (pure False) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
+      (value -> valDyn, validDyn) <- octopodTextInput' (pure []) (pure False) (pure mempty) (pure clss) placeholder (pure . fromMaybe "" $ val) errEv
       pure (valDyn, validDyn)
 
 -- | Widget that can show and hide overrides if there are more than 3. This
 -- widget is used in the deployments table and the deployment action table.
 overridesWidget ::
-  (MonadWidget t m, Renderable te, Ord te) =>
+  (MonadWidget t m, Renderable te, IsString te, Monoid te) =>
   -- | List of overrides.
   Overrides' te l ->
-  (Event t () -> m (Event t (DefaultConfig' te l))) ->
   m ()
-overridesWidget ovs getDef = divClass "listing listing--for-text" $ mdo
-  defMDyn <- getDef firstExpand >>= holdDynMaybe
-  dyn_ $
-    expandState <&> \case
-      ExpandedState ->
-        void $
-          networkView $
-            do
-              defM <- defMDyn
-              pure $
-                showNonEditableWorkingOverride (isNothing defM) (isJust defM) RegularNonEditableWorkingOverrideStyle $
-                  elemsUniq $ constructWorkingOverrides defM ovs
-      ContractedState ->
-        let ovsList = elemsUniq $ constructWorkingOverrides Nothing ovs
-         in showNonEditableWorkingOverride False False RegularNonEditableWorkingOverrideStyle $
-              take 3 ovsList
+overridesWidget (Overrides ovs) = mdo
+  let l = CT.toFlatList ovs
+      expandable = length l > 3
 
-  expandState <-
-    expanderButton
-      ExpanderButtonConfig
-        { buttonText = do
-            s <- expandState
-            pure $ case s of
-              ExpandedState -> "Hide default configuration"
-              ContractedState -> "Show full configuration"
-        , buttonInitialState = ContractedState
-        , buttonType = Just ListingExpanderButton
-        , buttonStyle = RegularExpanderButtonStyle
-        }
-  firstExpand <- headE $ ($> ()) $ ffilter (== ExpandedState) $ updated expandState
+  if expandable
+    then mdo
+      dyn_ $
+        expandState <&> \s -> do
+          let l' = case s of
+                ExpandedState -> l
+                ContractedState -> take 3 l
+          showFlatConfig l'
+          pure ()
+
+      expandState <-
+        expanderButton
+          ExpanderButtonConfig
+            { buttonText = do
+                s <- expandState
+                pure $ case s of
+                  ExpandedState -> "Hide default configuration"
+                  ContractedState -> "Show full configuration"
+            , buttonInitialState = ContractedState
+            , buttonType = Just ListingExpanderButton
+            , buttonStyle = RegularExpanderButtonStyle
+            }
+      pure ()
+    else showFlatConfig l
   pure ()
-
-deploymentOverridesWidget ::
-  (MonadWidget t m) =>
-  RequestErrorHandler t m ->
-  Overrides 'DeploymentLevel ->
-  m ()
-deploymentOverridesWidget hReq depOvs =
-  deploymentOverridesWidgetSearched hReq (wrapResult depOvs)
-
-deploymentOverridesWidgetSearched ::
-  (MonadWidget t m) =>
-  RequestErrorHandler t m ->
-  Overrides' SearchResult 'DeploymentLevel ->
-  m ()
-deploymentOverridesWidgetSearched hReq depOvs =
-  overridesWidget depOvs $ (fmap . fmap . fmap) wrapResult $ defaultDeploymentOverrides >=> hReq
-
-applicationOverridesWidget ::
-  MonadWidget t m =>
-  RequestErrorHandler t m ->
-  Overrides 'DeploymentLevel ->
-  Overrides 'ApplicationLevel ->
-  m ()
-applicationOverridesWidget hReq depOvs appOvs =
-  applicationOverridesWidgetSearched hReq (wrapResult depOvs) (wrapResult appOvs)
-
-applicationOverridesWidgetSearched ::
-  MonadWidget t m =>
-  RequestErrorHandler t m ->
-  Overrides' SearchResult 'DeploymentLevel ->
-  Overrides' SearchResult 'ApplicationLevel ->
-  m ()
-applicationOverridesWidgetSearched hReq depOvs appOvs =
-  overridesWidget appOvs $ \fire -> do
-    depDefEv <- defaultDeploymentOverrides fire >>= hReq
-    fmap switchDyn $
-      (fmap . fmap . fmap) wrapResult $
-        networkHold (pure never) $
-          depDefEv <&> \depDef -> do
-            pb <- getPostBuild
-            defaultApplicationOverrides (pure $ Right $ applyOverrides (deSearch depOvs) depDef) pb >>= hReq
 
 -- | Type of notification at the top of pages.
 data DeploymentPageNotification
@@ -351,9 +273,11 @@ deploymentPopupBody ::
   m (Dynamic t (Maybe DeploymentUpdate))
 deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
   pb <- getPostBuild
-  (defDepEv, defApp, depCfgEv) <- deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
-  defAppM <- holdClearingWith defApp (unitEv deploymentOvsDyn)
-  defDep <- holdDynMaybe defDepEv
+  (defDepEv, defAppEv, depCfgEv) <-
+    deploymentConfigProgressiveComponents hReq deploymentOvsDynDebounced
+
+  defAppEvM <- holdClearingWith defAppEv (unitEv deploymentOvsDyn)
+
   depKeys <- deploymentOverrideKeys pb >>= hReq
 
   let commandResponseEv = fmapMaybe commandResponse errEv
@@ -361,46 +285,47 @@ deploymentPopupBody hReq defAppOv defDepOv errEv = mdo
 
   let holdDCfg ::
         Dynamic t [Text] ->
-        Dynamic t (Maybe (DefaultConfig l)) ->
+        (DefaultConfig l) ->
         Overrides l ->
-        m (Dynamic t (Overrides l), Dynamic t (Overrides l), Dynamic t Bool)
-      holdDCfg values dCfgDyn ovs = mdo
-        ovsDyn <- holdDyn ovs ovsEv
-        ovsDynDebounced <- holdDyn ovs ovsEvDebounced
-        x <- attachDyn (current ovsDyn) dCfgDyn
-        (splitE -> (ovsEvEv, isValidDynEv)) <-
-          (>>= joinEvM) $
-            runWithReplace' loadingOverrides $
-              updated x <&> \(ovs', dCfg) -> untilReady' loadingOverrides $ envVarsInput values dCfg ovs'
-        ovsEv <- joinEvM ovsEvEv
-        ovsEvDebounced <- debounce 2 ovsEv
-        isValid <- join <$> holdDyn (pure False) isValidDynEv
-        pure (ovsDyn, ovsDynDebounced, isValid)
+        m (Dynamic t (Overrides l), Dynamic t (Overrides l))
+      holdDCfg (traceDyn "values" -> values) cfgDyn@(DefaultConfig ct) ovs = mdo
+        let ovs' = constructWorkingOverrides cfgDyn ovs
+            lookupOverride k = CT.lookup (CT.deconstructConfigKey k) ct
+        (resCfgDyn :: Dynamic t [Dynamic t WorkingOverride]) <- envVarsInput values lookupOverride ovs'
+        (resEvDebounced :: Event t [Dynamic t WorkingOverride]) <- debounce 2 $ updated resCfgDyn
+        let resDyn' = join . fmap destructWorkingOverridesDyn $ resCfgDyn
+        debouncedResDyn <- fmap join . holdDyn (pure ovs) . fmap destructWorkingOverridesDyn $ resEvDebounced
+        pure (resDyn', debouncedResDyn)
 
   depKeysDyn <- holdDyn [] depKeys
-  (deploymentOvsDyn, deploymentOvsDynDebounced, depValidDyn) <-
-    deploymentSection "Deployment configuration" $ holdDCfg depKeysDyn defDep defDepOv
+
+  (join . fmap fst &&& join . fmap snd -> (deploymentOvsDyn, deploymentOvsDynDebounced)) <-
+    deploymentSection "Deployment configuration" $
+      networkHold (loadingOverrides $> (pure defDepOv, pure defDepOv)) $
+        defDepEv <&> \defDep -> holdDCfg depKeysDyn defDep defDepOv
 
   appKeys <- waitForValuePromptly depCfgEv $ \deploymentCfg -> do
     pb' <- getPostBuild
     applicationOverrideKeys (pure $ Right deploymentCfg) pb' >>= hReq >>= immediateNothing
+
   appKeysDyn <- holdDyn [] $ catMaybes appKeys
-  (applicationOvsDyn, _, appValidDyn) <- deploymentSection "App configuration" $ holdDCfg appKeysDyn defAppM defAppOv
+  (join -> applicationOvsMDyn) <-
+    deploymentSection "App configuration" >=> holdDyn (pure Nothing) . fmap sequenceA $
+      networkView $
+        defAppEvM <&> \case
+          Nothing -> loadingOverrides $> Nothing
+          Just defApp -> Just . fst <$> holdDCfg appKeysDyn defApp defAppOv
 
   pure $ do
-    depValid <- depValidDyn
-    appValid <- appValidDyn
-    if depValid && appValid
-      then do
-        depCfg <- deploymentOvsDyn
-        appOvs <- applicationOvsDyn
-        pure $
-          Just $
-            DeploymentUpdate
-              { appOverrides = appOvs
-              , deploymentOverrides = depCfg
-              }
-      else pure Nothing
+    depCfg <- deploymentOvsDyn
+    appOvsM <- applicationOvsMDyn
+    pure $ do
+      appOvs <- appOvsM
+      Just $
+        DeploymentUpdate
+          { appOverrides = appOvs
+          , deploymentOverrides = depCfg
+          }
 
 deploymentConfigProgressiveComponents ::
   MonadWidget t m =>
@@ -427,36 +352,17 @@ deploymentConfigProgressiveComponents hReq depOvsDyn = do
           defaultApplicationOverrides (pure $ Right depCfg) pb' >>= hReq
   pure (defDepEv, defAppEv, depCfgEv)
 
-deploymentConfigProgressive ::
-  MonadWidget t m =>
-  RequestErrorHandler t m ->
-  Dynamic t (Overrides 'DeploymentLevel) ->
-  Dynamic t (Overrides 'ApplicationLevel) ->
-  m (Dynamic t ProgressiveFullConfig)
-deploymentConfigProgressive hReq depOvsDyn appOvsDyn = do
-  (depCfgEv, defAppEv, _) <- deploymentConfigProgressiveComponents hReq depOvsDyn
-  defAppMDyn <- holdDynMaybe defAppEv
-  defCfgMDyn <- holdDynMaybe depCfgEv
-  pure $ do
-    defAppM <- defAppMDyn
-    appOvs <- appOvsDyn
-    defDepM <- defCfgMDyn
-    depOvs <- depOvsDyn
-    pure
-      ProgressiveFullConfig
-        { appConfig = constructWorkingOverrides defAppM appOvs
-        , appConfigLoading = isNothing defAppM
-        , depConfig = constructWorkingOverrides defDepM depOvs
-        , depConfigLoading = isNothing defDepM
-        }
-
-data ProgressiveFullConfig = ProgressiveFullConfig
-  { appConfig :: WorkingOverrides
-  , appConfigLoading :: Bool
-  , depConfig :: WorkingOverrides
-  , depConfigLoading :: Bool
-  }
-  deriving stock (Generic)
+constructWorkingOverridesEv ::
+  MonadWidget t m => Event t (DefaultConfig l) -> Dynamic t (Overrides l) -> m (Event t WorkingOverrides)
+constructWorkingOverridesEv defCfgEv ovsDyn = do
+  defCfgMDyn <- holdDynMaybe defCfgEv
+  pure $
+    catMaybes . updated $ do
+      defCfgM <- defCfgMDyn
+      ovs <- ovsDyn
+      pure $ do
+        defCfg <- defCfgM
+        pure $ constructWorkingOverrides defCfg ovs
 
 waitForValuePromptly :: (MonadHold t m, Adjustable t m) => Event t x -> (x -> m (Event t y)) -> m (Event t y)
 waitForValuePromptly ev f = fmap switchPromptlyDyn $ networkHold (pure never) $ f <$> ev
@@ -492,32 +398,23 @@ errorHeader ::
   -- | Message text.
   Dynamic t Text ->
   m ()
-errorHeader appErr = do
-  divClass "deployment__output notification notification--danger" $ do
+errorHeader appErr =
+  elClass "pre" "deployment__output notification notification--danger" $
     dynText appErr
 
 -- | Widget with override fields. This widget supports adding and
 -- removing key-value pairs.
 envVarsInput ::
-  forall l t m.
+  forall t m.
   MonadWidget t m =>
   Dynamic t [Text] ->
-  Maybe (DefaultConfig l) ->
+  (Text -> Maybe Text) ->
   -- | Initial deployment overrides.
-  Overrides l ->
-  -- | Updated deployment overrides.
-  m (Event t (Overrides l), Dynamic t Bool)
-envVarsInput values dCfg ovs = mdo
-  let initialOverrides = constructWorkingOverrides dCfg ovs
-  (envsDyn, addedKeys) <-
-    mapAccumDyn
-      ( \prevOvs -> \case
-          Left () ->
-            Bi.second S.singleton $ insertUniqStart newWorkingOverride prevOvs
-          Right (Endo f) -> (f prevOvs, S.empty)
-      )
-      initialOverrides
-      $ leftmost [Left <$> clickEv, Right <$> updEv]
+  WorkingOverrides ->
+  -- | Updated deployment overrides. [(<full deconstructed key>, <value>)]
+  m (Dynamic t [Dynamic t WorkingOverride])
+envVarsInput (traceDyn "values" -> values) lookupOverride ovs = divClass "padded" $ mdo
+  let initialConfig = CT.markValues ovs
   clickEv <-
     dashButton
       DashButtonConfig
@@ -526,187 +423,93 @@ envVarsInput values dCfg ovs = mdo
         , buttonType = Just AddDashButtonType
         , buttonStyle = OverridesDashButtonStyle
         }
-  let workingOverridesWithErrors = validateWorkingOverrides . uniqMap <$> envsDyn
-      erroredOverride = M.filter ((/= mempty) . snd) <$> workingOverridesWithErrors
-      isValid = M.null <$> erroredOverride
-  (_, changedValues) <-
-    mapAccumDyn
-      ( \prev new ->
-          ( fmap (\(v, _) -> (v, mempty)) new
-          , new <> prev
-          )
-      )
-      mempty
-      (updated erroredOverride)
-  let updatedValues = restrictMapEv updatedKeys (updated workingOverridesWithErrors)
-      valChangedEvSelector = fanMap (clearedOvs <> updatedValues <> changedValues)
-      (splitE -> (clearedOvs, deletedOvs)) =
-        alignEventWithMaybe
-          ( \case
-              These keys m ->
-                Just $
-                  let cleared = M.restrictKeys m keys
-                   in (cleared, M.fromSet (const Nothing) (keys `S.difference` M.keysSet cleared))
-              _ -> Nothing
-          )
-          removedKeys
-          (updated workingOverridesWithErrors)
-      listChange =
-        deletedOvs <> (fmap . fmap) Just (restrictMapEv addedKeys (updated workingOverridesWithErrors))
+  let emptyItem = ("", CustomConfigValue $ Left $ CustomKey "")
+  addedItemsCount <- foldDyn (const (fst . insertUniqStart ())) emptyUniqKeyMap clickEv
+  addedOvsListDyn <- (fmap . fmap) (fmap snd . M.toList)
+    <$> list (uniqMap <$> addedItemsCount)
+    $ \_ ->
+      envVarInput lookupOverride values emptyItem
+  treeResCfg <-
+    showOverrideTree
+      (isn't (_Ctor' @"DefaultConfigValue") . snd)
+      (\_ v -> v)
+      (\a _ _ -> envVarInput lookupOverride values (trace "a" a))
+      initialConfig
+  let resCfg :: Dynamic t [Dynamic t (Text, ConfigValue Text)]
+      resCfg = (<> treeResCfg) <$> addedOvsListDyn
+      addingIsEnabled = join $ fmap and . sequenceA . (fmap . fmap) (not . T.null . fst) <$> resCfg
+  pure resCfg
 
-  (splitE3 -> (updEv, removedKeys, updatedKeys)) <-
-    switchDyn . fmap F.fold
-      <$> listHoldWithKey
-        (validateWorkingOverrides . uniqMap $ initialOverrides)
-        listChange
-        ( \i val -> do
-            valDyn <- holdDyn val $ select valChangedEvSelector $ Const2 i
-            userActionEv <- envVarInput values valDyn
-            pure $ performUserOverrideAction (lookupDefaultConfig <$> dCfg) i <$> userActionEv
-        )
-  let addingIsEnabled = all (\(WorkingOverrideKey _ x, _) -> not . T.null $ x) . elemsUniq <$> envsDyn
-  case dCfg of
-    Just _ -> pure ()
-    Nothing -> loadingOverrides
-  pure (updated $ destructWorkingOverrides <$> envsDyn, isValid)
-
-restrictMapEv :: (Reflex t, Ord k) => Event t (Set k) -> Event t (Map k v) -> Event t (Map k v)
-restrictMapEv =
-  alignEventWithMaybe
-    ( \case
-        These keys _ | S.null keys -> Nothing
-        These keys m -> Just $ M.restrictKeys m keys
-        _ -> Nothing
-    )
-
-validateWorkingOverrides ::
-  forall f.
-  Traversable f =>
-  f WorkingOverride ->
-  f (WorkingOverride, OverrideErrors)
-validateWorkingOverrides overrides =
-  let (result, keyOccurrences :: MonoidalMap Text (Sum Int)) =
-        flip runState mempty $ forM overrides \override@(WorkingOverrideKey _ key, value') -> do
-          case value' of
-            WorkingDeletedValue _ -> pure ()
-            _ -> modify (<> MM.singleton key (Sum 1))
-          pure . (override,) . mconcat $
-            [ case MM.lookup key keyOccurrences of
-                Just (Sum n)
-                  | n > 1 ->
-                    overrideKeyErrors "You can not use the same key multiple times."
-                _ -> mempty
-            , if T.null key
-                then overrideKeyErrors "Keys can not be empty."
-                else mempty
-            , case value' of
-                WorkingCustomValue "" -> overrideValueErrors "Values can not be empty."
-                WorkingCustomValue _ -> mempty
-                WorkingDefaultValue "" -> overrideValueErrors "Values can not be empty."
-                WorkingDefaultValue _ -> mempty
-                WorkingDeletedValue _ -> mempty
-            ]
-   in result
-
-data OverrideErrors = OverrideErrors
-  { keyErrors :: Maybe (NonEmpty Text)
-  , valueErrors :: Maybe (NonEmpty Text)
-  }
-  deriving stock (Generic, Eq, Show)
-  deriving (Semigroup, Monoid) via Generically OverrideErrors
-
-overrideKeyErrors :: Text -> OverrideErrors
-overrideKeyErrors x = mempty {keyErrors = Just $ pure x}
-
-overrideValueErrors :: Text -> OverrideErrors
-overrideValueErrors x = mempty {valueErrors = Just $ pure x}
+-- validateWorkingOverrides ::
+--   forall f.
+--   Traversable f =>
+--   f WorkingOverride ->
+--   f (WorkingOverride, OverrideErrors)
+-- validateWorkingOverrides overrides =
+--   let (result, keyOccurrences :: MonoidalMap Text (Sum Int)) =
+--         flip runState mempty $ for overrides \override@(WorkingOverrideKey _ key, value') -> do
+--           case value' of
+--             WorkingDeletedValue _ -> pure ()
+--             _ -> modify (<> MM.singleton key (Sum 1))
+--           pure . (override,) . mconcat $
+--             [ case MM.lookup key keyOccurrences of
+--                 Just (Sum n)
+--                   | n > 1 ->
+--                     overrideKeyErrors "You can not use the same key multiple times."
+--                 _ -> mempty
+--             , if T.null key
+--                 then overrideKeyErrors "Keys can not be empty."
+--                 else mempty
+--             , case value' of
+--                 WorkingCustomValue "" -> overrideValueErrors "Values can not be empty."
+--                 WorkingCustomValue _ -> mempty
+--                 WorkingDefaultValue "" -> overrideValueErrors "Values can not be empty."
+--                 WorkingDefaultValue _ -> mempty
+--                 WorkingDeletedValue _ -> mempty
+--             ]
+--    in result
 
 -- | Widget for entering a key-value pair.
 envVarInput ::
   (MonadWidget t m) =>
+  (Text -> Maybe Text) ->
   -- | The key values to suggest to the user
   Dynamic t [Text] ->
   -- | Current variable key and value.
-  Dynamic t (WorkingOverride, OverrideErrors) ->
-  m (Event t UserOverrideAction)
-envVarInput values val = untilReadyEv' loadingOverride $ do
-  let kDyn = val <&> fst <&> \(WorkingOverrideKey _ x, _) -> x
-  -- Either <override present> <override deleted>
-  d <-
-    eitherDyn $
-      val <&> snd . fst <&> \case
-        WorkingCustomValue v -> Right (v, EditedOverrideFieldType)
-        WorkingDefaultValue v -> Right (v, DefaultOverrideFieldType)
-        WorkingDeletedValue v -> Left v
-  networkView >=> switchHold never $
-    d <&> \case
-      Right vtDyn -> do
-        let (vDyn, vTypeDyn) = splitDynPure vtDyn
-        (keyTextDyn, valTextDyn, closeEv) <-
-          overrideField
-            values
-            OverrideField
-              { fieldValue = kDyn
-              , fieldError = keyErrors . snd <$> val
-              , fieldDisabled =
-                  val <&> fst <&> \(WorkingOverrideKey t _, _) -> t == DefaultWorkingOverrideKey
-              , fieldType =
-                  val <&> fst <&> \(WorkingOverrideKey t _, _) -> case t of
-                    CustomWorkingOverrideKey -> EditedOverrideFieldType
-                    DefaultWorkingOverrideKey -> DefaultOverrideFieldType
-              }
-            OverrideField
-              { fieldValue = vDyn
-              , fieldError = valueErrors . snd <$> val
-              , fieldDisabled = pure False
-              , fieldType = vTypeDyn
-              }
+  WorkingOverride ->
+  m (Dynamic t WorkingOverride)
+envVarInput f keys val = mdo
+  value' <- holdDyn val (leftmost [buttonValue, updated inputValue])
+  (keyTextDyn, valTextDyn, buttonPressEv) <- configField keys value'
+  let inputValue = do
+        v <- valTextDyn
+        k <- keyTextDyn
         pure $
-          leftmost
-            [ UpdateKey <$> updated keyTextDyn
-            , UpdateValue <$> updated valTextDyn
-            , closeEv $> DeleteOverride
-            ]
-      Left vDyn -> do
-        restoreEv <-
-          networkView >=> switchHold never $ do
-            v <- vDyn
-            k <- kDyn
-            pure $ deletedOverride k v
-        pure $
-          flip push restoreEv $ \() -> do
-            v <- sample . current $ vDyn
-            pure $ UpdateValue <$> v
-
-data UserOverrideAction = UpdateKey !Text | UpdateValue !Text | DeleteOverride
-
-performUserOverrideAction ::
-  Maybe (Text -> Maybe Text) ->
-  Int ->
-  UserOverrideAction ->
-  -- | (endo, removed/cleared keys, updatedKeys)
-  (Endo WorkingOverrides, Set Int, Set Int)
-performUserOverrideAction f i (UpdateValue v) = (,S.empty,S.singleton i) $
-  Endo $
-    updateUniq i $ \(k@(WorkingOverrideKey _ kt), _) ->
-      ( k
-      , case f >>= ($ kt) of
-          Just v' | v == v' -> WorkingDefaultValue v
-          _ -> WorkingCustomValue v
-      )
-performUserOverrideAction _ i (UpdateKey k) = (,S.empty,S.singleton i) $
-  Endo $
-    updateUniq i $
-      \(_, v) -> (WorkingOverrideKey CustomWorkingOverrideKey k, v)
-performUserOverrideAction f i DeleteOverride = (,S.singleton i,S.empty) $
-  Endo $ \m ->
-    case f of
-      Nothing -> updateUniq i (\(k, _) -> (k, WorkingDeletedValue Nothing)) m
-      Just _ -> case lookupUniq i m of
-        Nothing -> m
-        Just (WorkingOverrideKey DefaultWorkingOverrideKey k, _) ->
-          updateUniq i (const (WorkingOverrideKey DefaultWorkingOverrideKey k, WorkingDeletedValue (f >>= ($ k)))) m
-        Just (WorkingOverrideKey CustomWorkingOverrideKey _, _) -> deleteUniq i m
+          ( k
+          , case f k of
+              Nothing -> CustomConfigValue $ Left $ CustomKey v
+              Just x | x == v -> DefaultConfigValue v
+              Just _ -> CustomConfigValue $ Right $ CustomValue v
+          )
+      buttonValue = flip push buttonPressEv $ \x ->
+        Just <$> do
+          k <- sample . current $ keyTextDyn
+          (k,) <$> case x of
+            ConfigFieldButtonClear -> do
+              v <- case f k of
+                Nothing -> sample . current $ valTextDyn
+                Just v -> pure v
+              pure $ CustomConfigValue $ Right $ DeletedValue $ Just v
+            ConfigFieldButtonRecover -> do
+              case f k of
+                Nothing -> do
+                  -- the value is not in the default config
+                  v <- sample . current $ valTextDyn
+                  pure $ CustomConfigValue $ Left $ CustomKey v
+                Just v -> do
+                  -- the value is in the default config
+                  pure $ DefaultConfigValue v
+  pure $ value'
 
 holdDynMaybe :: (Reflex t, MonadHold t m) => Event t a -> m (Dynamic t (Maybe a))
 holdDynMaybe ev = holdDyn Nothing $ fmapCheap Just ev
@@ -715,12 +518,6 @@ immediateNothing :: (PostBuild t m) => Event t a -> m (Event t (Maybe a))
 immediateNothing ev = do
   pb <- getPostBuild
   pure $ leftmost [pb $> Nothing, fmapCheap Just ev]
-
-attachDyn :: (Reflex t, MonadHold t m) => Behavior t a -> Dynamic t b -> m (Dynamic t (a, b))
-attachDyn b d = do
-  currD <- sample . current $ d
-  currB <- sample b
-  holdDyn (currB, currD) (attach b $ updated d)
 
 holdClearingWith :: (Reflex t, MonadHold t m) => Event t a -> Event t () -> m (Dynamic t (Maybe a))
 holdClearingWith aEv clear =
@@ -751,6 +548,3 @@ catchReturns :: (DomBuilder t m, MonadFix m) => (Event t () -> m a) -> m a
 catchReturns f = mdo
   (divEl, a) <- el' "div" $ f $ ($> ()) . ffilter (== 13) $ domEvent Keypress divEl
   pure a
-
-splitE3 :: Reflex t => Event t (a, b, c) -> (Event t a, Event t b, Event t c)
-splitE3 e = ((\(a, _, _) -> a) <$> e, (\(_, b, _) -> b) <$> e, (\(_, _, c) -> c) <$> e)

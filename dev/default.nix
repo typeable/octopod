@@ -104,6 +104,7 @@ in
         #!${pkgs.bash}/bin/bash
 
         echo "You did something wrong :("
+        echo "You did something wrong twice :("
 
         1>&2 echo "You did something wrong, but you shouldn't see this."
 
@@ -117,7 +118,27 @@ in
 
         for i in {1..10}
         do
-          echo "key$i,value"
+        for j in {1..10}
+        do
+          echo "foo.vat$i.fjij.key$j,value"
+        done
+        done
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i,value"
+        done
+
+        exit 0
+      '';
+      smallInfoScript = pkgs.writeScript "info.sh" ''
+        #!${pkgs.bash}/bin/bash
+
+        sleep 4
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i,value"
         done
 
         exit 0
@@ -130,7 +151,16 @@ in
 
         for i in {1..10}
         do
-          echo "key$i"
+          echo "foo.vat.fkijf.fjij.key$i"
+        done
+        for i in {1..10}
+        do
+          echo "foo.vat.fjij.key$i"
+        done
+
+        for i in {1..10}
+        do
+          echo "fjij.key$i"
         done
 
         exit 0
@@ -162,8 +192,8 @@ in
         export CHECKING_COMMAND=${echoScript}
         export CLEANUP_COMMAND=${echoScript}
         export ARCHIVE_CHECKING_COMMAND=${echoScript}
-        export CONFIG_CHECKING_COMMAND=${echoScript}
-        export INFO_COMMAND=${infoScript}
+        export CONFIG_CHECKING_COMMAND=${failScript}
+        export INFO_COMMAND=${smallInfoScript}
         export NOTIFICATION_COMMAND=${writeScript}
         export DEPLOYMENT_CONFIG_COMMAND=${infoScript}
         export DEPLOYMENT_KEYS_COMMAND=${keysScript}

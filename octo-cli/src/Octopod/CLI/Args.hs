@@ -68,7 +68,8 @@ readLogOutput _ = Nothing
 
 -- | Parses octo CLI subcommands and arguments.
 parseArgs :: IO Args
-parseArgs = execParser $ info (commandArgs <**> helper) fullDesc
+parseArgs =
+  customExecParser (prefs showHelpOnError) $ info (commandArgs <**> helper) fullDesc
 
 -- | Parses octo CLI subcommands.
 commandArgs :: Parser Args

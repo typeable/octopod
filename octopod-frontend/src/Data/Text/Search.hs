@@ -21,6 +21,7 @@ import Data.Maybe (listToMaybe)
 import Data.Ord
 import Data.Semigroup
 import Data.Sequence (Seq (..))
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
@@ -91,6 +92,19 @@ data SearchResult = SearchResult
   }
   deriving stock (Eq, Ord, Generic)
   deriving anyclass (NFData)
+
+instance IsString SearchResult where
+  fromString s = SearchResult (T.pack s) Nothing
+
+instance Semigroup SearchResult where
+  SearchResult a aRes <> SearchResult b bRes = SearchResult (a <> b) $ case (aRes, bRes) of
+    (Nothing, Nothing) -> Nothing
+    (Just a', Nothing) -> Just $ a' :|> NotMatched b
+    (Nothing, Just b') -> Just $ NotMatched a :<| b'
+    (Just a', Just b') -> Just $ a' <> b'
+
+instance Monoid SearchResult where
+  mempty = SearchResult mempty Nothing
 
 instance Searchable SearchResult SearchResult where
   type Searched SearchResult res = res

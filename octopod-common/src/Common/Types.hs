@@ -12,12 +12,12 @@ import Control.DeepSeq (NFData)
 import Control.Lens
 import Control.Searchable
 import Data.Aeson hiding (Result)
+import Data.ConfigTree (ConfigTree)
+import qualified Data.ConfigTree as CT
 import Data.Csv
 import Data.Generics.Labels ()
 import Data.Int
-import Data.Map.Ordered.Strict (OMap, (<>|))
-import qualified Data.Map.Ordered.Strict as OM
-import Data.Map.Ordered.Strict.Extra ()
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -54,21 +54,21 @@ type OverrideValue = OverrideValue' Text
 
 type DefaultConfig = DefaultConfig' Text
 
-newtype DefaultConfig' te (l :: OverrideLevel) = DefaultConfig (OMap te te)
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
+newtype DefaultConfig' te (l :: OverrideLevel) = DefaultConfig (ConfigTree te te)
+  deriving newtype (Eq, Ord, Show)
+
+deriving newtype instance FromJSON (DefaultConfig' Text l)
+deriving newtype instance ToJSON (DefaultConfig' Text l)
 
 instance Searchable t x => Searchable t (DefaultConfig' x l) where
   type SearchableConstraint t (DefaultConfig' x l) res = (Ord (Searched x res), SearchableConstraint t x res)
   type Searched (DefaultConfig' x l) res = DefaultConfig' (Searched x res) l
-  searchWith f (DefaultConfig oMap) = do
-    oMap' <- searchWith f . OM.assocs $ oMap
-    pure $ DefaultConfig $ OM.fromList oMap'
+  searchWith f (DefaultConfig ct) = DefaultConfig <$> searchWith f ct
   {-# INLINE searchWith #-}
 
-lookupDefaultConfig :: DefaultConfig l -> Text -> Maybe Text
-lookupDefaultConfig (DefaultConfig m) k = OM.lookup k m
+type ConfigKey = [Text]
 
-newtype Config (l :: OverrideLevel) = Config {unConfig :: OMap Text Text}
+newtype Config (l :: OverrideLevel) = Config {unConfig :: ConfigTree Text Text}
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON)
 
 data FullDefaultConfig = FullDefaultConfig
@@ -87,63 +87,58 @@ data FullConfig = FullConfig
 
 applyOverrides :: Overrides l -> DefaultConfig l -> Config l
 applyOverrides (Overrides oo) (DefaultConfig dd) =
-  Config . extract $ oo <>| (ValueAdded <$> dd)
+  Config . extract $ oo <> (ValueAdded <$> dd)
   where
-    extract :: OMap Text OverrideValue -> OMap Text Text
+    extract :: ConfigTree Text OverrideValue -> ConfigTree Text Text
     extract =
       fmap
         ( \case
             ValueAdded v -> v
             ValueDeleted -> error "invariant"
         )
-        . OM.filter
-          ( \_ -> \case
+        . CT.filter
+          ( \case
               ValueAdded _ -> True
               ValueDeleted -> False
           )
 
+newtype Overrides' t (l :: OverrideLevel) = Overrides {unOverrides :: ConfigTree t (OverrideValue' t)}
+  deriving newtype (Eq, Ord, Show, NFData, Semigroup, Monoid)
+
+deriving newtype instance FromJSON (Overrides' Text l)
+deriving newtype instance ToJSON (Overrides' Text l)
+
 instance Searchable t x => Searchable t (Overrides' x l) where
   type SearchableConstraint t (Overrides' x l) res = (Ord (Searched x res), SearchableConstraint t x res)
   type Searched (Overrides' x l) res = Overrides' (Searched x res) l
-  searchWith f (Overrides oMap) = do
-    oMap' <- searchWith f . OM.assocs $ oMap
-    pure $ Overrides $ OM.fromList oMap'
+  searchWith f (Overrides ct) = Overrides <$> searchWith f ct
   {-# INLINE searchWith #-}
-
-newtype Overrides' t (l :: OverrideLevel) = Overrides {unOverrides :: OMap t (OverrideValue' t)}
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
 
 type Overrides = Overrides' Text
 
 extractOverrides :: DefaultConfig l -> Config l -> Overrides l
 extractOverrides (DefaultConfig dCfg) (Config cfg) =
-  Overrides . OM.fromList $ removed <> present
+  Overrides . CT.fromList $ removed <> present
   where
-    present :: [(Text, OverrideValue)]
-    present = mapMaybe processPresent . OM.assocs $ cfg
+    present :: [(NonEmpty Text, OverrideValue)]
+    present = mapMaybe processPresent . CT.toList $ cfg
 
-    processPresent :: (Text, Text) -> Maybe (Text, OverrideValue)
-    processPresent (k, v) = case OM.lookup k dCfg of
+    processPresent :: (NonEmpty Text, Text) -> Maybe (NonEmpty Text, OverrideValue)
+    processPresent (k, v) = case CT.lookup k dCfg of
       Just v' | v == v' -> Nothing
       _ -> Just (k, ValueAdded v)
 
-    processRemoved :: (Text, Text) -> Maybe (Text, OverrideValue)
+    processRemoved :: (NonEmpty Text, Text) -> Maybe (NonEmpty Text, OverrideValue)
     processRemoved (k, _) =
-      if OM.member k cfg
+      if CT.member k cfg
         then Nothing
         else Just (k, ValueDeleted)
 
-    removed :: [(Text, OverrideValue)]
-    removed = mapMaybe processRemoved . OM.assocs $ dCfg
+    removed :: [(NonEmpty Text, OverrideValue)]
+    removed = mapMaybe processRemoved . CT.toList $ dCfg
 
-ov :: Text -> OverrideValue -> Overrides l
-ov k v = Overrides $ OM.singleton (k, v)
-
-instance Semigroup (Overrides l) where
-  (Overrides lhs) <> (Overrides rhs) = Overrides $ rhs <>| lhs
-
-instance Monoid (Overrides l) where
-  mempty = Overrides OM.empty
+ov :: NonEmpty Text -> OverrideValue -> Overrides l
+ov k v = Overrides $ CT.singleton k v
 
 newtype DeploymentId = DeploymentId {unDeploymentId :: Int64}
   deriving stock (Show)
@@ -243,8 +238,10 @@ data Deployment' t = Deployment
   , deploymentOverrides :: Overrides' t 'DeploymentLevel
   }
   deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake (Deployment' t)
   deriving anyclass (NFData)
+
+deriving via Snake (Deployment' Text) instance FromJSON (Deployment' Text)
+deriving via Snake (Deployment' Text) instance ToJSON (Deployment' Text)
 
 instance (Searchable needle t) => Searchable needle (Deployment' t) where
   type
@@ -317,8 +314,10 @@ data DeploymentFullInfo' t = DeploymentFullInfo
   , updatedAt :: UTCTime
   }
   deriving stock (Generic, Show, Eq)
-  deriving (FromJSON, ToJSON) via Snake (DeploymentFullInfo' t)
   deriving anyclass (NFData)
+
+deriving via Snake (DeploymentFullInfo' Text) instance FromJSON (DeploymentFullInfo' Text)
+deriving via Snake (DeploymentFullInfo' Text) instance ToJSON (DeploymentFullInfo' Text)
 
 type DeploymentFullInfo = DeploymentFullInfo' Text
 
@@ -386,14 +385,14 @@ parseSetOverrides texts = do
     Just x -> Right x
     Nothing ->
       Left $ "Malformed override key-value pair " <> text <> ", should be similar to FOO=bar"
-  return . Overrides $ OM.fromList pairs'
+  return . Overrides $ CT.fromList pairs'
   where
-    parseSingleOverride :: Text -> Maybe (Text, OverrideValue)
+    parseSingleOverride :: Text -> Maybe (NonEmpty Text, OverrideValue)
     parseSingleOverride t
       | Just i <- T.findIndex (== '=') t =
-        let (key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
+        let (CT.deconstructConfigKey -> key, value) = bimap T.strip (T.tail . T.strip) $ T.splitAt i t
          in Just (key, ValueAdded value)
     parseSingleOverride _ = Nothing
 
 parseUnsetOverrides :: [Text] -> Overrides l
-parseUnsetOverrides = Overrides . OM.fromList . fmap (,ValueDeleted)
+parseUnsetOverrides = Overrides . CT.fromList . fmap ((,ValueDeleted) . CT.deconstructConfigKey)

@@ -1,4 +1,7 @@
 {
   "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
-  "haskell.formattingProvider": "fourmolu"
+  "haskell.formattingProvider": "fourmolu",
+  "haskell.plugin.hlint.diagnosticsOn": false,
+  "haskell.hlint.logLevel": "none",
+  "haskell.hlint.run": "never"
 }

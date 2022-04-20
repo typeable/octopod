@@ -88,7 +88,7 @@ editDeploymentPopupHeader dname validDyn loadingDyn =
                   )
 
     divClass "popup__menu drop drop--actions" blank
-    pure (closeEv, saveEv)
+    pure (closeEv $> (), saveEv $> ())
 
 -- | The body of the sidebar containing the edit form. Contains a tag field and
 -- an override field.

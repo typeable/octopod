@@ -4,13 +4,14 @@ module Frontend.UIKit.Button.Static
     closePopupButton,
     deleteOverrideButton,
     undoOverrideButton,
+    dropButton,
   )
 where
 
 import Frontend.UIKit.Button.Common
 import Reflex.Dom
 
-closeNotificationButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+closeNotificationButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
 closeNotificationButton =
   buttonEl
     CommonButtonConfig
@@ -18,11 +19,11 @@ closeNotificationButton =
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
-      , buttonText = pure ""
+      , buttonText = ""
       , buttonBaseTag = ButtonTag
       }
 
-closeClassicPopupButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+closeClassicPopupButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
 closeClassicPopupButton =
   buttonEl
     CommonButtonConfig
@@ -30,11 +31,11 @@ closeClassicPopupButton =
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
-      , buttonText = pure ""
+      , buttonText = ""
       , buttonBaseTag = ButtonTag
       }
 
-closePopupButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+closePopupButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
 closePopupButton =
   buttonEl
     CommonButtonConfig
@@ -42,30 +43,42 @@ closePopupButton =
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
-      , buttonText = pure ""
+      , buttonText = ""
       , buttonBaseTag = ButtonTag
       }
 
-deleteOverrideButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+deleteOverrideButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
 deleteOverrideButton =
   buttonEl
     CommonButtonConfig
-      { constantClasses = pure "overrides__delete spot spot--cancel"
+      { constantClasses = pure "editable-row__delete spot spot--cancel"
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
-      , buttonText = pure ""
+      , buttonText = ""
       , buttonBaseTag = ButtonTag
       }
 
-undoOverrideButton :: (DomBuilder t m, PostBuild t m) => m (Event t ())
+undoOverrideButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
 undoOverrideButton =
   buttonEl
     CommonButtonConfig
-      { constantClasses = pure "overrides__delete spot spot--undo"
+      { constantClasses = pure "editable-row__delete spot spot--undo"
       , enabledClasses = mempty
       , disabledClasses = mempty
       , buttonEnabled = pure True
-      , buttonText = pure ""
+      , buttonText = ""
+      , buttonBaseTag = ButtonTag
+      }
+
+dropButton :: (DomBuilder t m, PostBuild t m) => m (Event t (Either () ()))
+dropButton =
+  buttonEl
+    CommonButtonConfig
+      { constantClasses = pure "drop__handler"
+      , enabledClasses = mempty
+      , disabledClasses = mempty
+      , buttonEnabled = pure True
+      , buttonText = "Actions"
       , buttonBaseTag = ButtonTag
       }

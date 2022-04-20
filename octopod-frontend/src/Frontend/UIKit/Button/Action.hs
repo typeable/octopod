@@ -47,7 +47,7 @@ buttonTypeClasses = \case
 actionButton ::
   (DomBuilder t m, PostBuild t m) =>
   ActionButtonConfig t ->
-  m (Event t ())
+  m (Event t (Either () ()))
 actionButton cfg =
   buttonEl
     CommonButtonConfig
@@ -58,6 +58,6 @@ actionButton cfg =
       , enabledClasses = mempty
       , disabledClasses = "action--disabled"
       , buttonEnabled = cfg ^. #buttonEnabled
-      , buttonText = pure $ cfg ^. #buttonText
+      , buttonText = textBuilder $ cfg ^. #buttonText
       , buttonBaseTag = cfg ^. #buttonBaseTag
       }

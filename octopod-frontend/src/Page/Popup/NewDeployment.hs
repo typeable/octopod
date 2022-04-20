@@ -83,7 +83,7 @@ newDeploymentPopupHeader enabledDyn loadingDyn =
                       True -> Just LoadingLargeButtonType
                   )
     divClass "popup__menu drop drop--actions" blank
-    pure (closeEv, saveEv)
+    pure (closeEv $> (), saveEv $> ())
 
 -- | The body of the sidebar contains the creation form. It contains: a name field,
 -- a tag field and overrides fields. The name field is validated with the regexp:
