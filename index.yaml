@@ -2,14 +2,40 @@ apiVersion: v1
 entries:
   octopod:
   - apiVersion: v2
-    appVersion: 1.4.2
-    created: "2021-12-10T18:06:38.048023595+03:00"
+    appVersion: 1.5.0
+    created: "2022-04-21T13:43:26.504416+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
+    digest: 597018b050a94a48cf128a61ef11c215f6443e4f20d19ea91509cd5c3db7c4b5
+    home: https://github.com/typeable/octopod
+    keywords:
+    - kubernetes
+    - octopod
+    maintainers:
+    - email: a.sizov@typeable.io
+      name: Alex Sizov
+    name: octopod
+    sources:
+    - https://github.com/typeable/octopod
+    type: application
+    urls:
+    - https://typeable.github.io/octopod/octopod-0.6.7.tgz
+    version: 0.6.7
+  - apiVersion: v2
+    appVersion: 1.4.2
+    created: "2022-04-21T13:43:26.498192+03:00"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: 10.5.3
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: f78cde0a0f8d6d96f8340a73b0e102bb7c6ea83f688af6b0d5d7c1c0f8e39632
     home: https://github.com/typeable/octopod
     keywords:
@@ -23,17 +49,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.6.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.6.tgz
     version: 0.6.6
   - apiVersion: v2
     appVersion: 1.4.2
-    created: "2021-12-10T18:06:38.044051182+03:00"
+    created: "2022-04-21T13:43:26.49331+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 2c45824933eda8f22f203e2f1fecf41013275f16c2c6c26b5b07652d3b223a75
     home: https://github.com/typeable/octopod
     keywords:
@@ -47,11 +74,11 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.5.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.5.tgz
     version: 0.6.5
   - apiVersion: v2
     appVersion: 1.4.1
-    created: "2021-12-10T18:06:38.040890986+03:00"
+    created: "2022-04-21T13:43:26.48765+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -71,17 +98,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.4.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.4.tgz
     version: 0.6.4
   - apiVersion: v2
     appVersion: "1.4"
-    created: "2021-12-10T18:06:38.037251756+03:00"
+    created: "2022-04-21T13:43:26.482738+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 7068cb55898b1e9fc54f303576221c93ed103edb6fa73c3525c48f08f775d75e
     home: https://github.com/typeable/octopod
     keywords:
@@ -95,17 +123,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.2.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.2.tgz
     version: 0.6.2
   - apiVersion: v2
     appVersion: "1.4"
-    created: "2021-12-10T18:06:38.034027242+03:00"
+    created: "2022-04-21T13:43:26.47703+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 821ee8f87234b5446a7a17e761ec14e7bfd72539eacad53022e01ee30f10e1b8
     home: https://github.com/typeable/octopod
     keywords:
@@ -119,17 +148,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.1.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.1.tgz
     version: 0.6.1
   - apiVersion: v2
     appVersion: "1.4"
-    created: "2021-12-10T18:06:38.03051927+03:00"
+    created: "2022-04-21T13:43:26.472108+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 2a164079432ebba886a701641761b601566b7a484933b1516046b643b83f2785
     home: https://github.com/typeable/octopod
     keywords:
@@ -143,17 +173,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.6.0.tgz
+    - https://typeable.github.io/octopod/octopod-0.6.0.tgz
     version: 0.6.0
   - apiVersion: v2
     appVersion: 1.3.1
-    created: "2021-12-10T18:06:38.026392613+03:00"
+    created: "2022-04-21T13:43:26.466935+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: e21793b5887c6b6c5a3707c7a073290b33fa2cb78720cc26f9cea61874040c7d
     home: https://octopod.site
     keywords:
@@ -167,17 +198,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.5.1.tgz
+    - https://typeable.github.io/octopod/octopod-0.5.1.tgz
     version: 0.5.1
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-12-10T18:06:38.022587951+03:00"
+    created: "2022-04-21T13:43:26.461518+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 43e262ab199390e370689d7364eb6d54fbe9a5ea32f9e2ab6ff7257ce7aed96f
     home: https://octopod.site
     keywords:
@@ -191,17 +223,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.4.3.tgz
+    - https://typeable.github.io/octopod/octopod-0.4.3.tgz
     version: 0.4.3
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-12-10T18:06:38.017322255+03:00"
+    created: "2022-04-21T13:43:26.456556+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 40ccff559f13cc90db75702e72b5235fe9a15b420d3f96748228b545499249ce
     home: https://octopod.site
     keywords:
@@ -215,17 +248,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.4.2.tgz
+    - https://typeable.github.io/octopod/octopod-0.4.2.tgz
     version: 0.4.2
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-12-10T18:06:38.011233137+03:00"
+    created: "2022-04-21T13:43:26.450809+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: eb5a47973ec6d372db183134a07ac654f9bf4a1af8b983648c283f06cadb7f0e
     home: https://octopod.site
     keywords:
@@ -239,17 +273,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.4.1.tgz
+    - https://typeable.github.io/octopod/octopod-0.4.1.tgz
     version: 0.4.1
   - apiVersion: v2
     appVersion: "1.3"
-    created: "2021-12-10T18:06:38.006605186+03:00"
+    created: "2022-04-21T13:43:26.445223+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 8b8501e0ab6ffd2b1f43a7fbe053da6a9b88aeb2c4608167684f8d66197129df
     home: https://octopod.site
     keywords:
@@ -263,17 +298,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.4.0.tgz
+    - https://typeable.github.io/octopod/octopod-0.4.0.tgz
     version: 0.4.0
   - apiVersion: v2
     appVersion: 1.2.1
-    created: "2021-12-10T18:06:38.002596708+03:00"
+    created: "2022-04-21T13:43:26.44023+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 568ca591dd8a4617b1597fb59a9a3f694fc1dde577a060e084c0abf2d38791a2
     home: https://octopod.site
     keywords:
@@ -287,17 +323,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.3.2.tgz
+    - https://typeable.github.io/octopod/octopod-0.3.2.tgz
     version: 0.3.2
   - apiVersion: v2
     appVersion: "1.2"
-    created: "2021-12-10T18:06:37.953817736+03:00"
+    created: "2022-04-21T13:43:26.435144+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.5.3
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: f792e44a06516d58e14928e12606857aba376d7c39ba6ce249846cab01bde3d7
     home: https://octopod.site
     keywords:
@@ -311,17 +348,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.3.1.tgz
+    - https://typeable.github.io/octopod/octopod-0.3.1.tgz
     version: 0.3.1
   - apiVersion: v2
     appVersion: "1.2"
-    created: "2021-12-10T18:06:37.949808694+03:00"
+    created: "2022-04-21T13:43:26.428696+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.4.2
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: d7b1d72775461c1f713b0ad069f2cea69ce6f77398c1ffa8d2bdd405a27df5f3
     home: https://octopod.site
     keywords:
@@ -335,17 +373,18 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.3.0.tgz
+    - https://typeable.github.io/octopod/octopod-0.3.0.tgz
     version: 0.3.0
   - apiVersion: v2
     appVersion: "1.1"
-    created: "2021-12-10T18:06:37.944711799+03:00"
+    created: "2022-04-21T13:43:26.424012+03:00"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
       repository: https://charts.bitnami.com/bitnami
       version: 10.4.2
-    description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
+    description: An opensource self-hosted solution for managing multiple deployments
+      in a Kubernetes cluster.
     digest: 10f1c09c6be241deb580e98a6db064877a8ee5f920a7c4ca7668ba3987ec9e44
     home: https://octopod.site
     keywords:
@@ -359,6 +398,6 @@ entries:
     - https://github.com/typeable/octopod
     type: application
     urls:
-    - octopod-0.2.0.tgz
+    - https://typeable.github.io/octopod/octopod-0.2.0.tgz
     version: 0.2.0
-generated: "2021-12-10T18:06:37.941061518+03:00"
+generated: "2022-04-21T13:43:26.417902+03:00"
