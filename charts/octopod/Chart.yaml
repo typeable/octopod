@@ -2,8 +2,8 @@ apiVersion: v2
 name: octopod
 description: An opensource self-hosted solution for managing multiple deployments in a Kubernetes cluster.
 type: application
-version: 0.6.7
-appVersion: 1.5.0
+version: 0.6.8
+appVersion: 1.5.1
 keywords:
   - kubernetes
   - octopod
