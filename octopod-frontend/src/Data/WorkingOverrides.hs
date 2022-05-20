@@ -68,7 +68,7 @@ configTreeHasLeaf ::
   (te -> Bool) ->
   ConfigTree kv te ->
   m Bool
-configTreeHasLeaf name f = memo (\(_, CT.ConfigTree x) -> go $ toList x)  . (name,)
+configTreeHasLeaf name f = memo (\(_, CT.ConfigTree x) -> go $ toList x) . (name,)
   where
     go :: [(Maybe te, ConfigTree kv te)] -> m Bool
     go [] = pure False

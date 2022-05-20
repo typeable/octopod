@@ -441,7 +441,6 @@ envVarsInput (traceDyn "values" -> values) lookupOverride ovs = divClass "padded
       addingIsEnabled = join $ fmap and . sequenceA . (fmap . fmap) (not . T.null . fst) <$> resCfg
   pure resCfg
 
-
 -- | Widget for entering a key-value pair.
 envVarInput ::
   (MonadWidget t m) =>
