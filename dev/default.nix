@@ -116,6 +116,8 @@ in
 
         sleep 4
 
+        echo "foo.vat1.fjij.key1,"
+
         for i in {1..10}
         do
         for j in {1..10}

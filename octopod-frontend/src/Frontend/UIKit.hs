@@ -377,6 +377,7 @@ showNonEditableWorkingOverrideTree treeDyn = do
           untilReady (lift nonEditableLoading) $
             divClass "padded" $
               showWorkingOverrideTree'
+                (const False)
                 (is (_Ctor' @"CustomConfigValue"))
                 (\_ _ -> ())
                 (\_ k v -> renderRow k v $> pure ())
@@ -400,6 +401,8 @@ showOverrideTree ::
   , Ord tk
   , Ord tv
   ) =>
+  -- | Value should be shown by default
+  (tv -> Bool) ->
   -- | Value is modified
   (tv -> Bool) ->
   -- | Prepare the fixpoint data
@@ -409,19 +412,21 @@ showOverrideTree ::
   ConfigTree tk tv ->
   -- | Should we render anything
   m [Dynamic t x]
-showOverrideTree isModified prepareData renderValue ct = do
+showOverrideTree isShown isModified prepareData renderValue ct = do
   memoRef <- newRef mempty
   flip runReaderT memoRef $
-    showWorkingOverrideTree' isModified prepareData ((fmap . fmap . fmap) lift renderValue) ct (pure True) never
+    showWorkingOverrideTree' isShown isModified prepareData ((fmap . fmap . fmap) lift renderValue) ct (pure True) never
 
 showWorkingOverrideTree' ::
   ( MonadWidget t m
   , Renderable tk
   , Show x
-  , MonadReader (Ref m (Map (ConfigTree tk tv) Bool)) m
+  , MonadReader (Ref m (Map (Text, ConfigTree tk tv) Bool)) m
   , Ord tv
   , Ord tk
   ) =>
+  -- | Value should be shown by default
+  (tv -> Bool) ->
   -- | Value is modified
   (tv -> Bool) ->
   -- | Prepare the fixpoint data
@@ -434,7 +439,7 @@ showWorkingOverrideTree' ::
   -- | Force open/close all subtrees
   Event t Bool ->
   m [Dynamic t x]
-showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shouldRenderDyn' forceSubtreesEv = do
+showWorkingOverrideTree' isShown isModified prepareData renderValue (ConfigTree m) shouldRenderDyn' forceSubtreesEv = do
   shouldRenderDyn <- holdUniqDyn shouldRenderDyn'
   (appEndo . fold -> f) <- for (OM.assocs m) $ \(k, (mv, _)) -> do
     xMaybe <- for mv $ \v -> mdo
@@ -462,7 +467,8 @@ showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shoul
                       then "collapse--expanded"
                       else mempty
         (ovs, openDyn) <- elDynClass "div" wrapperClass $ do
-          modified <- configTreeHasLeaf isModified subtree
+          modified <- configTreeHasLeaf "isModified" isModified subtree
+          shown <- configTreeHasLeaf "isShown" isShown subtree
           (traceEvent "clickEv" -> clickEv) <-
             treeButton
               TreeButtonConfig
@@ -471,11 +477,12 @@ showWorkingOverrideTree' isModified prepareData renderValue (ConfigTree m) shoul
                 , visible = shouldRenderDyn
                 , forceState = forceSubtreesEv
                 }
-          buttonIsOpen <- holdDyn False $ leftmost [forceSubtreesEv, fst <$> clickEv]
+          buttonIsOpen <- holdDyn shown $ leftmost [forceSubtreesEv, fst <$> clickEv]
           let selfForceSubtrees = fst <$> ffilter (isRight . snd) clickEv
           ovs' <-
             divClass "collapse__inner" $
               showWorkingOverrideTree'
+                isShown
                 isModified
                 prepareData
                 renderValue
