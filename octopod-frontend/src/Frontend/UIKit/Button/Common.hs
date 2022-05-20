@@ -77,7 +77,7 @@ buttonEl cfg = do
               ( const
                   EventFlags
                     { _eventFlags_propagation = Propagation_StopImmediate
-                    , _eventFlags_preventDefault = True
+                    , _eventFlags_preventDefault = False
                     }
               )
           & elementConfig_eventSpec
@@ -87,7 +87,7 @@ buttonEl cfg = do
               ( const
                   EventFlags
                     { _eventFlags_propagation = Propagation_StopImmediate
-                    , _eventFlags_preventDefault = True
+                    , _eventFlags_preventDefault = False
                     }
               )
   (bEl, _) <- element t elCfg (unTextBuilder (cfg ^. #buttonText))
