@@ -1,6 +1,7 @@
 module Data.WorkingOverrides
   ( WorkingOverrides,
     WorkingOverrideKey' (..),
+    getConfigValueText,
     WorkingOverrideKey,
     WorkingOverrideKeyType (..),
     destructWorkingOverrides,
@@ -42,29 +43,38 @@ data ConfigValue te
 
 newtype CustomKey v = CustomKey v
   deriving stock (Show, Generic, Eq, Ord)
+
 data CustomConfigValue te
   = CustomValue !te
   | DeletedValue !(Maybe te)
   deriving stock (Show, Generic, Eq, Ord)
 
+getConfigValueText :: ConfigValue te -> Maybe te
+getConfigValueText (DefaultConfigValue t) = Just t
+getConfigValueText (CustomConfigValue (Left (CustomKey t))) = Just t
+getConfigValueText (CustomConfigValue (Right (CustomValue t))) = Just t
+getConfigValueText (CustomConfigValue (Right (DeletedValue t))) = t
+
 -- Super inefficient but i dont care
 configTreeHasLeaf ::
   forall m kv te.
-  ( MonadReader (Ref m (Map (ConfigTree kv te) Bool)) m
+  ( MonadReader (Ref m (Map (Text, ConfigTree kv te) Bool)) m
   , MonadRef m
   , Ord kv
   , Ord te
   ) =>
+  -- | The id of the predicate used for caching
+  Text ->
   (te -> Bool) ->
   ConfigTree kv te ->
   m Bool
-configTreeHasLeaf f = memo $ \(CT.ConfigTree x) -> go $ toList x
+configTreeHasLeaf name f = memo (\(_, CT.ConfigTree x) -> go $ toList x) . (name,)
   where
     go :: [(Maybe te, ConfigTree kv te)] -> m Bool
     go [] = pure False
     go ((Just y, _) : _) | f y = pure True
     go ((_, ct) : rest) =
-      configTreeHasLeaf f ct >>= \case
+      configTreeHasLeaf name f ct >>= \case
         True -> pure True
         False -> go rest
 

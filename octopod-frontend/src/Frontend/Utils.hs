@@ -431,6 +431,7 @@ envVarsInput (traceDyn "values" -> values) lookupOverride ovs = divClass "padded
       envVarInput lookupOverride values emptyItem
   treeResCfg <-
     showOverrideTree
+      ((== Just True) . fmap (T.null . T.strip) . getConfigValueText . snd)
       (isn't (_Ctor' @"DefaultConfigValue") . snd)
       (\_ v -> v)
       (\a _ _ -> envVarInput lookupOverride values (trace "a" a))
@@ -439,35 +440,6 @@ envVarsInput (traceDyn "values" -> values) lookupOverride ovs = divClass "padded
       resCfg = (<> treeResCfg) <$> addedOvsListDyn
       addingIsEnabled = join $ fmap and . sequenceA . (fmap . fmap) (not . T.null . fst) <$> resCfg
   pure resCfg
-
--- validateWorkingOverrides ::
---   forall f.
---   Traversable f =>
---   f WorkingOverride ->
---   f (WorkingOverride, OverrideErrors)
--- validateWorkingOverrides overrides =
---   let (result, keyOccurrences :: MonoidalMap Text (Sum Int)) =
---         flip runState mempty $ for overrides \override@(WorkingOverrideKey _ key, value') -> do
---           case value' of
---             WorkingDeletedValue _ -> pure ()
---             _ -> modify (<> MM.singleton key (Sum 1))
---           pure . (override,) . mconcat $
---             [ case MM.lookup key keyOccurrences of
---                 Just (Sum n)
---                   | n > 1 ->
---                     overrideKeyErrors "You can not use the same key multiple times."
---                 _ -> mempty
---             , if T.null key
---                 then overrideKeyErrors "Keys can not be empty."
---                 else mempty
---             , case value' of
---                 WorkingCustomValue "" -> overrideValueErrors "Values can not be empty."
---                 WorkingCustomValue _ -> mempty
---                 WorkingDefaultValue "" -> overrideValueErrors "Values can not be empty."
---                 WorkingDefaultValue _ -> mempty
---                 WorkingDeletedValue _ -> mempty
---             ]
---    in result
 
 -- | Widget for entering a key-value pair.
 envVarInput ::
