@@ -295,7 +295,7 @@ activeDeploymentWidget dDyn' = do
                               def
                                 { buttonText = "Details"
                                 , buttonType = Just LogsActionButtonType
-                                , buttonBaseTag = ATag url
+                                , buttonBaseTag = ATag $ pure url
                                 }
                       )
                 pure $
@@ -379,7 +379,7 @@ archivedDeploymentWidget dDyn' = do
           btnEv <- dropdownWidget body
           void $ restoreEndpoint (constDyn $ Right $ dName) (btnEv $> ())
       let route = DashboardRoute :/ Just dName
-      setRoute $ route <$ domEvent Dblclick linkEl
+      setRoute $ route <$ domEvent Click linkEl
 
 -- | Sort deployments by the supplied condition.
 sortDeployments ::

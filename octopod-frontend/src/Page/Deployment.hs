@@ -158,7 +158,7 @@ deploymentHead dfiDyn sentEv =
                     , buttonType = pure $ Just LogsLargeButtonType
                     , buttonPriority = SecondaryLargeButton
                     , buttonStyle = PageActionLargeButtonStyle
-                    , buttonBaseTag = ATag url
+                    , buttonBaseTag = ATag $ pure url
                     }
           )
     delEv <- confirmArchivePopup (archEv $> ()) $ do

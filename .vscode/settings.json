@@ -4,5 +4,6 @@
   "haskell.plugin.hlint.diagnosticsOn": false,
   "haskell.hlint.logLevel": "none",
   "haskell.hlint.run": "never",
-  "haskell.serverExecutablePath": "haskell-language-server"
+  "haskell.serverExecutablePath": "haskell-language-server",
+  "editor.formatOnSave": true
 }

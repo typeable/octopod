@@ -39,15 +39,18 @@ data CommonButtonConfig t = CommonButtonConfig
   , disabledClasses :: Classes
   , buttonEnabled :: Dynamic t Bool
   , buttonText :: TextBuilder t
-  , buttonBaseTag :: BaseButtonTag
+  , buttonBaseTag :: BaseButtonTag t
   }
   deriving stock (Generic)
 
-data BaseButtonTag = ButtonTag | ATag Text
+data BaseButtonTag t = ButtonTag | ATag (Dynamic t Text)
 
-baseTag :: BaseButtonTag -> (Text, Map Text Text)
-baseTag ButtonTag = ("button", "type" =: "button")
-baseTag (ATag url) = ("a", "href" =: url <> "target" =: "_blank")
+baseTag :: Reflex t => BaseButtonTag t -> (Text, Dynamic t (Map Text Text))
+baseTag ButtonTag = ("button", pure $ "type" =: "button")
+baseTag (ATag urlDyn) =
+  ( "a"
+  , urlDyn <&> \url -> "href" =: url <> "target" =: "_blank"
+  )
 
 buttonEl ::
   forall m t.
@@ -55,15 +58,16 @@ buttonEl ::
   CommonButtonConfig t ->
   m (Event t (Either () ()))
 buttonEl cfg = do
-  let (t, staticAttrs) = baseTag (cfg ^. #buttonBaseTag)
+  let (t, tagAttrsDyn) = baseTag (cfg ^. #buttonBaseTag)
       attrsDyn = do
         enabled <- cfg ^. #buttonEnabled
         let (enabledClasses, enabledAttrs) = case enabled of
               True -> (cfg ^. #enabledClasses, mempty)
               False -> (cfg ^. #disabledClasses, "disabled" =: "")
         cs <- cfg ^. #constantClasses
+        tagAttrs <- tagAttrsDyn
         pure $
-          staticAttrs
+          tagAttrs
             <> "class" =: destructClasses (enabledClasses <> cs)
             <> enabledAttrs
   modAttrs <- dynamicAttributesToModifyAttributes attrsDyn
