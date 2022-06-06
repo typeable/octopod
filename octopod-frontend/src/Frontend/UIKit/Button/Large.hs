@@ -23,7 +23,7 @@ data LargeButtonConfig t = LargeButtonConfig
   , buttonType :: Dynamic t (Maybe LargeButtonType)
   , buttonPriority :: LargeButtonPriority
   , buttonStyle :: LargeButtonStyle
-  , buttonBaseTag :: BaseButtonTag
+  , buttonBaseTag :: BaseButtonTag t
   }
   deriving stock (Generic)
 

@@ -18,7 +18,7 @@ data ActionButtonConfig t = ActionButtonConfig
   { buttonText :: Text
   , buttonEnabled :: Dynamic t Bool
   , buttonType :: Maybe ActionButtonType
-  , buttonBaseTag :: BaseButtonTag
+  , buttonBaseTag :: BaseButtonTag t
   }
   deriving stock (Generic)
 
