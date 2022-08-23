@@ -1,10 +1,13 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "octopod.fullname" . -}}
-{{- if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+{{- $kubeVersion := .Capabilities.KubeVersion.Version }}
+{{ if semverCompare ">= 1.19.0-0" $kubeVersion }}
+apiVersion: networking.k8s.io/v1
+{{ else if .Capabilities.APIVersions.Has "networking.k8s.io/v1beta1" }}
 apiVersion: networking.k8s.io/v1beta1
-{{- else -}}
+{{ else }}
 apiVersion: extensions/v1beta1
-{{- end }}
+{{ end }}
 kind: Ingress
 metadata:
   name: {{ $fullName }}-app
@@ -42,6 +45,8 @@ spec:
         paths:
           - path: /
             backend:
-              serviceName: {{ $fullName }}
-              servicePort: {{ .Values.service.ports.app }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ .Values.service.ports.app }}
 {{- end }}
