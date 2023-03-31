@@ -1,6 +1,6 @@
 { sources ? import ./nix/sources.nix
 , haskellNix ? import sources.haskellNix { inherit system; }
-, pkgsSrc ? import haskellNix.sources.nixpkgs-2105
+, pkgsSrc ? import haskellNix.sources.nixpkgs-unstable
 , pkgs ? pkgsSrc (haskellNix.nixpkgsArgs // { inherit system; })
 , nix-filter ? import sources.nix-filter
 , system ? builtins.currentSystem
