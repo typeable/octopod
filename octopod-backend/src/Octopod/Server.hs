@@ -828,8 +828,8 @@ updateH dName dUpdate = do
   olDep <- getDeploymentS dName <&> (^. #deployment)
   failIfImageNotFound
     ( olDep
-        & field' @"appOverrides" <>~ dUpdate ^. #appOverrides
-        & field' @"deploymentOverrides" <>~ dUpdate ^. #deploymentOverrides
+        & field' @"appOverrides" %~ (dUpdate ^. #appOverrides <>)
+        & field' @"deploymentOverrides" %~ (dUpdate ^. #deploymentOverrides <>)
     )
   failIfGracefulShutdownActivated
   runDeploymentBgWorker (Just UpdatePending) dName (pure ()) $ \() -> do

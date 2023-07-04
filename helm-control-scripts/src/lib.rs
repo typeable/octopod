@@ -417,6 +417,39 @@ pub mod lib {
             KubeError::KubeApiError(error)
         }
     }
+
+    #[derive(Debug)]
+    pub enum ImageError {
+        EcrError(DescribeImagesError),
+        DockerRegistryError(RegError),
+        NoImageError()
+    }
+
+    impl fmt::Display for ImageError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                ImageError::EcrError(err) => write!(f, "ECR error: {}", err),
+                ImageError::DockerRegistryError(err) => write!(f, "Docker registry error: {}", err),
+                ImageError::NoImageError() => write!(f, "No Image Error")
+            }
+        }
+    }
+
+    impl Error for ImageError {}
+
+    
+    impl From<DescribeImagesError> for ImageError {
+        fn from(error: DescribeImagesError) -> Self {
+            ImageError::EcrError(error)
+        }
+    }
+
+    impl From<RegError> for ImageError {
+        fn from(error: RegError) -> Self {
+            ImageError::DockerRegistryError(error)
+        }
+    }
+
     
     #[tokio::main]
     async fn check_deployment(namespace: &str, name: &str) -> Result<(), KubeError> {
@@ -638,7 +671,7 @@ pub mod lib {
         }
     }
     #[tokio::main]
-    async fn check_image(registry: &str, repository: &str, tag: &str) -> Result<(), RegError> {
+    async fn check_docker_image(registry: &str, repository: &str, tag: &str) -> Result<(), ImageError> {
         let client = RegClient::configure()
             .insecure_registry(false)
             .registry(registry)
@@ -646,11 +679,11 @@ pub mod lib {
         let aclient = client.authenticate(&[&format!("repository:{}:pull", repository)]).await?;
         match aclient.has_manifest(repository, tag, None).await? {
             Some(_) => return Ok(()),
-            None => panic!("Image not found: {} {} {}", registry, repository, tag),
+            None =>  return Err(ImageError::NoImageError())//panic!("Image not found: {} {} {}", registry, repository, tag),
         }
     }
     #[tokio::main]
-    pub async fn check_ecr_image(registry: &str, repository: &str, tag: &str) -> Result<(), DescribeImagesError>{
+    pub async fn check_ecr_image(registry: &str, repository: &str, tag: &str) -> Result<(), ImageError>{
         let re = Regex::new(r"^[0-9]*.dkr.ecr.(.*).amazonaws.com$").unwrap();
         let captures = re.captures(&registry).unwrap();
         let region_string = String::from(&captures[1]);
@@ -670,7 +703,7 @@ pub mod lib {
         };
         match client.describe_images(describe_request).await {
             Ok(_) => return Ok(()),
-            Err(err) => panic!("Image not found in ECR: {} {} {}\n {}", registry, repository, tag, err),
+            Err(err) => return Err(ImageError::NoImageError()) //panic!("Image not found in ECR: {} {} {}\n {}", registry, repository, tag, err),
         }
     }
     fn parse_image_name(image_name: &str) -> (String, String, String) {
@@ -696,18 +729,18 @@ pub mod lib {
         info!("Checking image: {} {} {}", registry, repository, tag);
         (registry, repository, tag)
     }
-    pub fn check_images(images: Vec<String>) -> Result<(), Box<dyn error::Error>> {
+    pub fn check_images(images: Vec<String>) -> Result<(), ImageError> {
         for image in images {
             let (registry, repository, tag) = parse_image_name(&image);
             if registry.contains("dkr.ecr") {
                 match check_ecr_image(&registry, &repository, &tag) {
                     Ok(_) => (),
-                    Err(err) => return Err(Box::new(err)),
+                    Err(err) => return Err(err),
                 }
             } else {
-                match check_image(&registry, &repository, &tag) {
+                match check_docker_image(&registry, &repository, &tag) {
                     Ok(_) => (),
-                    Err(err) => return Err(Box::new(err)),
+                    Err(err) => return Err(err),
                 }
             }
         }
