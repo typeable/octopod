@@ -389,26 +389,43 @@ pub mod lib {
         }
         return Ok((deployments, statefulsets, ingresses, old_ingresses, postgresqls, kafkas));
     }
-    
+
     #[derive(Debug)]
     pub struct NoReplicasError(String);
-    
+
     impl fmt::Display for NoReplicasError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "Deployment {} doesn't have any replicas", self.0)
         }
     }
     impl Error for NoReplicasError {}
-    
+
+    #[derive(Debug)]
+    pub struct UnavailableReplicasError(String);
+
+    impl fmt::Display for UnavailableReplicasError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Deployment {} has unavailable replicas", self.0)
+        }
+    }
+    impl Error for UnavailableReplicasError {}
+
     #[derive(Debug)]
     pub enum KubeError {
         NoReplicasError(NoReplicasError),
+        UnavailableReplicasError(UnavailableReplicasError),
         KubeApiError(kube::Error),
     }
-    
+
     impl From<NoReplicasError> for KubeError {
         fn from(error: NoReplicasError) -> Self {
             KubeError::NoReplicasError(error)
+        }
+    }
+
+    impl From<UnavailableReplicasError> for KubeError {
+        fn from(error: UnavailableReplicasError) -> Self {
+            KubeError::UnavailableReplicasError(error)
         }
     }
 
@@ -456,16 +473,15 @@ pub mod lib {
         let client = Client::try_default().await?;
         let api: Api<Deployment> = Api::namespaced(client, &namespace);
         let deployment = api.get(&name).await?;
+        info!("AAA {:?}", deployment.status);
         match deployment.status {
             Some(status) => {
-                match status.available_replicas {
+                match status.unavailable_replicas {
                     Some(replicas) => {
-                        if !replicas >= 1 {
-                           return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
-                        }
+                        return Err(KubeError::UnavailableReplicasError(UnavailableReplicasError(name.to_string())));
                     },
                     None => {
-                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
+                        return Ok(());
                     }
                 }
             },
@@ -482,9 +498,11 @@ pub mod lib {
         let statefulset = api.get(&name).await?;
         match statefulset.status {
             Some(status) => {
-                match status.current_replicas {
-                    Some(replicas) => {
-                        if !replicas >= 1 {
+                match (status.ready_replicas) {
+                    Some(ready_replicas) => {
+                        if ready_replicas == status.replicas {
+                            return Ok(());
+                        } else {
                             return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                         }
                     },
