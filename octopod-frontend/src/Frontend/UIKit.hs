@@ -354,13 +354,15 @@ showFlatConfig ::
 showFlatConfig l =
   for_ l $ \(k, v) ->
     let keyClasses = if is (_Ctor' @"ValueDeleted") v then "key-deleted" else "key-default-pristine"
+        truncatedValueStyle = "width:400px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;"
+        truncatedValueAttr = "style" =: truncatedValueStyle
      in divClass "row" $ do
           elClass "span" (destructClasses keyClasses) $ do
             rndr k
             text ": "
             pure ()
           case v of
-            ValueAdded t -> elClass "span" "value-edited" $ rndr t
+            ValueAdded t -> elAttr "span" ("class" =: "value-edited" <> truncatedValueAttr) $ rndr t
             ValueDeleted -> elClass "div" "listing__placeholder listing__placeholder__value" $ pure ()
           pure ()
 

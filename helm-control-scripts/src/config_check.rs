@@ -57,7 +57,8 @@ fn main() {
             }
         }
         Err((status, err)) => {
-            println!("{:#}", err);
+            println!("Something went wrong. It looks like chart {}:{} does not exist. helm repo add/update may help.", 
+                 helm_template.deployment_parameters.chart_name, helm_template.deployment_parameters.chart_version);
             error!("Error during helm execution");
             panic!("{:?}", status);
         }
