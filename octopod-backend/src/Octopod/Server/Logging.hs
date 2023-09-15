@@ -74,15 +74,14 @@ makeLogEnv :: LogConfig -> IO LogEnv
 makeLogEnv conf = do
   scribe <- mkHandleScribeWithFormatter formatter ColorIfTerminal stdout (permitItem severity) verbosity
   env <- initLogEnv "octopod" $ Environment $ uProjectName $ conf ^. #project
-  env' <- registerScribe "stdout" scribe defaultScribeSettings env
-  pure env'
+  registerScribe "stdout" scribe defaultScribeSettings env
   where
     verbosity = if conf ^. #prodLogs then V3 else V0
     severity = if conf ^. #debug then DebugS else InfoS
     formatter :: LogItem a => ItemFormatter a
     formatter =
       if conf ^. #prodLogs
-        then \color verb item -> bracketFormat color verb item {_itemPayload = SingleLineify $ _itemPayload item}
+        then jsonFormat
         else \color verb item ->
           brackets (fromText $ formatAsLogTime $ _itemTime item)
             <> brackets (fromText $ colorBySeverity color (_itemSeverity item) $ renderSeverity $ _itemSeverity item)
@@ -119,3 +118,6 @@ instance ToObject FilePayload where
 instance LogItem FilePayload where
   payloadKeys V3 _ = AllKeys
   payloadKeys _ _ = SomeKeys []
+
+newtype ContextPayload = ContextPayload { unContextPayload :: T.Text }
+  deriving stock (Generic)

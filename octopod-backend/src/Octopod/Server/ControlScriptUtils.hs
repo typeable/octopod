@@ -239,13 +239,13 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
-  let outs = TL.split (toEnum . fromEnum $ '\n') out
-  let errs = TL.split (toEnum . fromEnum $ '\n') err
+  let outs = P.reverse $ TL.split (toEnum . fromEnum $ '\n') out
+  let errs = P.reverse $ TL.split (toEnum . fromEnum $ '\n') err
   katipAddContext (sl "script" cmd) $ do
     katipAddContext (sl "file" ("stdout" :: T.Text)) $
-      forM_ (P.reverse $ P.filter (/= "") outs) $ \outLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr outLine
+      forM_ outs $ \outLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr outLine
     katipAddContext (sl "file" ("stderr" :: T.Text)) $ 
-      forM_ (P.reverse $ P.filter (/= "") errs) $ \errLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr errLine
+      forM_ errs $ \errLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr errLine
     logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
       "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec  
   pure
