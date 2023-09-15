@@ -565,7 +565,7 @@ updateDeploymentInfo ::
 updateDeploymentInfo dName = do
   DeploymentFullInfo {deployment = dep} <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, out, err, _) <- runCommandArgs infoCommand =<< infoCommandArgs cfg dep
+  (ec, out, err, _) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs infoCommand =<< infoCommandArgs cfg dep
   case ec of
     ExitSuccess -> case parseDeploymentMetadata (unStdout out) of
       Right dMeta -> upsertDeploymentMetadatum dName dMeta
@@ -595,7 +595,7 @@ createDeployment ::
   m (ExitCode, Stdout, Stderr, Duration)
 createDeployment dep = do
   cfg <- getDeploymentConfig dep
-  res <- runCommandArgs creationCommand =<< createCommandArgs cfg dep
+  res <- katipAddContext (sl "deployemnt" (dep ^. #name)) $ runCommandArgs creationCommand =<< createCommandArgs cfg dep
   logLocM InfoS $ "deployment created, deployment: " <> show' dep
   pure res
 
@@ -750,8 +750,9 @@ transitionToStatus dName s = do
   notificationCmd <- asks notificationCommand
   for_ notificationCmd $ \nCmd ->
     runBgWorker . void $
-      runCommandArgs' nCmd
-        =<< notificationCommandArgs dName oldS newS
+      katipAddContext (sl "deployemnt" dName) $ 
+        runCommandArgs' nCmd
+          =<< notificationCommandArgs dName oldS newS
   sendReloadEvent
 
 assertStatusTransitionPossible ::
@@ -809,7 +810,7 @@ archiveH dName = do
   runDeploymentBgWorker (Just ArchivePending) dName (pure ()) $ \() -> do
     (view #deployment -> dep) <- getDeploymentS dName
     cfg <- getDeploymentConfig dep
-    (ec, out, err, elTime) <- runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
+    (ec, out, err, elTime) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs archiveCommand =<< archiveCommandArgs cfg dep
     transitionToStatusS dName $
       TransitionArchivePending
         StatusTransitionProcessOutput
@@ -852,7 +853,7 @@ updateH dName dUpdate = do
     updateDeploymentInfo dName
     sendReloadEvent
     cfg <- getDeploymentConfig dep
-    (ec, out, err, elTime) <- runCommandArgs updateCommand =<< updateCommandArgs cfg dep
+    (ec, out, err, elTime) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs updateCommand =<< updateCommandArgs cfg dep
     logLocM DebugS $
       logStr $
         "deployment updated, name: "
@@ -909,7 +910,7 @@ statusH :: DeploymentName -> AppM CurrentDeploymentStatus
 statusH dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+  (ec, _, _, _) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
   pure . CurrentDeploymentStatus $
     case ec of
       ExitSuccess -> Ok
@@ -937,7 +938,7 @@ cleanupDeployment ::
 cleanupDeployment dName = do
   (view #deployment -> dep) <- getDeploymentS dName
   cfg <- getDeploymentConfig dep
-  (ec, out, err, elTime) <- runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
+  (ec, out, err, elTime) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs cleanupCommand =<< cleanupCommandArgs cfg dep
   katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStdout out) $
     katipAddContext (FilePayload "stdout" $ T.encodeUtf8 $ unStderr err) $
       logLocM DebugS "deployment destroyed"
@@ -1009,7 +1010,7 @@ restoreH dName = do
     (view #deployment -> dep') <- getDeploymentS dName
     updateDeploymentInfo dName
     cfg <- getDeploymentConfig dep'
-    (ec, out, err, elTime) <- runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
+    (ec, out, err, elTime) <- katipAddContext (sl "deployemnt" dName) $ runCommandArgs unarchiveCommand =<< unarchiveCommandArgs cfg dep'
     transitionToStatusS dName $
       TransitionRestore
         StatusTransitionProcessOutput
@@ -1108,7 +1109,7 @@ upsertDeploymentMetadatum dName dMetadata =
 failIfImageNotFound :: Deployment -> AppM ()
 failIfImageNotFound dep = do
   cfg <- getDeploymentConfig dep
-  (ec, Stdout out, _, _) <- runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
+  (ec, Stdout out, _, _) <- katipAddContext (sl "deployemnt" (dep ^. #name)) $ runCommandArgs configCheckingCommand =<< configCheckCommandArgs cfg dep
   case ec of
     ExitSuccess -> pure ()
     ExitFailure _ ->
@@ -1154,10 +1155,10 @@ runStatusUpdater = do
               cfg <- getDeploymentConfig dep
               case dStatus of
                 ArchivePending -> do
-                  (ec, _, _, _) <- runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
+                  (ec, _, _, _) <- katipAddContext (sl "deployemnt" (dep ^. #name)) $ runCommandArgs archiveCheckingCommand =<< archiveCheckArgs cfg dep
                   pure $ Just ec
                 _ -> do
-                  (ec, _, _, _) <- runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
+                  (ec, _, _, _) <- katipAddContext (sl "deployemnt" (dep ^. #name)) $ runCommandArgs checkingCommand =<< checkCommandArgs cfg dep
                   pure $ Just ec
         pure $ mEc <&> \ec -> (dName, statusTransition ec dStatus ts timeout, dStatus)
       updated <-

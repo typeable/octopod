@@ -43,7 +43,9 @@ import Data.Generics.Product.Typed
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
+import Katip (sl)
 import Octopod.Server.Logging
+import Prelude as P
 import System.Exit
 import System.Process (terminateProcess)
 import System.Process.Typed
@@ -208,7 +210,7 @@ runCommandArgs' (Command cmd) (ControlScriptArgs args) = do
 
 -- | Returns time delta between 2 timestamps.
 elapsedTime :: UTCTime -> UTCTime -> Duration
-elapsedTime t1 t2 = Duration . calendarTimeTime $ Prelude.abs $ t2 `diffUTCTime` t1
+elapsedTime t1 t2 = Duration . calendarTimeTime $ P.abs $ t2 `diffUTCTime` t1
 
 -- | Helper to run command with pipes.
 runCommand ::
@@ -237,10 +239,15 @@ runCommand cmd args = do
           <$> waitExitCodeSTM p
           <*> getStdout p
           <*> getStderr p
-  katipAddContext (FilePayload "stdout" $ TL.toStrict out) $
-    katipAddContext (FilePayload "stderr" $ TL.toStrict err) $
-      logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
-        "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec
+  let outs = TL.split (toEnum . fromEnum $ '\n') out
+  let errs = TL.split (toEnum . fromEnum $ '\n') err
+  katipAddContext (sl "script" cmd) $ do
+    katipAddContext (sl "file" ("stdout" :: T.Text)) $
+      forM_ (P.reverse $ P.filter (/= "") outs) $ \outLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr outLine
+    katipAddContext (sl "file" ("stderr" :: T.Text)) $ 
+      forM_ (P.reverse $ P.filter (/= "") errs) $ \errLine -> logLocM (if ec /= ExitSuccess then WarningS else DebugS) $ logStr errLine
+    logLocM (if ec /= ExitSuccess then WarningS else DebugS) $
+      "Control script " <> logStr cmd <> " " <> show' args <> " exited with: " <> show' ec  
   pure
     ( ec
     , Stdout . T.decodeUtf8 . TL.toStrict $ out
