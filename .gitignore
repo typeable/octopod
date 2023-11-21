@@ -11,3 +11,7 @@ dev/certs/*
 tmp/*
 octopod-css/production
 .idea/
+octopod-frontend-elm/elm-stuff
+octopod-frontend-elm/octopod-css
+octopod-frontend-elm/index.html
+.DS_Store
