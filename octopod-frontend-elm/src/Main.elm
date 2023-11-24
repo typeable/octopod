@@ -139,8 +139,13 @@ changeRouteTo maybeRoute model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model of
+        Initialization _ ->
+            Sub.none
+
+        Deployments deployments ->
+            Sub.map DeploymentsMsg (Deployments.subscriptions deployments)
 
 
 

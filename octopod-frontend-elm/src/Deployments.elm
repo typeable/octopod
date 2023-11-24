@@ -7,19 +7,37 @@ import Route exposing (Route(..))
 import Time
 
 
+type DeploymentName
+    = DeploymentName String
+
+
+unDeploymentName : DeploymentName -> String
+unDeploymentName (DeploymentName name) =
+    name
+
+
+type OverrideName
+    = OverrideName String
+
+
+unOverrideName : OverrideName -> String
+unOverrideName (OverrideName name) =
+    name
+
+
 type OverrideValue
     = ValueAdded String
     | ValueDeleted
 
 
 type alias Override =
-    { name : String
+    { name : OverrideName
     , value : OverrideValue
     }
 
 
 type alias Info =
-    { name : String
+    { name : DeploymentName
     , appOverrides : List Override
     , deploymentOverrides : List Override
     }
@@ -171,8 +189,8 @@ overrideValueDecoder =
 
 
 type OverrideHelper
-    = OverrideName String
-    | OverrideValue OverrideValue
+    = OverrideName_ String
+    | OverrideValue_ OverrideValue
 
 
 overrideDecoder : Decoder Override
@@ -181,18 +199,18 @@ overrideDecoder =
         overrideHelperDecoder =
             Decode.list
                 (Decode.oneOf
-                    [ string |> Decode.map OverrideName
-                    , overrideValueDecoder |> Decode.map OverrideValue
+                    [ string |> Decode.map OverrideName_
+                    , overrideValueDecoder |> Decode.map OverrideValue_
                     ]
                 )
 
         listDecoder vals =
             case vals of
-                [ OverrideName name, OverrideValue val ] ->
-                    Decode.succeed (Override name val)
+                [ OverrideName_ name, OverrideValue_ val ] ->
+                    Decode.succeed (Override (OverrideName name) val)
 
-                [ OverrideValue val, OverrideName name ] ->
-                    Decode.succeed (Override name val)
+                [ OverrideValue_ val, OverrideName_ name ] ->
+                    Decode.succeed (Override (OverrideName name) val)
 
                 _ ->
                     Decode.fail "Unknown override"
@@ -203,7 +221,7 @@ overrideDecoder =
 infoDecoder : Decoder Info
 infoDecoder =
     Decode.succeed Info
-        |> required "name" string
+        |> required "name" (Decode.map DeploymentName string)
         |> required "app_overrides" (Decode.list overrideDecoder)
         |> required "deployment_overrides" (Decode.list overrideDecoder)
 

@@ -1,4 +1,4 @@
-module Page.Initialization exposing (..)
+port module Page.Initialization exposing (..)
 
 import Api
 import Api.Endpoint as Endpoint exposing (configJson)
@@ -22,6 +22,9 @@ type alias Model =
     , config : WebData Config
     , projectName : WebData String
     }
+
+
+port getWebsocketAddress : String -> Cmd msg
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -85,7 +88,12 @@ update msg model =
         ConfigResponse webData ->
             case webData of
                 Success config ->
-                    ( { model | config = Success config }, reqProjectName config )
+                    ( { model | config = Success config }
+                    , Cmd.batch
+                        [ reqProjectName config
+                        , getWebsocketAddress (config.wsUrl ++ "/event")
+                        ]
+                    )
 
                 a ->
                     ( { model | config = a }, Cmd.none )
