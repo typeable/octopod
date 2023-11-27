@@ -26,7 +26,7 @@ pub mod lib {
     };
     pub use regex::Regex;
     pub use rusoto_core::{Region, RusotoError};
-    pub use rusoto_ecr::{Ecr, EcrClient, DescribeImagesRequest, ImageIdentifier, DescribeImagesError};    
+    pub use rusoto_ecr::{Ecr, EcrClient, DescribeImagesRequest, ImageIdentifier, DescribeImagesError};
     pub use schemars::JsonSchema;
     pub use tokio::task;
 
@@ -48,7 +48,7 @@ pub mod lib {
         #[structopt(long)]
         pub deployment_config: Vec<String>,
     }
-    
+
     #[derive(Deserialize, Debug)]
     pub struct EnvVars {
         pub helm_bin: String,
@@ -60,7 +60,7 @@ pub mod lib {
         pub helm_on_init_only: Option<bool>,
         pub ingress_host_key: Option<String>,
     }
-    
+
     impl EnvVars {
        pub fn parse() -> Self {
             let envs = match envy::from_env::<Self>() {
@@ -73,13 +73,13 @@ pub mod lib {
             return envs;
         }
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     struct HelmRepo {
         name: String,
         url: String
     }
-    
+
     #[derive(Deserialize, Debug)]
     pub struct DefaultValues {
         pub default_overrides: Vec<String>,
@@ -87,7 +87,7 @@ pub mod lib {
         pub chart_version: String,
         pub chart_name: String,
     }
-    
+
     impl DefaultValues {
         pub fn app_overrides(&self) -> Option<Vec<(String,String)>> {
             if self.default_overrides.is_empty() {
@@ -106,7 +106,7 @@ pub mod lib {
                 (String::from("chart_repo_url"), self.chart_repo_url.clone()),
                 (String::from("chart_version"), self.chart_version.clone()),
                 (String::from("chart_name"), self.chart_name.clone()),
-            ]   
+            ]
         }
         pub fn deployment_keys(&self) -> Vec<String> {
             let mut keys: Vec<String> = vec![
@@ -120,7 +120,7 @@ pub mod lib {
             keys
         }
     }
-        
+
     #[derive(Debug, Clone, Default)]
     pub struct HelmDeploymentParameters {
         pub chart_repo_url: String,
@@ -129,7 +129,7 @@ pub mod lib {
         pub chart_version: String,
         pub chart_name: String,
     }
-    
+
     impl HelmDeploymentParameters {
         pub fn new(cli_opts: &CliOpts, envs: &EnvVars) -> Self {
             let mut deployment_parameters = Self::default();
@@ -166,7 +166,7 @@ pub mod lib {
         pub deployment_parameters: HelmDeploymentParameters,
         pub overrides: Vec<String>,
     }
-    
+
     impl HelmCmd {
        pub fn args(&self) -> Vec<String> {
            let mut args: Vec<String> = Vec::new();
@@ -228,7 +228,7 @@ pub mod lib {
                    args.push(String::from("json"));
                },
            }
-    
+
            return args;
         }
         fn set_flag_values(&self) -> Vec<String> {
@@ -297,7 +297,7 @@ pub mod lib {
     #[derive(Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
     struct ZookeeperConfig {
         replicas: i32
-    }    
+    }
     fn check_value(value: String) -> Result<String, String> {
         let re = Regex::new(r"^([^=]*)=(.*)$").unwrap();
         match re.captures(&value) {
@@ -454,7 +454,7 @@ pub mod lib {
 
     impl Error for ImageError {}
 
-    
+
     impl From<DescribeImagesError> for ImageError {
         fn from(error: DescribeImagesError) -> Self {
             ImageError::EcrError(error)
@@ -467,7 +467,7 @@ pub mod lib {
         }
     }
 
-    
+
     #[tokio::main]
     async fn check_deployment(namespace: &str, name: &str) -> Result<(), KubeError> {
         let client = Client::try_default().await?;
@@ -476,12 +476,16 @@ pub mod lib {
         info!("AAA {:?}", deployment.status);
         match deployment.status {
             Some(status) => {
-                match status.unavailable_replicas {
-                    Some(replicas) => {
-                        return Err(KubeError::UnavailableReplicasError(UnavailableReplicasError(name.to_string())));
+                match (status.ready_replicas) {
+                    Some(ready_replicas) => {
+                        if Some(ready_replicas) == status.replicas {
+                            return Ok(());
+                        } else {
+                            return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
+                        }
                     },
                     None => {
-                        return Ok(());
+                        return Err(KubeError::NoReplicasError(NoReplicasError(name.to_string())));
                     }
                 }
             },
@@ -530,7 +534,7 @@ pub mod lib {
                 }
             }
         }
-        
+
         if statefulsets.is_empty() {
             info!("No statefulsets to check");
         }else{
@@ -978,7 +982,7 @@ pub mod lib {
                 api.patch(&name, &patch_params, &patch).await?;
             }
         }
-    
+
         let kafka_sts: Api<StatefulSet> = Api::namespaced(client, &namespace);
         let sts_list = ListParams::default().labels(&format!("strimzi.io/cluster={}", name));
         for sts in kafka_sts.list(&sts_list).await? {
@@ -1003,7 +1007,7 @@ pub mod lib {
                 }
             }
         }
-        
+
         if statefulsets.is_empty() {
             info!("No statefulsets to check");
         }else{
@@ -1016,7 +1020,7 @@ pub mod lib {
                 }
             }
         }
-        
+
         if postgresqls.is_empty() {
             info!("No postgresqls to check");
         }else{
@@ -1029,7 +1033,7 @@ pub mod lib {
                 }
             }
         }
-        
+
         if kafkas.is_empty() {
             info!("No kafkas to check");
         }else{
