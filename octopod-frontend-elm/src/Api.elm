@@ -32,13 +32,13 @@ put url auth body decoder msg =
         }
 
 
-post : Endpoint -> AppAuth -> Http.Body -> Decoder a -> (Result Http.Error a -> msg) -> Cmd msg
-post url auth body decoder msg =
+post : Config -> (AppUrl -> Endpoint) -> Http.Body -> Decoder a -> (Result Http.Error a -> msg) -> Cmd msg
+post config url body decoder msg =
     Endpoint.request
         { method = "POST"
-        , url = url
+        , url = url config.appUrl
         , expect = Http.expectJson msg decoder
-        , headers = [ authHeader auth ]
+        , headers = [ authHeader config.appAuth ]
         , body = body
         , timeout = Nothing
         , tracker = Nothing

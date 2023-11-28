@@ -1,6 +1,6 @@
 module Html.Common exposing (..)
 
-import Html exposing (Attribute, Html, a, b, button, div, h1, span, table, tbody, td, th, thead, tr)
+import Html exposing (Attribute, Html, a, b, button, div, h1, h2, h3, span, table, tbody, td, th, thead, tr)
 import Html.Attributes exposing (class, href, target)
 import Html.Events exposing (onClick)
 import Route exposing (Route)
@@ -59,6 +59,16 @@ theadClass =
 h1Class : String -> List (Html msg) -> Html msg
 h1Class =
     elClass h1
+
+
+h2Class : String -> List (Html msg) -> Html msg
+h2Class =
+    elClass h2
+
+
+h3Class : String -> List (Html msg) -> Html msg
+h3Class =
+    elClass h3
 
 
 aClassHrefExternal : String -> String -> List (Html msg) -> Html msg

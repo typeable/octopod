@@ -1,4 +1,4 @@
-module Api.Endpoint exposing (Endpoint, configJson, deleteDeployment, deployments, projectName, request, restoreDeployment)
+module Api.Endpoint exposing (Endpoint, appOverrideKeys, appOverrides, configJson, deleteDeployment, deploymentOverrideKeys, deploymentOverrides, deployments, projectName, request, restoreDeployment)
 
 import Config exposing (AppUrl, unwrapAppUrl)
 import Deployments exposing (DeploymentName, unDeploymentName)
@@ -69,3 +69,23 @@ deleteDeployment deploymentName appUrl =
 restoreDeployment : DeploymentName -> AppUrl -> Endpoint
 restoreDeployment deploymentName appUrl =
     url (Just appUrl) [ "api", "v1", "deployments", unDeploymentName deploymentName, "restore" ] []
+
+
+deploymentOverrides : AppUrl -> Endpoint
+deploymentOverrides appUrl =
+    url (Just appUrl) [ "api", "v1", "deployment_overrides" ] []
+
+
+deploymentOverrideKeys : AppUrl -> Endpoint
+deploymentOverrideKeys appUrl =
+    url (Just appUrl) [ "api", "v1", "deployment_override_keys" ] []
+
+
+appOverrides : AppUrl -> Endpoint
+appOverrides appUrl =
+    url (Just appUrl) [ "api", "v1", "application_overrides" ] []
+
+
+appOverrideKeys : AppUrl -> Endpoint
+appOverrideKeys appUrl =
+    url (Just appUrl) [ "api", "v1", "application_override_keys" ] []

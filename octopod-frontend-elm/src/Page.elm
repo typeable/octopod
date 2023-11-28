@@ -11,10 +11,10 @@ type Page
     | Deployments
 
 
-view : String -> Page -> { title : String, content : Html msg } -> Document msg
+view : String -> Page -> { title : String, content : List (Html msg) } -> Document msg
 view projectName page { title, content } =
     { title = title
-    , body = [ viewHeader projectName, content ]
+    , body = viewHeader projectName :: content
     }
 
 

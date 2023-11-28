@@ -121,23 +121,23 @@ update msg model =
             )
 
 
-view : Model -> { title : String, content : Html Msg }
+view : Model -> { title : String, content : List (Html Msg) }
 view model =
     case ( model.config, model.projectName ) of
         ( Failure _, _ ) ->
-            { title = "Octopod", content = failureView }
+            { title = "Octopod", content = [ failureView ] }
 
         ( _, Failure _ ) ->
-            { title = "Octopod", content = failureView }
+            { title = "Octopod", content = [ failureView ] }
 
         ( Loading, _ ) ->
-            { title = "Octopod", content = loadingView }
+            { title = "Octopod", content = [ loadingView ] }
 
         ( _, Loading ) ->
-            { title = "Octopod", content = loadingView }
+            { title = "Octopod", content = [ loadingView ] }
 
         _ ->
-            { title = "Octopod", content = div [] [] }
+            { title = "Octopod", content = [] }
 
 
 failureView : Html Msg

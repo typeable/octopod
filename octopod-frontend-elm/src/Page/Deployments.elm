@@ -9,8 +9,11 @@ import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onInput)
+import Page.Deployments.CreateSidebar as CreateSidebar
 import Page.Deployments.Table as Table
 import RemoteData exposing (RemoteData(..), WebData)
+import Task
+import Time
 
 
 type alias Model =
@@ -21,6 +24,7 @@ type alias Model =
     , archivedTable : Table.Model
     , search : String
     , showArchived : Bool
+    , sidebar : CreateSidebar.Model
     }
 
 
@@ -44,6 +48,7 @@ init settings config =
       , archivedTable = Table.init config settings.zone Table.ArchivedTable
       , search = ""
       , showArchived = False
+      , sidebar = CreateSidebar.init config False
       }
     , reqConfig config
     )
@@ -71,6 +76,8 @@ type Msg
     | ArchivedTableMsg Table.Msg
     | ToggleArchived
     | WSUpdate String
+    | ShowSidebar
+    | CreateSidebarMsg CreateSidebar.Msg
 
 
 port messageReceiver : (String -> msg) -> Sub msg
@@ -111,6 +118,15 @@ update cmd model =
         WSUpdate _ ->
             ( model, reqConfig model.config )
 
+        ShowSidebar ->
+            ( { model | sidebar = CreateSidebar.init model.config True }
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
+            )
+
+        CreateSidebarMsg subMsg ->
+            CreateSidebar.update subMsg model.sidebar
+                |> updateWith (\sidebar -> { model | sidebar = sidebar }) CreateSidebarMsg
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -121,10 +137,10 @@ subscriptions model =
         ]
 
 
-view : Model -> { title : String, content : Html Msg }
+view : Model -> { title : String, content : List (Html Msg) }
 view model =
     { title = "Deployments"
-    , content = pageView model
+    , content = pageView model :: List.map (Html.map CreateSidebarMsg) (CreateSidebar.view model.sidebar)
     }
 
 
@@ -179,7 +195,7 @@ pageHeaderView model =
         [ h1Class "page__heading title" <| [ text "All deployments" ]
         , pageHeaderTimeUpdateView model
         , pageHeaderSearchView model
-        , Html.a [ Attr.class "page__action button button--add popup-handler" ] [ text "New deployment" ]
+        , buttonClass "page__action button button--add popup-handler" ShowSidebar [ text "New deployment" ]
         ]
 
 
