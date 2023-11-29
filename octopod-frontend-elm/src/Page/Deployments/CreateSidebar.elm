@@ -12,43 +12,35 @@ import Html.Events exposing (onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Page.Deployments.Overrides as Overrides
 import RemoteData exposing (RemoteData(..), WebData)
 import Set exposing (Set)
 import Time exposing (Month(..))
-import Tree exposing (Tree, getLabel, mergeTrees, mergeTreesByWithSort)
+import Tree exposing (Tree, getLabel, mergeTrees, mergeTreesByWithSort, mergeTreesWithSort)
 
 
-type alias OverrideData =
-    { path : String
-    , originalPath : String
-    , defaultValue : String
-    , value : String
-    , deleted : Bool
-    , id : Int
-    }
+overridesToDict : List (List String) -> Dict Int Overrides.OverrideData
+overridesToDict raw =
+    let
+        f x =
+            case x of
+                [ p, v ] ->
+                    Just ( p, v )
 
+                _ ->
+                    Nothing
 
-newOverride : String -> Int -> OverrideData
-newOverride p id =
-    { path = p
-    , originalPath = p
-    , defaultValue = ""
-    , value = ""
-    , deleted = False
-    , id = id
-    }
+        g i ( p, v ) =
+            ( i, Overrides.OverrideData p v )
+    in
+    Dict.fromList <| List.indexedMap g <| List.filterMap f raw
 
 
 type alias Model =
-    { appOverrides : WebData (Dict Int OverrideData)
-    , appOverrideKeys : WebData (List String)
-    , deploymentOverrides : WebData (Dict Int OverrideData)
-    , deploymentOverrideKeys : WebData (List String)
+    { appOverrides : Overrides.Model
     , name : String
     , visibility : Bool
     , config : Config
-    , openedPaths : Set (List String)
-    , nextAppOverrideId : Int
     }
 
 
@@ -64,24 +56,11 @@ hide model =
 
 init : Config -> Bool -> Model
 init config visibility =
-    { appOverrides = Loading
-    , deploymentOverrides = Loading
-    , appOverrideKeys = Loading
-    , deploymentOverrideKeys = Loading
+    { appOverrides = Overrides.init "App configuration"
     , name = ""
     , visibility = visibility
     , config = config
-    , openedPaths = Set.empty
-    , nextAppOverrideId = 0
     }
-
-
-hasEmptyOverrides : Dict Int OverrideData -> Bool
-hasEmptyOverrides overrides =
-    overrides
-        |> Dict.toList
-        |> List.filter (\( _, x ) -> x.path == "" && x.originalPath == "")
-        |> (List.isEmpty >> not)
 
 
 overridesToTrees : List (List String) -> List (Tree ( String, Maybe OverrideValue ))
@@ -98,23 +77,6 @@ overridesToTrees respRaw =
     mergeTrees (List.filterMap f respRaw)
 
 
-overridesToDict : List (List String) -> Dict Int OverrideData
-overridesToDict raw =
-    let
-        f x =
-            case x of
-                [ p, v ] ->
-                    Just ( p, v )
-
-                _ ->
-                    Nothing
-
-        g i ( p, v ) =
-            ( i, OverrideData p p v "" False i )
-    in
-    Dict.fromList <| List.indexedMap g <| List.filterMap f raw
-
-
 type Msg
     = DeploymentOverrideKeysResponse (WebData (List String))
     | DeploymentOverridesResponse (WebData (List (List String)))
@@ -123,11 +85,7 @@ type Msg
     | Close
     | Save
     | NameInput String
-    | AddAppOverride
-    | DeleteAppOverride Int
-    | RestoreAppOverride Int
-    | EditAppOverridePath Int String
-    | EditAppOverrideValue Int String
+    | AppOverridesMsg Overrides.Msg
 
 
 reqDeploymentOverrideKeys : Config -> Cmd Msg
@@ -174,12 +132,19 @@ initReqs config =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update cmd model =
+    let
+        updateWith : (subModel -> Model) -> (subMsg -> Msg) -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
+        updateWith toModel toMsg ( subModel, subCmd ) =
+            ( toModel subModel
+            , Cmd.map toMsg subCmd
+            )
+    in
     case cmd of
         DeploymentOverrideKeysResponse keys ->
-            ( { model | deploymentOverrideKeys = keys }, Cmd.none )
+            ( model, Cmd.none )
 
         DeploymentOverridesResponse overrides ->
-            ( { model | deploymentOverrides = RemoteData.map overridesToDict overrides }
+            ( model
             , Cmd.batch
                 [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
                 , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
@@ -187,12 +152,11 @@ update cmd model =
             )
 
         AppOverrideKeysResponse keys ->
-            ( { model | appOverrideKeys = keys }, Cmd.none )
+            ( { model | appOverrides = Overrides.setKeys keys model.appOverrides }, Cmd.none )
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides = RemoteData.map overridesToDict overrides
-                , nextAppOverrideId = RemoteData.unwrap 0 List.length overrides + 1
+                | appOverrides = Overrides.setDefaultOverrides (RemoteData.map overridesToDict overrides) model.appOverrides
               }
             , Cmd.none
             )
@@ -206,52 +170,9 @@ update cmd model =
         NameInput name ->
             ( { model | name = name }, Cmd.none )
 
-        AddAppOverride ->
-            ( { model
-                | appOverrides =
-                    RemoteData.map
-                        (Dict.insert model.nextAppOverrideId (newOverride "" model.nextAppOverrideId))
-                        model.appOverrides
-                , nextAppOverrideId = model.nextAppOverrideId + 1
-              }
-            , Cmd.none
-            )
-
-        DeleteAppOverride ix ->
-            let
-                deleteValue val =
-                    { val | deleted = True }
-            in
-            ( { model | appOverrides = RemoteData.map (Dict.update ix (Maybe.map deleteValue)) model.appOverrides }
-            , Cmd.none
-            )
-
-        RestoreAppOverride ix ->
-            let
-                deleteValue val =
-                    { val | deleted = False }
-            in
-            ( { model | appOverrides = RemoteData.map (Dict.update ix (Maybe.map deleteValue)) model.appOverrides }
-            , Cmd.none
-            )
-
-        EditAppOverrideValue ix value ->
-            let
-                deleteValue override =
-                    { override | value = value }
-            in
-            ( { model | appOverrides = RemoteData.map (Dict.update ix (Maybe.map deleteValue)) model.appOverrides }
-            , Cmd.none
-            )
-
-        EditAppOverridePath ix path ->
-            let
-                deleteValue override =
-                    { override | path = path }
-            in
-            ( { model | appOverrides = RemoteData.map (Dict.update ix (Maybe.map deleteValue)) model.appOverrides }
-            , Cmd.none
-            )
+        AppOverridesMsg subMsg ->
+            Overrides.update subMsg model.appOverrides
+                |> updateWith (\appOverrides -> { model | appOverrides = appOverrides }) AppOverridesMsg
 
 
 view : Model -> List (Html Msg)
@@ -281,7 +202,6 @@ sidebarHeader =
         , divClass "popup__operations"
             [ buttonClass "button button--save popup__action"
                 Close
-                -- TODO
                 [ text "Save" ]
             ]
         , divClass "popup__menu drop drop--actions"
@@ -294,7 +214,7 @@ sidebarContent model =
     divClass "popup__content"
         [ divClass "deployment"
             [ nameSection model
-            , overridesSection model
+            , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
             ]
         ]
 
@@ -310,197 +230,3 @@ nameSection _ =
                 ]
             ]
         ]
-
-
-overridesSection : Model -> Html Msg
-overridesSection model =
-    divClass "deployment__section"
-        [ h3Class "deployment__sub-heading" [ text "App configuration" ]
-        , case ( model.appOverrides, model.appOverrideKeys ) of
-            ( Success overrides, Success keys ) ->
-                overridesSectionData model overrides keys
-
-            _ ->
-                overridesSectionLoading model
-        ]
-
-
-overridesSectionLoading : Model -> Html Msg
-overridesSectionLoading _ =
-    let
-        rowLoader =
-            divClass "editable-row loader"
-                [ divClass "editable-row__placeholder" []
-                , divClass "editable-row__placeholder" []
-                , divClass "overrides__delete spot spot--loader" []
-                ]
-    in
-    divClass "deployment__widget"
-        [ divClass "padded"
-            [ Html.button [ Attr.class "dash--disabled dash dash--add overrides__add", Attr.disabled True ] [ text "Add an override" ] ]
-        , rowLoader
-        , rowLoader
-        , rowLoader
-        ]
-
-
-overridesSectionData : Model -> Dict Int OverrideData -> List String -> Html Msg
-overridesSectionData model overridesDict keys =
-    let
-        overrideCompare a b =
-            case ( a, b ) of
-                ( Tree.Leaf x, Tree.Leaf y ) ->
-                    compare y.id x.id
-
-                ( Tree.Leaf _, _ ) ->
-                    LT
-
-                ( _, Tree.Leaf _ ) ->
-                    GT
-
-                ( Tree.Node x [ Tree.Leaf _ ], Tree.Node y [ Tree.Leaf _ ] ) ->
-                    compare x y
-
-                ( Tree.Node _ [ Tree.Leaf _ ], _ ) ->
-                    LT
-
-                ( _, Tree.Node _ [ Tree.Leaf _ ] ) ->
-                    GT
-
-                ( Tree.Node x _, Tree.Node y _ ) ->
-                    compare x y
-
-        getSplitPath a =
-            if a == "" then
-                []
-
-            else
-                String.split "." a
-
-        mrg a =
-            case a of
-                Tree.Node l _ ->
-                    l
-
-                Tree.Leaf v ->
-                    String.fromInt v.id
-
-        overridesTree =
-            overridesDict
-                |> Dict.toList
-                |> List.map (\( _, a ) -> Tree.pathToTree (getSplitPath a.originalPath) a)
-                |> mergeTreesByWithSort mrg overrideCompare
-
-        addButton =
-            if hasEmptyOverrides overridesDict then
-                Html.button [ Attr.class "dash--disabled dash dash--add overrides__add", Attr.disabled True ] [ text "Add an override" ]
-
-            else
-                buttonClass "dash dash--add overrides__add" AddAppOverride [ text "Add an override" ]
-    in
-    divClass "deployment__widget"
-        [ divClass "padded"
-            (addButton :: overridesLevelView model overridesTree keys)
-        ]
-
-
-overridesLevelView : Model -> List (Tree OverrideData) -> List String -> List (Html Msg)
-overridesLevelView model overrides keys =
-    List.map
-        (overrideView model keys [])
-        overrides
-
-
-overrideEditableView : Model -> List String -> OverrideData -> Html Msg
-overrideEditableView model keys overrideData =
-    divClass "row"
-        [ divClass "editable-row"
-            [ divClass "input editable-row__key"
-                [ Html.input
-                    [ Attr.class "input__widget key-default-pristine"
-                    , Attr.placeholder "key"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.value overrideData.path
-                    , onInput (EditAppOverridePath overrideData.id)
-                    ]
-                    []
-                ]
-            , divClass "input editable-row__value"
-                [ Html.input
-                    [ Attr.class "input__widget value-pristine"
-                    , Attr.placeholder "value"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.value
-                        (if overrideData.value == "" then
-                            overrideData.defaultValue
-
-                         else
-                            overrideData.value
-                        )
-                    , onInput (EditAppOverrideValue overrideData.id)
-                    ]
-                    []
-                ]
-            , buttonClass "editable-row__delete spot spot--cancel" (DeleteAppOverride overrideData.id) []
-            ]
-        ]
-
-
-overrideDeletedView : Model -> OverrideData -> Html Msg
-overrideDeletedView _ overrideData =
-    divClass "row"
-        [ divClass "editable-row"
-            [ divClass "input editable-row__key input--deleted"
-                [ Html.input
-                    [ Attr.class "input__widget key-deleted"
-                    , Attr.placeholder "key"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.disabled True
-                    , Attr.value overrideData.path
-                    ]
-                    []
-                ]
-            , divClass "input editable-row__value input--deleted"
-                [ Html.input
-                    [ Attr.class "input__widget value-deleted"
-                    , Attr.placeholder "key"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.disabled True
-                    , Attr.value
-                        (if overrideData.value == "" then
-                            overrideData.defaultValue
-
-                         else
-                            overrideData.value
-                        )
-                    ]
-                    []
-                ]
-            , buttonClass "editable-row__delete spot spot--undo" (RestoreAppOverride overrideData.id) []
-            ]
-        ]
-
-
-overrideView : Model -> List String -> List String -> Tree OverrideData -> Html Msg
-overrideView model keys partPath override =
-    case override of
-        Tree.Leaf overrideData ->
-            if overrideData.deleted then
-                overrideDeletedView model overrideData
-
-            else
-                overrideEditableView model keys overrideData
-
-        Tree.Node piece [ Tree.Leaf overrideData ] ->
-            if overrideData.deleted then
-                overrideDeletedView model overrideData
-
-            else
-                overrideEditableView model keys overrideData
-
-        _ ->
-            div [] [ text "TODO" ]
