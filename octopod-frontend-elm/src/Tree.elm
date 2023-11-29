@@ -62,11 +62,16 @@ mergeTrees ts =
                 ( _, Leaf _ ) ->
                     GT
     in
-    mergeTreesSortWith defaultCompare ts
+    mergeTreesWithSort defaultCompare ts
 
 
-mergeTreesSortWith : (Tree a -> Tree a -> Order) -> List (Tree a) -> List (Tree a)
-mergeTreesSortWith cmp ts =
+mergeTreesWithSort : (Tree a -> Tree a -> Order) -> List (Tree a) -> List (Tree a)
+mergeTreesWithSort =
+    mergeTreesByWithSort getLabel
+
+
+mergeTreesByWithSort : (Tree a -> b) -> (Tree a -> Tree a -> Order) -> List (Tree a) -> List (Tree a)
+mergeTreesByWithSort mrg cmp ts =
     let
         f x =
             case x of
@@ -74,14 +79,16 @@ mergeTreesSortWith cmp ts =
                     cs
                         :: List.map getChildren ns
                         |> List.concat
-                        |> mergeTreesSortWith cmp
+                        |> mergeTreesByWithSort mrg cmp
                         |> List.sortWith cmp
                         |> Node l
 
                 ( Leaf a, _ ) ->
                     Leaf a
     in
-    List.sortWith cmp (List.map f (List.gatherEqualsBy getLabel ts))
+    List.gatherEqualsBy mrg ts
+        |> List.map f
+        |> List.sortWith cmp
 
 
 getByPath : List (Tree a) -> List String -> Maybe a

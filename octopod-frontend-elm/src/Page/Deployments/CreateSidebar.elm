@@ -15,7 +15,7 @@ import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..), WebData)
 import Set exposing (Set)
 import Time exposing (Month(..))
-import Tree exposing (Tree, mergeTrees, mergeTreesSortWith)
+import Tree exposing (Tree, getLabel, mergeTrees, mergeTreesByWithSort)
 
 
 type alias OverrideData =
@@ -41,8 +41,8 @@ newOverride p id =
 
 type alias Model =
     { appOverrides : WebData (Dict Int OverrideData)
-    , deploymentOverrides : WebData (Dict Int OverrideData)
     , appOverrideKeys : WebData (List String)
+    , deploymentOverrides : WebData (Dict Int OverrideData)
     , deploymentOverrideKeys : WebData (List String)
     , name : String
     , visibility : Bool
@@ -207,16 +207,15 @@ update cmd model =
             ( { model | name = name }, Cmd.none )
 
         AddAppOverride ->
-            Debug.log "!"
-                ( { model
-                    | appOverrides =
-                        RemoteData.map
-                            (Dict.insert model.nextAppOverrideId (newOverride "" model.nextAppOverrideId))
-                            model.appOverrides
-                    , nextAppOverrideId = model.nextAppOverrideId + 1
-                  }
-                , Cmd.none
-                )
+            ( { model
+                | appOverrides =
+                    RemoteData.map
+                        (Dict.insert model.nextAppOverrideId (newOverride "" model.nextAppOverrideId))
+                        model.appOverrides
+                , nextAppOverrideId = model.nextAppOverrideId + 1
+              }
+            , Cmd.none
+            )
 
         DeleteAppOverride ix ->
             let
@@ -350,6 +349,15 @@ overridesSectionData model overridesDict keys =
     let
         overrideCompare a b =
             case ( a, b ) of
+                ( Tree.Leaf x, Tree.Leaf y ) ->
+                    compare y.id x.id
+
+                ( Tree.Leaf _, _ ) ->
+                    LT
+
+                ( _, Tree.Leaf _ ) ->
+                    GT
+
                 ( Tree.Node x [ Tree.Leaf _ ], Tree.Node y [ Tree.Leaf _ ] ) ->
                     compare x y
 
@@ -362,16 +370,26 @@ overridesSectionData model overridesDict keys =
                 ( Tree.Node x _, Tree.Node y _ ) ->
                     compare x y
 
-                _ ->
-                    GT
+        getSplitPath a =
+            if a == "" then
+                []
 
-        chose
+            else
+                String.split "." a
+
+        mrg a =
+            case a of
+                Tree.Node l _ ->
+                    l
+
+                Tree.Leaf v ->
+                    String.fromInt v.id
 
         overridesTree =
             overridesDict
                 |> Dict.toList
-                |> List.map (\( _, a ) -> Tree.pathToTree (String.split "." a.originalPath) a)
-                |> mergeTreesSortWith overrideCompare
+                |> List.map (\( _, a ) -> Tree.pathToTree (getSplitPath a.originalPath) a)
+                |> mergeTreesByWithSort mrg overrideCompare
 
         addButton =
             if hasEmptyOverrides overridesDict then
@@ -470,6 +488,13 @@ overrideDeletedView _ overrideData =
 overrideView : Model -> List String -> List String -> Tree OverrideData -> Html Msg
 overrideView model keys partPath override =
     case override of
+        Tree.Leaf overrideData ->
+            if overrideData.deleted then
+                overrideDeletedView model overrideData
+
+            else
+                overrideEditableView model keys overrideData
+
         Tree.Node piece [ Tree.Leaf overrideData ] ->
             if overrideData.deleted then
                 overrideDeletedView model overrideData
@@ -478,4 +503,4 @@ overrideView model keys partPath override =
                 overrideEditableView model keys overrideData
 
         _ ->
-            div [] [ text "lol" ]
+            div [] [ text "TODO" ]
