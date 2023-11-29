@@ -36,8 +36,19 @@ overridesToDict raw =
     Dict.fromList <| List.indexedMap g <| List.filterMap f raw
 
 
+dictToOverrides : Dict Int Overrides.OverrideData -> List (List String)
+dictToOverrides =
+    let
+        f ( _, b ) =
+            [ b.path, b.value ]
+    in
+    Dict.toList
+        >> List.map f
+
+
 type alias Model =
     { appOverrides : Overrides.Model
+    , deploymentOverrides : Overrides.Model
     , name : String
     , visibility : Bool
     , config : Config
@@ -57,6 +68,7 @@ hide model =
 init : Config -> Bool -> Model
 init config visibility =
     { appOverrides = Overrides.init "App configuration"
+    , deploymentOverrides = Overrides.init "Deployment configuration"
     , name = ""
     , visibility = visibility
     , config = config
@@ -86,6 +98,7 @@ type Msg
     | Save
     | NameInput String
     | AppOverridesMsg Overrides.Msg
+    | DeploymentOverridesMsg Overrides.Msg
 
 
 reqDeploymentOverrideKeys : Config -> Cmd Msg
@@ -141,10 +154,12 @@ update cmd model =
     in
     case cmd of
         DeploymentOverrideKeysResponse keys ->
-            ( model, Cmd.none )
+            ( { model | deploymentOverrides = Overrides.setKeys keys model.deploymentOverrides }, Cmd.none )
 
         DeploymentOverridesResponse overrides ->
-            ( model
+            ( { model
+                | deploymentOverrides = Overrides.setDefaultOverrides (RemoteData.map overridesToDict overrides) model.deploymentOverrides
+              }
             , Cmd.batch
                 [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
                 , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
@@ -173,6 +188,20 @@ update cmd model =
         AppOverridesMsg subMsg ->
             Overrides.update subMsg model.appOverrides
                 |> updateWith (\appOverrides -> { model | appOverrides = appOverrides }) AppOverridesMsg
+
+        DeploymentOverridesMsg subMsg ->
+            let
+                ( model_, cmd_ ) =
+                    Overrides.update subMsg model.deploymentOverrides
+                        |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
+            in
+            ( { model_ | appOverrides = Overrides.init "App configuration" }
+            , Cmd.batch
+                [ reqAppOverrideKeys model_.config ((Overrides.getEditOverrides >> dictToOverrides) model_.deploymentOverrides)
+                , reqAppOverrides model_.config ((Overrides.getEditOverrides >> dictToOverrides) model_.deploymentOverrides)
+                , cmd_
+                ]
+            )
 
 
 view : Model -> List (Html Msg)
@@ -214,6 +243,7 @@ sidebarContent model =
     divClass "popup__content"
         [ divClass "deployment"
             [ nameSection model
+            , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverrides)
             , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
             ]
         ]

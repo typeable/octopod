@@ -69,6 +69,25 @@ setDefaultOverrides defaultOverrides model =
     }
 
 
+getEditOverrides : Model -> Dict Int OverrideData
+getEditOverrides model =
+    case model.defaultOverrides of
+        Success defaultOverrides ->
+            Dict.merge
+                (\i a acc -> Dict.insert i a acc)
+                (\i a _ acc -> Dict.insert i a acc)
+                (\i b acc -> Dict.insert i (Just b) acc)
+                model.editedOverrides
+                defaultOverrides
+                Dict.empty
+                |> Dict.toList
+                |> List.filterMap (\( i, mv ) -> Maybe.map (\v -> ( i, v )) mv)
+                |> Dict.fromList
+
+        _ ->
+            Dict.empty
+
+
 setKeys : WebData (List String) -> Model -> Model
 setKeys keys model =
     { model | keys = keys }
