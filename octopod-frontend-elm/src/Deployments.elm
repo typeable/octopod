@@ -4,7 +4,6 @@ import Json.Decode as Decode exposing (Decoder, andThen, string)
 import Json.Decode.Extra exposing (datetime)
 import Json.Decode.Pipeline exposing (optional, required, resolve)
 import Json.Encode as Encode
-import Route exposing (Route(..))
 import Time
 
 

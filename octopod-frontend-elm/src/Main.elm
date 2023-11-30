@@ -7,6 +7,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode exposing (Decoder, field, int, map4, string)
 import Page
+import Page.Deployment as Deployment
 import Page.Deployments as Deployments
 import Page.Initialization as Initialization
 import Route exposing (Route)
@@ -36,6 +37,7 @@ main =
 type Model
     = Initialization Initialization.Model
     | Deployments Deployments.Model
+    | Deployment Deployment.Model
 
 
 getNavKey : Model -> Nav.Key
@@ -47,6 +49,9 @@ getNavKey model =
         Deployments subModel ->
             Deployments.getNavKey subModel
 
+        Deployment subModel ->
+            Deployment.getNavKey subModel
+
 
 getConfig : Model -> Config
 getConfig model =
@@ -57,6 +62,9 @@ getConfig model =
         Deployments subModel ->
             Deployments.getConfig subModel
 
+        Deployment subModel ->
+            Deployment.getConfig subModel
+
 
 getSettings : Model -> Settings
 getSettings model =
@@ -66,6 +74,9 @@ getSettings model =
 
         Deployments subModel ->
             Deployments.getSettings subModel
+
+        Deployment subModel ->
+            Deployment.getSettings subModel
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -83,6 +94,7 @@ type Msg
     | UrlChanged Url.Url
     | InitializationMsg Initialization.Msg
     | DeploymentsMsg Deployments.Msg
+    | DeploymentMsg Deployment.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -111,6 +123,10 @@ update msg model =
             Deployments.update subMsg deployments
                 |> updateWith Deployments DeploymentsMsg
 
+        ( DeploymentMsg subMsg, Deployment deployments ) ->
+            Deployment.update subMsg deployments
+                |> updateWith Deployment DeploymentMsg
+
         ( _, _ ) ->
             ( model, Cmd.none )
 
@@ -133,6 +149,10 @@ changeRouteTo maybeRoute model =
             Deployments.init (getSettings model) (getConfig model)
                 |> updateWith Deployments DeploymentsMsg
 
+        Just (Route.Deployment deploymentName) ->
+            Deployment.init (getSettings model) (getConfig model)
+                |> updateWith Deployment DeploymentMsg
+
 
 
 -- SUBSCRIPTIONS
@@ -146,6 +166,9 @@ subscriptions model =
 
         Deployments deployments ->
             Sub.map DeploymentsMsg (Deployments.subscriptions deployments)
+
+        _ ->
+            Sub.none
 
 
 
@@ -170,3 +193,6 @@ view model =
 
         Deployments subModel ->
             viewPage Page.Deployments DeploymentsMsg (Deployments.view subModel)
+
+        Deployment subModel ->
+            viewPage Page.Deployment DeploymentMsg (Deployment.view subModel)

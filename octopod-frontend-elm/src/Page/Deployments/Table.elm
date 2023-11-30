@@ -3,15 +3,17 @@ module Page.Deployments.Table exposing (..)
 import Api
 import Api.Endpoint as Endpoint exposing (..)
 import Browser.Events
-import Config exposing (Config)
+import Config exposing (Config, Settings)
 import Deployments exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onClick)
+import Html.Events.Extra exposing (onClickStopPropagation)
 import Http
 import Json.Decode as Decode
 import RemoteData exposing (RemoteData(..))
+import Route
 import Set.Any as Set exposing (AnySet)
 import Time exposing (Month(..), Posix, Zone, posixToMillis, toMonth)
 
@@ -24,7 +26,7 @@ type alias Model =
     , tableType : TableType
     , archivePopup : Maybe DeploymentName
     , config : Config
-    , zone : Zone
+    , settings : Settings
     }
 
 
@@ -58,10 +60,11 @@ type Msg
     | DeleteDeploymentResp (Api.WebData String)
     | RestoreDeploymentReq DeploymentName
     | RestoreDeploymentResp (Api.WebData String)
+    | GoToDeployment DeploymentName
 
 
-init : Config -> Zone -> TableType -> Model
-init config zone tableType =
+init : Config -> Settings -> TableType -> Model
+init config settings tableType =
     { sort = Desc Updated
     , openedAppOverrides = Set.empty unDeploymentName
     , openedDeployemntOverrides = Set.empty unDeploymentName
@@ -69,7 +72,7 @@ init config zone tableType =
     , tableType = tableType
     , archivePopup = Nothing
     , config = config
-    , zone = zone
+    , settings = settings
     }
 
 
@@ -114,6 +117,9 @@ update cmd model =
 
         RestoreDeploymentResp _ ->
             ( model, Cmd.none )
+
+        GoToDeployment deploymentName ->
+            ( model, Route.pushUrl model.settings.navKey (Route.Deployment deploymentName) )
 
 
 reqDeleteDeployment : Config -> DeploymentName -> Cmd Msg
@@ -384,17 +390,24 @@ overridesView openCmd closeCmd dName opened overrides =
 
         visibleOverrides =
             List.take 3 overrides
+
+        buttonClass_ cls msg body =
+            Html.button
+                [ Attr.class cls
+                , onClickStopPropagation msg
+                ]
+                body
     in
     if List.length overrides == List.length visibleOverrides then
         List.map overrideView overrides
 
     else if Set.member dName opened then
         List.append (List.map overrideView overrides)
-            [ buttonClass "expander listing__more expander--open" (closeCmd dName) [ text "Hide default configuration" ] ]
+            [ buttonClass_ "expander listing__more expander--open" (closeCmd dName) [ text "Hide default configuration" ] ]
 
     else
         List.append (List.map overrideView visibleOverrides)
-            [ buttonClass "expander listing__more" (openCmd dName) [ text "Show full configuration" ] ]
+            [ buttonClass_ "expander listing__more" (openCmd dName) [ text "Show full configuration" ] ]
 
 
 dateView : Zone -> Posix -> Html Msg
@@ -521,6 +534,13 @@ deploymentView model deployment =
             else
                 class
 
+        buttonClass_ cls msg body =
+            Html.button
+                [ Attr.class cls
+                , onClickStopPropagation msg
+                ]
+                body
+
         dropDown =
             div
                 [ Attr.class <|
@@ -533,7 +553,7 @@ deploymentView model deployment =
                            )
                 , Attr.id (getDropdownId model)
                 ]
-                [ buttonClass "drop__handler"
+                [ buttonClass_ "drop__handler"
                     (OpenMenu deployment.deployment.name)
                     [ text "Actions" ]
                 , divClass "drop__dropdown" <|
@@ -565,12 +585,12 @@ deploymentView model deployment =
                             ]
                 ]
     in
-    tr []
+    tr [ onClick (GoToDeployment deployment.deployment.name) ]
         [ td [] name
         , td [] links
         , td [] deploymentOverrides
         , td [] appOverrides
-        , td [] [ dateView model.zone deployment.createdAt ]
-        , td [] [ dateView model.zone deployment.updatedAt ]
+        , td [] [ dateView model.settings.zone deployment.createdAt ]
+        , td [] [ dateView model.settings.zone deployment.updatedAt ]
         , td [] [ dropDown ]
         ]

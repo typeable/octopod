@@ -9,6 +9,7 @@ import Html.Common exposing (bClass, divClass)
 type Page
     = Initialization
     | Deployments
+    | Deployment
 
 
 view : String -> Page -> { title : String, content : List (Html msg) } -> Document msg

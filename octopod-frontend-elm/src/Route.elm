@@ -1,6 +1,7 @@
-module Route exposing (Route(..), fromUrl, href, replaceUrl)
+module Route exposing (Route(..), fromUrl, href, pushUrl, replaceUrl)
 
 import Browser.Navigation as Nav
+import Deployments exposing (DeploymentName(..), unDeploymentName)
 import Html exposing (Attribute)
 import Html.Attributes as Attr
 import Url exposing (Url)
@@ -12,14 +13,16 @@ import Url.Parser as Parser exposing ((</>), Parser, oneOf, s)
 
 
 type Route
-  = Deployments
+    = Deployments
+    | Deployment DeploymentName
 
 
 parser : Parser (Route -> a) a
 parser =
-  oneOf
-    [ Parser.map Deployments (s "deployments")
-    ]
+    oneOf
+        [ Parser.map Deployments (s "deployments")
+        , Parser.map Deployment (s "deployments" </> Parser.custom "deployment" (\str -> Just (DeploymentName str)))
+        ]
 
 
 
@@ -34,6 +37,11 @@ href targetRoute =
 replaceUrl : Nav.Key -> Route -> Cmd msg
 replaceUrl key route =
     Nav.replaceUrl key (routeToString route)
+
+
+pushUrl : Nav.Key -> Route -> Cmd msg
+pushUrl key route =
+    Nav.pushUrl key (routeToString route)
 
 
 fromUrl : Url -> Maybe Route
@@ -56,6 +64,9 @@ routeToString page =
 
 routeToPieces : Route -> List String
 routeToPieces page =
-  case page of
-    Deployments ->
-      ["deployments"]
+    case page of
+        Deployments ->
+            [ "deployments" ]
+
+        Deployment deployment ->
+            [ "deployments", unDeploymentName deployment ]
