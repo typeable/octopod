@@ -10,7 +10,7 @@ import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Http
 import Json.Decode as Decode
-import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData exposing (RemoteData(..))
 import Set.Any as Set exposing (AnySet)
 import Time exposing (Month(..), Posix, Zone, posixToMillis, toMonth)
 
@@ -54,9 +54,9 @@ type Msg
     | OpenArchivePopup DeploymentName
     | CloseArchivePopup
     | DeleteDeploymentReq DeploymentName
-    | DeleteDeploymentResp (WebData String)
+    | DeleteDeploymentResp (Api.WebData String)
     | RestoreDeploymentReq DeploymentName
-    | RestoreDeploymentResp (WebData String)
+    | RestoreDeploymentResp (Api.WebData String)
 
 
 init : Config -> Zone -> TableType -> Model
@@ -182,7 +182,7 @@ isOutsideDropdown dropdownId =
         ]
 
 
-view : Model -> WebData Deployments -> String -> Html Msg
+view : Model -> Api.WebData Deployments -> String -> Html Msg
 view model deployments search =
     divClass "table table--deployments table--clickable table--double-click" <|
         table []
@@ -271,7 +271,7 @@ tablePrimaryHeaderView model =
         ]
 
 
-tablePrimaryBodyView : Model -> WebData Deployments -> String -> Html Msg
+tablePrimaryBodyView : Model -> Api.WebData Deployments -> String -> Html Msg
 tablePrimaryBodyView model deployments search =
     case deployments of
         Success d ->

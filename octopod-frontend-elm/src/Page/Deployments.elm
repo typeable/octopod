@@ -4,14 +4,15 @@ import Api
 import Api.Endpoint exposing (..)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
+import Debounce exposing (Debounce)
 import Deployments exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onInput)
-import Page.Deployments.CreateSidebar as CreateSidebar
 import Page.Deployments.Table as Table
-import RemoteData exposing (RemoteData(..), WebData)
+import Page.Sidebar.Create as CreateSidebar
+import RemoteData exposing (RemoteData(..))
 import Task
 import Time
 
@@ -19,24 +20,14 @@ import Time
 type alias Model =
     { settings : Settings
     , config : Config
-    , deployments : WebData Deployments
+    , deployments : Api.WebData Deployments
     , activeTable : Table.Model
     , archivedTable : Table.Model
     , search : String
     , showArchived : Bool
     , sidebar : CreateSidebar.Model
+    , debounce : Debounce ()
     }
-
-
-type Sort
-    = Asc Column
-    | Desc Column
-
-
-type Column
-    = Name
-    | Updated
-    | Created
 
 
 init : Settings -> Config -> ( Model, Cmd Msg )
@@ -49,9 +40,17 @@ init settings config =
       , search = ""
       , showArchived = False
       , sidebar = CreateSidebar.init config False
+      , debounce = Debounce.init
       }
     , reqConfig config
     )
+
+
+debounceConfig : Debounce.Config Msg
+debounceConfig =
+    { strategy = Debounce.soon 5000
+    , transform = DebounceMsg
+    }
 
 
 getNavKey : Model -> Nav.Key
@@ -70,7 +69,7 @@ getSettings model =
 
 
 type Msg
-    = DeploymentsResponse (WebData Deployments)
+    = DeploymentsResponse (Api.WebData Deployments)
     | SearchInput String
     | ActiveTableMsg Table.Msg
     | ArchivedTableMsg Table.Msg
@@ -78,6 +77,7 @@ type Msg
     | WSUpdate String
     | ShowSidebar
     | CreateSidebarMsg CreateSidebar.Msg
+    | DebounceMsg Debounce.Msg
 
 
 port messageReceiver : (String -> msg) -> Sub msg
@@ -116,8 +116,13 @@ update cmd model =
             ( { model | showArchived = not model.showArchived }, Cmd.none )
 
         WSUpdate _ ->
-            ( model, reqConfig model.config )
+            let
+                ( debounce, subCmd ) =
+                    Debounce.push debounceConfig () model.debounce
+            in
+            ( { model | debounce = debounce }, subCmd )
 
+        -- ( model, reqConfig model.config )
         ShowSidebar ->
             ( { model | sidebar = CreateSidebar.init model.config True }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
@@ -126,6 +131,19 @@ update cmd model =
         CreateSidebarMsg subMsg ->
             CreateSidebar.update subMsg model.sidebar
                 |> updateWith (\sidebar -> { model | sidebar = sidebar }) CreateSidebarMsg
+
+        DebounceMsg msg ->
+            let
+                ( debounce, subCmd ) =
+                    Debounce.update
+                        debounceConfig
+                        (Debounce.takeAll (\_ _ -> reqConfig model.config))
+                        msg
+                        model.debounce
+            in
+            ( { model | debounce = debounce }
+            , subCmd
+            )
 
 
 subscriptions : Model -> Sub Msg
@@ -204,7 +222,7 @@ pageBodyWrapper body =
     divClass "page__body" [ divClass "body" body ]
 
 
-dataPrimaryView : Model -> WebData Deployments -> Html Msg
+dataPrimaryView : Model -> Api.WebData Deployments -> Html Msg
 dataPrimaryView model activeDeploymets =
     divClass "data__primary"
         [ Html.map ActiveTableMsg (Table.view model.activeTable activeDeploymets model.search) ]
@@ -223,7 +241,7 @@ toggleButtonView model =
             [ text <| "Show Archived deployments" ]
 
 
-dataArchivedView : Model -> WebData Deployments -> Html Msg
+dataArchivedView : Model -> Api.WebData Deployments -> Html Msg
 dataArchivedView model archivedDeploymets =
     let
         dataClass =

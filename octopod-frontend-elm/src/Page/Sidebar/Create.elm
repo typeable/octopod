@@ -1,4 +1,4 @@
-module Page.Deployments.CreateSidebar exposing (..)
+module Page.Sidebar.Create exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
@@ -12,38 +12,10 @@ import Html.Events exposing (onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Page.Deployments.Overrides as Overrides
-import RemoteData exposing (RemoteData(..), WebData)
+import Page.Sidebar.Overrides as Overrides
+import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
-import Tree exposing (Tree, getLabel, mergeTrees, mergeTreesByWithSort, mergeTreesWithSort)
-
-
-overridesToDict : List (List String) -> Dict Int Overrides.OverrideData
-overridesToDict raw =
-    let
-        f x =
-            case x of
-                [ p, v ] ->
-                    Just ( p, v )
-
-                _ ->
-                    Nothing
-
-        g i ( p, v ) =
-            ( i, Overrides.OverrideData p v )
-    in
-    Dict.fromList <| List.indexedMap g <| List.filterMap f raw
-
-
-dictToOverrides : Dict Int Overrides.OverrideData -> List (List String)
-dictToOverrides =
-    let
-        f ( _, b ) =
-            [ b.path, b.value ]
-    in
-    Dict.toList
-        >> List.map f
 
 
 type alias Model =
@@ -52,17 +24,8 @@ type alias Model =
     , name : String
     , visibility : Bool
     , config : Config
+    , saveResp : Api.WebData ()
     }
-
-
-show : Model -> Model
-show model =
-    { model | visibility = True }
-
-
-hide : Model -> Model
-hide model =
-    { model | visibility = False }
 
 
 init : Config -> Bool -> Model
@@ -72,33 +35,21 @@ init config visibility =
     , name = ""
     , visibility = visibility
     , config = config
+    , saveResp = NotAsked
     }
 
 
-overridesToTrees : List (List String) -> List (Tree ( String, Maybe OverrideValue ))
-overridesToTrees respRaw =
-    let
-        f x =
-            case x of
-                [ p, v ] ->
-                    Just (Tree.pathToTree (String.split "." p) ( v, Nothing ))
-
-                _ ->
-                    Nothing
-    in
-    mergeTrees (List.filterMap f respRaw)
-
-
 type Msg
-    = DeploymentOverrideKeysResponse (WebData (List String))
-    | DeploymentOverridesResponse (WebData (List (List String)))
-    | AppOverrideKeysResponse (WebData (List String))
-    | AppOverridesResponse (WebData (List (List String)))
+    = DeploymentOverrideKeysResponse (Api.WebData (List String))
+    | DeploymentOverridesResponse (Api.WebData (List (List String)))
+    | AppOverrideKeysResponse (Api.WebData (List String))
+    | AppOverridesResponse (Api.WebData (List (List String)))
     | Close
     | Save
     | NameInput String
     | AppOverridesMsg Overrides.Msg
     | DeploymentOverridesMsg Overrides.Msg
+    | SaveDeploymentResponse (Api.WebData ())
 
 
 reqDeploymentOverrideKeys : Config -> Cmd Msg
@@ -135,6 +86,15 @@ reqAppOverrides config body =
         (RemoteData.fromResult >> AppOverridesResponse)
 
 
+reqSaveDeployment : Config -> Info -> Cmd Msg
+reqSaveDeployment config body =
+    Api.post config
+        saveDeployment
+        (Http.jsonBody (infoEncode body))
+        (Decode.succeed ())
+        (RemoteData.fromResult >> SaveDeploymentResponse)
+
+
 initReqs : Config -> Cmd Msg
 initReqs config =
     Cmd.batch
@@ -158,7 +118,7 @@ update cmd model =
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverrides = Overrides.setDefaultOverrides (RemoteData.map overridesToDict overrides) model.deploymentOverrides
+                | deploymentOverrides = Overrides.setDefaultOverrides overrides model.deploymentOverrides
               }
             , Cmd.batch
                 [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
@@ -171,16 +131,13 @@ update cmd model =
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides = Overrides.setDefaultOverrides (RemoteData.map overridesToDict overrides) model.appOverrides
+                | appOverrides = Overrides.setDefaultOverrides overrides model.appOverrides
               }
             , Cmd.none
             )
 
         Close ->
             ( { model | visibility = False }, Cmd.none )
-
-        Save ->
-            ( model, Cmd.none )
 
         NameInput name ->
             ( { model | name = name }, Cmd.none )
@@ -195,13 +152,36 @@ update cmd model =
                     Overrides.update subMsg model.deploymentOverrides
                         |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
             in
-            ( { model_ | appOverrides = Overrides.init "App configuration" }
-            , Cmd.batch
-                [ reqAppOverrideKeys model_.config ((Overrides.getEditOverrides >> dictToOverrides) model_.deploymentOverrides)
-                , reqAppOverrides model_.config ((Overrides.getEditOverrides >> dictToOverrides) model_.deploymentOverrides)
-                , cmd_
-                ]
-            )
+            if Overrides.changeData subMsg then
+                ( { model_ | appOverrides = Overrides.init "App configuration" }
+                , Cmd.batch
+                    [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
+                    , reqAppOverrides model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
+                    , cmd_
+                    ]
+                )
+
+            else
+                ( model_, cmd_ )
+
+        Save ->
+            let
+                deploymentOverrides =
+                    Overrides.getEditedOverrides model.deploymentOverrides
+
+                appOverrides =
+                    Overrides.getEditedOverrides model.appOverrides
+
+                info =
+                    { name = DeploymentName model.name
+                    , deploymentOverrides = deploymentOverrides
+                    , appOverrides = appOverrides
+                    }
+            in
+            ( { model | saveResp = Loading }, reqSaveDeployment model.config info )
+
+        SaveDeploymentResponse resp ->
+            ( { model | saveResp = resp }, Cmd.none )
 
 
 view : Model -> List (Html Msg)
@@ -210,7 +190,7 @@ view model =
         [ divClass "popup popup--visible"
             [ Html.div [ Attr.attribute "aria-hidden" "true", Attr.class "popup__overlay" ] []
             , divClass "popup__body"
-                [ sidebarHeader
+                [ sidebarHeader model
                 , sidebarContent model
                 ]
             ]
@@ -220,8 +200,26 @@ view model =
         []
 
 
-sidebarHeader : Html Msg
-sidebarHeader =
+sidebarHeader : Model -> Html Msg
+sidebarHeader model =
+    let
+        button =
+            case model.saveResp of
+                Loading ->
+                    Html.button
+                        [ Attr.class "popup__action button button--save-loading"
+                        , Attr.disabled True
+                        ]
+                        [ text "Save" ]
+
+                Success _ ->
+                    Html.button
+                        [ Attr.class "button button--save popup__action", Attr.disabled True ]
+                        [ text "Save" ]
+
+                _ ->
+                    buttonClass "button button--save popup__action" Save [ text "Save" ]
+    in
     divClass "popup__head"
         [ buttonClass "popup__close"
             Close
@@ -229,9 +227,7 @@ sidebarHeader =
         , h2Class "popup__project"
             [ text "Create new deployment" ]
         , divClass "popup__operations"
-            [ buttonClass "button button--save popup__action"
-                Close
-                [ text "Save" ]
+            [ button
             ]
         , divClass "popup__menu drop drop--actions"
             []
@@ -240,22 +236,50 @@ sidebarHeader =
 
 sidebarContent : Model -> Html Msg
 sidebarContent model =
+    let
+        errorText =
+            case model.saveResp of
+                RemoteData.Failure (Api.BadStatus _ msg) ->
+                    Just msg
+
+                RemoteData.Failure _ ->
+                    Just "Something went wrong"
+
+                _ ->
+                    Nothing
+
+        errorViewer msg =
+            [ divClass "deployment__output notification notification--danger"
+                [ text msg ]
+            ]
+
+        errorView =
+            errorText |> Maybe.map errorViewer |> Maybe.withDefault []
+    in
     divClass "popup__content"
         [ divClass "deployment"
-            [ nameSection model
-            , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverrides)
-            , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
-            ]
+            (errorView
+                ++ [ nameSection model
+                   , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverrides)
+                   , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
+                   ]
+            )
         ]
 
 
 nameSection : Model -> Html Msg
-nameSection _ =
+nameSection model =
     divClass "deployment__section"
         [ h3Class "deployment__sub-heading" [ text "Name" ]
         , divClass "deployment__widget"
             [ divClass "input"
-                [ input [ Attr.class "input__widget tag", Attr.type_ "text", Attr.placeholder "Name", onInput NameInput ]
+                [ input
+                    [ Attr.class "input__widget tag"
+                    , Attr.type_ "text"
+                    , Attr.placeholder "Name"
+                    , Attr.value model.name
+                    , onInput NameInput
+                    ]
                     []
                 ]
             ]

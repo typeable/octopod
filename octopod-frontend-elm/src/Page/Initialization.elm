@@ -9,7 +9,7 @@ import Html.Attributes as Attr
 import Html.Common exposing (bClass, divClass)
 import Http
 import Json.Decode as Decode
-import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData exposing (RemoteData(..))
 import Route
 import Task
 import Time
@@ -19,8 +19,8 @@ import Url
 type alias Model =
     { settings : Settings
     , url : Url.Url
-    , config : WebData Config
-    , projectName : WebData String
+    , config : Api.WebData Config
+    , projectName : Api.WebData String
     }
 
 
@@ -59,8 +59,8 @@ getSettings model =
 
 
 type Msg
-    = ConfigResponse (WebData Config)
-    | ProjectNameResponse (WebData String)
+    = ConfigResponse (Api.WebData Config)
+    | ProjectNameResponse (Api.WebData String)
     | AdjustTimeZone Time.Zone
 
 
@@ -69,7 +69,7 @@ reqConfig =
     Endpoint.request
         { method = "GET"
         , url = configJson
-        , expect = Http.expectJson (RemoteData.fromResult >> ConfigResponse) configDecoder
+        , expect = Api.expectJson (RemoteData.fromResult >> ConfigResponse) configDecoder
         , headers = []
         , body = Http.emptyBody
         , timeout = Nothing

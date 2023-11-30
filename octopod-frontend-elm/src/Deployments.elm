@@ -3,6 +3,7 @@ module Deployments exposing (..)
 import Json.Decode as Decode exposing (Decoder, andThen, string)
 import Json.Decode.Extra exposing (datetime)
 import Json.Decode.Pipeline exposing (optional, required, resolve)
+import Json.Encode as Encode
 import Route exposing (Route(..))
 import Time
 
@@ -193,6 +194,13 @@ type OverrideHelper
     | OverrideValue_ OverrideValue
 
 
+overrideToHelper : Override -> List OverrideHelper
+overrideToHelper override =
+    [ OverrideName_ (unOverrideName override.name)
+    , OverrideValue_ override.value
+    ]
+
+
 overrideDecoder : Decoder Override
 overrideDecoder =
     let
@@ -249,3 +257,45 @@ isDeploymentArchived d =
 
         DeploymentNotPending s ->
             List.member s [ ArchivePending, Archived ]
+
+
+infoEncode : Info -> Encode.Value
+infoEncode info =
+    Encode.object
+        [ ( "name", Encode.string (unDeploymentName info.name) )
+        , ( "app_overrides", Encode.list overrideEncode info.appOverrides )
+        , ( "deployment_overrides", Encode.list overrideEncode info.deploymentOverrides )
+        ]
+
+
+overrideValueEncode : OverrideValue -> Encode.Value
+overrideValueEncode value =
+    case value of
+        ValueAdded v ->
+            Encode.object
+                [ ( "tag", Encode.string "ValueAdded" )
+                , ( "contents", Encode.string v )
+                ]
+
+        ValueDeleted ->
+            Encode.object
+                [ ( "tag", Encode.string "ValueDeleted" ) ]
+
+
+overrideHelperEncode : OverrideHelper -> Encode.Value
+overrideHelperEncode helper =
+    case helper of
+        OverrideName_ name ->
+            Encode.string name
+
+        OverrideValue_ val ->
+            overrideValueEncode val
+
+
+overrideEncode : Override -> Encode.Value
+overrideEncode override =
+    let
+        helper =
+            overrideToHelper override
+    in
+    Encode.list overrideHelperEncode helper

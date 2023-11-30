@@ -1,20 +1,18 @@
-module Page.Deployments.Overrides exposing (..)
+module Page.Sidebar.Overrides exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
-import Config exposing (Config)
 import Deployments exposing (..)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
-import Html.Events exposing (onBlur, onClick, onFocus, onInput, onMouseDown)
-import Json.Decode as Decode
+import Html.Events exposing (onBlur, onFocus, onInput, onMouseDown)
 import List.Extra
-import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
-import Tree exposing (Tree, getLabel, mergeTrees, mergeTreesByWithSort, mergeTreesWithSort)
+import Tree exposing (Tree, mergeTreesWithSort)
 
 
 type alias OverrideData =
@@ -29,8 +27,8 @@ emptyOverride =
 
 
 type alias Model =
-    { defaultOverrides : WebData (Dict Int OverrideData)
-    , keys : WebData (List String)
+    { defaultOverrides : Api.WebData (Dict Int OverrideData)
+    , keys : Api.WebData (List String)
     , editedOverrides : Dict Int (Maybe OverrideData)
     , nextId : Int
     , openedPaths : Set (List String)
@@ -44,7 +42,7 @@ init name =
     Model Loading Loading Dict.empty 0 Set.empty Nothing name
 
 
-setDefaultOverrides : WebData (Dict Int OverrideData) -> Model -> Model
+setDefaultOverrides : Api.WebData (List (List String)) -> Model -> Model
 setDefaultOverrides defaultOverrides model =
     let
         emptyOverrides overrides =
@@ -61,16 +59,19 @@ setDefaultOverrides defaultOverrides model =
                     )
                 |> List.concat
                 |> Set.fromList
+
+        dictOverrides =
+            RemoteData.map overridesToDict defaultOverrides
     in
     { model
-        | defaultOverrides = defaultOverrides
-        , nextId = RemoteData.unwrap 0 Dict.size defaultOverrides
-        , openedPaths = RemoteData.unwrap Set.empty emptyOverrides defaultOverrides
+        | defaultOverrides = dictOverrides
+        , nextId = RemoteData.unwrap 0 Dict.size dictOverrides
+        , openedPaths = RemoteData.unwrap Set.empty emptyOverrides dictOverrides
     }
 
 
-getEditOverrides : Model -> Dict Int OverrideData
-getEditOverrides model =
+getFullOverrides : Model -> List (List String)
+getFullOverrides model =
     case model.defaultOverrides of
         Success defaultOverrides ->
             Dict.merge
@@ -83,12 +84,67 @@ getEditOverrides model =
                 |> Dict.toList
                 |> List.filterMap (\( i, mv ) -> Maybe.map (\v -> ( i, v )) mv)
                 |> Dict.fromList
+                |> dictToOverrides
 
         _ ->
-            Dict.empty
+            []
 
 
-setKeys : WebData (List String) -> Model -> Model
+getEditedOverrides : Model -> List Deployments.Override
+getEditedOverrides model =
+    let
+        overrideDataToOverride ( i, mOd ) =
+            case mOd of
+                Just od ->
+                    Just
+                        { name = OverrideName od.path
+                        , value = Deployments.ValueAdded od.value
+                        }
+
+                Nothing ->
+                    case RemoteData.map (Dict.get i) model.defaultOverrides of
+                        Success (Just od) ->
+                            Just
+                                { name = OverrideName od.path
+                                , value = Deployments.ValueDeleted
+                                }
+
+                        _ ->
+                            Nothing
+    in
+    model.editedOverrides
+        |> Dict.toList
+        |> List.filterMap overrideDataToOverride
+
+
+overridesToDict : List (List String) -> Dict Int OverrideData
+overridesToDict raw =
+    let
+        f x =
+            case x of
+                [ p, v ] ->
+                    Just ( p, v )
+
+                _ ->
+                    Nothing
+
+        g i ( p, v ) =
+            ( i, OverrideData p v )
+    in
+    Dict.fromList <| List.indexedMap g <| List.filterMap f raw
+
+
+dictToOverrides : Dict Int OverrideData -> List (List String)
+dictToOverrides =
+    let
+        f ( _, b ) =
+            [ b.path, b.value ]
+    in
+    Dict.toList
+        >> List.map f
+
+
+setKeys : Api.WebData (List String) -> Model -> Model
 setKeys keys model =
     { model | keys = keys }
 
@@ -103,6 +159,25 @@ type Msg
     | ClosePath (List String)
     | ShowAutocomplete Int
     | HideAutocomplete
+
+
+changeData : Msg -> Bool
+changeData msg =
+    case msg of
+        DeleteOverride _ ->
+            True
+
+        RestoreOverride _ ->
+            True
+
+        EditOverridePath _ _ ->
+            True
+
+        EditOverrideValue _ _ ->
+            True
+
+        _ ->
+            False
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -307,7 +382,7 @@ newOverrideView =
 
 
 overrideValueView : Model -> String -> String -> List String -> ( Int, OverrideData ) -> Html Msg
-overrideValueView model valueClass inputClass keys ( ix, overrideData ) =
+overrideValueView _ valueClass inputClass _ ( ix, overrideData ) =
     let
         valueClass_ =
             if overrideData.value == "" then
@@ -395,7 +470,7 @@ overrideView pathClass pathInputClass valueClass valueInputClass model keys ( ix
 
 
 overrideDeletedView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
-overrideDeletedView model keys ( ix, overrideData ) =
+overrideDeletedView _ _ ( ix, overrideData ) =
     divClass "row"
         [ divClass "editable-row"
             [ divClass "input editable-row__key input--deleted"
