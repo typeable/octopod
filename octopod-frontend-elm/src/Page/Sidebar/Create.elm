@@ -25,6 +25,7 @@ type alias Model =
     , visibility : Bool
     , config : Config
     , saveResp : Api.WebData ()
+    , nameEdited : Bool
     }
 
 
@@ -36,6 +37,7 @@ init config visibility =
     , visibility = visibility
     , config = config
     , saveResp = NotAsked
+    , nameEdited = False
     }
 
 
@@ -140,7 +142,7 @@ update cmd model =
             ( { model | visibility = False }, Cmd.none )
 
         NameInput name ->
-            ( { model | name = name }, Cmd.none )
+            ( { model | name = name, nameEdited = True }, Cmd.none )
 
         AppOverridesMsg subMsg ->
             Overrides.update subMsg model.appOverrides
@@ -204,20 +206,25 @@ sidebarHeader : Model -> Html Msg
 sidebarHeader model =
     let
         button =
-            case model.saveResp of
-                Loading ->
+            case ( model.saveResp, hasEmptyValues model ) of
+                ( Loading, _ ) ->
                     Html.button
                         [ Attr.class "popup__action button button--save-loading"
                         , Attr.disabled True
                         ]
                         [ text "Save" ]
 
-                Success _ ->
+                ( Success _, _ ) ->
+                    div [] []
+
+                ( _, True ) ->
                     Html.button
-                        [ Attr.class "button button--save popup__action", Attr.disabled True ]
+                        [ Attr.class "button--disabled button button--save popup__action"
+                        , Attr.disabled True
+                        ]
                         [ text "Save" ]
 
-                _ ->
+                ( _, False ) ->
                     buttonClass "button button--save popup__action" Save [ text "Save" ]
     in
     divClass "popup__head"
@@ -269,10 +276,30 @@ sidebarContent model =
 
 nameSection : Model -> Html Msg
 nameSection model =
+    let
+        nameError =
+            model.nameEdited && hasEmptyName model
+
+        inputClass =
+            if nameError then
+                "input input--error"
+
+            else
+                "input"
+
+        errorMessage =
+            if nameError then
+                [ divClass "input__output"
+                    [ text "Deployment name length should be longer than 2 characters and under 17 characters and begin with a letter." ]
+                ]
+
+            else
+                []
+    in
     divClass "deployment__section"
         [ h3Class "deployment__sub-heading" [ text "Name" ]
         , divClass "deployment__widget"
-            [ divClass "input"
+            (divClass inputClass
                 [ input
                     [ Attr.class "input__widget tag"
                     , Attr.type_ "text"
@@ -282,5 +309,22 @@ nameSection model =
                     ]
                     []
                 ]
-            ]
+                :: errorMessage
+            )
         ]
+
+
+hasEmptyName : Model -> Bool
+hasEmptyName model =
+    let
+        nameLength =
+            String.length model.name
+    in
+    nameLength < 2 || nameLength > 17
+
+
+hasEmptyValues : Model -> Bool
+hasEmptyValues model =
+    Overrides.hasEmptyValues model.appOverrides
+        || Overrides.hasEmptyValues model.deploymentOverrides
+        || hasEmptyName model

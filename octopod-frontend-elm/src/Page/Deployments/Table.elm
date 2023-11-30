@@ -8,6 +8,7 @@ import Deployments exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
+import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import RemoteData exposing (RemoteData(..))
@@ -513,6 +514,13 @@ deploymentView model deployment =
                     deployment.deployment.appOverrides
             ]
 
+        menuButtonClass status class =
+            if isPending status then
+                class ++ " action--disabled "
+
+            else
+                class
+
         dropDown =
             div
                 [ Attr.class <|
@@ -532,13 +540,22 @@ deploymentView model deployment =
                     case model.tableType of
                         ActiveTable ->
                             [ button
-                                [ Attr.class "action action--edit"
+                                [ Attr.class (menuButtonClass deployment.status "action action--edit")
                                 , Attr.type_ "button"
+                                , Attr.disabled (isPending deployment.status)
+                                , onClick CloseMenu
                                 ]
                                 [ text "Edit" ]
-                            , buttonClass "action action--archive classic-popup-handler"
-                                (OpenArchivePopup deployment.deployment.name)
+                            , button
+                                [ Attr.class (menuButtonClass deployment.status "action action--archive classic-popup-handler")
+                                , Attr.type_ "button"
+                                , Attr.disabled (isPending deployment.status)
+                                , onClick (OpenArchivePopup deployment.deployment.name)
+                                ]
                                 [ text "Move to archive" ]
+                            , aClassHrefExternal "action action--logs"
+                                (model.config.k8sDashboardUrlTemplate ++ unDeploymentName deployment.deployment.name)
+                                [ text "Details" ]
                             ]
 
                         ArchivedTable ->

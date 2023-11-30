@@ -27,6 +27,7 @@ type alias Model =
     , showArchived : Bool
     , sidebar : CreateSidebar.Model
     , debounce : Debounce ()
+    , updated : Int
     }
 
 
@@ -41,6 +42,7 @@ init settings config =
       , showArchived = False
       , sidebar = CreateSidebar.init config False
       , debounce = Debounce.init
+      , updated = 0
       }
     , reqConfig config
     )
@@ -48,7 +50,7 @@ init settings config =
 
 debounceConfig : Debounce.Config Msg
 debounceConfig =
-    { strategy = Debounce.soon 5000
+    { strategy = Debounce.soon 2000
     , transform = DebounceMsg
     }
 
@@ -78,6 +80,7 @@ type Msg
     | ShowSidebar
     | CreateSidebarMsg CreateSidebar.Msg
     | DebounceMsg Debounce.Msg
+    | Tick Time.Posix
 
 
 port messageReceiver : (String -> msg) -> Sub msg
@@ -99,7 +102,16 @@ update cmd model =
     in
     case cmd of
         DeploymentsResponse deployments ->
-            ( { model | deployments = deployments }, Cmd.none )
+            let
+                latestUpd =
+                    case deployments of
+                        Success _ ->
+                            0
+
+                        _ ->
+                            model.updated
+            in
+            ( { model | deployments = deployments, updated = latestUpd }, Cmd.none )
 
         SearchInput search ->
             ( { model | search = search }, Cmd.none )
@@ -141,9 +153,15 @@ update cmd model =
                         msg
                         model.debounce
             in
-            ( { model | debounce = debounce }
-            , subCmd
-            )
+            ( { model | debounce = debounce }, subCmd )
+
+        Tick _ ->
+            ( { model | updated = model.updated + tick }, Cmd.none )
+
+
+tick : Int
+tick =
+    15
 
 
 subscriptions : Model -> Sub Msg
@@ -152,6 +170,7 @@ subscriptions model =
         [ Sub.map ActiveTableMsg (Table.subscriptions model.activeTable)
         , Sub.map ArchivedTableMsg (Table.subscriptions model.archivedTable)
         , messageReceiver WSUpdate
+        , Time.every (toFloat tick * 1000) Tick
         ]
 
 
@@ -195,8 +214,25 @@ pageWrapper body =
 
 
 pageHeaderTimeUpdateView : Model -> Html Msg
-pageHeaderTimeUpdateView _ =
-    divClass "page__note" <| [ text "Updated 5 mins ago" ]
+pageHeaderTimeUpdateView model =
+    let
+        msg =
+            if model.updated < 30 then
+                "Updated just now"
+
+            else if model.updated < 90 then
+                "Updated 1 minute ago"
+
+            else if model.updated < 60 * 60 then
+                "Updated " ++ String.fromInt (model.updated // 60) ++ " minutes ago"
+
+            else if model.updated < 2 * 60 * 60 then
+                "Update 1 hour ago"
+
+            else
+                "Updated " ++ String.fromInt (model.updated // (60 * 60)) ++ " ho ago"
+    in
+    divClass "page__note" <| [ text msg ]
 
 
 pageHeaderSearchView : Model -> Html Msg

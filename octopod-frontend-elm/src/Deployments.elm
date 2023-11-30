@@ -80,6 +80,16 @@ type Status
     | DeploymentNotPending DeploymentStatus
 
 
+unStatus : Status -> DeploymentStatus
+unStatus status =
+    case status of
+        DeploymentPending ds ->
+            ds
+
+        DeploymentNotPending ds ->
+            ds
+
+
 type alias Deployments =
     List Deployment
 
@@ -257,6 +267,31 @@ isDeploymentArchived d =
 
         DeploymentNotPending s ->
             List.member s [ ArchivePending, Archived ]
+
+
+isPending : Status -> Bool
+isPending status =
+    case unStatus status of
+        Running ->
+            False
+
+        Failure _ ->
+            False
+
+        Archived ->
+            False
+
+        CreatePending ->
+            True
+
+        UpdatePending ->
+            True
+
+        ArchivePending ->
+            True
+
+        CleanupFailed ->
+            True
 
 
 infoEncode : Info -> Encode.Value

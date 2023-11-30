@@ -602,3 +602,23 @@ treeOverrideView model keys piecies defaultOverride =
 
         Tree.Leaf _ ->
             div [] []
+
+
+hasEmptyValues : Model -> Bool
+hasEmptyValues model =
+    case model.defaultOverrides of
+        Success defaultOverrides ->
+            Dict.merge
+                (\i a acc -> Dict.insert i a acc)
+                (\i a _ acc -> Dict.insert i a acc)
+                (\i b acc -> Dict.insert i (Just b) acc)
+                model.editedOverrides
+                defaultOverrides
+                Dict.empty
+                |> Dict.toList
+                |> List.filterMap (\( _, mv ) -> mv)
+                |> List.filter (\v -> v.value == "")
+                |> (List.isEmpty >> not)
+
+        _ ->
+            False
