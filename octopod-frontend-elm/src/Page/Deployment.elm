@@ -2,6 +2,7 @@ port module Page.Deployment exposing (..)
 
 import Api
 import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentOverrides, deployments)
+import Api.Types.DefaultOverrides exposing (DefaultOverride, DefaultOverrides, defaultOverrideEncoder, defaultOverridesDecoder)
 import Api.Types.Deployment as Deployments exposing (..)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
@@ -68,8 +69,8 @@ type Msg
     = DeploymentFullInfoResponse (Api.WebData Deployment)
     | WSUpdate String
     | DebounceMsg Debounce.Msg
-    | DeploymentOverridesResponse (Api.WebData (List (List String)))
-    | AppOverridesResponse (Api.WebData (List (List String)))
+    | DeploymentOverridesResponse (Api.WebData (List DefaultOverride))
+    | AppOverridesResponse (Api.WebData (List DefaultOverride))
     | AppOverridesMsg Overrides.Msg
     | DeploymentOverridesMsg Overrides.Msg
 
@@ -78,16 +79,16 @@ reqDeploymentOverrides : Config -> Cmd Msg
 reqDeploymentOverrides config =
     Api.get config
         deploymentOverrides
-        (Decode.list (Decode.list Decode.string))
+        defaultOverridesDecoder
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
-reqAppOverrides : Config -> List (List String) -> Cmd Msg
+reqAppOverrides : Config -> List DefaultOverride -> Cmd Msg
 reqAppOverrides config body =
     Api.post config
         appOverrides
-        (Http.jsonBody (Encode.list (Encode.list Encode.string) body))
-        (Decode.list (Decode.list Decode.string))
+        (Http.jsonBody (Encode.list defaultOverrideEncoder body))
+        defaultOverridesDecoder
         (RemoteData.fromResult >> AppOverridesResponse)
 
 

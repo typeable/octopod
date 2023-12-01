@@ -30,6 +30,16 @@ type OverrideValue
     | ValueDeleted
 
 
+getOverrideValue : Override -> Maybe String
+getOverrideValue override =
+    case override.value of
+        ValueAdded x ->
+            Just x
+
+        ValueDeleted ->
+            Nothing
+
+
 type alias Override =
     { name : OverrideName
     , value : OverrideValue

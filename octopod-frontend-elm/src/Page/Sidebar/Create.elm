@@ -2,7 +2,7 @@ module Page.Sidebar.Create exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
-import Api.Types.DefaultOverrides exposing (DefaultOverrides, defaultOverridesDecoder)
+import Api.Types.DefaultOverrides exposing (DefaultOverride, DefaultOverrides, defaultOverrideEncoder, defaultOverridesDecoder)
 import Api.Types.Deployment exposing (..)
 import Api.Types.OverrideKey exposing (OverrideKeys, keysDecoder)
 import Config exposing (Config)
@@ -72,20 +72,20 @@ reqDeploymentOverrides config =
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
-reqAppOverrideKeys : Config -> List (List String) -> Cmd Msg
+reqAppOverrideKeys : Config -> List DefaultOverride -> Cmd Msg
 reqAppOverrideKeys config body =
     Api.post config
         appOverrideKeys
-        (Http.jsonBody (Encode.list (Encode.list Encode.string) body))
+        (Http.jsonBody (Encode.list defaultOverrideEncoder body))
         keysDecoder
         (RemoteData.fromResult >> AppOverrideKeysResponse)
 
 
-reqAppOverrides : Config -> List (List String) -> Cmd Msg
+reqAppOverrides : Config -> List DefaultOverride -> Cmd Msg
 reqAppOverrides config body =
     Api.post config
         appOverrides
-        (Http.jsonBody (Encode.list (Encode.list Encode.string) body))
+        (Http.jsonBody (Encode.list defaultOverrideEncoder body))
         defaultOverridesDecoder
         (RemoteData.fromResult >> AppOverridesResponse)
 
@@ -156,7 +156,7 @@ update cmd model =
                     Overrides.update subMsg model.deploymentOverrides
                         |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
             in
-            if Overrides.changeData subMsg then
+            if Overrides.dataChanged subMsg then
                 ( { model_ | appOverrides = Overrides.init "App configuration" Overrides.Write }
                 , Cmd.batch
                     [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides model_.deploymentOverrides)

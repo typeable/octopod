@@ -1,19 +1,42 @@
 module Api.Types.DefaultOverrides exposing (..)
 
-import Api.Types.Deployment exposing (OverrideName(..))
-import Json.Decode as Decoder exposing (Decoder, Value, string)
+import Api.Types.Deployment exposing (OverrideName(..), unOverrideName)
+import Json.Decode as Decoder exposing (Decoder, Value)
+import Json.Decode.Pipeline exposing (resolve)
 import Json.Encode as Encode
 
 
+type alias DefaultOverride =
+    { name : OverrideName
+    , value : String
+    }
+
+
 type alias DefaultOverrides =
-    List (List String)
+    List DefaultOverride
+
+
+defaultOverridesDecode : Decoder DefaultOverride
+defaultOverridesDecode =
+    let
+        f x =
+            case x of
+                [ p, v ] ->
+                    Decoder.succeed (DefaultOverride (OverrideName p) v)
+
+                _ ->
+                    Decoder.fail "not an override"
+    in
+    Decoder.list Decoder.string
+        |> Decoder.map f
+        |> resolve
 
 
 defaultOverridesDecoder : Decoder DefaultOverrides
 defaultOverridesDecoder =
-    Decoder.list (Decoder.list Decoder.string)
+    Decoder.list defaultOverridesDecode
 
 
-defaultOverridesEncoder : DefaultOverrides -> Value
-defaultOverridesEncoder =
-    Encode.list (Encode.list Encode.string)
+defaultOverrideEncoder : DefaultOverride -> Value
+defaultOverrideEncoder defaultOverride =
+    Encode.list Encode.string [ unOverrideName defaultOverride.name, defaultOverride.value ]

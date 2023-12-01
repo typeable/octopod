@@ -2,7 +2,7 @@ module Html.Overrides exposing
     ( Mode(..)
     , Model
     , Msg
-    , changeData
+    , dataChanged
     , getEditedOverrides
     , getFullOverrides
     , hasEmptyValues
@@ -16,6 +16,7 @@ module Html.Overrides exposing
 
 import Api
 import Api.Endpoint exposing (..)
+import Api.Types.DefaultOverrides exposing (DefaultOverride, DefaultOverrides)
 import Api.Types.Deployment as Deployments exposing (..)
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -29,10 +30,11 @@ import Time exposing (Month(..))
 import Tree exposing (Tree, mergeTreesWithSort)
 
 
-type alias OverrideData =
-    { path : String
-    , value : String
-    }
+
+-- type alias OverrideData =
+--     { path : String
+--     , value : String
+--     }
 
 
 type Mode
@@ -41,9 +43,9 @@ type Mode
 
 
 type alias Model =
-    { defaultOverrides : Api.WebData (Dict Int OverrideData)
+    { defaultOverrides : Api.WebData (Dict Int DefaultOverride)
     , keys : Api.WebData (List String)
-    , editedOverrides : Dict Int (Maybe OverrideData)
+    , editedOverrides : Dict Int Override
     , nextId : Int
     , openedPaths : Set (List String)
     , autocomplete : Maybe Int
@@ -65,13 +67,13 @@ init name mode =
     }
 
 
-setDefaultOverrides : Api.WebData (List (List String)) -> Model -> Model
+setDefaultOverrides : Api.WebData (List DefaultOverride) -> Model -> Model
 setDefaultOverrides defaultOverrides model =
     let
         emptyOverrides overrides =
             Dict.toList overrides
                 |> List.filter (\( _, o ) -> o.value == "")
-                |> List.map (Tuple.second >> .path >> String.split ".")
+                |> List.map (Tuple.second >> .name >> unOverrideName >> String.split ".")
                 |> List.map
                     (List.Extra.inits
                         >> List.tail
@@ -83,8 +85,11 @@ setDefaultOverrides defaultOverrides model =
                 |> List.concat
                 |> Set.fromList
 
+        indexedPair i v =
+            ( i, v )
+
         dictOverrides =
-            RemoteData.map overridesToDict defaultOverrides
+            RemoteData.map (Dict.fromList << List.indexedMap indexedPair) defaultOverrides
     in
     { model
         | defaultOverrides = dictOverrides
@@ -94,7 +99,7 @@ setDefaultOverrides defaultOverrides model =
 
 
 setDefaultAndEditedOverrides :
-    Api.WebData (List (List String))
+    Api.WebData (List DefaultOverride)
     -> Api.WebData (List Override)
     -> Model
     -> Model
@@ -103,53 +108,50 @@ setDefaultAndEditedOverrides defaults edits model_ =
         model =
             setDefaultOverrides defaults model_
 
-        overrideToOverrideData override =
-            case override.value of
-                ValueAdded value ->
-                    Just { path = unOverrideName override.name, value = value }
+        nextId =
+            model.nextId + RemoteData.unwrap 0 List.length edits
 
-                ValueDeleted ->
-                    Nothing
+        editedOverrides overrides =
+            List.map2 (\a b -> ( a, b )) (List.range model.nextId (model.nextId + List.length overrides)) overrides
 
-        findByPath ds path =
-            ds
-                |> Dict.filter (\_ v -> v.path == path)
-                |> Dict.keys
-                |> List.head
-
-        mkOverrideData ds override ( accNextId, accOverrides ) =
-            case findByPath ds (unOverrideName override.name) of
-                Just ix ->
-                    ( accNextId, Dict.insert ix (overrideToOverrideData override) accOverrides )
-
-                Nothing ->
-                    ( accNextId + 1, Dict.insert accNextId (overrideToOverrideData override) accOverrides )
-
-        editedOverrides ds es =
-            List.foldl (mkOverrideData ds) ( model.nextId, Dict.empty ) es
-
-        ( nextId, dictOverrides ) =
-            RemoteData.map2 editedOverrides model.defaultOverrides edits
-                |> RemoteData.withDefault ( model.nextId, Dict.empty )
+        dictOverrides =
+            RemoteData.map editedOverrides edits
+                |> RemoteData.unwrap Dict.empty Dict.fromList
     in
     { model | editedOverrides = dictOverrides, nextId = nextId }
 
 
-getFullOverrides : Model -> List (List String)
+getFullOverrides : Model -> List DefaultOverride
 getFullOverrides model =
+    let
+        f ix o acc =
+            case o.value of
+                ValueDeleted ->
+                    acc
+
+                ValueAdded v ->
+                    DefaultOverride o.name v :: acc
+
+        g ix o d acc =
+            case o.value of
+                ValueDeleted ->
+                    acc
+
+                ValueAdded v ->
+                    DefaultOverride d.name v :: acc
+
+        h ix d acc =
+            d :: acc
+    in
     case model.defaultOverrides of
         Success defaultOverrides ->
             Dict.merge
-                (\i a acc -> Dict.insert i a acc)
-                (\i a _ acc -> Dict.insert i a acc)
-                (\i b acc -> Dict.insert i (Just b) acc)
+                f
+                g
+                h
                 model.editedOverrides
                 defaultOverrides
-                Dict.empty
-                |> Dict.toList
-                |> List.filterMap (\( i, mv ) -> Maybe.map (\v -> ( i, v )) mv)
-                |> Dict.fromList
-                |> dictToOverrides
+                []
 
         _ ->
             []
@@ -157,56 +159,8 @@ getFullOverrides model =
 
 getEditedOverrides : Model -> List Deployments.Override
 getEditedOverrides model =
-    let
-        overrideDataToOverride ( i, mOd ) =
-            case mOd of
-                Just od ->
-                    Just
-                        { name = OverrideName od.path
-                        , value = Deployments.ValueAdded od.value
-                        }
-
-                Nothing ->
-                    case RemoteData.map (Dict.get i) model.defaultOverrides of
-                        Success (Just od) ->
-                            Just
-                                { name = OverrideName od.path
-                                , value = Deployments.ValueDeleted
-                                }
-
-                        _ ->
-                            Nothing
-    in
     model.editedOverrides
-        |> Dict.toList
-        |> List.filterMap overrideDataToOverride
-
-
-overridesToDict : List (List String) -> Dict Int OverrideData
-overridesToDict raw =
-    let
-        f x =
-            case x of
-                [ p, v ] ->
-                    Just ( p, v )
-
-                _ ->
-                    Nothing
-
-        g i ( p, v ) =
-            ( i, OverrideData p v )
-    in
-    Dict.fromList <| List.indexedMap g <| List.filterMap f raw
-
-
-dictToOverrides : Dict Int OverrideData -> List (List String)
-dictToOverrides =
-    let
-        f ( _, b ) =
-            [ b.path, b.value ]
-    in
-    Dict.toList
-        >> List.map f
+        |> Dict.values
 
 
 setKeys : Api.WebData (List String) -> Model -> Model
@@ -226,8 +180,8 @@ type Msg
     | HideAutocomplete
 
 
-changeData : Msg -> Bool
-changeData msg =
+dataChanged : Msg -> Bool
+dataChanged msg =
     case msg of
         DeleteOverride _ ->
             True
@@ -279,7 +233,7 @@ update msg model =
 newOverride : Model -> Model
 newOverride model =
     { model
-        | editedOverrides = Dict.insert model.nextId (Just (OverrideData "" "")) model.editedOverrides
+        | editedOverrides = Dict.insert model.nextId (Override (OverrideName "") (ValueAdded "")) model.editedOverrides
         , nextId = model.nextId + 1
     }
 
@@ -289,8 +243,11 @@ deleteOverride ix model =
     let
         delete _ =
             case RemoteData.map (Dict.get ix) model.defaultOverrides of
-                Success (Just _) ->
-                    Just Nothing
+                Success (Just defaultOverride) ->
+                    Just
+                        { name = defaultOverride.name
+                        , value = ValueDeleted
+                        }
 
                 _ ->
                     Nothing
@@ -308,22 +265,15 @@ editOverridePath ix path model =
     let
         editPath mOverride =
             case ( mOverride, RemoteData.map (Dict.get ix) model.defaultOverrides ) of
-                ( Just (Just override), Success (Just default) ) ->
-                    if { override | path = path } == default then
+                ( Just override, Success (Just default) ) ->
+                    if OverrideName path == default.name then
                         Nothing
 
                     else
-                        Just (Just { override | path = path })
+                        Just { override | name = OverrideName path }
 
-                ( Just (Just override), Success Nothing ) ->
-                    Just (Just { override | path = path })
-
-                ( _, Success (Just default) ) ->
-                    if default.path == path then
-                        Nothing
-
-                    else
-                        Just (Just { default | path = path })
+                ( Just override, Success Nothing ) ->
+                    Just { override | name = OverrideName path }
 
                 _ ->
                     Nothing
@@ -336,22 +286,22 @@ editOverrideValue ix value model =
     let
         editPath mOverride =
             case ( mOverride, RemoteData.map (Dict.get ix) model.defaultOverrides ) of
-                ( Just (Just override), Success (Just default) ) ->
-                    if { override | value = value } == default then
+                ( Just override, Success (Just default) ) ->
+                    if value == default.value then
                         Nothing
 
                     else
-                        Just (Just { override | value = value })
+                        Just { override | value = ValueAdded value }
 
-                ( Just (Just override), Success Nothing ) ->
-                    Just (Just { override | value = value })
+                ( Just override, Success Nothing ) ->
+                    Just { override | value = ValueAdded value }
 
-                ( _, Success (Just default) ) ->
-                    if default.value == value then
+                ( Nothing, Success (Just default) ) ->
+                    if value == default.value then
                         Nothing
 
                     else
-                        Just (Just { default | value = value })
+                        Just { name = default.name, value = ValueAdded value }
 
                 _ ->
                     Nothing
@@ -394,22 +344,30 @@ overridesSectionLoading _ =
         ]
 
 
-hasEmptyOverrides : List ( Int, Maybe OverrideData ) -> Bool
-hasEmptyOverrides overrides =
-    overrides
-        |> List.filter (\( _, x ) -> Maybe.map (\y -> y.path == "") x |> Maybe.withDefault False)
-        |> (List.isEmpty >> not)
-
-
-overridesSectionData : Model -> Dict Int OverrideData -> List String -> Html Msg
+overridesSectionData : Model -> Dict Int DefaultOverride -> List String -> Html Msg
 overridesSectionData model defaultOverrides keys =
     let
-        newOverrideIds =
-            Set.diff (Set.fromList (Dict.keys model.editedOverrides)) (Set.fromList (Dict.keys defaultOverrides))
+        isEmptyOverride _ v =
+            case v.value of
+                ValueAdded "" ->
+                    True
+
+                _ ->
+                    False
+
+        hasEmptyOverrides overrides =
+            overrides
+                |> Dict.filter isEmptyOverride
+                |> (Dict.isEmpty >> not)
 
         newOverrides =
-            Set.foldl (\ix acc -> Maybe.map (\x -> ( ix, x )) (Dict.get ix model.editedOverrides) :: acc) [] newOverrideIds
-                |> List.filterMap (\x -> x)
+            Dict.merge
+                (\i v acc -> Dict.insert i v acc)
+                (\_ _ _ acc -> acc)
+                (\_ _ acc -> acc)
+                model.editedOverrides
+                defaultOverrides
+                Dict.empty
 
         addButton =
             if model.mode == Write then
@@ -425,17 +383,17 @@ overridesSectionData model defaultOverrides keys =
     in
     divClass "deployment__widget"
         [ divClass "padded"
-            (addButton ++ (newOverridesView model newOverrides keys ++ overridesLevelView model defaultOverrides keys))
+            (addButton ++ newOverridesView model newOverrides keys ++ overridesLevelView model defaultOverrides keys)
         ]
 
 
-newOverridesView : Model -> List ( Int, Maybe OverrideData ) -> List String -> List (Html Msg)
+newOverridesView : Model -> Dict Int Override -> List String -> List (Html Msg)
 newOverridesView model overrides keys =
     let
         overridesSorted =
             overrides
+                |> Dict.toList
                 |> List.sortBy (\( ix, _ ) -> ix)
-                |> List.filterMap (\( ix, m ) -> Maybe.map (\x -> ( ix, x )) m)
                 |> List.reverse
     in
     List.map
@@ -443,39 +401,35 @@ newOverridesView model overrides keys =
         overridesSorted
 
 
-newOverrideView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
-newOverrideView model keys ixOverride =
-    if model.mode == Write then
-        overrideWriteView
-            "input editable-row__key"
-            "input__widget key-custom-edited"
-            "input editable-row__value"
-            "input__widget value-edited"
-            model
-            keys
-            ixOverride
+newOverrideView : Model -> List String -> ( Int, Override ) -> Html Msg
+newOverrideView model keys ( ix, override ) =
+    case model.mode of
+        Write ->
+            overrideWriteWrapper model keys ix (Just override) Nothing
 
-    else
-        overrideReadView
-            "key-custom-edited"
-            "value-edited"
-            model
-            ixOverride
+        _ ->
+            div [] []
 
 
-overrideReadView : String -> String -> Model -> ( Int, OverrideData ) -> Html Msg
-overrideReadView pathClass valueClass model ( ix, overrideData ) =
-    divClass "row"
-        [ spanClass pathClass [ text (overrideData.path ++ ": ") ]
-        , spanClass valueClass [ text overrideData.value ]
-        ]
+
+-- overrideReadView
+--     "key-custom-edited"
+--     "value-edited"
+--     model
+--     ixOverride
+-- overrideReadView : String -> String -> Model -> Int -> Override -> Html Msg
+-- overrideReadView pathClass valueClass model ix overrideData =
+--     divClass "row"
+--         [ spanClass pathClass [ text (overrideData.path ++ ": ") ]
+--         , spanClass valueClass [ text overrideData.value ]
+--         ]
 
 
-overrideValueWriteView : Model -> String -> String -> List String -> ( Int, OverrideData ) -> Html Msg
-overrideValueWriteView _ valueClass inputClass _ ( ix, overrideData ) =
+overrideValueWriteView : Model -> String -> String -> Bool -> String -> Int -> Html Msg
+overrideValueWriteView model valueClass inputClass inputDisabled overrideValue ix =
     let
         valueClass_ =
-            if overrideData.value == "" then
+            if not inputDisabled && overrideValue == "" then
                 valueClass ++ " input--error"
 
             else
@@ -487,11 +441,12 @@ overrideValueWriteView _ valueClass inputClass _ ( ix, overrideData ) =
             , Attr.placeholder "value"
             , Attr.spellcheck False
             , Attr.type_ "text"
-            , Attr.value overrideData.value
+            , Attr.disabled inputDisabled
+            , Attr.value overrideValue
             , onInput (EditOverrideValue ix)
             ]
             []
-            :: (if overrideData.value == "" then
+            :: (if not inputDisabled && overrideValue == "" then
                     [ divClass "input__output" [ text "Value can not be empty" ] ]
 
                 else
@@ -500,19 +455,19 @@ overrideValueWriteView _ valueClass inputClass _ ( ix, overrideData ) =
         )
 
 
-overridePathWriteView : Model -> String -> String -> List String -> ( Int, OverrideData ) -> Html Msg
-overridePathWriteView model pathClass inputClass keys ( ix, overrideData ) =
+overridePathWriteView : Model -> String -> String -> Bool -> String -> List String -> Int -> Html Msg
+overridePathWriteView model pathClass inputClass inputDisabled overrideName keys ix =
     let
         suggestions =
-            List.filter (String.startsWith overrideData.path) keys
+            List.filter (String.startsWith overrideName) keys
 
         suggestionItem suggestion =
             Html.li
                 [ Attr.class "input__suggest"
                 , onMouseDown (EditOverridePath ix suggestion)
                 ]
-                [ b [] [ text overrideData.path ]
-                , text (String.dropLeft (String.length overrideData.path) suggestion)
+                [ b [] [ text overrideName ]
+                , text (String.dropLeft (String.length overrideName) suggestion)
                 ]
 
         inputPath =
@@ -521,7 +476,8 @@ overridePathWriteView model pathClass inputClass keys ( ix, overrideData ) =
                 , Attr.placeholder "value"
                 , Attr.spellcheck False
                 , Attr.type_ "text"
-                , Attr.value overrideData.path
+                , Attr.value overrideName
+                , Attr.disabled inputDisabled
                 , onInput (EditOverridePath ix)
                 , onFocus (ShowAutocomplete ix)
                 , onBlur HideAutocomplete
@@ -548,49 +504,113 @@ overridePathWriteView model pathClass inputClass keys ( ix, overrideData ) =
         )
 
 
-overrideWriteView : String -> String -> String -> String -> Model -> List String -> ( Int, OverrideData ) -> Html Msg
-overrideWriteView pathClass pathInputClass valueClass valueInputClass model keys ( ix, overrideData ) =
+type alias OverrideWriteConfig =
+    { nameDivClass : String
+    , nameInputClass : String
+    , nameInputDisabled : Bool
+    , nameInput : String
+    , valueDivClass : String
+    , valueInputClass : String
+    , valueInputDisabled : Bool
+    , valueInput : String
+    , buttonClass : String
+    , buttonMsg : Msg
+    , ix : Int
+    , keys : List String
+    }
+
+
+newOverrideConfig keys ix name value =
+    { nameDivClass = "input editable-row__key"
+    , nameInputClass = "input__widget key-custom-edited"
+    , nameInputDisabled = False
+    , nameInput = name
+    , valueDivClass = "input editable-row__value"
+    , valueInputClass = "input__widget value-edited"
+    , valueInputDisabled = False
+    , valueInput = value
+    , buttonClass = "editable-row__delete spot spot--cancel"
+    , buttonMsg = DeleteOverride ix
+    , ix = ix
+    , keys = keys
+    }
+
+
+editedOverrideConfig keys ix name value =
+    { nameDivClass = "input editable-row__key"
+    , nameInputClass = "input__widget key-default-edited"
+    , nameInputDisabled = False
+    , nameInput = name
+    , valueDivClass = "input editable-row__value"
+    , valueInputClass = "input__widget value-edited"
+    , valueInputDisabled = False
+    , valueInput = value
+    , buttonClass = "editable-row__delete spot spot--cancel"
+    , buttonMsg = DeleteOverride ix
+    , ix = ix
+    , keys = keys
+    }
+
+
+deletedOverrideConfig ix name value =
+    { nameDivClass = "input editable-row__key input--deleted"
+    , nameInputClass = "input__widget key-deleted"
+    , nameInputDisabled = True
+    , nameInput = name
+    , valueDivClass = "input editable-row__value input--deleted"
+    , valueInputClass = "input__widget value-deleted"
+    , valueInputDisabled = True
+    , valueInput = value
+    , buttonClass = "editable-row__delete spot spot--undo"
+    , buttonMsg = RestoreOverride ix
+    , ix = ix
+    , keys = []
+    }
+
+
+defaultOverrideConfig keys ix name value =
+    { nameDivClass = "input editable-row__key"
+    , nameInputClass = "input__widget key-default-pristine"
+    , nameInputDisabled = False
+    , nameInput = name
+    , valueDivClass = "input editable-row__value"
+    , valueInputClass = "input__widget value-pristine"
+    , valueInputDisabled = False
+    , valueInput = value
+    , buttonClass = "editable-row__delete spot spot--cancel"
+    , buttonMsg = DeleteOverride ix
+    , ix = ix
+    , keys = keys
+    }
+
+
+overrideWriteView :
+    Model
+    -> OverrideWriteConfig
+    -> Html Msg
+overrideWriteView model config =
     divClass "row"
         [ divClass "editable-row"
-            [ overridePathWriteView model pathClass pathInputClass keys ( ix, overrideData )
-            , overrideValueWriteView model valueClass valueInputClass keys ( ix, overrideData )
-            , buttonClass "editable-row__delete spot spot--cancel" (DeleteOverride ix) []
+            [ overridePathWriteView model
+                config.nameDivClass
+                config.nameInputClass
+                config.nameInputDisabled
+                config.nameInput
+                config.keys
+                config.ix
+            , overrideValueWriteView
+                model
+                config.valueDivClass
+                config.valueInputClass
+                config.valueInputDisabled
+                config.valueInput
+                config.ix
+            , buttonClass config.buttonClass config.buttonMsg []
             ]
         ]
 
 
-overrideDeletedWriteView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
-overrideDeletedWriteView _ _ ( ix, overrideData ) =
-    divClass "row"
-        [ divClass "editable-row"
-            [ divClass "input editable-row__key input--deleted"
-                [ Html.input
-                    [ Attr.class "input__widget key-deleted"
-                    , Attr.placeholder "key"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.disabled True
-                    , Attr.value overrideData.path
-                    ]
-                    []
-                ]
-            , divClass "input editable-row__value input--deleted"
-                [ Html.input
-                    [ Attr.class "input__widget value-deleted"
-                    , Attr.placeholder "key"
-                    , Attr.spellcheck False
-                    , Attr.type_ "text"
-                    , Attr.disabled True
-                    , Attr.value overrideData.value
-                    ]
-                    []
-                ]
-            , buttonClass "editable-row__delete spot spot--undo" (RestoreOverride ix) []
-            ]
-        ]
-
-
-overridesLevelView : Model -> Dict Int OverrideData -> List String -> List (Html Msg)
+overridesLevelView : Model -> Dict Int DefaultOverride -> List String -> List (Html Msg)
 overridesLevelView model defaultOverrides keys =
     let
         hasEmpty t =
@@ -632,7 +652,7 @@ overridesLevelView model defaultOverrides keys =
         overridesTree =
             defaultOverrides
                 |> Dict.toList
-                |> List.map (\( ix, a ) -> Tree.pathToTree (String.split "." a.path) ( ix, a ))
+                |> List.map (\( ix, a ) -> Tree.pathToTree (String.split "." (unOverrideName a.name)) ( ix, a ))
                 |> mergeTreesWithSort overrideCompare
     in
     List.map
@@ -640,72 +660,141 @@ overridesLevelView model defaultOverrides keys =
         overridesTree
 
 
-defaultOverrideWriteView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
-defaultOverrideWriteView =
-    overrideWriteView
-        "input editable-row__key"
-        "input__widget key-default-pristine"
-        "input editable-row__value"
-        "input__widget value-pristine"
+
+-- overrideDeletedWriteView : Model -> List String -> ( Int, DefaultOverride ) -> Html Msg
+-- overrideDeletedWriteView _ _ ( ix, overrideData ) =
+--     divClass "row"
+--         [ divClass "editable-row"
+--             [ divClass "input editable-row__key input--deleted"
+--                 [ Html.input
+--                     [ Attr.class "input__widget key-deleted"
+--                     , Attr.placeholder "key"
+--                     , Attr.spellcheck False
+--                     , Attr.type_ "text"
+--                     , Attr.disabled True
+--                     , Attr.value (unOverrideName overrideData.name)
+--                     ]
+--                     []
+--                 ]
+--             , divClass "input editable-row__value input--deleted"
+--                 [ Html.input
+--                     [ Attr.class "input__widget value-deleted"
+--                     , Attr.placeholder "key"
+--                     , Attr.spellcheck False
+--                     , Attr.type_ "text"
+--                     , Attr.disabled True
+--                     , Attr.value overrideData.value
+--                     ]
+--                     []
+--                 ]
+--             , buttonClass "editable-row__delete spot spot--undo" (RestoreOverride ix) []
+--             ]
+--         ]
+-- defaultOverrideWriteView : Model -> List String -> ( Int, DefaultOverride ) -> Html Msg
+-- defaultOverrideWriteView =
+--     overrideWriteView
+--         "input editable-row__key"
+--         "input__widget key-default-pristine"
+--         "input editable-row__value"
+--         "input__widget value-pristine"
+-- editedOverrideWriteView : Model -> List String -> ( Int, Override ) -> Html Msg
+-- editedOverrideWriteView =
+--     overrideWriteView
+--         "input editable-row__key"
+--         "input__widget key-default-edited"
+--         "input editable-row__value"
+--         "input__widget value-edited"
+-- editedOverrideReadView : Model -> ( Int, OverrideData ) -> Html Msg
+-- editedOverrideReadView =
+--     overrideReadView
+--         "key-default-edited"
+--         "value-edited"
+-- overrideDeletedReadView : Model -> ( Int, OverrideData ) -> Html Msg
+-- overrideDeletedReadView =
+--     overrideReadView
+--         "key-deleted"
+--         "value-deletes"
+-- defaultOverrideReadView : Model -> ( Int, OverrideData ) -> Html Msg
+-- defaultOverrideReadView =
+--     overrideReadView
+--         "key-default-pristine"
+--         "value-pristine"
+-- overrideInputWriteView :
 
 
-editedOverrideWriteView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
-editedOverrideWriteView =
-    overrideWriteView
-        "input editable-row__key"
-        "input__widget key-default-edited"
-        "input editable-row__value"
-        "input__widget value-edited"
+overrideWriteWrapper : Model -> List String -> Int -> Maybe Override -> Maybe DefaultOverride -> Html Msg
+overrideWriteWrapper model keys ix override default =
+    case ( override, default ) of
+        ( Just o, _ ) ->
+            case ( o.value, default ) of
+                ( ValueAdded v, Just d ) ->
+                    editedOverrideConfig keys ix (unOverrideName d.name) v
+                        |> overrideWriteView model
+
+                ( ValueAdded v, Nothing ) ->
+                    newOverrideConfig keys ix (unOverrideName o.name) v
+                        |> overrideWriteView model
+
+                ( ValueDeleted, Just d ) ->
+                    deletedOverrideConfig ix (unOverrideName d.name) d.value
+                        |> overrideWriteView model
+
+                _ ->
+                    deletedOverrideConfig ix "" ""
+                        |> overrideWriteView model
+
+        ( Nothing, Just d ) ->
+            defaultOverrideConfig keys ix (unOverrideName d.name) d.value
+                |> overrideWriteView model
+
+        _ ->
+            div [] []
 
 
-editedOverrideReadView : Model -> ( Int, OverrideData ) -> Html Msg
-editedOverrideReadView =
-    overrideReadView
-        "key-default-edited"
-        "value-edited"
+
+-- divClass "row"
+--     [ divClass "editable-row" inputs
+--         -- [ overridePathWriteView model pathClass pathInputClass keys ( ix, override )
+--         -- , overrideValueWriteView model valueClass valueInputClass keys ( ix, override )
+--         -- , buttonClass "editable-row__delete spot spot--cancel" (DeleteOverride ix) []
+--         -- ]
+--     ]
+-- overrideReadView : Model -> Int -> Maybe Override -> Maybe DefaultOverride -> Html Msg
+-- overrideReadView model ix override default =
+--     div [] []
 
 
-overrideDeletedReadView : Model -> ( Int, OverrideData ) -> Html Msg
-overrideDeletedReadView =
-    overrideReadView
-        "key-deleted"
-        "value-deletes"
-
-
-defaultOverrideReadView : Model -> ( Int, OverrideData ) -> Html Msg
-defaultOverrideReadView =
-    overrideReadView
-        "key-default-pristine"
-        "value-pristine"
-
-
-treeOverrideView : Model -> List String -> List String -> Tree ( Int, OverrideData ) -> Html Msg
+treeOverrideView : Model -> List String -> List String -> Tree ( Int, DefaultOverride ) -> Html Msg
 treeOverrideView model keys piecies defaultOverride =
     case defaultOverride of
         Tree.Node _ [ Tree.Leaf ( ix, default ) ] ->
             case model.mode of
                 Write ->
-                    case Dict.get ix model.editedOverrides of
-                        Just (Just edited) ->
-                            editedOverrideWriteView model keys ( ix, edited )
-
-                        Just Nothing ->
-                            overrideDeletedWriteView model keys ( ix, default )
-
-                        Nothing ->
-                            defaultOverrideWriteView model keys ( ix, default )
+                    overrideWriteWrapper model keys ix (Dict.get ix model.editedOverrides) (Just default)
 
                 Read ->
-                    case Dict.get ix model.editedOverrides of
-                        Just (Just edited) ->
-                            editedOverrideReadView model ( ix, edited )
+                    Debug.todo "!"
 
-                        Just Nothing ->
-                            overrideDeletedReadView model ( ix, default )
-
-                        Nothing ->
-                            defaultOverrideReadView model ( ix, default )
-
+        -- overrideReadView model ix (Dict.get ix model.editedOverrides) (Just default)
+        -- Write ->
+        --     case Dict.get ix model.editedOverrides of
+        --         Just edited ->
+        --             case edited.value of
+        --                 ValueAdded _ ->
+        --                     editedOverrideWriteView model keys ( ix, edited )
+        --                 ValueDeleted ->
+        --                     overrideDeletedWriteView model keys ( ix, default )
+        --         Nothing ->
+        --             defaultOverrideWriteView model keys ( ix, default )
+        -- Read ->
+        --     Debug.todo "!"
+        -- case Dict.get ix model.editedOverrides of
+        --     Just (Just edited) ->
+        --         editedOverrideReadView model ( ix, edited )
+        --     Just Nothing ->
+        --         overrideDeletedReadView model ( ix, default )
+        --     Nothing ->
+        --         defaultOverrideReadView model ( ix, default )
         Tree.Node piece cs ->
             if Set.member (piece :: piecies) model.openedPaths then
                 divClass "collapse--project collapse collapse--expanded"
@@ -730,19 +819,6 @@ treeOverrideView model keys piecies defaultOverride =
 
 hasEmptyValues : Model -> Bool
 hasEmptyValues model =
-    case model.defaultOverrides of
-        Success defaultOverrides ->
-            Dict.merge
-                (\i a acc -> Dict.insert i a acc)
-                (\i a _ acc -> Dict.insert i a acc)
-                (\i b acc -> Dict.insert i (Just b) acc)
-                model.editedOverrides
-                defaultOverrides
-                Dict.empty
-                |> Dict.toList
-                |> List.filterMap (\( _, mv ) -> mv)
-                |> List.filter (\v -> v.value == "")
-                |> (List.isEmpty >> not)
-
-        _ ->
-            False
+    getFullOverrides model
+        |> List.filter (\v -> v.value == "")
+        |> (List.isEmpty >> not)
