@@ -31,8 +31,8 @@ type alias Model =
 
 init : Config -> Bool -> Model
 init config visibility =
-    { appOverrides = Overrides.init "App configuration"
-    , deploymentOverrides = Overrides.init "Deployment configuration"
+    { appOverrides = Overrides.init "App configuration" Overrides.WriteOverride
+    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.WriteOverride
     , name = ""
     , visibility = visibility
     , config = config
@@ -155,7 +155,7 @@ update cmd model =
                         |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
             in
             if Overrides.changeData subMsg then
-                ( { model_ | appOverrides = Overrides.init "App configuration" }
+                ( { model_ | appOverrides = Overrides.init "App configuration" Overrides.WriteOverride }
                 , Cmd.batch
                     [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
                     , reqAppOverrides model_.config (Overrides.getFullOverrides model_.deploymentOverrides)

@@ -44,7 +44,7 @@ init settings config =
       , debounce = Debounce.init
       , updated = 0
       }
-    , reqConfig config
+    , reqDeployments config
     )
 
 
@@ -83,11 +83,11 @@ type Msg
     | Tick Time.Posix
 
 
-port messageReceiver : (String -> msg) -> Sub msg
+port deploymentsReceiver : (String -> msg) -> Sub msg
 
 
-reqConfig : Config -> Cmd Msg
-reqConfig cfg =
+reqDeployments : Config -> Cmd Msg
+reqDeployments cfg =
     Api.get cfg deployments deploymentsDecoder (RemoteData.fromResult >> DeploymentsResponse)
 
 
@@ -134,7 +134,6 @@ update cmd model =
             in
             ( { model | debounce = debounce }, subCmd )
 
-        -- ( model, reqConfig model.config )
         ShowSidebar ->
             ( { model | sidebar = CreateSidebar.init model.config True }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
@@ -149,7 +148,7 @@ update cmd model =
                 ( debounce, subCmd ) =
                     Debounce.update
                         debounceConfig
-                        (Debounce.takeAll (\_ _ -> reqConfig model.config))
+                        (Debounce.takeAll (\_ _ -> reqDeployments model.config))
                         msg
                         model.debounce
             in
@@ -169,7 +168,7 @@ subscriptions model =
     Sub.batch
         [ Sub.map ActiveTableMsg (Table.subscriptions model.activeTable)
         , Sub.map ArchivedTableMsg (Table.subscriptions model.archivedTable)
-        , messageReceiver WSUpdate
+        , deploymentsReceiver WSUpdate
         , Time.every (toFloat tick * 1000) Tick
         ]
 

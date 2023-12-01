@@ -150,7 +150,7 @@ changeRouteTo maybeRoute model =
                 |> updateWith Deployments DeploymentsMsg
 
         Just (Route.Deployment deploymentName) ->
-            Deployment.init (getSettings model) (getConfig model)
+            Deployment.init (getSettings model) (getConfig model) deploymentName
                 |> updateWith Deployment DeploymentMsg
 
 
@@ -167,8 +167,8 @@ subscriptions model =
         Deployments deployments ->
             Sub.map DeploymentsMsg (Deployments.subscriptions deployments)
 
-        _ ->
-            Sub.none
+        Deployment deployment ->
+            Sub.map DeploymentMsg (Deployment.subscriptions deployment)
 
 
 

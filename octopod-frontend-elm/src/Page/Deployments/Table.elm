@@ -410,60 +410,6 @@ overridesView openCmd closeCmd dName opened overrides =
             [ buttonClass_ "expander listing__more" (openCmd dName) [ text "Show full configuration" ] ]
 
 
-dateView : Zone -> Posix -> Html Msg
-dateView zone time =
-    let
-        toMonth month_ =
-            case month_ of
-                Jan ->
-                    "01"
-
-                Feb ->
-                    "02"
-
-                Mar ->
-                    "03"
-
-                Apr ->
-                    "04"
-
-                May ->
-                    "05"
-
-                Jun ->
-                    "06"
-
-                Jul ->
-                    "07"
-
-                Aug ->
-                    "08"
-
-                Sep ->
-                    "09"
-
-                Oct ->
-                    "10"
-
-                Nov ->
-                    "11"
-
-                Dec ->
-                    "12"
-
-        year =
-            String.fromInt (Time.toYear zone time)
-
-        month =
-            toMonth (Time.toMonth zone time)
-
-        day =
-            String.padLeft 2 '0' <|
-                String.fromInt (Time.toDay zone time)
-    in
-    text <| String.join "-" [ year, month, day ]
-
-
 deploymentView : Model -> Deployment -> Html Msg
 deploymentView model deployment =
     let
