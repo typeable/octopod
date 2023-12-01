@@ -1,4 +1,4 @@
-module Deployments exposing (..)
+module Api.Types.Deployment exposing (..)
 
 import Json.Decode as Decode exposing (Decoder, andThen, string)
 import Json.Decode.Extra exposing (datetime)

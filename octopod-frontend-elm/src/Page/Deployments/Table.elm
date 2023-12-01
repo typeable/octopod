@@ -2,9 +2,9 @@ module Page.Deployments.Table exposing (..)
 
 import Api
 import Api.Endpoint as Endpoint exposing (..)
+import Api.Types.Deployment as Deployments exposing (..)
 import Browser.Events
 import Config exposing (Config, Settings)
-import Deployments exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)

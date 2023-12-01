@@ -2,17 +2,19 @@ module Page.Sidebar.Create exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
+import Api.Types.DefaultOverrides exposing (DefaultOverrides, defaultOverridesDecoder)
+import Api.Types.Deployment exposing (..)
+import Api.Types.OverrideKey exposing (OverrideKeys, keysDecoder)
 import Config exposing (Config)
-import Deployments exposing (..)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onInput)
+import Html.Overrides as Overrides
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Page.Sidebar.Overrides as Overrides
 import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
@@ -31,8 +33,8 @@ type alias Model =
 
 init : Config -> Bool -> Model
 init config visibility =
-    { appOverrides = Overrides.init "App configuration" Overrides.WriteOverride
-    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.WriteOverride
+    { appOverrides = Overrides.init "App configuration" Overrides.Write
+    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
     , name = ""
     , visibility = visibility
     , config = config
@@ -42,10 +44,10 @@ init config visibility =
 
 
 type Msg
-    = DeploymentOverrideKeysResponse (Api.WebData (List String))
-    | DeploymentOverridesResponse (Api.WebData (List (List String)))
-    | AppOverrideKeysResponse (Api.WebData (List String))
-    | AppOverridesResponse (Api.WebData (List (List String)))
+    = DeploymentOverrideKeysResponse (Api.WebData OverrideKeys)
+    | DeploymentOverridesResponse (Api.WebData DefaultOverrides)
+    | AppOverrideKeysResponse (Api.WebData OverrideKeys)
+    | AppOverridesResponse (Api.WebData DefaultOverrides)
     | Close
     | Save
     | NameInput String
@@ -58,7 +60,7 @@ reqDeploymentOverrideKeys : Config -> Cmd Msg
 reqDeploymentOverrideKeys config =
     Api.get config
         deploymentOverrideKeys
-        (Decode.list Decode.string)
+        keysDecoder
         (RemoteData.fromResult >> DeploymentOverrideKeysResponse)
 
 
@@ -66,7 +68,7 @@ reqDeploymentOverrides : Config -> Cmd Msg
 reqDeploymentOverrides config =
     Api.get config
         deploymentOverrides
-        (Decode.list (Decode.list Decode.string))
+        defaultOverridesDecoder
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
@@ -75,7 +77,7 @@ reqAppOverrideKeys config body =
     Api.post config
         appOverrideKeys
         (Http.jsonBody (Encode.list (Encode.list Encode.string) body))
-        (Decode.list Decode.string)
+        keysDecoder
         (RemoteData.fromResult >> AppOverrideKeysResponse)
 
 
@@ -84,7 +86,7 @@ reqAppOverrides config body =
     Api.post config
         appOverrides
         (Http.jsonBody (Encode.list (Encode.list Encode.string) body))
-        (Decode.list (Decode.list Decode.string))
+        defaultOverridesDecoder
         (RemoteData.fromResult >> AppOverridesResponse)
 
 
@@ -155,7 +157,7 @@ update cmd model =
                         |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
             in
             if Overrides.changeData subMsg then
-                ( { model_ | appOverrides = Overrides.init "App configuration" Overrides.WriteOverride }
+                ( { model_ | appOverrides = Overrides.init "App configuration" Overrides.Write }
                 , Cmd.batch
                     [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
                     , reqAppOverrides model_.config (Overrides.getFullOverrides model_.deploymentOverrides)

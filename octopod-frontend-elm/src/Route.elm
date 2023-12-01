@@ -1,7 +1,7 @@
 module Route exposing (Route(..), fromUrl, href, pushUrl, replaceUrl)
 
+import Api.Types.Deployment exposing (DeploymentName(..), unDeploymentName)
 import Browser.Navigation as Nav
-import Deployments exposing (DeploymentName(..), unDeploymentName)
 import Html exposing (Attribute)
 import Html.Attributes as Attr
 import Url exposing (Url)

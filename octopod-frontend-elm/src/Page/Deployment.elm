@@ -2,17 +2,17 @@ port module Page.Deployment exposing (..)
 
 import Api
 import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentOverrides, deployments)
+import Api.Types.Deployment as Deployments exposing (..)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
-import Deployments exposing (Deployment, DeploymentName, DeploymentStatus(..), Status(..), deploymentDecoder, isDeploymentArchived, isPending, unDeploymentName)
 import Html exposing (Html, div, text)
 import Html.Attributes as Attr
 import Html.Common exposing (aClassHrefExternal, aClassHrefInternal, bClass, dateView, divClass, h1Class, h3Class)
+import Html.Overrides as Overrides
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Page.Sidebar.Overrides as Overrides
 import RemoteData exposing (RemoteData(..))
 import Route
 
@@ -35,8 +35,8 @@ init settings config deploymentName =
       , deployment = Loading
       , deploymentName = deploymentName
       , debounce = Debounce.init
-      , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.ReadOverride
-      , appOverrides = Overrides.init "App configuration" Overrides.ReadOverride
+      , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Read
+      , appOverrides = Overrides.init "App configuration" Overrides.Read
       }
     , Cmd.batch
         [ reqDeployment deploymentName config

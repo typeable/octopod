@@ -2,10 +2,10 @@ port module Page.Deployments exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
+import Api.Types.Deployment exposing (..)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
-import Deployments exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)

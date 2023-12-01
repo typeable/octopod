@@ -1,14 +1,27 @@
-module Page.Sidebar.Overrides exposing (..)
+module Html.Overrides exposing
+    ( Mode(..)
+    , Model
+    , Msg
+    , changeData
+    , getEditedOverrides
+    , getFullOverrides
+    , hasEmptyValues
+    , init
+    , setDefaultAndEditedOverrides
+    , setDefaultOverrides
+    , setKeys
+    , update
+    , view
+    )
 
 import Api
 import Api.Endpoint exposing (..)
-import Deployments exposing (..)
+import Api.Types.Deployment as Deployments exposing (..)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onBlur, onFocus, onInput, onMouseDown)
-import Json.Decode exposing (Value)
 import List.Extra
 import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
@@ -22,14 +35,9 @@ type alias OverrideData =
     }
 
 
-emptyOverride : OverrideData
-emptyOverride =
-    OverrideData "" ""
-
-
-type OverridesMode
-    = ReadOverride
-    | WriteOverride
+type Mode
+    = Read
+    | Write
 
 
 type alias Model =
@@ -40,13 +48,21 @@ type alias Model =
     , openedPaths : Set (List String)
     , autocomplete : Maybe Int
     , name : String
-    , overridesMode : OverridesMode
+    , mode : Mode
     }
 
 
-init : String -> OverridesMode -> Model
-init name overridesMode =
-    Model Loading Loading Dict.empty 0 Set.empty Nothing name overridesMode
+init : String -> Mode -> Model
+init name mode =
+    { defaultOverrides = Loading
+    , keys = Loading
+    , editedOverrides = Dict.empty
+    , nextId = 0
+    , openedPaths = Set.empty
+    , autocomplete = Nothing
+    , name = name
+    , mode = mode
+    }
 
 
 setDefaultOverrides : Api.WebData (List (List String)) -> Model -> Model
@@ -77,7 +93,11 @@ setDefaultOverrides defaultOverrides model =
     }
 
 
-setDefaultAndEditedOverrides : Api.WebData (List (List String)) -> Api.WebData (List Override) -> Model -> Model
+setDefaultAndEditedOverrides :
+    Api.WebData (List (List String))
+    -> Api.WebData (List Override)
+    -> Model
+    -> Model
 setDefaultAndEditedOverrides defaults edits model_ =
     let
         model =
@@ -259,7 +279,7 @@ update msg model =
 newOverride : Model -> Model
 newOverride model =
     { model
-        | editedOverrides = Dict.insert model.nextId (Just emptyOverride) model.editedOverrides
+        | editedOverrides = Dict.insert model.nextId (Just (OverrideData "" "")) model.editedOverrides
         , nextId = model.nextId + 1
     }
 
@@ -343,11 +363,11 @@ view : Model -> Html Msg
 view model =
     divClass "deployment__section"
         [ h3Class "deployment__sub-heading" [ text model.name ]
-        , case ( model.defaultOverrides, model.keys, model.overridesMode ) of
-            ( Success defaultOverrides, Success keys, WriteOverride ) ->
+        , case ( model.defaultOverrides, model.keys, model.mode ) of
+            ( Success defaultOverrides, Success keys, Write ) ->
                 overridesSectionData model defaultOverrides keys
 
-            ( Success defaultOverrides, _, ReadOverride ) ->
+            ( Success defaultOverrides, _, Read ) ->
                 overridesSectionData model defaultOverrides []
 
             _ ->
@@ -392,7 +412,7 @@ overridesSectionData model defaultOverrides keys =
                 |> List.filterMap (\x -> x)
 
         addButton =
-            if model.overridesMode == WriteOverride then
+            if model.mode == Write then
                 [ if hasEmptyOverrides newOverrides then
                     Html.button [ Attr.class "dash--disabled dash dash--add overrides__add", Attr.disabled True ] [ text "Add an override" ]
 
@@ -425,7 +445,7 @@ newOverridesView model overrides keys =
 
 newOverrideView : Model -> List String -> ( Int, OverrideData ) -> Html Msg
 newOverrideView model keys ixOverride =
-    if model.overridesMode == WriteOverride then
+    if model.mode == Write then
         overrideWriteView
             "input editable-row__key"
             "input__widget key-custom-edited"
@@ -663,8 +683,8 @@ treeOverrideView : Model -> List String -> List String -> Tree ( Int, OverrideDa
 treeOverrideView model keys piecies defaultOverride =
     case defaultOverride of
         Tree.Node _ [ Tree.Leaf ( ix, default ) ] ->
-            case model.overridesMode of
-                WriteOverride ->
+            case model.mode of
+                Write ->
                     case Dict.get ix model.editedOverrides of
                         Just (Just edited) ->
                             editedOverrideWriteView model keys ( ix, edited )
@@ -675,7 +695,7 @@ treeOverrideView model keys piecies defaultOverride =
                         Nothing ->
                             defaultOverrideWriteView model keys ( ix, default )
 
-                ReadOverride ->
+                Read ->
                     case Dict.get ix model.editedOverrides of
                         Just (Just edited) ->
                             editedOverrideReadView model ( ix, edited )
