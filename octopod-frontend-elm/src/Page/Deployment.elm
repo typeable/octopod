@@ -24,8 +24,8 @@ type alias Model =
     , deployment : Api.WebData Deployment
     , deploymentName : DeploymentName
     , debounce : Debounce ()
-    , deploymentOverrides : Overrides.Model
-    , appOverrides : Overrides.Model
+    , deploymentOverridesModel : Overrides.Model
+    , appOverridesModel : Overrides.Model
     }
 
 
@@ -36,8 +36,8 @@ init settings config deploymentName =
       , deployment = Loading
       , deploymentName = deploymentName
       , debounce = Debounce.init
-      , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Read
-      , appOverrides = Overrides.init "App configuration" Overrides.Read
+      , deploymentOverridesModel = Overrides.init "Deployment configuration" Overrides.Read
+      , appOverridesModel = Overrides.init "App configuration" Overrides.Read
       }
     , Cmd.batch
         [ reqDeployment deploymentName config
@@ -135,33 +135,37 @@ update cmd model =
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverrides =
+                | deploymentOverridesModel =
                     Overrides.setDefaultAndEditedOverrides
                         overrides
                         (RemoteData.map (\x -> x.deployment.deploymentOverrides) model.deployment)
-                        model.deploymentOverrides
+                        model.deploymentOverridesModel
               }
             , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
             )
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides =
+                | appOverridesModel =
                     Overrides.setDefaultAndEditedOverrides
                         overrides
                         (RemoteData.map (\x -> x.deployment.appOverrides) model.deployment)
-                        model.appOverrides
+                        model.appOverridesModel
               }
             , Cmd.none
             )
 
         AppOverridesMsg subMsg ->
-            Overrides.update subMsg model.appOverrides
-                |> updateWith (\appOverrides -> { model | appOverrides = appOverrides }) AppOverridesMsg
+            Overrides.update subMsg model.appOverridesModel
+                |> updateWith
+                    (\appOverridesModel -> { model | appOverridesModel = appOverridesModel })
+                    AppOverridesMsg
 
         DeploymentOverridesMsg subMsg ->
-            Overrides.update subMsg model.deploymentOverrides
-                |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
+            Overrides.update subMsg model.deploymentOverridesModel
+                |> updateWith
+                    (\deploymentOverridesModel -> { model | deploymentOverridesModel = deploymentOverridesModel })
+                    DeploymentOverridesMsg
 
 
 port deploymentReceiver : (String -> msg) -> Sub msg
@@ -293,8 +297,8 @@ deploymentView model deployment =
     divClass "deployment"
         [ deploymentSummaryView model deployment
         , deploymentLinksView model deployment
-        , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverrides)
-        , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
+        , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverridesModel)
+        , Html.map AppOverridesMsg (Overrides.view model.appOverridesModel)
 
         -- , deploymentOverrides model deployment
         ]

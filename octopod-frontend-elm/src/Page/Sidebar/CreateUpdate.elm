@@ -1,4 +1,4 @@
-module Page.Sidebar.Create exposing (..)
+module Page.Sidebar.CreateUpdate exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
@@ -35,6 +35,18 @@ init : Config -> Bool -> Model
 init config visibility =
     { appOverrides = Overrides.init "App configuration" Overrides.Write
     , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
+    , name = ""
+    , visibility = visibility
+    , config = config
+    , saveResp = NotAsked
+    , nameEdited = False
+    }
+
+
+initWithOverrides : Overrides.Model -> Overrides.Model -> Config -> Bool -> Model
+initWithOverrides deploymentOverrides appOverrides config visibility =
+    { appOverrides = appOverrides
+    , deploymentOverrides = deploymentOverrides
     , name = ""
     , visibility = visibility
     , config = config

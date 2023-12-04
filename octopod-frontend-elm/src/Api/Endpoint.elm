@@ -12,6 +12,7 @@ module Api.Endpoint exposing
     , request
     , restoreDeployment
     , saveDeployment
+    , updateDeployment
     )
 
 import Api.Types.Deployment exposing (DeploymentName, unDeploymentName)
@@ -108,6 +109,11 @@ appOverrideKeys appUrl =
 saveDeployment : AppUrl -> Endpoint
 saveDeployment appUrl =
     url (Just appUrl) [ "api", "v1", "deployments" ] []
+
+
+updateDeployment : DeploymentName -> AppUrl -> Endpoint
+updateDeployment deploymentName appUrl =
+    url (Just appUrl) [ "api", "v1", "deployments", unDeploymentName deploymentName ] []
 
 
 deploymentFullInfo : DeploymentName -> AppUrl -> Endpoint

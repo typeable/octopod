@@ -11,7 +11,7 @@ import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onInput)
 import Page.Deployments.Table as Table
-import Page.Sidebar.Create as CreateSidebar
+import Page.Sidebar.CreateUpdate as CreateSidebar
 import RemoteData exposing (RemoteData(..))
 import Task
 import Time
