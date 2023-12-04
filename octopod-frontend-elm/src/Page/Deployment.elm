@@ -134,23 +134,15 @@ update cmd model =
             ( { model | debounce = debounce }, subCmd )
 
         DeploymentOverridesResponse overrides ->
-            Debug.log
-                (Debug.toString
-                    (Overrides.setDefaultAndEditedOverrides
+            ( { model
+                | deploymentOverrides =
+                    Overrides.setDefaultAndEditedOverrides
                         overrides
                         (RemoteData.map (\x -> x.deployment.deploymentOverrides) model.deployment)
                         model.deploymentOverrides
-                    )
-                )
-                ( { model
-                    | deploymentOverrides =
-                        Overrides.setDefaultAndEditedOverrides
-                            overrides
-                            (RemoteData.map (\x -> x.deployment.deploymentOverrides) model.deployment)
-                            model.deploymentOverrides
-                  }
-                , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
-                )
+              }
+            , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
+            )
 
         AppOverridesResponse overrides ->
             ( { model
