@@ -2,9 +2,6 @@ module Page.Sidebar.CreateUpdate exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
-import Api.Types.DefaultOverrides exposing (DefaultOverride, DefaultOverrides, defaultOverrideEncoder, defaultOverridesDecoder)
-import Api.Types.Deployment exposing (..)
-import Api.Types.OverrideKey exposing (OverrideKeys, keysDecoder)
 import Config exposing (Config)
 import Dict exposing (Dict)
 import Html exposing (..)
@@ -18,6 +15,8 @@ import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
+import Types.DefaultOverride exposing (DefaultOverride, defaultOverrideEncoder, defaultOverridesDecode)
+import Types.Deployment exposing (..)
 
 
 type alias Model =
@@ -56,10 +55,10 @@ initWithOverrides deploymentOverrides appOverrides config visibility =
 
 
 type Msg
-    = DeploymentOverrideKeysResponse (Api.WebData OverrideKeys)
-    | DeploymentOverridesResponse (Api.WebData DefaultOverrides)
-    | AppOverrideKeysResponse (Api.WebData OverrideKeys)
-    | AppOverridesResponse (Api.WebData DefaultOverrides)
+    = DeploymentOverrideKeysResponse (Api.WebData (List OverrideName))
+    | DeploymentOverridesResponse (Api.WebData (List DefaultOverride))
+    | AppOverrideKeysResponse (Api.WebData (List OverrideName))
+    | AppOverridesResponse (Api.WebData (List DefaultOverride))
     | Close
     | Save
     | NameInput String
@@ -72,7 +71,7 @@ reqDeploymentOverrideKeys : Config -> Cmd Msg
 reqDeploymentOverrideKeys config =
     Api.get config
         deploymentOverrideKeys
-        keysDecoder
+        (Decode.list overrideNameDecoder)
         (RemoteData.fromResult >> DeploymentOverrideKeysResponse)
 
 
@@ -80,7 +79,7 @@ reqDeploymentOverrides : Config -> Cmd Msg
 reqDeploymentOverrides config =
     Api.get config
         deploymentOverrides
-        defaultOverridesDecoder
+        (Decode.list defaultOverridesDecode)
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
@@ -89,7 +88,7 @@ reqAppOverrideKeys config body =
     Api.post config
         appOverrideKeys
         (Http.jsonBody (Encode.list defaultOverrideEncoder body))
-        keysDecoder
+        (Decode.list overrideNameDecoder)
         (RemoteData.fromResult >> AppOverrideKeysResponse)
 
 
@@ -98,7 +97,7 @@ reqAppOverrides config body =
     Api.post config
         appOverrides
         (Http.jsonBody (Encode.list defaultOverrideEncoder body))
-        defaultOverridesDecoder
+        (Decode.list defaultOverridesDecode)
         (RemoteData.fromResult >> AppOverridesResponse)
 
 

@@ -103,3 +103,23 @@ getByPath ts p =
 
         _ ->
             Nothing
+
+
+map : (a -> b) -> Tree a -> Tree b
+map f t =
+    case t of
+        Node l cs ->
+            Node l (List.map (map f) cs)
+
+        Leaf x ->
+            Leaf (f x)
+
+
+values : Tree a -> List a
+values t =
+    case t of
+        Node _ cs ->
+            List.concat (List.map values cs)
+
+        Leaf x ->
+            [ x ]

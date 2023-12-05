@@ -1,4 +1,4 @@
-module Api.Types.Deployment exposing (..)
+module Types.Deployment exposing (..)
 
 import Json.Decode as Decode exposing (Decoder, andThen, string)
 import Json.Decode.Extra exposing (datetime)
@@ -99,8 +99,9 @@ unStatus status =
             ds
 
 
-type alias Deployments =
-    List Deployment
+overrideNameDecoder : Decoder OverrideName
+overrideNameDecoder =
+    Decode.map OverrideName Decode.string
 
 
 failureTypeDecoder : Decoder FailureType
@@ -261,11 +262,6 @@ deploymentDecoder =
         |> required "metadata" (Decode.list metadataDecoder)
         |> required "created_at" datetime
         |> required "updated_at" datetime
-
-
-deploymentsDecoder : Decoder Deployments
-deploymentsDecoder =
-    Decode.list deploymentDecoder
 
 
 isDeploymentArchived : Deployment -> Bool

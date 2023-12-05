@@ -1,9 +1,7 @@
 port module Page.Deployment exposing (..)
 
 import Api
-import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentOverrides, deployments)
-import Api.Types.DefaultOverrides exposing (DefaultOverride, DefaultOverrides, defaultOverrideEncoder, defaultOverridesDecoder)
-import Api.Types.Deployment as Deployments exposing (..)
+import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentOverrides)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
@@ -16,6 +14,8 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
 import Route
+import Types.DefaultOverride exposing (DefaultOverride, defaultOverrideEncoder, defaultOverridesDecode)
+import Types.Deployment as Deployments exposing (..)
 
 
 type alias Model =
@@ -79,7 +79,7 @@ reqDeploymentOverrides : Config -> Cmd Msg
 reqDeploymentOverrides config =
     Api.get config
         deploymentOverrides
-        defaultOverridesDecoder
+        (Decode.list defaultOverridesDecode)
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
@@ -88,7 +88,7 @@ reqAppOverrides config body =
     Api.post config
         appOverrides
         (Http.jsonBody (Encode.list defaultOverrideEncoder body))
-        defaultOverridesDecoder
+        (Decode.list defaultOverridesDecode)
         (RemoteData.fromResult >> AppOverridesResponse)
 
 
@@ -136,7 +136,7 @@ update cmd model =
         DeploymentOverridesResponse overrides ->
             ( { model
                 | deploymentOverridesModel =
-                    Overrides.setDefaultAndEditedOverrides
+                    Overrides.setDefaultAndLoadedOverrides
                         overrides
                         (RemoteData.map (\x -> x.deployment.deploymentOverrides) model.deployment)
                         model.deploymentOverridesModel
@@ -147,7 +147,7 @@ update cmd model =
         AppOverridesResponse overrides ->
             ( { model
                 | appOverridesModel =
-                    Overrides.setDefaultAndEditedOverrides
+                    Overrides.setDefaultAndLoadedOverrides
                         overrides
                         (RemoteData.map (\x -> x.deployment.appOverrides) model.deployment)
                         model.appOverridesModel

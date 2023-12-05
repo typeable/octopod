@@ -2,7 +2,6 @@ module Page.Deployments.Table exposing (..)
 
 import Api
 import Api.Endpoint as Endpoint exposing (..)
-import Api.Types.Deployment as Deployments exposing (..)
 import Browser.Events
 import Config exposing (Config, Settings)
 import Html exposing (..)
@@ -16,6 +15,7 @@ import RemoteData exposing (RemoteData(..))
 import Route
 import Set.Any as Set exposing (AnySet)
 import Time exposing (Month(..), Posix, Zone, posixToMillis, toMonth)
+import Types.Deployment as Deployments exposing (..)
 
 
 type alias Model =
@@ -189,7 +189,7 @@ isOutsideDropdown dropdownId =
         ]
 
 
-view : Model -> Api.WebData Deployments -> String -> Html Msg
+view : Model -> Api.WebData (List Deployment) -> String -> Html Msg
 view model deployments search =
     divClass "table table--deployments table--clickable table--double-click" <|
         table []
@@ -278,7 +278,7 @@ tablePrimaryHeaderView model =
         ]
 
 
-tablePrimaryBodyView : Model -> Api.WebData Deployments -> String -> Html Msg
+tablePrimaryBodyView : Model -> Api.WebData (List Deployment) -> String -> Html Msg
 tablePrimaryBodyView model deployments search =
     case deployments of
         Success d ->
@@ -317,7 +317,7 @@ tableFailureView =
         ]
 
 
-tableDeploymentsView : Model -> Deployments -> String -> Html Msg
+tableDeploymentsView : Model -> List Deployment -> String -> Html Msg
 tableDeploymentsView model deployments search =
     let
         compareDeployments : Deployment -> Deployment -> Order

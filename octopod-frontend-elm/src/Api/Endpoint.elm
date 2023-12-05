@@ -15,10 +15,10 @@ module Api.Endpoint exposing
     , updateDeployment
     )
 
-import Api.Types.Deployment exposing (DeploymentName, unDeploymentName)
 import Config exposing (AppUrl, unwrapAppUrl)
 import Http
 import Maybe exposing (map, withDefault)
+import Types.Deployment exposing (DeploymentName, unDeploymentName)
 import Url.Builder exposing (QueryParameter)
 
 

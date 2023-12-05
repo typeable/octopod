@@ -7,7 +7,7 @@ module Html.Overrides exposing
     , getFullOverrides
     , hasEmptyValues
     , init
-    , setDefaultAndEditedOverrides
+    , setDefaultAndLoadedOverrides
     , setDefaultOverrides
     , setKeys
     , update
@@ -16,20 +16,19 @@ module Html.Overrides exposing
 
 import Api
 import Api.Endpoint exposing (..)
-import Api.Types.DefaultOverrides exposing (DefaultOverride)
-import Api.Types.Deployment as Deployments exposing (..)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
-import Html.Events exposing (on, onBlur, onFocus, onInput, onMouseDown)
-import Html.Extra exposing (nothing)
+import Html.Events exposing (onBlur, onFocus, onInput, onMouseDown)
 import List exposing (reverse)
 import List.Extra
 import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
 import Tree exposing (Tree, mergeTreesWithSort)
+import Types.DefaultOverride as Types
+import Types.Deployment exposing (..)
 
 
 
@@ -41,12 +40,30 @@ type Mode
     | Write
 
 
+type OverrideDataStatus
+    = New
+    | Edited
+    | Deleted
+
+
+type alias OverrideData =
+    { name : OverrideName
+    , value : String
+    , status : OverrideDataStatus
+    }
+
+
+type WrappedOverride
+    = DefaultOverride Types.DefaultOverride
+    | NonDefaultOverride OverrideData
+
+
 type alias Model =
-    { defaultOverrides : Api.WebData (Dict Int DefaultOverride)
-    , keys : Api.WebData (List String)
-    , editedOverrides : Dict Int Override
+    { keys : Api.WebData (List OverrideName)
+    , treeSchema : Api.WebData (List (Tree Int))
+    , defaultOverrides : Dict Int Types.DefaultOverride
+    , editedOverrides : Dict Int OverrideData
     , nextId : Int
-    , lastTreeId : Int
     , openedNames : Set (List String)
     , autocomplete : Maybe Int
     , name : String
@@ -56,11 +73,11 @@ type alias Model =
 
 init : String -> Mode -> Model
 init name mode =
-    { defaultOverrides = Loading
+    { treeSchema = Loading
     , keys = Loading
+    , defaultOverrides = Dict.empty
     , editedOverrides = Dict.empty
     , nextId = 0
-    , lastTreeId = 0
     , openedNames = Set.empty
     , autocomplete = Nothing
     , name = name
@@ -68,101 +85,237 @@ init name mode =
     }
 
 
-setDefaultOverrides : Api.WebData (List DefaultOverride) -> Model -> Model
+setDefaultOverrides : Api.WebData (List Types.DefaultOverride) -> Model -> Model
 setDefaultOverrides defaultOverrides model =
-    let
-        emptyOverrides overrides =
-            List.filter (\o -> o.value == "") overrides
-                |> List.map (.name >> unOverrideName >> String.split "." >> List.Extra.inits >> List.map reverse)
-                |> List.concat
-                |> Set.fromList
-
-        dictOverrides =
-            RemoteData.map (Dict.fromList << List.indexedMap Tuple.pair) defaultOverrides
-    in
-    { model
-        | defaultOverrides = dictOverrides
-        , nextId = RemoteData.unwrap 0 Dict.size dictOverrides
-        , lastTreeId = RemoteData.unwrap 0 Dict.size dictOverrides
-        , openedNames = RemoteData.unwrap Set.empty emptyOverrides defaultOverrides
-    }
+    setDefaultAndLoadedOverrides defaultOverrides (Success []) model
 
 
-setDefaultAndEditedOverrides :
-    Api.WebData (List DefaultOverride)
+setDefaultAndLoadedOverrides :
+    Api.WebData (List Types.DefaultOverride)
     -> Api.WebData (List Override)
     -> Model
     -> Model
-setDefaultAndEditedOverrides defaultsRemote editsRemote model =
+setDefaultAndLoadedOverrides defaultsRemote editsRemote model =
     let
-        mkDicts defaults edits =
-            let
-                f _ d ( ds, os ) =
-                    ( Dict.insert (Dict.size ds) d ds, os )
+        mkDefaultNameDict : List Types.DefaultOverride -> Dict String Types.DefaultOverride
+        mkDefaultNameDict defaultsList =
+            defaultsList |> List.map (\d -> ( unOverrideName d.name, d )) |> Dict.fromList
 
-                g _ d o ( ds, os ) =
-                    ( Dict.insert (Dict.size ds) d ds, Dict.insert (Dict.size ds) o os )
+        mkEditsNameDict : List Override -> Dict String Override
+        mkEditsNameDict editsList =
+            editsList |> List.map (\d -> ( unOverrideName d.name, d )) |> Dict.fromList
 
-                h _ o ( ds, os ) =
-                    ( ds, Dict.insert (Dict.size defaults + Dict.size os) o os )
-            in
-            Dict.merge f g h defaults edits ( Dict.empty, Dict.empty )
+        mkIds : Dict String Types.DefaultOverride -> Dict String Override -> Dict String Int
+        mkIds defaults edits =
+            Dict.merge
+                (\n _ res -> Dict.insert n (Dict.size res) res)
+                (\n _ _ res -> Dict.insert n (Dict.size res) res)
+                (\n _ res -> Dict.insert n (Dict.size res) res)
+                defaults
+                edits
+                Dict.empty
 
-        mkOverrideDict =
-            List.map (\x -> ( unOverrideName x.name, x )) >> Dict.fromList
+        mkDefaultsDict : Dict String Int -> Dict String Types.DefaultOverride -> Dict Int Types.DefaultOverride
+        mkDefaultsDict ids defaults =
+            Dict.merge
+                (\_ _ res -> res)
+                (\_ id def res -> Dict.insert id def res)
+                (\_ _ res -> res)
+                ids
+                defaults
+                Dict.empty
 
-        dictsRemote =
-            RemoteData.map2
-                mkDicts
-                (RemoteData.map mkOverrideDict defaultsRemote)
-                (RemoteData.map mkOverrideDict editsRemote)
+        mkEditsDict : Dict String Int -> Dict String Override -> Dict Int Override
+        mkEditsDict ids edits =
+            Dict.merge
+                (\_ _ res -> res)
+                (\_ id def res -> Dict.insert id def res)
+                (\_ _ res -> res)
+                ids
+                edits
+                Dict.empty
+
+        mkOverrideDataList : Dict Int Types.DefaultOverride -> Dict Int Override -> Dict Int OverrideData
+        mkOverrideDataList defaults edits =
+            Dict.merge
+                (\_ _ res -> res)
+                (\id def edit res ->
+                    case edit.value of
+                        ValueAdded v ->
+                            Dict.insert id (OverrideData edit.name v Edited) res
+
+                        ValueDeleted ->
+                            Dict.insert id (OverrideData edit.name def.value Deleted) res
+                )
+                (\id edit res ->
+                    case edit.value of
+                        ValueAdded v ->
+                            Dict.insert id (OverrideData edit.name v New) res
+
+                        ValueDeleted ->
+                            res
+                )
+                defaults
+                edits
+                Dict.empty
+
+        treeHasEmptyOrEdited : Dict Int WrappedOverride -> Tree Int -> Bool
+        treeHasEmptyOrEdited overrideData t =
+            case t of
+                Tree.Node _ cs ->
+                    List.any (treeHasEmptyOrEdited overrideData) cs
+
+                Tree.Leaf i ->
+                    case Dict.get i overrideData of
+                        Just (NonDefaultOverride _) ->
+                            True
+
+                        Just (DefaultOverride x) ->
+                            x.value == ""
+
+                        _ ->
+                            False
+
+        compareTree : Dict Int WrappedOverride -> Tree Int -> Tree Int -> Order
+        compareTree overrideData a b =
+            case ( a, b ) of
+                ( Tree.Node x [ Tree.Leaf i ], Tree.Node y [ Tree.Leaf j ] ) ->
+                    case ( Dict.get i overrideData, Dict.get j overrideData ) of
+                        ( Just aa, Just bb ) ->
+                            compareWrappedOverride aa bb
+
+                        _ ->
+                            compare x y
+
+                ( Tree.Node _ [ Tree.Leaf _ ], _ ) ->
+                    LT
+
+                ( _, Tree.Node _ [ Tree.Leaf _ ] ) ->
+                    GT
+
+                ( Tree.Node x _, Tree.Node y _ ) ->
+                    case ( treeHasEmptyOrEdited overrideData a, treeHasEmptyOrEdited overrideData b ) of
+                        ( True, True ) ->
+                            compare x y
+
+                        ( False, False ) ->
+                            compare x y
+
+                        ( True, False ) ->
+                            LT
+
+                        ( False, True ) ->
+                            GT
+
+                _ ->
+                    EQ
+
+        mkTree : Dict String Int -> Dict Int WrappedOverride -> List (Tree Int)
+        mkTree ids overridesData =
+            Dict.toList ids
+                |> List.map (\( n, id ) -> Tree.pathToTree (String.split "." n) id)
+                |> mergeTreesWithSort (compareTree overridesData)
+
+        mkOpenedPaths : Dict Int WrappedOverride -> Set (List String)
+        mkOpenedPaths overridesData =
+            Dict.toList overridesData
+                |> List.map Tuple.second
+                |> List.filter (getWrappedValue >> (\x -> x == ""))
+                |> List.map
+                    (getWrappedName
+                        >> unOverrideName
+                        >> String.split "."
+                        >> List.Extra.init
+                        >> Maybe.withDefault []
+                        >> List.reverse
+                        >> List.Extra.tails
+                    )
+                |> List.concat
+                |> Set.fromList
+
+        defaultNameDictR =
+            RemoteData.map mkDefaultNameDict defaultsRemote
+
+        editNameDictR =
+            RemoteData.map mkEditsNameDict editsRemote
+
+        idsR =
+            RemoteData.map2 mkIds defaultNameDictR editNameDictR
+
+        defaultsDictR =
+            RemoteData.map2 mkDefaultsDict idsR defaultNameDictR
+
+        overridesDictR =
+            RemoteData.map2 mkEditsDict idsR editNameDictR
+                |> RemoteData.map2 mkOverrideDataList defaultsDictR
+
+        treeDataR =
+            RemoteData.map2 mkWrappedOverride defaultsDictR overridesDictR
+
+        treeR =
+            RemoteData.map2 mkTree idsR treeDataR
 
         nextId =
-            RemoteData.unwrap 0 (Tuple.first >> Dict.size) dictsRemote
-                + RemoteData.unwrap 0 (Tuple.second >> Dict.size) dictsRemote
+            RemoteData.unwrap 0 Dict.size defaultsDictR + RemoteData.unwrap 0 Dict.size overridesDictR
+
+        openedPaths =
+            RemoteData.unwrap Set.empty mkOpenedPaths treeDataR
     in
     { model
-        | editedOverrides = RemoteData.unwrap Dict.empty Tuple.second dictsRemote
-        , defaultOverrides = RemoteData.map Tuple.first dictsRemote
-        , lastTreeId = nextId
+        | treeSchema = treeR
+        , defaultOverrides = RemoteData.withDefault Dict.empty defaultsDictR
+        , editedOverrides = RemoteData.withDefault Dict.empty overridesDictR
         , nextId = nextId
+        , openedNames = openedPaths
     }
 
 
-getFullOverrides : Model -> List DefaultOverride
+getFullOverrides : Model -> List Types.DefaultOverride
 getFullOverrides model =
-    let
-        f _ o acc =
-            case o.value of
-                ValueDeleted ->
-                    acc
+    Dict.merge
+        (\_ e res ->
+            case e.status of
+                New ->
+                    { name = e.name, value = e.value } :: res
 
-                ValueAdded v ->
-                    DefaultOverride o.name v :: acc
+                _ ->
+                    res
+        )
+        (\_ e _ res ->
+            case e.status of
+                Edited ->
+                    { name = e.name, value = e.value } :: res
 
-        g _ o d acc =
-            case o.value of
-                ValueDeleted ->
-                    acc
-
-                ValueAdded v ->
-                    DefaultOverride d.name v :: acc
-
-        h _ d acc =
-            d :: acc
-    in
-    RemoteData.unwrap []
-        (\defaultOverrides -> Dict.merge f g h model.editedOverrides defaultOverrides [])
+                _ ->
+                    res
+        )
+        (\_ d res ->
+            d :: res
+        )
+        model.editedOverrides
         model.defaultOverrides
+        []
 
 
 getEditedOverrides : Model -> List Override
 getEditedOverrides model =
     model.editedOverrides
         |> Dict.values
+        |> List.map
+            (\o ->
+                case o.status of
+                    Deleted ->
+                        Override o.name ValueDeleted
+
+                    New ->
+                        Override o.name (ValueAdded o.value)
+
+                    Edited ->
+                        Override o.name (ValueAdded o.value)
+            )
 
 
-setKeys : Api.WebData (List String) -> Model -> Model
+setKeys : Api.WebData (List OverrideName) -> Model -> Model
 setKeys keys model =
     { model | keys = keys }
 
@@ -188,25 +341,6 @@ type Msg
     | CloseName (List String)
     | ShowAutocomplete Int
     | HideAutocomplete
-
-
-dataChanged : Msg -> Bool
-dataChanged msg =
-    case msg of
-        DeleteOverride _ ->
-            True
-
-        RestoreOverride _ ->
-            True
-
-        EditOverrideName _ _ ->
-            True
-
-        EditOverrideValue _ _ ->
-            True
-
-        _ ->
-            False
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -243,7 +377,7 @@ update msg model =
 newOverride : Model -> Model
 newOverride model =
     { model
-        | editedOverrides = Dict.insert model.nextId (Override (OverrideName "") (ValueAdded "")) model.editedOverrides
+        | editedOverrides = Dict.insert model.nextId (OverrideData (OverrideName "") "" New) model.editedOverrides
         , nextId = model.nextId + 1
     }
 
@@ -251,13 +385,13 @@ newOverride model =
 deleteOverride : Int -> Model -> Model
 deleteOverride ix model =
     let
-        delete _ =
-            case RemoteData.map (Dict.get ix) model.defaultOverrides of
-                Success (Just defaultOverride) ->
-                    Just
-                        { name = defaultOverride.name
-                        , value = ValueDeleted
-                        }
+        delete mOverride =
+            case ( mOverride, Dict.get ix model.defaultOverrides ) of
+                ( Nothing, Just default ) ->
+                    Just { name = default.name, value = default.value, status = Deleted }
+
+                ( Just override, Nothing ) ->
+                    Just { override | status = Deleted }
 
                 _ ->
                     Nothing
@@ -267,26 +401,39 @@ deleteOverride ix model =
 
 restoreOverride : Int -> Model -> Model
 restoreOverride ix model =
-    { model | editedOverrides = Dict.update ix (\_ -> Nothing) model.editedOverrides }
+    let
+        restore mOverride =
+            case ( mOverride, Dict.get ix model.defaultOverrides ) of
+                ( Just override, Nothing ) ->
+                    Just { override | status = New }
+
+                _ ->
+                    Nothing
+    in
+    { model | editedOverrides = Dict.update ix restore model.editedOverrides }
 
 
 editOverrideName : Int -> String -> Model -> Model
 editOverrideName ix name model =
     let
         editName mOverride =
-            case ( mOverride, RemoteData.map (Dict.get ix) model.defaultOverrides ) of
-                ( Just override, Success (Just default) ) ->
+            case ( mOverride, Dict.get ix model.defaultOverrides ) of
+                ( Just override, Just default ) ->
+                    if OverrideName name == default.name && override.value == default.value then
+                        Nothing
+
+                    else
+                        Just { override | name = OverrideName name, status = Edited }
+
+                ( Just override, Nothing ) ->
+                    Just { override | name = OverrideName name, status = New }
+
+                ( Nothing, Just default ) ->
                     if OverrideName name == default.name then
                         Nothing
 
                     else
-                        Just { override | name = OverrideName name }
-
-                ( Just override, Success Nothing ) ->
-                    Just { override | name = OverrideName name }
-
-                ( Nothing, Success (Just default) ) ->
-                    Just { name = OverrideName name, value = ValueAdded default.value }
+                        Just { name = OverrideName name, value = default.value, status = Edited }
 
                 _ ->
                     Nothing
@@ -298,23 +445,23 @@ editOverrideValue : Int -> String -> Model -> Model
 editOverrideValue ix value model =
     let
         editName mOverride =
-            case ( mOverride, RemoteData.map (Dict.get ix) model.defaultOverrides ) of
-                ( Just override, Success (Just default) ) ->
+            case ( mOverride, Dict.get ix model.defaultOverrides ) of
+                ( Just override, Just default ) ->
+                    if value == default.value && override.name == default.name then
+                        Nothing
+
+                    else
+                        Just { override | value = value, status = Edited }
+
+                ( Just override, Nothing ) ->
+                    Just { override | value = value, status = New }
+
+                ( Nothing, Just default ) ->
                     if value == default.value then
                         Nothing
 
                     else
-                        Just { override | value = ValueAdded value }
-
-                ( Just override, Success Nothing ) ->
-                    Just { override | value = ValueAdded value }
-
-                ( Nothing, Success (Just default) ) ->
-                    if value == default.value then
-                        Nothing
-
-                    else
-                        Just { name = default.name, value = ValueAdded value }
+                        Just { name = default.name, value = value, status = Edited }
 
                 _ ->
                     Nothing
@@ -330,12 +477,12 @@ view : Model -> Html Msg
 view model =
     divClass "deployment__section"
         [ h3Class "deployment__sub-heading" [ text model.name ]
-        , case ( model.defaultOverrides, model.keys, model.mode ) of
-            ( Success defaultOverrides, Success keys, Write ) ->
-                overridesSectionData model defaultOverrides keys
+        , case ( model.treeSchema, model.keys, model.mode ) of
+            ( Success treeSchema, Success keys, Write ) ->
+                overridesSectionData model treeSchema keys
 
-            ( Success defaultOverrides, _, Read ) ->
-                overridesSectionData model defaultOverrides []
+            ( Success treeSchema, _, Read ) ->
+                overridesSectionData model treeSchema []
 
             _ ->
                 overridesSectionLoading model
@@ -376,89 +523,37 @@ overridesSectionLoading model =
         )
 
 
-type OverrideTreeType
-    = Default
-    | Edited
-    | New
-    | Deleted
-
-
-type alias OverrideTree =
-    { name : String
-    , value : String
-    , type_ : OverrideTreeType
-    }
-
-
-overridesSectionData : Model -> Dict Int DefaultOverride -> List String -> Html Msg
-overridesSectionData model defaultOverrides keys =
+overridesSectionData : Model -> List (Tree Int) -> List OverrideName -> Html Msg
+overridesSectionData model treeSchema keys =
     let
         isEmptyOverride _ v =
-            case v.value of
-                ValueAdded "" ->
-                    True
-
-                _ ->
-                    False
+            v.value == ""
 
         hasEmptyOverrides overrides =
             overrides
                 |> Dict.filter isEmptyOverride
                 |> (Dict.isEmpty >> not)
 
+        treeIds =
+            List.concatMap Tree.values treeSchema |> Set.fromList
+
         newOverrides =
-            Dict.merge
-                (\i v acc ->
-                    if i >= model.lastTreeId then
-                        Dict.insert i v acc
-
-                    else
-                        acc
-                )
-                (\_ _ _ acc -> acc)
-                (\_ _ acc -> acc)
-                model.editedOverrides
-                defaultOverrides
-                Dict.empty
-
-        treeOverrides =
-            Dict.merge
-                (\i v acc ->
-                    case ( v.value, i < model.lastTreeId ) of
-                        ( ValueAdded x, True ) ->
-                            Dict.insert i (OverrideTree (unOverrideName v.name) x New) acc
-
-                        _ ->
-                            acc
-                )
-                (\i o d acc ->
-                    case o.value of
-                        ValueAdded x ->
-                            Dict.insert i (OverrideTree (unOverrideName o.name) x Edited) acc
-
-                        ValueDeleted ->
-                            Dict.insert i (OverrideTree (unOverrideName o.name) d.value Deleted) acc
-                )
-                (\i d acc -> Dict.insert i (OverrideTree (unOverrideName d.name) d.value Default) acc)
-                model.editedOverrides
-                defaultOverrides
-                Dict.empty
-
-        editedNames =
-            Dict.values treeOverrides
-                |> List.filter (\o -> o.type_ /= Default)
-                |> List.map (.name >> String.split "." >> List.Extra.inits >> List.map reverse)
-                |> List.concat
-                |> Set.fromList
+            Dict.filter (\id _ -> Set.member id treeIds |> not) model.editedOverrides
 
         addButton =
             case model.mode of
                 Write ->
                     [ if hasEmptyOverrides newOverrides then
-                        Html.button [ Attr.class "dash--disabled dash dash--add overrides__add", Attr.disabled True ] [ text "Add an override" ]
+                        Html.button
+                            [ Attr.class "dash--disabled dash dash--add overrides__add"
+                            , Attr.disabled True
+                            ]
+                            [ text "Add an override" ]
 
                       else
-                        buttonClass "dash dash--add overrides__add" AddOverride [ text "Add an override" ]
+                        buttonClass "dash dash--add overrides__add"
+                            AddOverride
+                            [ text "Add an override" ]
                     ]
 
                 Read ->
@@ -466,11 +561,11 @@ overridesSectionData model defaultOverrides keys =
     in
     divClass "deployment__widget"
         [ divClass "padded"
-            (addButton ++ newOverridesView model newOverrides keys ++ overridesLevelView model treeOverrides keys editedNames)
+            (addButton ++ newOverridesView model newOverrides keys ++ overridesLevelView model treeSchema keys)
         ]
 
 
-newOverridesView : Model -> Dict Int Override -> List String -> List (Html Msg)
+newOverridesView : Model -> Dict Int OverrideData -> List OverrideName -> List (Html Msg)
 newOverridesView model overrides keys =
     let
         overridesSorted =
@@ -478,18 +573,9 @@ newOverridesView model overrides keys =
                 |> Dict.toList
                 |> List.sortBy (\( ix, _ ) -> ix)
                 |> List.reverse
-                |> List.filterMap overrideValue
 
-        overrideValue ( ix, o ) =
-            case o.value of
-                ValueAdded v ->
-                    Just ( ix, unOverrideName o.name, v )
-
-                ValueDeleted ->
-                    Nothing
-
-        newOverrideWriteView_ ( ix, oName, oValue ) =
-            newOverrideWriteView model oName oValue ix keys
+        newOverrideWriteView_ ( ix, override ) =
+            overrideWriteWrapper model keys ix (NonDefaultOverride override)
     in
     case model.mode of
         Write ->
@@ -499,86 +585,44 @@ newOverridesView model overrides keys =
             []
 
 
-overridesLevelView : Model -> Dict Int OverrideTree -> List String -> Set (List String) -> List (Html Msg)
-overridesLevelView model defaultOverrides keys editedNames =
+overridesLevelView : Model -> List (Tree Int) -> List OverrideName -> List (Html Msg)
+overridesLevelView model treeSchema keys =
     let
-        hasEmptyOrEdited t =
-            case t of
-                Tree.Node _ cs ->
-                    List.any hasEmptyOrEdited cs
+        treeData =
+            mkWrappedOverride model.defaultOverrides model.editedOverrides
 
-                Tree.Leaf ( _, o ) ->
-                    o.value == "" || o.type_ /= Default
-
-        overrideCompare a b =
-            case ( a, b ) of
-                ( Tree.Node x [ Tree.Leaf ( _, xx ) ], Tree.Node y [ Tree.Leaf ( _, yy ) ] ) ->
-                    case ( xx.type_, yy.type_ ) of
-                        ( Deleted, _ ) ->
-                            LT
-
-                        ( _, Deleted ) ->
-                            GT
-
-                        ( New, _ ) ->
-                            LT
-
-                        ( _, New ) ->
-                            GT
-
-                        ( Edited, _ ) ->
-                            LT
-
-                        ( _, Edited ) ->
-                            GT
-
-                        _ ->
-                            compare x y
-
-                ( Tree.Node _ [ Tree.Leaf _ ], _ ) ->
-                    LT
-
-                ( _, Tree.Node _ [ Tree.Leaf _ ] ) ->
-                    GT
-
-                ( Tree.Node x _, Tree.Node y _ ) ->
-                    case ( hasEmptyOrEdited a, hasEmptyOrEdited b ) of
-                        ( True, True ) ->
-                            compare x y
-
-                        ( False, False ) ->
-                            compare x y
-
-                        ( True, False ) ->
-                            LT
-
-                        ( False, True ) ->
-                            GT
-
-                _ ->
-                    EQ
-
-        overridesTree =
-            defaultOverrides
-                |> Dict.toList
-                |> List.map (\( ix, o ) -> Tree.pathToTree (String.split "." o.name) ( ix, o ))
-                |> mergeTreesWithSort overrideCompare
+        editedNames =
+            Dict.toList treeData
+                |> List.filter (Tuple.second >> isDefautOverride >> not)
+                |> List.map
+                    (Tuple.second
+                        >> getWrappedName
+                        >> unOverrideName
+                        >> String.split "."
+                        >> List.Extra.inits
+                        >> List.map reverse
+                    )
+                |> List.concat
+                |> Set.fromList
     in
     List.map
-        (treeOverrideView model keys [] editedNames)
-        overridesTree
+        (treeOverrideView model treeData editedNames keys [])
+        treeSchema
 
 
-treeOverrideView : Model -> List String -> List String -> Set (List String) -> Tree ( Int, OverrideTree ) -> Html Msg
-treeOverrideView model keys piecies editedNames tree =
-    case tree of
-        Tree.Node _ [ Tree.Leaf ( ix, override ) ] ->
-            case model.mode of
-                Write ->
+treeOverrideView : Model -> Dict Int WrappedOverride -> Set (List String) -> List OverrideName -> List String -> Tree Int -> Html Msg
+treeOverrideView model treeData editedNames keys piecies treeSchema =
+    case treeSchema of
+        Tree.Node _ [ Tree.Leaf ix ] ->
+            case ( model.mode, Dict.get ix treeData ) of
+                ( Write, Just override ) ->
                     overrideWriteWrapper model keys ix override
 
-                Read ->
+                ( Read, Just override ) ->
                     overrideReadWrapper override
+
+                _ ->
+                    div [] []
 
         Tree.Node piece cs ->
             let
@@ -595,7 +639,7 @@ treeOverrideView model keys piecies editedNames tree =
                         (CloseName (piece :: piecies))
                         [ text piece ]
                     , divClass "collapse__inner"
-                        (List.map (treeOverrideView model keys (piece :: piecies) editedNames) cs)
+                        (List.map (treeOverrideView model treeData editedNames keys (piece :: piecies)) cs)
                     ]
 
             else
@@ -615,7 +659,7 @@ treeOverrideView model keys piecies editedNames tree =
 
 
 overrideValueWriteView : Model -> String -> Bool -> String -> Int -> Html Msg
-overrideValueWriteView model inputClass deleted overrideValue ix =
+overrideValueWriteView _ inputClass deleted overrideValue ix =
     let
         valueClass =
             "editable-row__value input"
@@ -653,19 +697,19 @@ overrideValueWriteView model inputClass deleted overrideValue ix =
         )
 
 
-overrideNameWriteView : Model -> String -> Bool -> String -> List String -> Int -> Html Msg
+overrideNameWriteView : Model -> String -> Bool -> String -> List OverrideName -> Int -> Html Msg
 overrideNameWriteView model inputClass deleted overrideName keys ix =
     let
         suggestions =
-            List.filter (String.startsWith overrideName) keys
+            List.filter (unOverrideName >> String.startsWith overrideName) keys
 
         suggestionItem suggestion =
             Html.li
                 [ Attr.class "input__suggest"
-                , onMouseDown (EditOverrideName ix suggestion)
+                , onMouseDown (EditOverrideName ix (unOverrideName suggestion))
                 ]
                 [ b [] [ text overrideName ]
-                , text (String.dropLeft (String.length overrideName) suggestion)
+                , text (String.dropLeft (String.length overrideName) (unOverrideName suggestion))
                 ]
 
         nameClass =
@@ -711,7 +755,7 @@ overrideNameWriteView model inputClass deleted overrideName keys ix =
         )
 
 
-defaultOverrideWriteView : Model -> String -> String -> Int -> List String -> Html Msg
+defaultOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
 defaultOverrideWriteView =
     overrideWriteView
         "input__widget key-default-pristine"
@@ -719,7 +763,7 @@ defaultOverrideWriteView =
         False
 
 
-editedOverrideWriteView : Model -> String -> String -> Int -> List String -> Html Msg
+editedOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
 editedOverrideWriteView =
     overrideWriteView
         "input__widget key-default-edited"
@@ -727,7 +771,7 @@ editedOverrideWriteView =
         False
 
 
-newOverrideWriteView : Model -> String -> String -> Int -> List String -> Html Msg
+newOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
 newOverrideWriteView =
     overrideWriteView
         "input__widget key-custom-pristine"
@@ -735,7 +779,7 @@ newOverrideWriteView =
         False
 
 
-deletedOverrideWriteView : Model -> String -> String -> Int -> List String -> Html Msg
+deletedOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
 deletedOverrideWriteView =
     overrideWriteView
         "input__widget key-deleted"
@@ -743,23 +787,29 @@ deletedOverrideWriteView =
         True
 
 
-overrideWriteWrapper : Model -> List String -> Int -> OverrideTree -> Html Msg
-overrideWriteWrapper model keys ix overrideTree =
-    case overrideTree.type_ of
-        Edited ->
-            editedOverrideWriteView model overrideTree.name overrideTree.value ix keys
+overrideWriteWrapper : Model -> List OverrideName -> Int -> WrappedOverride -> Html Msg
+overrideWriteWrapper model keys ix wrapped =
+    let
+        ( viewer, overrideName, overrideValue ) =
+            case wrapped of
+                DefaultOverride override ->
+                    ( defaultOverrideWriteView, override.name, override.value )
 
-        Deleted ->
-            deletedOverrideWriteView model overrideTree.name overrideTree.value ix keys
+                NonDefaultOverride override ->
+                    case override.status of
+                        Edited ->
+                            ( editedOverrideWriteView, override.name, override.value )
 
-        Default ->
-            defaultOverrideWriteView model overrideTree.name overrideTree.value ix keys
+                        Deleted ->
+                            ( deletedOverrideWriteView, override.name, override.value )
 
-        New ->
-            defaultOverrideWriteView model overrideTree.name overrideTree.value ix keys
+                        New ->
+                            ( newOverrideWriteView, override.name, override.value )
+    in
+    viewer model (unOverrideName overrideName) overrideValue ix keys
 
 
-overrideWriteView : String -> String -> Bool -> Model -> String -> String -> Int -> List String -> Html Msg
+overrideWriteView : String -> String -> Bool -> Model -> String -> String -> Int -> List OverrideName -> Html Msg
 overrideWriteView nameInputClass valueInputClass deleted model nameInput valueInput ix keys =
     let
         ( btnClass, btnMsg ) =
@@ -800,20 +850,22 @@ overrideReadView nameClass valueClass nameInput valueInput =
         ]
 
 
-overrideReadWrapper : OverrideTree -> Html Msg
-overrideReadWrapper overrideTree =
-    case overrideTree.type_ of
-        Edited ->
-            editedOverrideReadView overrideTree.name overrideTree.value
+overrideReadWrapper : WrappedOverride -> Html Msg
+overrideReadWrapper wrapped =
+    case wrapped of
+        DefaultOverride override ->
+            defaultOverrideReadView (unOverrideName override.name) override.value
 
-        Deleted ->
-            deletedOverrideReadView overrideTree.name overrideTree.value
+        NonDefaultOverride override ->
+            case override.status of
+                Edited ->
+                    editedOverrideReadView (unOverrideName override.name) override.value
 
-        Default ->
-            defaultOverrideReadView overrideTree.name overrideTree.value
+                Deleted ->
+                    deletedOverrideReadView (unOverrideName override.name) override.value
 
-        New ->
-            newOverrideReadView overrideTree.name overrideTree.value
+                New ->
+                    newOverrideReadView (unOverrideName override.name) override.value
 
 
 editedOverrideReadView : String -> String -> Html Msg
@@ -842,3 +894,108 @@ newOverrideReadView =
     overrideReadView
         "key-custom-edited"
         "value-edited"
+
+
+
+-- UTILS
+
+
+compareOverrideData : OverrideData -> OverrideData -> Order
+compareOverrideData a b =
+    case ( a.status, b.status ) of
+        ( Deleted, Deleted ) ->
+            compare (unOverrideName a.name) (unOverrideName b.name)
+
+        ( New, New ) ->
+            compare (unOverrideName a.name) (unOverrideName b.name)
+
+        ( Edited, Edited ) ->
+            compare (unOverrideName a.name) (unOverrideName b.name)
+
+        ( Deleted, _ ) ->
+            LT
+
+        ( _, Deleted ) ->
+            GT
+
+        ( New, _ ) ->
+            LT
+
+        ( _, New ) ->
+            GT
+
+
+isDefautOverride : WrappedOverride -> Bool
+isDefautOverride w =
+    case w of
+        DefaultOverride _ ->
+            True
+
+        _ ->
+            False
+
+
+getWrappedValue : WrappedOverride -> String
+getWrappedValue w =
+    case w of
+        DefaultOverride x ->
+            x.value
+
+        NonDefaultOverride x ->
+            x.value
+
+
+getWrappedName : WrappedOverride -> OverrideName
+getWrappedName w =
+    case w of
+        DefaultOverride x ->
+            x.name
+
+        NonDefaultOverride x ->
+            x.name
+
+
+mkWrappedOverride : Dict Int Types.DefaultOverride -> Dict Int OverrideData -> Dict Int WrappedOverride
+mkWrappedOverride defaults edits =
+    Dict.merge
+        (\id d res -> Dict.insert id (DefaultOverride d) res)
+        (\id _ e res -> Dict.insert id (NonDefaultOverride e) res)
+        (\id e res -> Dict.insert id (NonDefaultOverride e) res)
+        defaults
+        edits
+        Dict.empty
+
+
+compareWrappedOverride : WrappedOverride -> WrappedOverride -> Order
+compareWrappedOverride a b =
+    case ( a, b ) of
+        ( NonDefaultOverride x, NonDefaultOverride y ) ->
+            compareOverrideData x y
+
+        ( NonDefaultOverride _, _ ) ->
+            LT
+
+        ( _, NonDefaultOverride _ ) ->
+            GT
+
+        ( DefaultOverride x, DefaultOverride y ) ->
+            compare (unOverrideName x.name) (unOverrideName y.name)
+
+
+dataChanged : Msg -> Bool
+dataChanged msg =
+    case msg of
+        DeleteOverride _ ->
+            True
+
+        RestoreOverride _ ->
+            True
+
+        EditOverrideName _ _ ->
+            True
+
+        EditOverrideValue _ _ ->
+            True
+
+        _ ->
+            False

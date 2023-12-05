@@ -2,7 +2,6 @@ port module Page.Deployments exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
-import Api.Types.Deployment exposing (..)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
@@ -10,17 +9,19 @@ import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
 import Html.Events exposing (onInput)
+import Json.Decode as Decode
 import Page.Deployments.Table as Table
 import Page.Sidebar.CreateUpdate as CreateSidebar
 import RemoteData exposing (RemoteData(..))
 import Task
 import Time
+import Types.Deployment exposing (..)
 
 
 type alias Model =
     { settings : Settings
     , config : Config
-    , deployments : Api.WebData Deployments
+    , deployments : Api.WebData (List Deployment)
     , activeTable : Table.Model
     , archivedTable : Table.Model
     , search : String
@@ -71,7 +72,7 @@ getSettings model =
 
 
 type Msg
-    = DeploymentsResponse (Api.WebData Deployments)
+    = DeploymentsResponse (Api.WebData (List Deployment))
     | SearchInput String
     | ActiveTableMsg Table.Msg
     | ArchivedTableMsg Table.Msg
@@ -88,7 +89,7 @@ port deploymentsReceiver : (String -> msg) -> Sub msg
 
 reqDeployments : Config -> Cmd Msg
 reqDeployments cfg =
-    Api.get cfg deployments deploymentsDecoder (RemoteData.fromResult >> DeploymentsResponse)
+    Api.get cfg deployments (Decode.list deploymentDecoder) (RemoteData.fromResult >> DeploymentsResponse)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -257,7 +258,7 @@ pageBodyWrapper body =
     divClass "page__body" [ divClass "body" body ]
 
 
-dataPrimaryView : Model -> Api.WebData Deployments -> Html Msg
+dataPrimaryView : Model -> Api.WebData (List Deployment) -> Html Msg
 dataPrimaryView model activeDeploymets =
     divClass "data__primary"
         [ Html.map ActiveTableMsg (Table.view model.activeTable activeDeploymets model.search) ]
@@ -276,7 +277,7 @@ toggleButtonView model =
             [ text <| "Show Archived deployments" ]
 
 
-dataArchivedView : Model -> Api.WebData Deployments -> Html Msg
+dataArchivedView : Model -> Api.WebData (List Deployment) -> Html Msg
 dataArchivedView model archivedDeploymets =
     let
         dataClass =
