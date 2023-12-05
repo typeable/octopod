@@ -8,10 +8,12 @@ import Debounce exposing (Debounce)
 import Html exposing (Html, div, text)
 import Html.Attributes as Attr
 import Html.Common exposing (aClassHrefExternal, aClassHrefInternal, bClass, dateView, divClass, h1Class, h3Class)
+import Html.Events exposing (onClick)
 import Html.Overrides as Overrides
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Page.Sidebar.CreateUpdate as CreateSidebar
 import RemoteData exposing (RemoteData(..))
 import Route
 import Types.Deployment as Deployments exposing (..)
@@ -26,6 +28,7 @@ type alias Model =
     , debounce : Debounce ()
     , deploymentOverridesModel : Overrides.Model
     , appOverridesModel : Overrides.Model
+    , sidebar : CreateSidebar.Model
     }
 
 
@@ -38,6 +41,7 @@ init settings config deploymentName =
       , debounce = Debounce.init
       , deploymentOverridesModel = Overrides.init "Deployment configuration" Overrides.Read
       , appOverridesModel = Overrides.init "App configuration" Overrides.Read
+      , sidebar = CreateSidebar.init config False
       }
     , Cmd.batch
         [ reqDeployment deploymentName config
@@ -73,6 +77,8 @@ type Msg
     | AppOverridesResponse (Api.WebData (List OverrideWithDefault))
     | AppOverridesMsg Overrides.Msg
     | DeploymentOverridesMsg Overrides.Msg
+    | ShowSidebar Deployment
+    | CreateSidebarMsg CreateSidebar.Msg
 
 
 reqDeploymentOverrides : Config -> Cmd Msg
@@ -167,6 +173,15 @@ update cmd model =
                     (\deploymentOverridesModel -> { model | deploymentOverridesModel = deploymentOverridesModel })
                     DeploymentOverridesMsg
 
+        ShowSidebar deployment ->
+            ( { model | sidebar = CreateSidebar.initWithDeployment model.config True deployment }
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
+            )
+
+        CreateSidebarMsg subMsg ->
+            CreateSidebar.update subMsg model.sidebar
+                |> updateWith (\sidebar -> { model | sidebar = sidebar }) CreateSidebarMsg
+
 
 port deploymentReceiver : (String -> msg) -> Sub msg
 
@@ -181,7 +196,7 @@ subscriptions _ =
 view : Model -> { title : String, content : List (Html Msg) }
 view model =
     { title = "Deployments"
-    , content = [ pageView model ]
+    , content = pageView model :: List.map (Html.map CreateSidebarMsg) (CreateSidebar.view model.sidebar)
     }
 
 
@@ -207,18 +222,26 @@ backButton =
 deploymentHeaderView : Model -> Html Msg
 deploymentHeaderView model =
     let
-        buttonCommon cls txt =
+        buttonCommon disabled mMsg cls txt =
             Html.button
-                [ Attr.class cls
-                , Attr.disabled True
-                ]
+                ([ Attr.class cls
+                 , Attr.disabled disabled
+                 ]
+                    ++ (case mMsg of
+                            Just msg ->
+                                [ onClick msg ]
+
+                            _ ->
+                                []
+                       )
+                )
                 [ text txt ]
 
-        buttonEnabled =
-            buttonCommon
+        buttonEnabled cls msg txt =
+            buttonCommon False (Just msg) cls txt
 
         buttonDisabled cls txt =
-            buttonCommon (cls ++ " button--disabled") txt
+            buttonCommon True Nothing (cls ++ " button--disabled") txt
 
         buttons =
             case model.deployment of
@@ -232,15 +255,15 @@ deploymentHeaderView model =
                         ]
 
                     else if isDeploymentArchived deployment then
-                        [ buttonEnabled " button button--restore page__action button--secondary" "Restore from archive"
+                        [ buttonDisabled " button button--restore page__action button--secondary" "Restore from archive"
                         , aClassHrefExternal "button button--logs page__action button--secondary"
                             (model.config.k8sDashboardUrlTemplate ++ unDeploymentName model.deploymentName)
                             [ text "Details" ]
                         ]
 
                     else
-                        [ buttonEnabled "button button--edit page__action" "Edit deployment"
-                        , buttonEnabled "button button--archive page__action button--secondary" "Move to archive"
+                        [ buttonEnabled "button button--edit page__action" (ShowSidebar deployment) "Edit deployment"
+                        , buttonDisabled "button button--archive page__action button--secondary" "Move to archive"
                         , aClassHrefExternal "button button--logs page__action button--secondary"
                             (model.config.k8sDashboardUrlTemplate ++ unDeploymentName model.deploymentName)
                             [ text "Details" ]

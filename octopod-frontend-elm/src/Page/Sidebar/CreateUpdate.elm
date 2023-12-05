@@ -13,7 +13,6 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
-import Set exposing (Set)
 import Time exposing (Month(..))
 import Types.Deployment exposing (..)
 import Types.Override exposing (..)
@@ -23,11 +22,12 @@ import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideE
 type alias Model =
     { appOverrides : Overrides.Model
     , deploymentOverrides : Overrides.Model
-    , name : String
+    , name : DeploymentName
     , visibility : Bool
     , config : Config
     , saveResp : Api.WebData ()
     , nameEdited : Bool
+    , deployment : Maybe Deployment
     }
 
 
@@ -35,23 +35,25 @@ init : Config -> Bool -> Model
 init config visibility =
     { appOverrides = Overrides.init "App configuration" Overrides.Write
     , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
-    , name = ""
+    , name = DeploymentName ""
     , visibility = visibility
     , config = config
     , saveResp = NotAsked
     , nameEdited = False
+    , deployment = Nothing
     }
 
 
-initWithOverrides : Overrides.Model -> Overrides.Model -> Config -> Bool -> Model
-initWithOverrides deploymentOverrides appOverrides config visibility =
-    { appOverrides = appOverrides
-    , deploymentOverrides = deploymentOverrides
-    , name = ""
+initWithDeployment : Config -> Bool -> Deployment -> Model
+initWithDeployment config visibility deployment =
+    { appOverrides = Overrides.init "App configuration" Overrides.Write
+    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
+    , name = deployment.deployment.name
     , visibility = visibility
     , config = config
     , saveResp = NotAsked
     , nameEdited = False
+    , deployment = Just deployment
     }
 
 
@@ -134,7 +136,13 @@ update cmd model =
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverrides = Overrides.setOverrideWithDefaults overrides model.deploymentOverrides
+                | deploymentOverrides =
+                    case model.deployment of
+                        Just deployment ->
+                            Overrides.setDefaultAndLoadedOverrides overrides (Success deployment.deployment.deploymentOverrides) model.deploymentOverrides
+
+                        Nothing ->
+                            Overrides.setOverrideWithDefaults overrides model.deploymentOverrides
               }
             , Cmd.batch
                 [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
@@ -147,7 +155,13 @@ update cmd model =
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides = Overrides.setOverrideWithDefaults overrides model.appOverrides
+                | appOverrides =
+                    case model.deployment of
+                        Just deployment ->
+                            Overrides.setDefaultAndLoadedOverrides overrides (Success deployment.deployment.appOverrides) model.appOverrides
+
+                        Nothing ->
+                            Overrides.setOverrideWithDefaults overrides model.appOverrides
               }
             , Cmd.none
             )
@@ -156,7 +170,7 @@ update cmd model =
             ( { model | visibility = False }, Cmd.none )
 
         NameInput name ->
-            ( { model | name = name, nameEdited = True }, Cmd.none )
+            ( { model | name = DeploymentName name, nameEdited = True }, Cmd.none )
 
         AppOverridesMsg subMsg ->
             Overrides.update subMsg model.appOverrides
@@ -189,7 +203,7 @@ update cmd model =
                     Overrides.getEditedOverrides model.appOverrides
 
                 info =
-                    { name = DeploymentName model.name
+                    { name = model.name
                     , deploymentOverrides = deploymentOverrides
                     , appOverrides = appOverrides
                     }
@@ -318,7 +332,7 @@ nameSection model =
                     [ Attr.class "input__widget tag"
                     , Attr.type_ "text"
                     , Attr.placeholder "Name"
-                    , Attr.value model.name
+                    , Attr.value (unDeploymentName model.name)
                     , onInput NameInput
                     ]
                     []
@@ -332,7 +346,7 @@ hasEmptyName : Model -> Bool
 hasEmptyName model =
     let
         nameLength =
-            String.length model.name
+            String.length (unDeploymentName model.name)
     in
     nameLength < 2 || nameLength > 17
 
