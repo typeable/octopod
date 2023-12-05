@@ -14,8 +14,8 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
 import Route
-import Types.DefaultOverride exposing (DefaultOverride, defaultOverrideEncoder, defaultOverridesDecode)
 import Types.Deployment as Deployments exposing (..)
+import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideEncoder, defaultOverridesDecode)
 
 
 type alias Model =
@@ -69,8 +69,8 @@ type Msg
     = DeploymentFullInfoResponse (Api.WebData Deployment)
     | WSUpdate String
     | DebounceMsg Debounce.Msg
-    | DeploymentOverridesResponse (Api.WebData (List DefaultOverride))
-    | AppOverridesResponse (Api.WebData (List DefaultOverride))
+    | DeploymentOverridesResponse (Api.WebData (List OverrideWithDefault))
+    | AppOverridesResponse (Api.WebData (List OverrideWithDefault))
     | AppOverridesMsg Overrides.Msg
     | DeploymentOverridesMsg Overrides.Msg
 
@@ -83,7 +83,7 @@ reqDeploymentOverrides config =
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
-reqAppOverrides : Config -> List DefaultOverride -> Cmd Msg
+reqAppOverrides : Config -> List OverrideWithDefault -> Cmd Msg
 reqAppOverrides config body =
     Api.post config
         appOverrides

@@ -15,8 +15,9 @@ import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
 import Set exposing (Set)
 import Time exposing (Month(..))
-import Types.DefaultOverride exposing (DefaultOverride, defaultOverrideEncoder, defaultOverridesDecode)
 import Types.Deployment exposing (..)
+import Types.Override exposing (..)
+import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideEncoder, defaultOverridesDecode)
 
 
 type alias Model =
@@ -56,9 +57,9 @@ initWithOverrides deploymentOverrides appOverrides config visibility =
 
 type Msg
     = DeploymentOverrideKeysResponse (Api.WebData (List OverrideName))
-    | DeploymentOverridesResponse (Api.WebData (List DefaultOverride))
+    | DeploymentOverridesResponse (Api.WebData (List OverrideWithDefault))
     | AppOverrideKeysResponse (Api.WebData (List OverrideName))
-    | AppOverridesResponse (Api.WebData (List DefaultOverride))
+    | AppOverridesResponse (Api.WebData (List OverrideWithDefault))
     | Close
     | Save
     | NameInput String
@@ -83,7 +84,7 @@ reqDeploymentOverrides config =
         (RemoteData.fromResult >> DeploymentOverridesResponse)
 
 
-reqAppOverrideKeys : Config -> List DefaultOverride -> Cmd Msg
+reqAppOverrideKeys : Config -> List OverrideWithDefault -> Cmd Msg
 reqAppOverrideKeys config body =
     Api.post config
         appOverrideKeys
@@ -92,7 +93,7 @@ reqAppOverrideKeys config body =
         (RemoteData.fromResult >> AppOverrideKeysResponse)
 
 
-reqAppOverrides : Config -> List DefaultOverride -> Cmd Msg
+reqAppOverrides : Config -> List OverrideWithDefault -> Cmd Msg
 reqAppOverrides config body =
     Api.post config
         appOverrides
@@ -133,7 +134,7 @@ update cmd model =
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverrides = Overrides.setDefaultOverrides overrides model.deploymentOverrides
+                | deploymentOverrides = Overrides.setOverrideWithDefaults overrides model.deploymentOverrides
               }
             , Cmd.batch
                 [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
@@ -146,7 +147,7 @@ update cmd model =
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides = Overrides.setDefaultOverrides overrides model.appOverrides
+                | appOverrides = Overrides.setOverrideWithDefaults overrides model.appOverrides
               }
             , Cmd.none
             )

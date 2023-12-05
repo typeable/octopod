@@ -5,6 +5,7 @@ import Json.Decode.Extra exposing (datetime)
 import Json.Decode.Pipeline exposing (optional, required, resolve)
 import Json.Encode as Encode
 import Time
+import Types.Override exposing (..)
 
 
 type DeploymentName
@@ -14,36 +15,6 @@ type DeploymentName
 unDeploymentName : DeploymentName -> String
 unDeploymentName (DeploymentName name) =
     name
-
-
-type OverrideName
-    = OverrideName String
-
-
-unOverrideName : OverrideName -> String
-unOverrideName (OverrideName name) =
-    name
-
-
-type OverrideValue
-    = ValueAdded String
-    | ValueDeleted
-
-
-getOverrideValue : Override -> Maybe String
-getOverrideValue override =
-    case override.value of
-        ValueAdded x ->
-            Just x
-
-        ValueDeleted ->
-            Nothing
-
-
-type alias Override =
-    { name : OverrideName
-    , value : OverrideValue
-    }
 
 
 type alias Info =
@@ -97,11 +68,6 @@ unStatus status =
 
         DeploymentNotPending ds ->
             ds
-
-
-overrideNameDecoder : Decoder OverrideName
-overrideNameDecoder =
-    Decode.map OverrideName Decode.string
 
 
 failureTypeDecoder : Decoder FailureType
@@ -188,64 +154,6 @@ metadataDecoder =
         |> required "link" string
 
 
-overrideValueDecoder : Decoder OverrideValue
-overrideValueDecoder =
-    let
-        toDecoder : String -> Maybe String -> Decoder OverrideValue
-        toDecoder tag contents =
-            case ( tag, contents ) of
-                ( "ValueDeleted", _ ) ->
-                    Decode.succeed ValueDeleted
-
-                ( "ValueAdded", Just value ) ->
-                    Decode.succeed (ValueAdded value)
-
-                ( _, _ ) ->
-                    Decode.fail ("Unknown DeploymentStatus: " ++ tag)
-    in
-    Decode.succeed toDecoder
-        |> required "tag" string
-        |> optional "contents" (Decode.maybe string) Nothing
-        |> resolve
-
-
-type OverrideHelper
-    = OverrideName_ String
-    | OverrideValue_ OverrideValue
-
-
-overrideToHelper : Override -> List OverrideHelper
-overrideToHelper override =
-    [ OverrideName_ (unOverrideName override.name)
-    , OverrideValue_ override.value
-    ]
-
-
-overrideDecoder : Decoder Override
-overrideDecoder =
-    let
-        overrideHelperDecoder =
-            Decode.list
-                (Decode.oneOf
-                    [ string |> Decode.map OverrideName_
-                    , overrideValueDecoder |> Decode.map OverrideValue_
-                    ]
-                )
-
-        listDecoder vals =
-            case vals of
-                [ OverrideName_ name, OverrideValue_ val ] ->
-                    Decode.succeed (Override (OverrideName name) val)
-
-                [ OverrideValue_ val, OverrideName_ name ] ->
-                    Decode.succeed (Override (OverrideName name) val)
-
-                _ ->
-                    Decode.fail "Unknown override"
-    in
-    overrideHelperDecoder |> andThen listDecoder
-
-
 infoDecoder : Decoder Info
 infoDecoder =
     Decode.succeed Info
@@ -306,36 +214,3 @@ infoEncode info =
         , ( "app_overrides", Encode.list overrideEncode info.appOverrides )
         , ( "deployment_overrides", Encode.list overrideEncode info.deploymentOverrides )
         ]
-
-
-overrideValueEncode : OverrideValue -> Encode.Value
-overrideValueEncode value =
-    case value of
-        ValueAdded v ->
-            Encode.object
-                [ ( "tag", Encode.string "ValueAdded" )
-                , ( "contents", Encode.string v )
-                ]
-
-        ValueDeleted ->
-            Encode.object
-                [ ( "tag", Encode.string "ValueDeleted" ) ]
-
-
-overrideHelperEncode : OverrideHelper -> Encode.Value
-overrideHelperEncode helper =
-    case helper of
-        OverrideName_ name ->
-            Encode.string name
-
-        OverrideValue_ val ->
-            overrideValueEncode val
-
-
-overrideEncode : Override -> Encode.Value
-overrideEncode override =
-    let
-        helper =
-            overrideToHelper override
-    in
-    Encode.list overrideHelperEncode helper
