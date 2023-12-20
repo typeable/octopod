@@ -41,7 +41,7 @@ init settings config =
       , archivedTable = Table.init config settings Table.ArchivedTable
       , search = ""
       , showArchived = False
-      , sidebar = CreateSidebar.init config False
+      , sidebar = CreateSidebar.init config CreateSidebar.Create False
       , debounce = Debounce.init
       , updated = 0
       }
@@ -136,7 +136,7 @@ update cmd model =
             ( { model | debounce = debounce }, subCmd )
 
         ShowSidebar ->
-            ( { model | sidebar = CreateSidebar.init model.config True }
+            ( { model | sidebar = CreateSidebar.init model.config CreateSidebar.Create True }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
             )
 

@@ -19,42 +19,49 @@ import Types.Override exposing (..)
 import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideEncoder, defaultOverridesDecode)
 
 
+type Mode
+    = Create
+    | Update
+
+
 type alias Model =
-    { appOverrides : Overrides.Model
-    , deploymentOverrides : Overrides.Model
+    { appOverrides : Api.WebData Overrides.Model
+    , deploymentOverrides : Api.WebData Overrides.Model
     , name : DeploymentName
     , visibility : Bool
     , config : Config
     , saveResp : Api.WebData ()
     , nameEdited : Bool
+    , mode : Mode
     , deployment : Maybe Deployment
+    , appKeys : Api.WebData (List OverrideName)
+    , appDefaults : Api.WebData (List OverrideWithDefault)
+    , deploymentKeys : Api.WebData (List OverrideName)
+    , deploymentDefaults : Api.WebData (List OverrideWithDefault)
     }
 
 
-init : Config -> Bool -> Model
-init config visibility =
-    { appOverrides = Overrides.init "App configuration" Overrides.Write
-    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
+init : Config -> Mode -> Bool -> Model
+init config mode visibility =
+    { appOverrides = Loading
+    , deploymentOverrides = Loading
     , name = DeploymentName ""
     , visibility = visibility
     , config = config
     , saveResp = NotAsked
     , nameEdited = False
     , deployment = Nothing
+    , mode = mode
+    , appKeys = Loading
+    , appDefaults = Loading
+    , deploymentKeys = Loading
+    , deploymentDefaults = Loading
     }
 
 
-initWithDeployment : Config -> Bool -> Deployment -> Model
-initWithDeployment config visibility deployment =
-    { appOverrides = Overrides.init "App configuration" Overrides.Write
-    , deploymentOverrides = Overrides.init "Deployment configuration" Overrides.Write
-    , name = deployment.deployment.name
-    , visibility = visibility
-    , config = config
-    , saveResp = NotAsked
-    , nameEdited = False
-    , deployment = Just deployment
-    }
+initWithDeployment : Config -> Mode -> Bool -> Deployment -> Model
+initWithDeployment config mode visibility deployment =
+    Debug.todo "fix"
 
 
 type Msg
@@ -129,39 +136,47 @@ update cmd model =
             ( toModel subModel
             , Cmd.map toMsg subCmd
             )
+
+        initOverrides name defaults keys =
+            Overrides.init defaults [] keys Overrides.Write name
     in
     case cmd of
         DeploymentOverrideKeysResponse keys ->
-            ( { model | deploymentOverrides = Overrides.setKeys keys model.deploymentOverrides }, Cmd.none )
+            ( { model
+                | deploymentKeys = keys
+                , deploymentOverrides = RemoteData.map2 (initOverrides "Deployment configuration") model.deploymentDefaults keys
+              }
+            , Cmd.none
+            )
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverrides =
-                    case model.deployment of
-                        Just deployment ->
-                            Overrides.setDefaultAndLoadedOverrides overrides (Success deployment.deployment.deploymentOverrides) model.deploymentOverrides
-
-                        Nothing ->
-                            Overrides.setOverrideWithDefaults overrides model.deploymentOverrides
+                | deploymentDefaults = overrides
+                , deploymentOverrides = RemoteData.map2 (initOverrides "Deployment configuration") overrides model.deploymentKeys
               }
-            , Cmd.batch
-                [ reqAppOverrideKeys model.config (RemoteData.withDefault [] overrides)
-                , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
-                ]
+            , case overrides of
+                Success defaults ->
+                    Cmd.batch
+                        [ reqAppOverrideKeys model.config defaults
+                        , reqAppOverrides model.config defaults
+                        ]
+
+                _ ->
+                    Cmd.none
             )
 
         AppOverrideKeysResponse keys ->
-            ( { model | appOverrides = Overrides.setKeys keys model.appOverrides }, Cmd.none )
+            ( { model
+                | appKeys = keys
+                , appOverrides = RemoteData.map2 (initOverrides "App configuration") model.appDefaults keys
+              }
+            , Cmd.none
+            )
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverrides =
-                    case model.deployment of
-                        Just deployment ->
-                            Overrides.setDefaultAndLoadedOverrides overrides (Success deployment.deployment.appOverrides) model.appOverrides
-
-                        Nothing ->
-                            Overrides.setOverrideWithDefaults overrides model.appOverrides
+                | appDefaults = overrides
+                , appOverrides = RemoteData.map2 (initOverrides "App configuration") overrides model.appKeys
               }
             , Cmd.none
             )
@@ -173,42 +188,62 @@ update cmd model =
             ( { model | name = DeploymentName name, nameEdited = True }, Cmd.none )
 
         AppOverridesMsg subMsg ->
-            Overrides.update subMsg model.appOverrides
-                |> updateWith (\appOverrides -> { model | appOverrides = appOverrides }) AppOverridesMsg
+            case model.appOverrides of
+                Success appOverrides ->
+                    Overrides.update subMsg appOverrides
+                        |> updateWith (\updated -> { model | appOverrides = Success updated }) AppOverridesMsg
+
+                _ ->
+                    ( model, Cmd.none )
 
         DeploymentOverridesMsg subMsg ->
-            let
-                ( model_, cmd_ ) =
-                    Overrides.update subMsg model.deploymentOverrides
-                        |> updateWith (\deploymentOverrides -> { model | deploymentOverrides = deploymentOverrides }) DeploymentOverridesMsg
-            in
-            if Overrides.dataChanged subMsg then
-                ( { model_ | appOverrides = Overrides.init "App configuration" Overrides.Write }
-                , Cmd.batch
-                    [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
-                    , reqAppOverrides model_.config (Overrides.getFullOverrides model_.deploymentOverrides)
-                    , cmd_
-                    ]
-                )
+            case model.deploymentOverrides of
+                Success deploymentOverrides ->
+                    let
+                        ( model_, cmd_ ) =
+                            Overrides.update subMsg deploymentOverrides
+                                |> updateWith
+                                    (\deploymentOverrides_ ->
+                                        { model | deploymentOverrides = Success deploymentOverrides_ }
+                                    )
+                                    DeploymentOverridesMsg
+                    in
+                    case ( Overrides.dataChanged subMsg, model_.deploymentOverrides ) of
+                        ( True, Success deploymentOverrides_ ) ->
+                            ( { model_ | appOverrides = Loading }
+                            , Cmd.batch
+                                [ reqAppOverrideKeys model_.config (Overrides.getFullOverrides deploymentOverrides_)
+                                , reqAppOverrides model_.config (Overrides.getFullOverrides deploymentOverrides_)
+                                , cmd_
+                                ]
+                            )
 
-            else
-                ( model_, cmd_ )
+                        _ ->
+                            ( model_, cmd_ )
+
+                _ ->
+                    ( model, Cmd.none )
 
         Save ->
-            let
-                deploymentOverrides =
-                    Overrides.getEditedOverrides model.deploymentOverrides
+            case ( model.deploymentOverrides, model.appOverrides ) of
+                ( Success deploymentOverrides, Success appOverrides ) ->
+                    let
+                        deploymentOverridesData =
+                            Overrides.getEditedOverrides deploymentOverrides
 
-                appOverrides =
-                    Overrides.getEditedOverrides model.appOverrides
+                        appOverridesData =
+                            Overrides.getEditedOverrides appOverrides
 
-                info =
-                    { name = model.name
-                    , deploymentOverrides = deploymentOverrides
-                    , appOverrides = appOverrides
-                    }
-            in
-            ( { model | saveResp = Loading }, reqSaveDeployment model.config info )
+                        info =
+                            { name = model.name
+                            , deploymentOverrides = deploymentOverridesData
+                            , appOverrides = appOverridesData
+                            }
+                    in
+                    ( { model | saveResp = Loading }, reqSaveDeployment model.config info )
+
+                _ ->
+                    ( model, Cmd.none )
 
         SaveDeploymentResponse resp ->
             ( { model | saveResp = resp }, Cmd.none )
@@ -295,11 +330,22 @@ sidebarContent model =
         [ divClass "deployment"
             (errorView
                 ++ [ nameSection model
-                   , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverrides)
-                   , Html.map AppOverridesMsg (Overrides.view model.appOverrides)
+                   , overridesView model.deploymentOverrides DeploymentOverridesMsg
+                   , overridesView model.appOverrides AppOverridesMsg
                    ]
             )
         ]
+
+
+overridesView : Api.WebData Overrides.Model -> (Overrides.Msg -> Msg) -> Html Msg
+overridesView overrides mapper =
+    Html.map mapper <|
+        case overrides of
+            Success x ->
+                Overrides.view x
+
+            _ ->
+                Overrides.overridesSectionLoading Overrides.Write
 
 
 nameSection : Model -> Html Msg
@@ -353,6 +399,11 @@ hasEmptyName model =
 
 hasEmptyValues : Model -> Bool
 hasEmptyValues model =
-    Overrides.hasEmptyValues model.appOverrides
-        || Overrides.hasEmptyValues model.deploymentOverrides
-        || hasEmptyName model
+    case ( model.appOverrides, model.deploymentOverrides ) of
+        ( Success appOverrides, Success deploymentOverrides ) ->
+            Overrides.hasEmptyValues appOverrides
+                || Overrides.hasEmptyValues deploymentOverrides
+                || hasEmptyName model
+
+        _ ->
+            True

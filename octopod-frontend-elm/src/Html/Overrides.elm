@@ -7,9 +7,7 @@ module Html.Overrides exposing
     , getFullOverrides
     , hasEmptyValues
     , init
-    , setDefaultAndLoadedOverrides
-    , setKeys
-    , setOverrideWithDefaults
+    , overridesSectionLoading
     , update
     , view
     )
@@ -59,8 +57,8 @@ type WrappedOverride
 
 
 type alias Model =
-    { keys : Api.WebData (List OverrideName)
-    , treeSchema : Api.WebData (List (Tree Int))
+    { keys : List OverrideName
+    , treeSchema : List (Tree Int)
     , defaultOverrides : Dict Int OverrideWithDefault
     , editedOverrides : Dict Int OverrideData
     , nextId : Int
@@ -71,58 +69,52 @@ type alias Model =
     }
 
 
-init : String -> Mode -> Model
-init name mode =
-    { treeSchema = Loading
-    , keys = Loading
-    , defaultOverrides = Dict.empty
-    , editedOverrides = Dict.empty
-    , nextId = 0
-    , openedNames = Set.empty
-    , autocomplete = Nothing
+
+-- init : String -> Mode -> Model
+-- init name mode =
+--     { treeSchema = []
+--     , keys = []
+--     , defaultOverrides = Dict.empty
+--     , editedOverrides = Dict.empty
+--     , nextId = 0
+--     , openedNames = Set.empty
+--     , autocomplete = Nothing
+--     , name = name
+--     , mode = mode
+--     }
+
+
+init : List OverrideWithDefault -> List Override -> List OverrideName -> Mode -> String -> Model
+init defaults edits keys mode name =
+    let
+        defaultNameDict =
+            mkDefaultNameDict defaults
+
+        editNameDict =
+            mkEditsNameDict edits
+
+        ids =
+            mkIds defaultNameDict editNameDict
+
+        defaultsDict =
+            mkDefaultsDict ids defaultNameDict
+
+        overridesDict =
+            mkEditsDict ids editNameDict
+                |> mkOverrideDataList defaultsDict
+
+        treeData =
+            mkWrappedOverride defaultsDict overridesDict
+    in
+    { treeSchema = mkTree ids treeData
+    , defaultOverrides = defaultsDict
+    , editedOverrides = overridesDict
+    , nextId = Dict.size defaultsDict + Dict.size overridesDict
+    , openedNames = mkOpenedPaths treeData
     , name = name
     , mode = mode
-    }
-
-
-setOverrideWithDefaults : Api.WebData (List OverrideWithDefault) -> Model -> Model
-setOverrideWithDefaults defaultOverrides model =
-    setDefaultAndLoadedOverrides defaultOverrides (Success []) model
-
-
-setDefaultAndLoadedOverrides :
-    Api.WebData (List OverrideWithDefault)
-    -> Api.WebData (List Override)
-    -> Model
-    -> Model
-setDefaultAndLoadedOverrides defaultsRemote editsRemote model =
-    let
-        defaultNameDictR =
-            RemoteData.map mkDefaultNameDict defaultsRemote
-
-        editNameDictR =
-            RemoteData.map mkEditsNameDict editsRemote
-
-        idsR =
-            RemoteData.map2 mkIds defaultNameDictR editNameDictR
-
-        defaultsDictR =
-            RemoteData.map2 mkDefaultsDict idsR defaultNameDictR
-
-        overridesDictR =
-            RemoteData.map2 mkEditsDict idsR editNameDictR
-                |> RemoteData.map2 mkOverrideDataList defaultsDictR
-
-        treeDataR =
-            RemoteData.map2 mkWrappedOverride defaultsDictR overridesDictR
-    in
-    { model
-        | treeSchema = RemoteData.map2 mkTree idsR treeDataR
-        , defaultOverrides = RemoteData.withDefault Dict.empty defaultsDictR
-        , editedOverrides = RemoteData.withDefault Dict.empty overridesDictR
-        , nextId =
-            RemoteData.unwrap 0 Dict.size defaultsDictR + RemoteData.unwrap 0 Dict.size overridesDictR
-        , openedNames = RemoteData.unwrap Set.empty mkOpenedPaths treeDataR
+    , keys = keys
+    , autocomplete = Nothing
     }
 
 
@@ -169,11 +161,6 @@ getEditedOverrides model =
                     Edited ->
                         Override o.name (ValueAdded o.value)
             )
-
-
-setKeys : Api.WebData (List OverrideName) -> Model -> Model
-setKeys keys model =
-    { model | keys = keys }
 
 
 hasEmptyValues : Model -> Bool
@@ -333,20 +320,12 @@ view : Model -> Html Msg
 view model =
     divClass "deployment__section"
         [ h3Class "deployment__sub-heading" [ text model.name ]
-        , case ( model.treeSchema, model.keys, model.mode ) of
-            ( Success treeSchema, Success keys, Write ) ->
-                overridesSectionData model treeSchema keys
-
-            ( Success treeSchema, _, Read ) ->
-                overridesSectionData model treeSchema []
-
-            _ ->
-                overridesSectionLoading model
+        , overridesSectionData model
         ]
 
 
-overridesSectionLoading : Model -> Html Msg
-overridesSectionLoading model =
+overridesSectionLoading : Mode -> Html Msg
+overridesSectionLoading mode =
     let
         rowLoader =
             divClass "editable-row loader"
@@ -356,7 +335,7 @@ overridesSectionLoading model =
                 ]
 
         addBtn =
-            case model.mode of
+            case mode of
                 Read ->
                     []
 
@@ -379,8 +358,8 @@ overridesSectionLoading model =
         )
 
 
-overridesSectionData : Model -> List (Tree Int) -> List OverrideName -> Html Msg
-overridesSectionData model treeSchema keys =
+overridesSectionData : Model -> Html Msg
+overridesSectionData model =
     let
         isEmptyOverride _ v =
             v.value == ""
@@ -391,7 +370,7 @@ overridesSectionData model treeSchema keys =
                 |> (Dict.isEmpty >> not)
 
         treeIds =
-            List.concatMap Tree.values treeSchema |> Set.fromList
+            List.concatMap Tree.values model.treeSchema |> Set.fromList
 
         newOverrides =
             Dict.filter (\id _ -> Set.member id treeIds |> not) model.editedOverrides
@@ -417,12 +396,15 @@ overridesSectionData model treeSchema keys =
     in
     divClass "deployment__widget"
         [ divClass "padded"
-            (addButton ++ newOverridesView model newOverrides keys ++ overridesLevelView model treeSchema keys)
+            (addButton
+                ++ newOverridesView model newOverrides
+                ++ overridesLevelView model
+            )
         ]
 
 
-newOverridesView : Model -> Dict Int OverrideData -> List OverrideName -> List (Html Msg)
-newOverridesView model overrides keys =
+newOverridesView : Model -> Dict Int OverrideData -> List (Html Msg)
+newOverridesView model overrides =
     let
         overridesSorted =
             overrides
@@ -431,7 +413,7 @@ newOverridesView model overrides keys =
                 |> List.reverse
 
         newOverrideWriteView_ ( ix, override ) =
-            overrideWriteWrapper model keys ix (NonOverrideWithDefault override)
+            overrideWriteWrapper model ix (NonOverrideWithDefault override)
     in
     case model.mode of
         Write ->
@@ -441,8 +423,8 @@ newOverridesView model overrides keys =
             []
 
 
-overridesLevelView : Model -> List (Tree Int) -> List OverrideName -> List (Html Msg)
-overridesLevelView model treeSchema keys =
+overridesLevelView : Model -> List (Html Msg)
+overridesLevelView model =
     let
         treeData =
             mkWrappedOverride model.defaultOverrides model.editedOverrides
@@ -462,17 +444,17 @@ overridesLevelView model treeSchema keys =
                 |> Set.fromList
     in
     List.map
-        (treeOverrideView model treeData editedNames keys [])
-        treeSchema
+        (treeOverrideView model treeData editedNames [])
+        model.treeSchema
 
 
-treeOverrideView : Model -> Dict Int WrappedOverride -> Set (List String) -> List OverrideName -> List String -> Tree Int -> Html Msg
-treeOverrideView model treeData editedNames keys piecies treeSchema =
+treeOverrideView : Model -> Dict Int WrappedOverride -> Set (List String) -> List String -> Tree Int -> Html Msg
+treeOverrideView model treeData editedNames piecies treeSchema =
     case treeSchema of
         Tree.Node _ [ Tree.Leaf ix ] ->
             case ( model.mode, Dict.get ix treeData ) of
                 ( Write, Just override ) ->
-                    overrideWriteWrapper model keys ix override
+                    overrideWriteWrapper model ix override
 
                 ( Read, Just override ) ->
                     overrideReadWrapper override
@@ -495,7 +477,7 @@ treeOverrideView model treeData editedNames keys piecies treeSchema =
                         (CloseName (piece :: piecies))
                         [ text piece ]
                     , divClass "collapse__inner"
-                        (List.map (treeOverrideView model treeData editedNames keys (piece :: piecies)) cs)
+                        (List.map (treeOverrideView model treeData editedNames (piece :: piecies)) cs)
                     ]
 
             else
@@ -611,7 +593,7 @@ overrideNameWriteView model inputClass deleted overrideName keys ix =
         )
 
 
-defaultOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
+defaultOverrideWriteView : Model -> String -> String -> Int -> Html Msg
 defaultOverrideWriteView =
     overrideWriteView
         "input__widget key-default-pristine"
@@ -619,7 +601,7 @@ defaultOverrideWriteView =
         False
 
 
-editedOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
+editedOverrideWriteView : Model -> String -> String -> Int -> Html Msg
 editedOverrideWriteView =
     overrideWriteView
         "input__widget key-default-edited"
@@ -627,7 +609,7 @@ editedOverrideWriteView =
         False
 
 
-newOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
+newOverrideWriteView : Model -> String -> String -> Int -> Html Msg
 newOverrideWriteView =
     overrideWriteView
         "input__widget key-custom-pristine"
@@ -635,7 +617,7 @@ newOverrideWriteView =
         False
 
 
-deletedOverrideWriteView : Model -> String -> String -> Int -> List OverrideName -> Html Msg
+deletedOverrideWriteView : Model -> String -> String -> Int -> Html Msg
 deletedOverrideWriteView =
     overrideWriteView
         "input__widget key-deleted"
@@ -643,8 +625,8 @@ deletedOverrideWriteView =
         True
 
 
-overrideWriteWrapper : Model -> List OverrideName -> Int -> WrappedOverride -> Html Msg
-overrideWriteWrapper model keys ix wrapped =
+overrideWriteWrapper : Model -> Int -> WrappedOverride -> Html Msg
+overrideWriteWrapper model ix wrapped =
     let
         ( viewer, overrideName, overrideValue ) =
             case wrapped of
@@ -662,11 +644,11 @@ overrideWriteWrapper model keys ix wrapped =
                         New ->
                             ( newOverrideWriteView, override.name, override.value )
     in
-    viewer model (unOverrideName overrideName) overrideValue ix keys
+    viewer model (unOverrideName overrideName) overrideValue ix
 
 
-overrideWriteView : String -> String -> Bool -> Model -> String -> String -> Int -> List OverrideName -> Html Msg
-overrideWriteView nameInputClass valueInputClass deleted model nameInput valueInput ix keys =
+overrideWriteView : String -> String -> Bool -> Model -> String -> String -> Int -> Html Msg
+overrideWriteView nameInputClass valueInputClass deleted model nameInput valueInput ix =
     let
         ( btnClass, btnMsg ) =
             if deleted then
@@ -681,7 +663,7 @@ overrideWriteView nameInputClass valueInputClass deleted model nameInput valueIn
                 nameInputClass
                 deleted
                 nameInput
-                keys
+                model.keys
                 ix
             , overrideValueWriteView
                 model

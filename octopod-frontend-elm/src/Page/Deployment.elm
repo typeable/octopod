@@ -26,9 +26,11 @@ type alias Model =
     , deployment : Api.WebData Deployment
     , deploymentName : DeploymentName
     , debounce : Debounce ()
-    , deploymentOverridesModel : Overrides.Model
-    , appOverridesModel : Overrides.Model
+    , deploymentOverrides : Api.WebData Overrides.Model
+    , appOverrides : Api.WebData Overrides.Model
     , sidebar : CreateSidebar.Model
+    , appDefaults : Api.WebData (List OverrideWithDefault)
+    , deploymentDefaults : Api.WebData (List OverrideWithDefault)
     }
 
 
@@ -39,9 +41,11 @@ init settings config deploymentName =
       , deployment = Loading
       , deploymentName = deploymentName
       , debounce = Debounce.init
-      , deploymentOverridesModel = Overrides.init "Deployment configuration" Overrides.Read
-      , appOverridesModel = Overrides.init "App configuration" Overrides.Read
-      , sidebar = CreateSidebar.init config False
+      , deploymentOverrides = Loading
+      , appOverrides = Loading
+      , sidebar = CreateSidebar.init config CreateSidebar.Update False
+      , appDefaults = Loading
+      , deploymentDefaults = Loading
       }
     , Cmd.batch
         [ reqDeployment deploymentName config
@@ -113,6 +117,9 @@ update cmd model =
             ( toModel subModel
             , Cmd.map toMsg subCmd
             )
+
+        initOverrides name defaults edits =
+            Overrides.init defaults edits [] Overrides.Read name
     in
     case cmd of
         DeploymentFullInfoResponse deployment ->
@@ -141,40 +148,53 @@ update cmd model =
 
         DeploymentOverridesResponse overrides ->
             ( { model
-                | deploymentOverridesModel =
-                    Overrides.setDefaultAndLoadedOverrides
+                | deploymentDefaults = overrides
+                , deploymentOverrides =
+                    RemoteData.map2
+                        (initOverrides "Deployment configuration")
                         overrides
                         (RemoteData.map (\x -> x.deployment.deploymentOverrides) model.deployment)
-                        model.deploymentOverridesModel
               }
-            , reqAppOverrides model.config (RemoteData.withDefault [] overrides)
+            , case overrides of
+                Success defaults ->
+                    reqAppOverrides model.config defaults
+
+                _ ->
+                    Cmd.none
             )
 
         AppOverridesResponse overrides ->
             ( { model
-                | appOverridesModel =
-                    Overrides.setDefaultAndLoadedOverrides
+                | appDefaults = overrides
+                , appOverrides =
+                    RemoteData.map2
+                        (initOverrides "App configuration")
                         overrides
                         (RemoteData.map (\x -> x.deployment.appOverrides) model.deployment)
-                        model.appOverridesModel
               }
             , Cmd.none
             )
 
         AppOverridesMsg subMsg ->
-            Overrides.update subMsg model.appOverridesModel
-                |> updateWith
-                    (\appOverridesModel -> { model | appOverridesModel = appOverridesModel })
-                    AppOverridesMsg
+            case model.appOverrides of
+                Success appOverrides ->
+                    Overrides.update subMsg appOverrides
+                        |> updateWith (\updated -> { model | appOverrides = Success updated }) AppOverridesMsg
+
+                _ ->
+                    ( model, Cmd.none )
 
         DeploymentOverridesMsg subMsg ->
-            Overrides.update subMsg model.deploymentOverridesModel
-                |> updateWith
-                    (\deploymentOverridesModel -> { model | deploymentOverridesModel = deploymentOverridesModel })
-                    DeploymentOverridesMsg
+            case model.deploymentOverrides of
+                Success deploymentOverrides ->
+                    Overrides.update subMsg deploymentOverrides
+                        |> updateWith (\updated -> { model | deploymentOverrides = Success updated }) DeploymentOverridesMsg
+
+                _ ->
+                    ( model, Cmd.none )
 
         ShowSidebar deployment ->
-            ( { model | sidebar = CreateSidebar.initWithDeployment model.config True deployment }
+            ( { model | sidebar = CreateSidebar.initWithDeployment model.config CreateSidebar.Update True deployment }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
             )
 
@@ -320,11 +340,20 @@ deploymentView model deployment =
     divClass "deployment"
         [ deploymentSummaryView model deployment
         , deploymentLinksView model deployment
-        , Html.map DeploymentOverridesMsg (Overrides.view model.deploymentOverridesModel)
-        , Html.map AppOverridesMsg (Overrides.view model.appOverridesModel)
-
-        -- , deploymentOverrides model deployment
+        , overridesView model.deploymentOverrides DeploymentOverridesMsg
+        , overridesView model.appOverrides AppOverridesMsg
         ]
+
+
+overridesView : Api.WebData Overrides.Model -> (Overrides.Msg -> Msg) -> Html Msg
+overridesView overrides mapper =
+    Html.map mapper <|
+        case overrides of
+            Success x ->
+                Overrides.view x
+
+            _ ->
+                Overrides.overridesSectionLoading Overrides.Read
 
 
 deploymentSummaryView : Model -> Deployment -> Html Msg
