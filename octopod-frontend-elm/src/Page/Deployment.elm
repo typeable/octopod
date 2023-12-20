@@ -1,7 +1,7 @@
 port module Page.Deployment exposing (..)
 
 import Api
-import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentOverrides)
+import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentInfo, deploymentOverrides)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
@@ -13,9 +13,11 @@ import Html.Overrides as Overrides
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Page.Deployment.ActionTable as ActionTable
 import Page.Sidebar.CreateUpdate as CreateSidebar
 import RemoteData exposing (RemoteData(..))
 import Route
+import Types.Action exposing (Log, LogWrapper, logDecoder, logWrapperDecoder)
 import Types.Deployment as Deployments exposing (..)
 import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideEncoder, defaultOverridesDecode)
 
@@ -24,6 +26,7 @@ type alias Model =
     { settings : Settings
     , config : Config
     , deployment : Api.WebData Deployment
+    , logs : Api.WebData (List LogWrapper)
     , deploymentName : DeploymentName
     , debounce : Debounce ()
     , deploymentOverrides : Api.WebData Overrides.Model
@@ -31,6 +34,7 @@ type alias Model =
     , sidebar : CreateSidebar.Model
     , appDefaults : Api.WebData (List OverrideWithDefault)
     , deploymentDefaults : Api.WebData (List OverrideWithDefault)
+    , actionTable : ActionTable.Model
     }
 
 
@@ -39,6 +43,7 @@ init settings config deploymentName =
     ( { settings = settings
       , config = config
       , deployment = Loading
+      , logs = Loading
       , deploymentName = deploymentName
       , debounce = Debounce.init
       , deploymentOverrides = Loading
@@ -46,9 +51,11 @@ init settings config deploymentName =
       , sidebar = CreateSidebar.init config CreateSidebar.Update False
       , appDefaults = Loading
       , deploymentDefaults = Loading
+      , actionTable = ActionTable.init
       }
     , Cmd.batch
         [ reqDeployment deploymentName config
+        , reqLogs deploymentName config
         ]
     )
 
@@ -56,6 +63,11 @@ init settings config deploymentName =
 reqDeployment : DeploymentName -> Config -> Cmd Msg
 reqDeployment deploymentName cfg =
     Api.get cfg (deploymentFullInfo deploymentName) deploymentDecoder (RemoteData.fromResult >> DeploymentFullInfoResponse)
+
+
+reqLogs : DeploymentName -> Config -> Cmd Msg
+reqLogs deploymentName cfg =
+    Api.get cfg (deploymentInfo deploymentName) (Decode.list logWrapperDecoder) (RemoteData.fromResult >> DeploymentInfoResponse)
 
 
 getNavKey : Model -> Nav.Key
@@ -75,6 +87,7 @@ getSettings model =
 
 type Msg
     = DeploymentFullInfoResponse (Api.WebData Deployment)
+    | DeploymentInfoResponse (Api.WebData (List LogWrapper))
     | WSUpdate String
     | DebounceMsg Debounce.Msg
     | DeploymentOverridesResponse (Api.WebData (List OverrideWithDefault))
@@ -83,6 +96,7 @@ type Msg
     | DeploymentOverridesMsg Overrides.Msg
     | ShowSidebar Deployment
     | CreateSidebarMsg CreateSidebar.Msg
+    | ActionMsg ActionTable.Msg
 
 
 reqDeploymentOverrides : Config -> Cmd Msg
@@ -126,6 +140,11 @@ update cmd model =
             ( { model | deployment = deployment }
             , Cmd.batch
                 [ reqDeploymentOverrides model.config ]
+            )
+
+        DeploymentInfoResponse logs ->
+            ( { model | logs = logs }
+            , Cmd.none
             )
 
         WSUpdate _ ->
@@ -201,6 +220,10 @@ update cmd model =
         CreateSidebarMsg subMsg ->
             CreateSidebar.update subMsg model.sidebar
                 |> updateWith (\sidebar -> { model | sidebar = sidebar }) CreateSidebarMsg
+
+        ActionMsg subMsg ->
+            ActionTable.update subMsg model.actionTable
+                |> updateWith (\updated -> { model | actionTable = updated }) ActionMsg
 
 
 port deploymentReceiver : (String -> msg) -> Sub msg
@@ -342,6 +365,7 @@ deploymentView model deployment =
         , deploymentLinksView model deployment
         , overridesView model.deploymentOverrides DeploymentOverridesMsg
         , overridesView model.appOverrides AppOverridesMsg
+        , actionsView model
         ]
 
 
@@ -413,4 +437,13 @@ deploymentLinksView _ deployment =
             [ divClass "listing" <|
                 List.map link deployment.metadata
             ]
+        ]
+
+
+actionsView : Model -> Html Msg
+actionsView model =
+    divClass "deployment__section"
+        [ h3Class "deployment__sub-heading" [ text "Actions" ]
+        , divClass "deployment__widget"
+            [ Html.map ActionMsg (ActionTable.view model.actionTable model.logs) ]
         ]

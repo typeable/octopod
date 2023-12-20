@@ -69,21 +69,6 @@ type alias Model =
     }
 
 
-
--- init : String -> Mode -> Model
--- init name mode =
---     { treeSchema = []
---     , keys = []
---     , defaultOverrides = Dict.empty
---     , editedOverrides = Dict.empty
---     , nextId = 0
---     , openedNames = Set.empty
---     , autocomplete = Nothing
---     , name = name
---     , mode = mode
---     }
-
-
 init : List OverrideWithDefault -> List Override -> List OverrideName -> Mode -> String -> Model
 init defaults edits keys mode name =
     let

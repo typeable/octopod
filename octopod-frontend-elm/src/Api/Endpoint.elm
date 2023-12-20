@@ -5,6 +5,7 @@ module Api.Endpoint exposing
     , configJson
     , deleteDeployment
     , deploymentFullInfo
+    , deploymentInfo
     , deploymentOverrideKeys
     , deploymentOverrides
     , deployments
@@ -119,3 +120,8 @@ updateDeployment deploymentName appUrl =
 deploymentFullInfo : DeploymentName -> AppUrl -> Endpoint
 deploymentFullInfo deploymentName appUrl =
     url (Just appUrl) [ "api", "v1", "deployments", unDeploymentName deploymentName, "full_info" ] []
+
+
+deploymentInfo : DeploymentName -> AppUrl -> Endpoint
+deploymentInfo deploymentName appUrl =
+    url (Just appUrl) [ "api", "v1", "deployments", unDeploymentName deploymentName, "info" ] []

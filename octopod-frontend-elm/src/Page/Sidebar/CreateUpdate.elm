@@ -3,7 +3,6 @@ module Page.Sidebar.CreateUpdate exposing (..)
 import Api
 import Api.Endpoint exposing (..)
 import Config exposing (Config)
-import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Common exposing (..)
@@ -61,7 +60,20 @@ init config mode visibility =
 
 initWithDeployment : Config -> Mode -> Bool -> Deployment -> Model
 initWithDeployment config mode visibility deployment =
-    Debug.todo "fix"
+    { appOverrides = Loading
+    , deploymentOverrides = Loading
+    , name = DeploymentName ""
+    , visibility = visibility
+    , config = config
+    , saveResp = NotAsked
+    , nameEdited = False
+    , deployment = Just deployment
+    , mode = mode
+    , appKeys = Loading
+    , appDefaults = Loading
+    , deploymentKeys = Loading
+    , deploymentDefaults = Loading
+    }
 
 
 type Msg
@@ -137,14 +149,26 @@ update cmd model =
             , Cmd.map toMsg subCmd
             )
 
-        initOverrides name defaults keys =
-            Overrides.init defaults [] keys Overrides.Write name
+        initOverrides name edits defaults keys =
+            Overrides.init defaults edits keys Overrides.Write name
+
+        ( appEdits, deployEdits ) =
+            case model.deployment of
+                Just deployment ->
+                    ( deployment.deployment.appOverrides, deployment.deployment.deploymentOverrides )
+
+                _ ->
+                    ( [], [] )
     in
     case cmd of
         DeploymentOverrideKeysResponse keys ->
             ( { model
                 | deploymentKeys = keys
-                , deploymentOverrides = RemoteData.map2 (initOverrides "Deployment configuration") model.deploymentDefaults keys
+                , deploymentOverrides =
+                    RemoteData.map2
+                        (initOverrides "Deployment configuration" deployEdits)
+                        model.deploymentDefaults
+                        keys
               }
             , Cmd.none
             )
@@ -152,7 +176,11 @@ update cmd model =
         DeploymentOverridesResponse overrides ->
             ( { model
                 | deploymentDefaults = overrides
-                , deploymentOverrides = RemoteData.map2 (initOverrides "Deployment configuration") overrides model.deploymentKeys
+                , deploymentOverrides =
+                    RemoteData.map2
+                        (initOverrides "Deployment configuration" deployEdits)
+                        overrides
+                        model.deploymentKeys
               }
             , case overrides of
                 Success defaults ->
@@ -168,7 +196,11 @@ update cmd model =
         AppOverrideKeysResponse keys ->
             ( { model
                 | appKeys = keys
-                , appOverrides = RemoteData.map2 (initOverrides "App configuration") model.appDefaults keys
+                , appOverrides =
+                    RemoteData.map2
+                        (initOverrides "App configuration" appEdits)
+                        model.appDefaults
+                        keys
               }
             , Cmd.none
             )
@@ -176,7 +208,11 @@ update cmd model =
         AppOverridesResponse overrides ->
             ( { model
                 | appDefaults = overrides
-                , appOverrides = RemoteData.map2 (initOverrides "App configuration") overrides model.appKeys
+                , appOverrides =
+                    RemoteData.map2
+                        (initOverrides "App configuration" appEdits)
+                        overrides
+                        model.appKeys
               }
             , Cmd.none
             )
