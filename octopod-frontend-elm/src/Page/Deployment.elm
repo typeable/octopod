@@ -1,13 +1,13 @@
 port module Page.Deployment exposing (..)
 
 import Api
-import Api.Endpoint exposing (appOverrides, deploymentFullInfo, deploymentInfo, deploymentOverrides)
+import Api.Endpoint as Endpoint exposing (appOverrides, deploymentFullInfo, deploymentInfo, deploymentOverrides)
 import Browser.Navigation as Nav
 import Config exposing (Config, Settings)
 import Debounce exposing (Debounce)
-import Html exposing (Html, div, text)
+import Html exposing (Html, br, button, div, text)
 import Html.Attributes as Attr
-import Html.Common exposing (aClassHrefExternal, aClassHrefInternal, bClass, dateView, divClass, h1Class, h3Class)
+import Html.Common exposing (aClassHrefExternal, aClassHrefInternal, bClass, buttonClass, dateView, divClass, h1Class, h3Class)
 import Html.Events exposing (onClick)
 import Html.Overrides as Overrides
 import Http
@@ -35,6 +35,8 @@ type alias Model =
     , appDefaults : Api.WebData (List OverrideWithDefault)
     , deploymentDefaults : Api.WebData (List OverrideWithDefault)
     , actionTable : ActionTable.Model
+    , archivePopup : Maybe DeploymentName
+    , restoreDisabled : Bool
     }
 
 
@@ -52,6 +54,8 @@ init settings config deploymentName =
       , appDefaults = Loading
       , deploymentDefaults = Loading
       , actionTable = ActionTable.init
+      , archivePopup = Nothing
+      , restoreDisabled = False
       }
     , Cmd.batch
         [ reqDeployment deploymentName config
@@ -97,6 +101,12 @@ type Msg
     | ShowSidebar Deployment
     | CreateSidebarMsg CreateSidebar.Msg
     | ActionMsg ActionTable.Msg
+    | OpenArchivePopup DeploymentName
+    | CloseArchivePopup
+    | DeleteDeploymentReq DeploymentName
+    | DeleteDeploymentResp (Api.WebData String)
+    | RestoreDeploymentReq DeploymentName
+    | RestoreDeploymentResp (Api.WebData String)
 
 
 reqDeploymentOverrides : Config -> Cmd Msg
@@ -162,8 +172,19 @@ update cmd model =
                         (Debounce.takeAll (\_ _ -> reqDeployment model.deploymentName model.config))
                         msg
                         model.debounce
+
+                restoreDisabled =
+                    model.deployment
+                        |> RemoteData.unwrap False
+                            (\x ->
+                                if isDeploymentArchived x then
+                                    model.restoreDisabled
+
+                                else
+                                    False
+                            )
             in
-            ( { model | debounce = debounce }, subCmd )
+            ( { model | debounce = debounce, restoreDisabled = restoreDisabled }, subCmd )
 
         DeploymentOverridesResponse overrides ->
             ( { model
@@ -213,8 +234,8 @@ update cmd model =
                     ( model, Cmd.none )
 
         ShowSidebar deployment ->
-            ( { model | sidebar = CreateSidebar.initWithDeployment model.config CreateSidebar.Update True deployment }
-            , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
+            ( { model | sidebar = CreateSidebar.initWithDeploymentName model.config CreateSidebar.Update True deployment.deployment.name }
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdate model.config deployment.deployment.name)
             )
 
         CreateSidebarMsg subMsg ->
@@ -225,8 +246,43 @@ update cmd model =
             ActionTable.update subMsg model.actionTable
                 |> updateWith (\updated -> { model | actionTable = updated }) ActionMsg
 
+        OpenArchivePopup deploymentName ->
+            ( { model | archivePopup = Just deploymentName }, Cmd.none )
+
+        CloseArchivePopup ->
+            ( { model | archivePopup = Nothing }, Cmd.none )
+
+        DeleteDeploymentReq deploymentName ->
+            ( { model | archivePopup = Nothing }, reqDeleteDeployment model.config deploymentName )
+
+        DeleteDeploymentResp _ ->
+            ( model, Cmd.none )
+
+        RestoreDeploymentReq deploymentName ->
+            ( { model | restoreDisabled = True }, reqRestoreDeployment model.config deploymentName )
+
+        RestoreDeploymentResp _ ->
+            ( model, Cmd.none )
+
 
 port deploymentReceiver : (String -> msg) -> Sub msg
+
+
+reqDeleteDeployment : Config -> DeploymentName -> Cmd Msg
+reqDeleteDeployment config deploymentName =
+    Api.delete config
+        (Endpoint.deleteDeployment deploymentName)
+        Http.emptyBody
+        Decode.string
+        (RemoteData.fromResult >> DeleteDeploymentResp)
+
+
+reqRestoreDeployment : Config -> DeploymentName -> Cmd Msg
+reqRestoreDeployment config deploymentName =
+    Api.patch config
+        (Endpoint.restoreDeployment deploymentName)
+        Decode.string
+        (RemoteData.fromResult >> RestoreDeploymentResp)
 
 
 subscriptions : Model -> Sub Msg
@@ -239,7 +295,17 @@ subscriptions _ =
 view : Model -> { title : String, content : List (Html Msg) }
 view model =
     { title = "Deployments"
-    , content = pageView model :: List.map (Html.map CreateSidebarMsg) (CreateSidebar.view model.sidebar)
+    , content =
+        (pageView model
+            :: List.map (Html.map CreateSidebarMsg) (CreateSidebar.view model.sidebar)
+        )
+            ++ (case model.archivePopup of
+                    Nothing ->
+                        []
+
+                    Just deploymentName ->
+                        [ archivePopupView deploymentName ]
+               )
     }
 
 
@@ -265,48 +331,40 @@ backButton =
 deploymentHeaderView : Model -> Html Msg
 deploymentHeaderView model =
     let
-        buttonCommon disabled mMsg cls txt =
-            Html.button
-                ([ Attr.class cls
-                 , Attr.disabled disabled
-                 ]
-                    ++ (case mMsg of
-                            Just msg ->
-                                [ onClick msg ]
+        disabledButtonClass cls disabled =
+            if disabled then
+                cls ++ " button--disabled"
 
-                            _ ->
-                                []
-                       )
-                )
-                [ text txt ]
-
-        buttonEnabled cls msg txt =
-            buttonCommon False (Just msg) cls txt
-
-        buttonDisabled cls txt =
-            buttonCommon True Nothing (cls ++ " button--disabled") txt
+            else
+                cls
 
         buttons =
             case model.deployment of
                 Success deployment ->
-                    if isPending deployment.status then
-                        [ buttonDisabled "button button--edit page__action" "Edit deployment"
-                        , buttonDisabled "button button--archive page__action button--secondary" "Move to archive"
-                        , aClassHrefExternal "button button--logs page__action button--secondary"
+                    if isDeploymentPending deployment.status then
+                        [ aClassHrefExternal "button button--logs page__action button--secondary"
                             (model.config.k8sDashboardUrlTemplate ++ unDeploymentName model.deploymentName)
                             [ text "Details" ]
                         ]
 
                     else if isDeploymentArchived deployment then
-                        [ buttonDisabled " button button--restore page__action button--secondary" "Restore from archive"
+                        [ button
+                            [ Attr.class (disabledButtonClass "button button--restore page__action button--secondary" model.restoreDisabled)
+                            , onClick (RestoreDeploymentReq model.deploymentName)
+                            , Attr.disabled model.restoreDisabled
+                            ]
+                            [ text "Restore from archive" ]
                         , aClassHrefExternal "button button--logs page__action button--secondary"
                             (model.config.k8sDashboardUrlTemplate ++ unDeploymentName model.deploymentName)
                             [ text "Details" ]
                         ]
 
                     else
-                        [ buttonEnabled "button button--edit page__action" (ShowSidebar deployment) "Edit deployment"
-                        , buttonDisabled "button button--archive page__action button--secondary" "Move to archive"
+                        [ buttonClass "button button--edit page__action" (ShowSidebar deployment) [ text "Edit deployment" ]
+                        , buttonClass
+                            "button button--archive page__action button--secondary"
+                            (OpenArchivePopup model.deploymentName)
+                            [ text "Move to archive" ]
                         , aClassHrefExternal "button button--logs page__action button--secondary"
                             (model.config.k8sDashboardUrlTemplate ++ unDeploymentName model.deploymentName)
                             [ text "Details" ]
@@ -446,4 +504,38 @@ actionsView model =
         [ h3Class "deployment__sub-heading" [ text "Actions" ]
         , divClass "deployment__widget"
             [ Html.map ActionMsg (ActionTable.view model.actionTable model.logs) ]
+        ]
+
+
+archivePopupView : DeploymentName -> Html Msg
+archivePopupView deploymentName =
+    div
+        [ Attr.class "classic-popup"
+        , Attr.style "display" "block"
+        ]
+        [ divClass "classic-popup__container"
+            [ divClass "classic-popup__viewport"
+                [ divClass "classic-popup__slot"
+                    [ divClass "dialog dialog--archive"
+                        [ divClass "dialog__content"
+                            [ text "Are you sure you want to archive the"
+                            , br [] []
+                            , text (unDeploymentName deploymentName)
+                            , text " deployment?"
+                            ]
+                        , divClass "dialog__footer"
+                            [ buttonClass "button dialog__action"
+                                (DeleteDeploymentReq deploymentName)
+                                [ text "Archive" ]
+                            , buttonClass "button dialog__action button--secondary"
+                                CloseArchivePopup
+                                [ text "Cancel" ]
+                            ]
+                        ]
+                    , buttonClass "classic-popup__close"
+                        CloseArchivePopup
+                        []
+                    ]
+                ]
+            ]
         ]

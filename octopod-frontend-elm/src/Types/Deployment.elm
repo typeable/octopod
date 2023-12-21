@@ -207,6 +207,16 @@ isPending status =
             True
 
 
+isDeploymentPending : Status -> Bool
+isDeploymentPending status =
+    case status of
+        DeploymentPending _ ->
+            True
+
+        DeploymentNotPending _ ->
+            isPending status
+
+
 infoEncode : Info -> Encode.Value
 infoEncode info =
     Encode.object

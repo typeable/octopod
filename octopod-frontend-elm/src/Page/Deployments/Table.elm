@@ -62,6 +62,7 @@ type Msg
     | RestoreDeploymentReq DeploymentName
     | RestoreDeploymentResp (Api.WebData String)
     | GoToDeployment DeploymentName
+    | ShowEditSidebar DeploymentName
 
 
 init : Config -> Settings -> TableType -> Model
@@ -121,6 +122,9 @@ update cmd model =
 
         GoToDeployment deploymentName ->
             ( model, Route.pushUrl model.settings.navKey (Route.Deployment deploymentName) )
+
+        ShowEditSidebar _ ->
+            ( model, Cmd.none )
 
 
 reqDeleteDeployment : Config -> DeploymentName -> Cmd Msg
@@ -510,14 +514,14 @@ deploymentView model deployment =
                                 [ Attr.class (menuButtonClass deployment.status "action action--edit")
                                 , Attr.type_ "button"
                                 , Attr.disabled (isPending deployment.status)
-                                , onClick CloseMenu
+                                , onClickStopPropagation (ShowEditSidebar deployment.deployment.name)
                                 ]
                                 [ text "Edit" ]
                             , button
                                 [ Attr.class (menuButtonClass deployment.status "action action--archive classic-popup-handler")
                                 , Attr.type_ "button"
                                 , Attr.disabled (isPending deployment.status)
-                                , onClick (OpenArchivePopup deployment.deployment.name)
+                                , onClickStopPropagation (OpenArchivePopup deployment.deployment.name)
                                 ]
                                 [ text "Move to archive" ]
                             , aClassHrefExternal "action action--logs"
@@ -526,8 +530,10 @@ deploymentView model deployment =
                             ]
 
                         ArchivedTable ->
-                            [ buttonClass "action action--restore"
-                                (RestoreDeploymentReq deployment.deployment.name)
+                            [ button
+                                [ Attr.class "action action--restore"
+                                , onClickStopPropagation (RestoreDeploymentReq deployment.deployment.name)
+                                ]
                                 [ text "Restore from archive" ]
                             ]
                 ]

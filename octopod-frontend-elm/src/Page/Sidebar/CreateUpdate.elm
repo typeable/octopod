@@ -32,7 +32,7 @@ type alias Model =
     , saveResp : Api.WebData ()
     , nameEdited : Bool
     , mode : Mode
-    , deployment : Maybe Deployment
+    , deployment : Api.WebData Deployment
     , appKeys : Api.WebData (List OverrideName)
     , appDefaults : Api.WebData (List OverrideWithDefault)
     , deploymentKeys : Api.WebData (List OverrideName)
@@ -49,7 +49,7 @@ init config mode visibility =
     , config = config
     , saveResp = NotAsked
     , nameEdited = False
-    , deployment = Nothing
+    , deployment = NotAsked
     , mode = mode
     , appKeys = Loading
     , appDefaults = Loading
@@ -58,16 +58,16 @@ init config mode visibility =
     }
 
 
-initWithDeployment : Config -> Mode -> Bool -> Deployment -> Model
-initWithDeployment config mode visibility deployment =
+initWithDeploymentName : Config -> Mode -> Bool -> DeploymentName -> Model
+initWithDeploymentName config mode visibility deploymentName =
     { appOverrides = Loading
     , deploymentOverrides = Loading
-    , name = DeploymentName ""
+    , name = deploymentName
     , visibility = visibility
     , config = config
     , saveResp = NotAsked
     , nameEdited = False
-    , deployment = Just deployment
+    , deployment = Loading
     , mode = mode
     , appKeys = Loading
     , appDefaults = Loading
@@ -81,6 +81,7 @@ type Msg
     | DeploymentOverridesResponse (Api.WebData (List OverrideWithDefault))
     | AppOverrideKeysResponse (Api.WebData (List OverrideName))
     | AppOverridesResponse (Api.WebData (List OverrideWithDefault))
+    | DeploymentFullInfoResponse (Api.WebData Deployment)
     | Close
     | Save
     | NameInput String
@@ -132,12 +133,22 @@ reqSaveDeployment config body =
         (RemoteData.fromResult >> SaveDeploymentResponse)
 
 
-initReqs : Config -> Cmd Msg
-initReqs config =
+reqDeployment : DeploymentName -> Config -> Cmd Msg
+reqDeployment deploymentName cfg =
+    Api.get cfg (deploymentFullInfo deploymentName) deploymentDecoder (RemoteData.fromResult >> DeploymentFullInfoResponse)
+
+
+initCreate : Config -> Cmd Msg
+initCreate config =
     Cmd.batch
         [ reqDeploymentOverrideKeys config
         , reqDeploymentOverrides config
         ]
+
+
+initUpdate : Config -> DeploymentName -> Cmd Msg
+initUpdate config deploymentName =
+    reqDeployment deploymentName config
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -154,7 +165,7 @@ update cmd model =
 
         ( appEdits, deployEdits ) =
             case model.deployment of
-                Just deployment ->
+                Success deployment ->
                     ( deployment.deployment.appOverrides, deployment.deployment.deploymentOverrides )
 
                 _ ->
@@ -284,6 +295,9 @@ update cmd model =
         SaveDeploymentResponse resp ->
             ( { model | saveResp = resp }, Cmd.none )
 
+        DeploymentFullInfoResponse resp ->
+            ( { model | deployment = resp }, initCreate model.config )
+
 
 view : Model -> List (Html Msg)
 view model =
@@ -331,7 +345,14 @@ sidebarHeader model =
             Close
             []
         , h2Class "popup__project"
-            [ text "Create new deployment" ]
+            [ text <|
+                case model.mode of
+                    Create ->
+                        "Create new deployment"
+
+                    Update ->
+                        "Update  deployment"
+            ]
         , divClass "popup__operations"
             [ button
             ]

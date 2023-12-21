@@ -20,6 +20,7 @@
             "elm-community/list-extra": "8.7.0",
             "jinjor/elm-debounce": "3.0.0",
             "krisajenkins/remotedata": "6.0.1",
+            "rtfeldman/elm-iso8601-date-strings": "1.1.4",
             "turboMaCk/any-set": "1.6.0"
         },
         "indirect": {
@@ -28,7 +29,6 @@
             "elm/parser": "1.1.0",
             "elm/regex": "1.0.0",
             "elm/virtual-dom": "1.0.3",
-            "rtfeldman/elm-iso8601-date-strings": "1.1.4",
             "turboMaCk/any-dict": "2.6.0"
         }
     },

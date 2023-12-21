@@ -78,7 +78,7 @@ type Msg
     | ArchivedTableMsg Table.Msg
     | ToggleArchived
     | WSUpdate String
-    | ShowSidebar
+    | ShowCreateSidebar
     | CreateSidebarMsg CreateSidebar.Msg
     | DebounceMsg Debounce.Msg
     | Tick Time.Posix
@@ -117,6 +117,11 @@ update cmd model =
         SearchInput search ->
             ( { model | search = search }, Cmd.none )
 
+        ActiveTableMsg (Table.ShowEditSidebar deploymentName) ->
+            ( { model | sidebar = CreateSidebar.init model.config CreateSidebar.Update True }
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdate model.config deploymentName)
+            )
+
         ActiveTableMsg subMsg ->
             Table.update subMsg model.activeTable
                 |> updateWith (\table -> { model | activeTable = table }) ActiveTableMsg
@@ -135,9 +140,9 @@ update cmd model =
             in
             ( { model | debounce = debounce }, subCmd )
 
-        ShowSidebar ->
+        ShowCreateSidebar ->
             ( { model | sidebar = CreateSidebar.init model.config CreateSidebar.Create True }
-            , Cmd.map CreateSidebarMsg (CreateSidebar.initReqs model.config)
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initCreate model.config)
             )
 
         CreateSidebarMsg subMsg ->
@@ -249,7 +254,7 @@ pageHeaderView model =
         [ h1Class "page__heading title" <| [ text "All deployments" ]
         , pageHeaderTimeUpdateView model
         , pageHeaderSearchView model
-        , buttonClass "page__action button button--add popup-handler" ShowSidebar [ text "New deployment" ]
+        , buttonClass "page__action button button--add popup-handler" ShowCreateSidebar [ text "New deployment" ]
         ]
 
 
