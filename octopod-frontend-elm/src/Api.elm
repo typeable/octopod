@@ -20,13 +20,13 @@ get config url decoder msg =
         }
 
 
-put : Endpoint -> AppAuth -> Http.Body -> Decoder a -> (Result Error a -> msg) -> Cmd msg
-put url auth body decoder msg =
+put : Config -> (AppUrl -> Endpoint) -> Http.Body -> Decoder a -> (Result Error a -> msg) -> Cmd msg
+put config url body decoder msg =
     Endpoint.request
         { method = "PUT"
-        , url = url
+        , url = url config.appUrl
         , expect = expectJson msg decoder
-        , headers = [ authHeader auth ]
+        , headers = [ authHeader config.appAuth ]
         , body = body
         , timeout = Nothing
         , tracker = Nothing

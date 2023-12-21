@@ -50,7 +50,7 @@ init settings config deploymentName =
       , debounce = Debounce.init
       , deploymentOverrides = Loading
       , appOverrides = Loading
-      , sidebar = CreateSidebar.init config CreateSidebar.Update False
+      , sidebar = CreateSidebar.initUpdate config False deploymentName
       , appDefaults = Loading
       , deploymentDefaults = Loading
       , actionTable = ActionTable.init
@@ -169,7 +169,14 @@ update cmd model =
                 ( debounce, subCmd ) =
                     Debounce.update
                         debounceConfig
-                        (Debounce.takeAll (\_ _ -> reqDeployment model.deploymentName model.config))
+                        (Debounce.takeAll
+                            (\_ _ ->
+                                Cmd.batch
+                                    [ reqDeployment model.deploymentName model.config
+                                    , reqLogs model.deploymentName model.config
+                                    ]
+                            )
+                        )
                         msg
                         model.debounce
 
@@ -234,8 +241,8 @@ update cmd model =
                     ( model, Cmd.none )
 
         ShowSidebar deployment ->
-            ( { model | sidebar = CreateSidebar.initWithDeploymentName model.config CreateSidebar.Update True deployment.deployment.name }
-            , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdate model.config deployment.deployment.name)
+            ( { model | sidebar = CreateSidebar.initUpdate model.config True deployment.deployment.name }
+            , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdateReq model.config deployment.deployment.name)
             )
 
         CreateSidebarMsg subMsg ->

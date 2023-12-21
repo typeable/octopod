@@ -224,3 +224,11 @@ infoEncode info =
         , ( "app_overrides", Encode.list overrideEncode info.appOverrides )
         , ( "deployment_overrides", Encode.list overrideEncode info.deploymentOverrides )
         ]
+
+
+updateInfoEncode : Info -> Encode.Value
+updateInfoEncode info =
+    Encode.object
+        [ ( "app_overrides", Encode.list overrideEncode info.appOverrides )
+        , ( "deployment_overrides", Encode.list overrideEncode info.deploymentOverrides )
+        ]

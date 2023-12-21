@@ -40,8 +40,8 @@ type alias Model =
     }
 
 
-init : Config -> Mode -> Bool -> Model
-init config mode visibility =
+initCreate : Config -> Bool -> Model
+initCreate config visibility =
     { appOverrides = Loading
     , deploymentOverrides = Loading
     , name = DeploymentName ""
@@ -50,7 +50,7 @@ init config mode visibility =
     , saveResp = NotAsked
     , nameEdited = False
     , deployment = NotAsked
-    , mode = mode
+    , mode = Create
     , appKeys = Loading
     , appDefaults = Loading
     , deploymentKeys = Loading
@@ -58,8 +58,8 @@ init config mode visibility =
     }
 
 
-initWithDeploymentName : Config -> Mode -> Bool -> DeploymentName -> Model
-initWithDeploymentName config mode visibility deploymentName =
+initUpdate : Config -> Bool -> DeploymentName -> Model
+initUpdate config visibility deploymentName =
     { appOverrides = Loading
     , deploymentOverrides = Loading
     , name = deploymentName
@@ -68,7 +68,7 @@ initWithDeploymentName config mode visibility deploymentName =
     , saveResp = NotAsked
     , nameEdited = False
     , deployment = Loading
-    , mode = mode
+    , mode = Update
     , appKeys = Loading
     , appDefaults = Loading
     , deploymentKeys = Loading
@@ -124,11 +124,20 @@ reqAppOverrides config body =
         (RemoteData.fromResult >> AppOverridesResponse)
 
 
-reqSaveDeployment : Config -> Info -> Cmd Msg
-reqSaveDeployment config body =
+reqCreateDeployment : Config -> Info -> Cmd Msg
+reqCreateDeployment config body =
     Api.post config
         saveDeployment
         (Http.jsonBody (infoEncode body))
+        (Decode.succeed ())
+        (RemoteData.fromResult >> SaveDeploymentResponse)
+
+
+reqUpdateDeployment : DeploymentName -> Config -> Info -> Cmd Msg
+reqUpdateDeployment deploymentName config body =
+    Api.put config
+        (updateDeployment deploymentName)
+        (Http.jsonBody (updateInfoEncode body))
         (Decode.succeed ())
         (RemoteData.fromResult >> SaveDeploymentResponse)
 
@@ -138,16 +147,16 @@ reqDeployment deploymentName cfg =
     Api.get cfg (deploymentFullInfo deploymentName) deploymentDecoder (RemoteData.fromResult >> DeploymentFullInfoResponse)
 
 
-initCreate : Config -> Cmd Msg
-initCreate config =
+initCreateReq : Config -> Cmd Msg
+initCreateReq config =
     Cmd.batch
         [ reqDeploymentOverrideKeys config
         , reqDeploymentOverrides config
         ]
 
 
-initUpdate : Config -> DeploymentName -> Cmd Msg
-initUpdate config deploymentName =
+initUpdateReq : Config -> DeploymentName -> Cmd Msg
+initUpdateReq config deploymentName =
     reqDeployment deploymentName config
 
 
@@ -287,16 +296,31 @@ update cmd model =
                             , appOverrides = appOverridesData
                             }
                     in
-                    ( { model | saveResp = Loading }, reqSaveDeployment model.config info )
+                    ( { model | saveResp = Loading }
+                    , case model.mode of
+                        Create ->
+                            reqCreateDeployment model.config info
+
+                        Update ->
+                            reqUpdateDeployment model.name model.config info
+                    )
 
                 _ ->
                     ( model, Cmd.none )
+
+        SaveDeploymentResponse (Success _) ->
+            ( { model | visibility = False }, Cmd.none )
 
         SaveDeploymentResponse resp ->
             ( { model | saveResp = resp }, Cmd.none )
 
         DeploymentFullInfoResponse resp ->
-            ( { model | deployment = resp }, initCreate model.config )
+            ( { model
+                | deployment = resp
+                , name = RemoteData.unwrap (DeploymentName "") (\x -> x.deployment.name) resp
+              }
+            , initCreateReq model.config
+            )
 
 
 view : Model -> List (Html Msg)
