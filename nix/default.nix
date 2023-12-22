@@ -5,6 +5,7 @@
 , hsPkgs ? import ./.. { inherit system prod; }
 , pkgs ? hsPkgs.pkgs
 , pkgsSrc ? hsPkgs.pkgsSrc
+, elm-frontend ? import ../octopod-frontend-elm {}
 , prod ? true
 }:
 let
@@ -12,22 +13,6 @@ let
   octopod-backend = hsPkgs.octopod-backend.components.exes.octopod-exe;
 
   closurecompiler = (import sources.nixpkgs { inherit system; }).closurecompiler;
-
-  octopod-frontend-ugly =
-    let frontend = hsPkgs.octopod-frontend-pretty;
-    in
-    pkgs.runCommand "octopod-frontend-ugly"
-      { } ''
-      shopt -s globstar
-      mkdir $out
-      cp -av ${frontend}/* $out
-      rm $out/all.js
-
-      chmod +w -R $out
-
-      ${closurecompiler}/bin/closure-compiler --compilation_level ADVANCED --jscomp_off=checkVars --warning_level QUIET --js ${frontend}/all.js --externs ${frontend}/all.js.externs --js_output_file $out/all.js
-      ${pkgs.zopfli}/bin/zopfli $out/**/*.{js,css,json,html}
-    '';
 
   octopod-server-container = pkgs.dockerTools.buildImage {
     name = "octopod-server-container-slim";
@@ -54,7 +39,7 @@ let
       cp -av ${migrations}/* /migrations/
 
       mkdir /www
-      cp -av ${octopod-frontend-ugly}/* /www
+      cp -av ${elm-frontend}/* /www
     '';
 
     config =
@@ -95,5 +80,5 @@ let
   };
 in
 {
-  inherit octo-cli-container octopod-server-container octopod-frontend-ugly;
+  inherit octo-cli-container octopod-server-container;
 }

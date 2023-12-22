@@ -91,9 +91,8 @@ tablePrimaryBodyView model deployments =
         Success d ->
             tableDeploymentsView model (List.concatMap .logs d)
 
-        RemoteData.Failure x ->
-            Debug.log (Debug.toString x) <|
-                tableFailureView
+        RemoteData.Failure _ ->
+            tableFailureView
 
         _ ->
             tableLoadingView

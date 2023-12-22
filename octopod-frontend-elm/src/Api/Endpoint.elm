@@ -56,10 +56,18 @@ unwrap (Endpoint str) =
 
 url : Maybe AppUrl -> List String -> List QueryParameter -> Endpoint
 url mAppUrl paths queryParams =
-    Url.Builder.crossOrigin (withDefault "http://localhost:3100" (map unwrapAppUrl mAppUrl))
-        paths
-        queryParams
-        |> Endpoint
+    case mAppUrl of
+        Just appUrl ->
+            Url.Builder.crossOrigin (unwrapAppUrl appUrl)
+                paths
+                queryParams
+                |> Endpoint
+
+        Nothing ->
+            Url.Builder.absolute
+                paths
+                queryParams
+                |> Endpoint
 
 
 configJson : Endpoint
