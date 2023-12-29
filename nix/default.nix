@@ -5,7 +5,7 @@
 , hsPkgs ? import ./.. { inherit system prod; }
 , pkgs ? hsPkgs.pkgs
 , pkgsSrc ? hsPkgs.pkgsSrc
-, elm-frontend ? import ../octopod-frontend-elm {}
+, elm-frontend ? import ../octopod-frontend {}
 , prod ? true
 }:
 let

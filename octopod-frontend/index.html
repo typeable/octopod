@@ -1,13 +1,24 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html>
-
 <head>
   <meta charset="UTF-8">
-  <meta name="theme-color" content="#3671E3">
+  <title>Main</title>
+   <link rel="stylesheet" href="/octopod-css/development/styles/style.css">
 </head>
-
 <body>
+  <div id="octopod"></div>
+  <script type="text/javascript" src="/Main.min.js"></script>
+  <script>
+    var socket;
+    var app = Elm.Main.init({
+      node: document.getElementById('octopod')
+    });
+    app.ports.getWebsocketAddress.subscribe(function(address) {
+      socket = new WebSocket(address);
+      socket.addEventListener("message", function(event) {
+          app.ports.deploymentsReceiver.send(event.data);
+          app.ports.deploymentReceiver.send(event.data);
+      });
+    });
+  </script>
 </body>
-<script language="javascript" src="all.js"></script>
-
-</html>

@@ -64,7 +64,8 @@ url mAppUrl paths queryParams =
                 |> Endpoint
 
         Nothing ->
-            Url.Builder.absolute
+            Url.Builder.crossOrigin "http://localhost:3100"
+                -- Url.Builder.absolute
                 paths
                 queryParams
                 |> Endpoint

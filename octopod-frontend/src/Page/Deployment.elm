@@ -17,7 +17,7 @@ import Page.Deployment.ActionTable as ActionTable
 import Page.Sidebar.CreateUpdate as CreateSidebar
 import RemoteData exposing (RemoteData(..))
 import Route
-import Types.Action exposing (Log, LogWrapper, logDecoder, logWrapperDecoder)
+import Types.Action exposing (LogWrapper, logWrapperDecoder)
 import Types.Deployment as Deployments exposing (..)
 import Types.OverrideWithDefault exposing (OverrideWithDefault, defaultOverrideEncoder, defaultOverridesDecode)
 
