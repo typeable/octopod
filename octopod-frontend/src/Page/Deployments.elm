@@ -41,7 +41,7 @@ init settings config =
       , archivedTable = Table.init config settings Table.ArchivedTable
       , search = ""
       , showArchived = False
-      , sidebar = CreateSidebar.initCreate config False
+      , sidebar = CreateSidebar.initCreate settings.navKey config False
       , debounce = Debounce.init
       , updated = 0
       }
@@ -118,7 +118,7 @@ update cmd model =
             ( { model | search = search }, Cmd.none )
 
         ActiveTableMsg (Table.ShowEditSidebar deploymentName) ->
-            ( { model | sidebar = CreateSidebar.initUpdate model.config True deploymentName }
+            ( { model | sidebar = CreateSidebar.initUpdate model.settings.navKey model.config True deploymentName }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdateReq model.config deploymentName)
             )
 
@@ -141,7 +141,7 @@ update cmd model =
             ( { model | debounce = debounce }, subCmd )
 
         ShowCreateSidebar ->
-            ( { model | sidebar = CreateSidebar.initCreate model.config True }
+            ( { model | sidebar = CreateSidebar.initCreate model.settings.navKey model.config True }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initCreateReq model.config)
             )
 

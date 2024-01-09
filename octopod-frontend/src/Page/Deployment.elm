@@ -50,7 +50,7 @@ init settings config deploymentName =
       , debounce = Debounce.init
       , deploymentOverrides = Loading
       , appOverrides = Loading
-      , sidebar = CreateSidebar.initUpdate config False deploymentName
+      , sidebar = CreateSidebar.initUpdate settings.navKey config False deploymentName
       , appDefaults = Loading
       , deploymentDefaults = Loading
       , actionTable = ActionTable.init
@@ -104,9 +104,9 @@ type Msg
     | OpenArchivePopup DeploymentName
     | CloseArchivePopup
     | DeleteDeploymentReq DeploymentName
-    | DeleteDeploymentResp (Api.WebData String)
+    | DeleteDeploymentResp DeploymentName (Api.WebData String)
     | RestoreDeploymentReq DeploymentName
-    | RestoreDeploymentResp (Api.WebData String)
+    | RestoreDeploymentResp DeploymentName (Api.WebData String)
 
 
 reqDeploymentOverrides : Config -> Cmd Msg
@@ -180,18 +180,18 @@ update cmd model =
                         msg
                         model.debounce
 
-                restoreDisabled =
-                    model.deployment
-                        |> RemoteData.unwrap False
-                            (\x ->
-                                if isDeploymentArchived x then
-                                    model.restoreDisabled
+                -- restoreDisabled =
+                --     model.deployment
+                --         |> RemoteData.unwrap False
+                --             (\x ->
+                --                 if isDeploymentArchived x then
+                --                     model.restoreDisabled
 
-                                else
-                                    False
-                            )
+                --                 else
+                --                     False
+                --             )
             in
-            ( { model | debounce = debounce, restoreDisabled = restoreDisabled }, subCmd )
+            ( { model | debounce = debounce }, subCmd )
 
         DeploymentOverridesResponse overrides ->
             ( { model
@@ -241,7 +241,7 @@ update cmd model =
                     ( model, Cmd.none )
 
         ShowSidebar deployment ->
-            ( { model | sidebar = CreateSidebar.initUpdate model.config True deployment.deployment.name }
+            ( { model | sidebar = CreateSidebar.initUpdate model.settings.navKey model.config True deployment.deployment.name }
             , Cmd.map CreateSidebarMsg (CreateSidebar.initUpdateReq model.config deployment.deployment.name)
             )
 
@@ -262,15 +262,20 @@ update cmd model =
         DeleteDeploymentReq deploymentName ->
             ( { model | archivePopup = Nothing }, reqDeleteDeployment model.config deploymentName )
 
-        DeleteDeploymentResp _ ->
-            ( model, Cmd.none )
+        DeleteDeploymentResp deploymentName (Success _) ->
+            ( model, Nav.reload )
+
+        DeleteDeploymentResp _ err ->
+            ( model, Nav.reload)
 
         RestoreDeploymentReq deploymentName ->
-            ( { model | restoreDisabled = True }, reqRestoreDeployment model.config deploymentName )
+             ( { model | restoreDisabled = True }, reqRestoreDeployment model.config deploymentName)
 
-        RestoreDeploymentResp _ ->
-            ( model, Cmd.none )
+        RestoreDeploymentResp deploymentName (Success _) ->
+            ( model, Nav.reload )
 
+        RestoreDeploymentResp _ err ->
+             ( model, Nav.reload)
 
 port deploymentReceiver : (String -> msg) -> Sub msg
 
@@ -281,7 +286,7 @@ reqDeleteDeployment config deploymentName =
         (Endpoint.deleteDeployment deploymentName)
         Http.emptyBody
         Decode.string
-        (RemoteData.fromResult >> DeleteDeploymentResp)
+        (RemoteData.fromResult >> (DeleteDeploymentResp deploymentName))
 
 
 reqRestoreDeployment : Config -> DeploymentName -> Cmd Msg
@@ -289,7 +294,7 @@ reqRestoreDeployment config deploymentName =
     Api.patch config
         (Endpoint.restoreDeployment deploymentName)
         Decode.string
-        (RemoteData.fromResult >> RestoreDeploymentResp)
+        (RemoteData.fromResult >> (RestoreDeploymentResp deploymentName))
 
 
 subscriptions : Model -> Sub Msg

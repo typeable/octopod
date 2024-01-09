@@ -2,6 +2,7 @@ module Page.Sidebar.CreateUpdate exposing (..)
 
 import Api
 import Api.Endpoint exposing (..)
+import Browser.Navigation as Nav
 import Config exposing (Config)
 import Html exposing (..)
 import Html.Attributes as Attr
@@ -12,6 +13,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import RemoteData exposing (RemoteData(..))
+import Route
 import Time exposing (Month(..))
 import Types.Deployment exposing (..)
 import Types.Override exposing (..)
@@ -37,11 +39,12 @@ type alias Model =
     , appDefaults : Api.WebData (List OverrideWithDefault)
     , deploymentKeys : Api.WebData (List OverrideName)
     , deploymentDefaults : Api.WebData (List OverrideWithDefault)
+    , navKey : Nav.Key
     }
 
 
-initCreate : Config -> Bool -> Model
-initCreate config visibility =
+initCreate : Nav.Key -> Config -> Bool -> Model
+initCreate navKey config visibility =
     { appOverrides = Loading
     , deploymentOverrides = Loading
     , name = DeploymentName ""
@@ -55,11 +58,12 @@ initCreate config visibility =
     , appDefaults = Loading
     , deploymentKeys = Loading
     , deploymentDefaults = Loading
+    , navKey = navKey
     }
 
 
-initUpdate : Config -> Bool -> DeploymentName -> Model
-initUpdate config visibility deploymentName =
+initUpdate : Nav.Key -> Config -> Bool -> DeploymentName -> Model
+initUpdate navKey config visibility deploymentName =
     { appOverrides = Loading
     , deploymentOverrides = Loading
     , name = deploymentName
@@ -73,6 +77,7 @@ initUpdate config visibility deploymentName =
     , appDefaults = Loading
     , deploymentKeys = Loading
     , deploymentDefaults = Loading
+    , navKey = navKey
     }
 
 
@@ -309,7 +314,7 @@ update cmd model =
                     ( model, Cmd.none )
 
         SaveDeploymentResponse (Success _) ->
-            ( { model | visibility = False }, Cmd.none )
+            ( { model | visibility = False }, Route.replaceUrl model.navKey (Route.Deployment model.name) )
 
         SaveDeploymentResponse resp ->
             ( { model | saveResp = resp }, Cmd.none )
