@@ -179,17 +179,6 @@ update cmd model =
                         )
                         msg
                         model.debounce
-
-                -- restoreDisabled =
-                --     model.deployment
-                --         |> RemoteData.unwrap False
-                --             (\x ->
-                --                 if isDeploymentArchived x then
-                --                     model.restoreDisabled
-
-                --                 else
-                --                     False
-                --             )
             in
             ( { model | debounce = debounce }, subCmd )
 
