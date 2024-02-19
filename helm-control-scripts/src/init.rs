@@ -8,15 +8,6 @@ fn main() {
     info!("Env variables received {:?}", &envs);
     let default_values: DefaultValues = serde_json::from_str(&envs.defaults).unwrap();
     let deployment_parameters = HelmDeploymentParameters::new_env_only(&default_values, &envs);
-    match &envs.helm_on_init_only {
-        Some(enabled) => {
-            if *enabled {
-                helm_repo_add_update(&envs, &deployment_parameters);
-            } else {
-                info!("Skipping helm initialization since HELM_ON_INIT_ONLY is false");
-            }
-        },
-        None => info!("Skipping helm initialization since HELM_ON_INIT_ONLY is not set"),
-    }
+    helm_repo_add_update(&envs, &deployment_parameters);
     info!("Success!");
 }

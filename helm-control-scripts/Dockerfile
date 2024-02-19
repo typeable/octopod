@@ -2,7 +2,7 @@ FROM alpine:3
 ARG HELM_BIN=/utils/helm
 ENV HELM_BIN=$HELM_BIN
 
-ADD https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz /tmp/helm.tar.gz
+ADD https://get.helm.sh/helm-v3.14.1-linux-amd64.tar.gz /tmp/helm.tar.gz
 
 RUN tar -xf /tmp/helm.tar.gz -C /tmp &&\
     mkdir -p /utils &&\

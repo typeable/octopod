@@ -768,6 +768,24 @@ pub mod lib {
         }
         Ok(())
     }
+    pub fn helm_repo_update(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) {
+        let helm_repo_update_ = HelmCmd {
+            name: String::from(&envs.helm_bin),
+            mode: HelmMode::RepoUpdate,
+            release_name: String::from(""),
+            namespace: String::from(""),
+            deployment_parameters: deployment_parameters.clone(),
+            overrides: vec![],
+        };
+        match helm_repo_update_.run() {
+            Ok(_status) => info!("Repo update success!"),
+            Err(status) => {
+                println!("Couldn't update repo.");
+                error!("Error during helm execution");
+                panic!("{:?}", status);
+            }
+        }
+    }
     pub fn helm_repo_add_update(envs: &EnvVars, deployment_parameters: &HelmDeploymentParameters) {
         let helm_repo_add = HelmCmd {
             name: String::from(&envs.helm_bin),
@@ -809,7 +827,8 @@ pub mod lib {
                     info!("Skipping helm initialization, it must be initialied on init");
                 } else {
                     if helm_repo_exists(&envs, &deployment_parameters) {
-                        info!("Skipping helm initialization, because requested repo was already added");
+                        info!("Skipping helm initialization, because requested repo was already added, just update");
+                        helm_repo_update(&envs, &deployment_parameters);
                     } else {
                         info!("Starting helm initialization");
                         helm_repo_add_update(&envs, &deployment_parameters);
@@ -818,7 +837,8 @@ pub mod lib {
             },
             None => {
                 if helm_repo_exists(&envs, &deployment_parameters) {
-                    info!("Skipping helm initialization, because requested repo was already added");
+                    info!("Skipping helm initialization, because requested repo was already added, just update");
+                    helm_repo_update(&envs, &deployment_parameters);
                 } else {
                     info!("Starting helm initialization");
                     helm_repo_add_update(&envs, &deployment_parameters);
