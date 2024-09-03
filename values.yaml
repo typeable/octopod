@@ -1,0 +1,27 @@
+controlScripts:
+  image:
+    repository: localhost:5001/ocs
+    tag: 0.12
+octopod:
+  cliAuthSecret: 1qaz2wsx
+  baseDomain: lvh.me
+  env:
+    HELM_ON_INIT_ONLY: true
+    DEBUG: true
+postgresql:
+  postgresqlPassword: 1qaz2wsx
+  postgresqlPostgresPassword: 1qaz2wsx
+ingress:
+  tls:
+    enabled: false
+image:
+  repository: localhost:5001/octopod-test
+  pullPolicy: Always
+  tag: "0.12"
+resources:
+  requests:
+    memory: "500Mi"
+    cpu: "300m"
+  limits:
+    memory: "500Mi"
+    cpu: "300m"
