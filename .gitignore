@@ -14,4 +14,6 @@ octopod-css/production
 octopod-frontend/elm-stuff
 octopod-frontend/octopod-css
 octopod-frontend/index.html
+octopod-frontend/static/*
+migrator/.venv/*
 .DS_Store
