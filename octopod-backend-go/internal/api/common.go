@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -40,7 +39,7 @@ func applyOverride(data map[interface{}]interface{}, override Override) error {
 			if m, ok := lastMap[k].(map[interface{}]interface{}); ok {
 				lastMap = m
 			} else {
-				log.Fatalf("key %s is not a map", k)
+				return fmt.Errorf("key %s is not a map", k)
 			}
 		}
 	}
@@ -53,8 +52,7 @@ func setStatus(p *sql.DB, deploymentName string, status Status) error {
 		WHERE deployment_id = (SELECT id FROM deployment WHERE name = $2);
 	`, status, deploymentName)
 	if err != nil {
-		log.Println(err)
-		return err
+		return fmt.Errorf("Cannot set status: %s", err)
 	}
 
 	return nil
@@ -113,8 +111,7 @@ func (h *Handler) prepareHelmSpec(c *gin.Context, deployment *DeploymentData) (s
 func (h *Handler) getIngressLinks(c *gin.Context, releaseName string) ([]Link, error) {
 	ingressList, err := h.K8sClient.NetworkingV1().Ingresses(h.Config.ReleaseNamespace).List(c, v1.ListOptions{})
 	if err != nil {
-		log.Fatalf("Error listing Ingress resources: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("Error listing Ingress resources: %s", err)
 	}
 
 	var links []Link
@@ -249,7 +246,6 @@ func (h *Handler) scaleResources(c *gin.Context, releaseName string, replicas in
 		return fmt.Errorf("failed to list deployments: %v", err)
 	}
 	for _, deployment := range deployments.Items {
-		log.Println(deployment.Annotations["meta.helm.sh/release-name"], releaseName)
 		if deployment.Annotations["meta.helm.sh/release-name"] == releaseName {
 			scale := &autoscalingv1.Scale{
 				ObjectMeta: metav1.ObjectMeta{
@@ -287,6 +283,83 @@ func (h *Handler) scaleResources(c *gin.Context, releaseName string, replicas in
 				return fmt.Errorf("failed to scale statefulset %s/%s to zero: %v", statefulset.Namespace, statefulset.Name, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func ginError(err string) gin.H {
+	return gin.H{"error": err}
+}
+
+func ginHelmProcess() gin.H {
+	return gin.H{"message": "Helm command run"}
+}
+
+func ginMessage(message string) gin.H {
+	return gin.H{"message": message}
+}
+
+func (h *Handler) finishDeploymentAction(deploymentId int, deploymentActionId int, status Status, helmError string) error {
+
+	tx, err := h.Postgres.Begin()
+	if err != nil {
+		return fmt.Errorf("Error starting transaction: %s", err)
+	}
+	defer tx.Rollback()
+
+	err = h.finishDeploymentActionQueries(tx, deploymentId, deploymentActionId, status, helmError)
+	if err != nil {
+		return fmt.Errorf("Error inserting deployment records: %s", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("Error committing transaction: %s", err)
+	}
+
+	return nil
+}
+
+func (h *Handler) finishDeploymentActionQueries(tx *sql.Tx, deploymentId int, deploymentActionId int, status Status, helmError string) error {
+	_, err := tx.Exec(`
+        UPDATE deployment_status
+        SET status = $1, is_pending = FALSE, updated_at = $2
+        WHERE deployment_id = $3
+    `, status, time.Now(), deploymentId)
+	if err != nil {
+		return fmt.Errorf("failed to update status: %v", err)
+	}
+
+	_, err = tx.Exec(`
+		UPDATE deployment_action
+		SET error = $1
+		WHERE id = $2
+	`, helmError, deploymentActionId)
+	if err != nil {
+		return fmt.Errorf("failed to update status: %v", err)
+	}
+
+	return nil
+}
+
+func (h *Handler) saveDeploymentLinks(deploymentId int, links []Link) error {
+	tx, err := h.Postgres.Begin()
+	if err != nil {
+		return fmt.Errorf("Error starting transaction: %s", err)
+	}
+	defer tx.Rollback()
+
+	for _, link := range links {
+		_, err := tx.Exec(`
+			INSERT INTO deployment_link (deployment_id, name, url)
+			VALUES ($1, $2, $3)
+		`, deploymentId, link.Name, link.URL)
+		if err != nil {
+			return fmt.Errorf("Error inserting into deployment_link table: %s", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("Error committing transaction: %s", err)
 	}
 
 	return nil

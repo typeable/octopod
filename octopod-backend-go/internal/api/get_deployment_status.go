@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ func (h *Handler) GetDeploymentStatusHandler(c *gin.Context) {
 
 	status, err := getDeploymentStatus(h.Postgres, deploymentName)
 	if err != nil {
+		log.Print(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -35,7 +37,7 @@ func getDeploymentStatus(db *sql.DB, deploymentName string) (*FullStatus, error)
 	err := row.Scan(&status.Status, &status.Pending)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("deployment not found: %v", deploymentName)
+			return nil, fmt.Errorf("Deployment not found: %v", deploymentName)
 		}
 		return nil, err
 	}

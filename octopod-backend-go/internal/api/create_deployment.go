@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -13,43 +14,74 @@ import (
 )
 
 func (h *Handler) CreateDeploymentHandler(c *gin.Context) {
+
 	var deployment DeploymentData
 	if err := c.ShouldBindJSON(&deployment); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		log.Print(err)
+		c.JSON(http.StatusBadRequest, ginError("Invalid request payload"))
 		return
 	}
+	log.SetPrefix(deployment.Name)
+	log.Printf("Starting deployment creation")
 
 	if err := h.addOrUpdateHelmRepo(c); err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
 		return
 	}
 
 	chartName, chartVersion, values, err := h.prepareHelmSpec(c, &deployment)
 	if err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
 		return
 	}
 
-	if err := h.installChart(c, &deployment, chartName, chartVersion, values); err != nil {
-		return
-	}
-
-	links, err := h.getIngressLinks(c, deployment.Name)
+	deploymentId, deploymentActionId, err := h.saveCreateAction(&deployment)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get ingress links"})
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
 		return
 	}
 
-	if err := h.saveDeploymentData(c, &deployment, links); err != nil {
-		return
-	}
+	c.JSON(http.StatusOK, ginHelmProcess())
+	log.Println("Deployment process started")
 
-	c.JSON(http.StatusOK, gin.H{"message": "Deployment created successfully"})
+	go func() {
+		if err := h.installChart(c, &deployment, chartName, chartVersion, values); err != nil {
+			log.Print(err)
+			h.finishDeploymentAction(deploymentId, deploymentActionId, CreatingFailed, err.Error())
+			if err != nil {
+				log.Print(err)
+			}
+			return
+		}
+		err = h.finishDeploymentAction(deploymentId, deploymentActionId, Creating, "")
+		if err != nil {
+			log.Print(err)
+			return
+		}
+
+		links, err := h.getIngressLinks(c, deployment.Name)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+
+		if err = h.saveDeploymentLinks(deploymentId, links); err != nil {
+			log.Print(err)
+			c.JSON(http.StatusOK, ginError("Something went wrong"))
+			return
+		}
+
+		log.Printf("Deployment successfully created")
+	}()
 }
 
 func (h *Handler) installChart(c *gin.Context, deployment *DeploymentData, chartName, chartVersion string, values map[interface{}]interface{}) error {
 	stringValues, err := yaml.Marshal(values)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
-		return err
+		return fmt.Errorf("Error marshalling helm values: %s", err)
 	}
 
 	spec := &helmclient.ChartSpec{
@@ -64,35 +96,32 @@ func (h *Handler) installChart(c *gin.Context, deployment *DeploymentData, chart
 
 	_, err = h.HelmClient.InstallChart(c, spec, nil)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
-	}
-	return err
-}
-
-func (h *Handler) saveDeploymentData(c *gin.Context, deployment *DeploymentData, links []Link) error {
-	tx, err := h.Postgres.Begin()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
-		return err
-	}
-	defer tx.Rollback()
-
-	err = h.insertDeploymentRecords(tx, deployment, links)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert deployment data"})
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
-		return err
+		return fmt.Errorf("Error installing chart: %s", err)
 	}
 
 	return nil
 }
 
-func (h *Handler) insertDeploymentRecords(tx *sql.Tx, deployment *DeploymentData, links []Link) error {
+func (h *Handler) saveCreateAction(deployment *DeploymentData) (int, int, error) {
+	tx, err := h.Postgres.Begin()
+	if err != nil {
+		return 0, 0, fmt.Errorf("Error starting transaction: %s", err)
+	}
+	defer tx.Rollback()
+
+	deploymentId, deploymentActionId, err := h.saveCreateActionQueries(tx, deployment)
+	if err != nil {
+		return 0, 0, fmt.Errorf("Error inserting deployment records: %s", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, fmt.Errorf("Error committing transaction: %s", err)
+	}
+
+	return deploymentId, deploymentActionId, nil
+}
+
+func (h *Handler) saveCreateActionQueries(tx *sql.Tx, deployment *DeploymentData) (int, int, error) {
 	var deploymentId int
 	var deploymentActionId int
 
@@ -101,8 +130,15 @@ func (h *Handler) insertDeploymentRecords(tx *sql.Tx, deployment *DeploymentData
 		VALUES ($1, $2) RETURNING id
 	`, deployment.Name, time.Now()).Scan(&deploymentId)
 	if err != nil {
-		log.Println(err)
-		return err
+		return 0, 0, fmt.Errorf("Error inserting into deployment table: %s", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO deployment_status (deployment_id, status, is_pending, checked_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, deploymentId, Creating, true, time.Now(), time.Now())
+	if err != nil {
+		return 0, 0, fmt.Errorf("Error inserting into deployment_status table: %s", err)
 	}
 
 	err = tx.QueryRow(`
@@ -110,17 +146,7 @@ func (h *Handler) insertDeploymentRecords(tx *sql.Tx, deployment *DeploymentData
 		VALUES ($1, $2, $3) RETURNING id
 	`, deploymentId, Create, time.Now()).Scan(&deploymentActionId)
 	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	_, err = tx.Exec(`
-		INSERT INTO deployment_status (deployment_id, status, is_pending, checked_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, deploymentId, Creating, false, time.Now(), time.Now())
-	if err != nil {
-		log.Println(err)
-		return err
+		return 0, 0, fmt.Errorf("Error inserting into deployment_action table: %s", err)
 	}
 
 	if deployment.ChartVersionOverride != "" {
@@ -129,8 +155,7 @@ func (h *Handler) insertDeploymentRecords(tx *sql.Tx, deployment *DeploymentData
 			VALUES ($1, $2)
 		`, deploymentActionId, deployment.ChartVersionOverride)
 		if err != nil {
-			log.Println(err)
-			return err
+			return 0, 0, fmt.Errorf("Error inserting into deployment_helm_override table: %s", err)
 		}
 	}
 
@@ -140,20 +165,9 @@ func (h *Handler) insertDeploymentRecords(tx *sql.Tx, deployment *DeploymentData
 			VALUES ($1, $2, $3, $4)
 		`, deploymentActionId, override.OverrideAction, override.Name, override.Value)
 		if err != nil {
-			log.Println(err)
-			return err
-		}
-	}
-	for _, link := range links {
-		_, err := tx.Exec(`
-			INSERT INTO deployment_link (deployment_id, name, url)
-			VALUES ($1, $2, $3)
-		`, deploymentId, link.Name, link.URL)
-		if err != nil {
-			log.Println(err)
-			return err
+			return 0, 0, fmt.Errorf("Error inserting into deployment_helm_values_override table: %s", err)
 		}
 	}
 
-	return nil
+	return deploymentId, deploymentActionId, nil
 }

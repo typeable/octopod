@@ -13,18 +13,19 @@ func (h *Handler) GetDeploymentHandler(c *gin.Context) {
 	deploymentName := c.Param("name")
 	rows, err := queryDeployment(h.Postgres, deploymentName)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	defer rows.Close()
 
 	deployments, err := processDeployments(rows)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 
 	if deployment, ok := deployments[deploymentName]; ok {
 		c.JSON(http.StatusOK, deployment)
 	} else {
+		log.Print("Cannot get deployment")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
 	}
 }
@@ -33,7 +34,7 @@ func queryDeployment(postgres *sql.DB, deploymentName string) (*sql.Rows, error)
 	return postgres.Query(`
 		SELECT
 			d.name AS deployment_name,
-			da.created_at AS action_created_at,
+			d.created_at AS created_at,
 			ds.status AS last_status,
 			ds.is_pending,
 			dho.version AS helm_version,

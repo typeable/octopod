@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -9,30 +10,46 @@ import (
 )
 
 func (h *Handler) CleanupDeploymentHandler(c *gin.Context) {
-	deploymentName := c.Param("name")
+	log.Println("Starting deployment cleanup")
 
-	if err := h.uninstallChart(c, deploymentName); err != nil {
+	deploymentName := c.Param("name")
+	if deploymentName == "" {
+		log.Printf("Error: Deployment name is required")
+		c.JSON(http.StatusBadRequest, ginError("Invalid request payload"))
 		return
 	}
-	h.deleteDeploymentData(c, deploymentName)
+	log.SetPrefix(deploymentName)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Deployment deleted successfully"})
+	err := h.uninstallChart(deploymentName)
+	if err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Cannot uninstall release"))
+		return
+	}
+
+	err = h.deleteDeploymentData(deploymentName)
+	if err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Cannot delete deployment data"))
+		return
+	}
+
+	c.JSON(http.StatusOK, ginMessage("Deployment deleted successfully"))
+	log.Println("Finished deployment cleanup")
 }
 
-func (h *Handler) uninstallChart(c *gin.Context, deploymentName string) error {
+func (h *Handler) uninstallChart(deploymentName string) error {
 	err := h.HelmClient.UninstallReleaseByName(deploymentName)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		return fmt.Errorf("Error during Helm release uninstallation for deployment: %v", err)
 	}
-	return err
+	return nil
 }
 
-func (h *Handler) deleteDeploymentData(c *gin.Context, deploymentName string) error {
+func (h *Handler) deleteDeploymentData(deploymentName string) error {
 	tx, err := h.Postgres.Begin()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
-		return err
+		return fmt.Errorf("Error starting transaction for deleting deployment: %v", err)
 	}
 	defer tx.Rollback()
 
@@ -41,12 +58,11 @@ func (h *Handler) deleteDeploymentData(c *gin.Context, deploymentName string) er
 		WHERE name = $1
 	`, deploymentName)
 	if err != nil {
-		log.Println(err)
-		return err
+		return fmt.Errorf("Error deleting deployment record for deployment: %v", err)
 	}
+
 	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
-		return err
+		return fmt.Errorf("Error committing transaction for deployment: %v", err)
 	}
 
 	return nil

@@ -11,80 +11,76 @@ import (
 )
 
 func (h *Handler) RestoreDeploymentHandler(c *gin.Context) {
+
 	deploymentName := c.Param("name")
 	if deploymentName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Deployment name is required"})
+		log.Printf("Error: Deployment name is required")
+		c.JSON(http.StatusBadRequest, ginError("Invalid request payload"))
 		return
 	}
-	setStatusRestore(h.Postgres, deploymentName)
-	log.Printf("Status %s set to %s", deploymentName, Archiving)
+	log.Println("Starting deployment restoring")
+	log.SetPrefix(deploymentName)
 
-	err := h.scaleResources(c, deploymentName, 1)
-
-	if err == nil {
-		log.Printf("Release %s scaled down", deploymentName)
-
-		addRestoreAction(h.Postgres, deploymentName, "")
-		log.Printf("Added action %s for %s", Restore, deploymentName)
-		log.Printf("Status %s set to %s", deploymentName, Restoring)
-
-		c.JSON(http.StatusOK, gin.H{"message": "Deployment '" + deploymentName + "' restored successfully"})
-	} else {
-		log.Printf("Release %s NOT scaled down", deploymentName)
-
-		addRestoreAction(h.Postgres, deploymentName, err.Error())
-		log.Printf("Added action %s for %s", Restore, deploymentName)
-		log.Printf("Status %s set to %s", deploymentName, Restoring)
-
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Archiving error"})
-	}
-}
-
-func setStatusRestore(db *sql.DB, deploymentName string) error {
-	_, err := db.Exec(`
-		UPDATE deployment_status
-		SET status = $1, is_pending = TRUE, updated_at = $2
-		WHERE deployment_id = (
-			SELECT id FROM deployment WHERE name = $3
-		)
-	`, Restoring, time.Now(), deploymentName)
+	deploymentId, deploymentActionId, err := saveRestoreAction(h.Postgres, deploymentName)
 	if err != nil {
-		return fmt.Errorf("failed to update status: %v", err)
+		log.Printf("Error setting status to %s: %v", Restoring, err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
+		return
 	}
-	return nil
+	log.Printf("Status %s set to %s", deploymentName, Restoring)
+	c.JSON(http.StatusOK, ginHelmProcess())
+
+	go func() {
+		log.Printf("Scaling resources for deployment %s to 1", deploymentName)
+		err = h.scaleResources(c, deploymentName, 1)
+		if err != nil {
+			log.Print(err)
+			err = h.finishDeploymentAction(deploymentId, deploymentActionId, RestoringFailed, err.Error())
+			if err != nil {
+				log.Print(err)
+			}
+			return
+		}
+		err = h.finishDeploymentAction(deploymentId, deploymentActionId, Creating, "")
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		log.Printf("Deployment %s successfully restored", deploymentName)
+	}()
 }
 
-func addRestoreAction(db *sql.DB, deploymentName string, helmError string) error {
+func saveRestoreAction(db *sql.DB, deploymentName string) (int, int, error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return 0, 0, fmt.Errorf("Failed to begin transaction: %v", err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
         UPDATE deployment_status
-        SET status = $1, is_pending = FALSE, updated_at = $2
+        SET status = $1, is_pending = TRUE, updated_at = $2
         WHERE deployment_id = (
             SELECT id FROM deployment WHERE name = $3
         )
     `, Restoring, time.Now(), deploymentName)
 	if err != nil {
-		return fmt.Errorf("failed to update status: %v", err)
+		return 0, 0, fmt.Errorf("Failed to update status for deployment: %v", err)
 	}
 
-	var newActionID int
+	var deploymentId int
+	var deploymentActionId int
 	err = tx.QueryRow(`
-        INSERT INTO deployment_action (deployment_id, action, created_at, error)
+        INSERT INTO deployment_action (deployment_id, action, created_at)
         VALUES (
             (SELECT id FROM deployment WHERE name = $1),
             $2,
-            $3,
-			$4
+            $3
         )
-        RETURNING id
-    `, deploymentName, Restore, time.Now(), helmError).Scan(&newActionID)
+        RETURNING id, deployment_id
+    `, deploymentName, Restore, time.Now()).Scan(&deploymentActionId, &deploymentId)
 	if err != nil {
-		return fmt.Errorf("failed to insert new action: %v", err)
+		return 0, 0, fmt.Errorf("Failed to insert new action for deployment %s: %v", deploymentName, err)
 	}
 
 	_, err = tx.Exec(`
@@ -100,10 +96,9 @@ func addRestoreAction(db *sql.DB, deploymentName string, helmError string) error
             ORDER BY created_at DESC
 			OFFSET 1
             LIMIT 1
-        )
-    `, newActionID, deploymentName)
+    `, deploymentActionId, deploymentName)
 	if err != nil {
-		return fmt.Errorf("failed to duplicate helm override: %v", err)
+		return 0, 0, fmt.Errorf("Failed to duplicate helm override for deployment %s: %v", deploymentName, err)
 	}
 
 	_, err = tx.Exec(`
@@ -120,15 +115,14 @@ func addRestoreAction(db *sql.DB, deploymentName string, helmError string) error
 			OFFSET 1
             LIMIT 1
         )
-    `, newActionID, deploymentName)
+    `, deploymentActionId, deploymentName)
 	if err != nil {
-		return fmt.Errorf("failed to duplicate helm values override: %v", err)
+		return 0, 0, fmt.Errorf("Failed to duplicate helm values override for deployment %s: %v", deploymentName, err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return fmt.Errorf("failed to commit transaction: %v", err)
+		return 0, 0, fmt.Errorf("Failed to commit transaction for deployment %s: %v", deploymentName, err)
 	}
-
-	return nil
+	return deploymentId, deploymentActionId, nil
 }

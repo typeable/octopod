@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"maps"
 	"net/http"
@@ -15,28 +16,7 @@ import (
 
 func (h *Handler) GetDeploymentActionsHandler(c *gin.Context) {
 	deploymentName := c.Param("name")
-	rows, err := queryDeploymentActions(h.Postgres, deploymentName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	deploymentActionsMap, err := processDeploymentActions(rows)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	deploymentActions := slices.Collect(maps.Values(deploymentActionsMap))
-
-	sort.SliceStable(deploymentActions, func(i, j int) bool {
-		return deploymentActions[i].CreatedAt.After(deploymentActions[j].CreatedAt)
-	})
-
-	c.JSON(http.StatusOK, deploymentActions)
-}
-
-func queryDeploymentActions(postgres *sql.DB, deploymentName string) (*sql.Rows, error) {
-	return postgres.Query(`
+	rows, err := h.Postgres.Query(`
 		SELECT
 			da.action AS action,
 			da.created_at AS action_created_at,
@@ -59,6 +39,24 @@ func queryDeploymentActions(postgres *sql.DB, deploymentName string) (*sql.Rows,
 			deployment_helm_values_override dhvo ON dhvo.deployment_action_id = da.id
 		WHERE
 			d.name = $1`, deploymentName)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	defer rows.Close()
+
+	deploymentActionsMap, err := processDeploymentActions(rows)
+	if err != nil {
+		log.Print(err)
+	}
+
+	deploymentActions := slices.Collect(maps.Values(deploymentActionsMap))
+
+	sort.SliceStable(deploymentActions, func(i, j int) bool {
+		return deploymentActions[i].CreatedAt.After(deploymentActions[j].CreatedAt)
+	})
+
+	c.JSON(http.StatusOK, deploymentActions)
 }
 
 func processDeploymentActions(rows *sql.Rows) (map[time.Time]*DeploymentAction, error) {
@@ -83,16 +81,16 @@ func processDeploymentActions(rows *sql.Rows) (map[time.Time]*DeploymentAction, 
 			&helmKey,
 			&helmValue,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Cannot read row: %s", err)
 		}
 
 		if err := updateDeploymentAction(deploymentActions, Action(action), createdAt, helmError, helmVersion, helmValueAction, helmKey, helmValue); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Cannot parse deploymet actions: %s", err)
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Cannot parse deploymet actions: %s", err)
 	}
 
 	return deploymentActions, nil

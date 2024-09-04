@@ -45,12 +45,17 @@ const (
 type Status string
 
 const (
-	Creating  Action = "Creating"
-	Running   Action = "Running"
-	Archiving Action = "Archiving"
-	Archived  Action = "Archived"
-	Updating  Action = "Updating"
-	Restoring Action = "Restoring"
+	Creating        Status = "Creating"
+	CreatingFailed  Status = "CreatingFailed"
+	Running         Status = "Running"
+	Archiving       Status = "Archiving"
+	ArchivingFailed Status = "ArchivingFailed"
+	Archived        Status = "Archived"
+	Updating        Status = "Updating"
+	UpdatingFailed  Status = "UpdatingFailed"
+	Restoring       Status = "Restoring"
+	RestoringFailed Status = "RestoringFailed"
+	Failed          Status = "Failed"
 )
 
 type DeploymentAction struct {

@@ -12,13 +12,13 @@ import (
 func (h *Handler) ListDeploymentsHandler(c *gin.Context) {
 	rows, err := executeQuery(h.Postgres)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	defer rows.Close()
 
 	deployments, err := processDeployments(rows)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 
 	c.JSON(http.StatusOK, deployments)
@@ -28,7 +28,7 @@ func executeQuery(postgres *sql.DB) (*sql.Rows, error) {
 	return postgres.Query(`
 		SELECT
 			d.name AS deployment_name,
-			da.created_at AS action_created_at,
+			d.created_at AS action_created_at,
 			ds.status AS last_status,
 			ds.is_pending,
 			dho.version AS helm_version,
@@ -40,9 +40,9 @@ func executeQuery(postgres *sql.DB) (*sql.Rows, error) {
 		FROM
 			deployment d
 		JOIN
-			deployment_action da ON da.deployment_id = d.id
-		JOIN
 			deployment_status ds ON ds.deployment_id = d.id
+		JOIN
+			deployment_action da ON da.deployment_id = d.id
 		LEFT JOIN
 			deployment_link dl ON dl.deployment_id = d.id
 		LEFT JOIN

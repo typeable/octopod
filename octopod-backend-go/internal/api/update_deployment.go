@@ -14,55 +14,68 @@ import (
 )
 
 func (h *Handler) UpdateDeploymentHandler(c *gin.Context) {
+
 	var deployment DeploymentData
 	if err := c.ShouldBindJSON(&deployment); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		log.Print(err)
+		c.JSON(http.StatusBadRequest, ginError("Invalid request payload"))
 		return
 	}
+	log.SetPrefix(deployment.Name)
+	log.Printf("Starting deployment update")
 
 	if err := h.addOrUpdateHelmRepo(c); err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
 		return
 	}
 
 	chartName, chartVersion, values, err := h.prepareHelmSpec(c, &deployment)
 	if err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
 		return
 	}
 
-	if err := h.upgradeChart(c, &deployment, chartName, chartVersion, values); err != nil {
-		if err := addUpdateAction(h.Postgres, deployment, []Link{}, err.Error()); err != nil {
+	deploymentId, deploymentActionId, err := h.saveUpdateAction(&deployment)
+	if err != nil {
+		log.Print(err)
+		c.JSON(http.StatusInternalServerError, ginError("Something went wrong"))
+		return
+	}
+
+	c.JSON(http.StatusOK, ginHelmProcess())
+	log.Println("Deployment process started")
+
+	go func() {
+		if err := h.upgradeChart(c, &deployment, chartName, chartVersion, values); err != nil {
+			log.Print(err)
+			h.finishDeploymentAction(deploymentId, deploymentActionId, UpdatingFailed, err.Error())
+			if err != nil {
+				log.Print(err)
+			}
+			return
+		}
+		err = h.finishDeploymentAction(deploymentId, deploymentActionId, Updating, "")
+		if err != nil {
+			log.Print(err)
 			return
 		}
 
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
-	} else {
 		links, err := h.getIngressLinks(c, deployment.Name)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get ingress links"})
+			log.Print(err)
 			return
 		}
 
-		if err := addUpdateAction(h.Postgres, deployment, links, ""); err != nil {
+		if err = h.saveDeploymentLinks(deploymentId, links); err != nil {
+			log.Print(err)
+			c.JSON(http.StatusOK, ginError("Something went wrong"))
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Deployment updated successfully"})
-	}
-
-}
-
-func setStatusUpdating(db *sql.DB, deploymentName string) error {
-	_, err := db.Exec(`
-		UPDATE deployment_status
-		SET status = $1, is_pending = TRUE, updated_at = $2
-		WHERE deployment_id = (
-			SELECT id FROM deployment WHERE name = $3
-		)
-	`, Updating, time.Now(), deploymentName)
-	if err != nil {
-		return fmt.Errorf("failed to update status: %v", err)
-	}
-	return nil
+		log.Printf("Deployment successfully udpated")
+	}()
 }
 
 func (h *Handler) upgradeChart(c *gin.Context, deployment *DeploymentData, chartName, chartVersion string, values map[interface{}]interface{}) error {
@@ -90,39 +103,52 @@ func (h *Handler) upgradeChart(c *gin.Context, deployment *DeploymentData, chart
 	return err
 }
 
-func addUpdateAction(db *sql.DB, deployment DeploymentData, links []Link, helmError string) error {
-	tx, err := db.Begin()
+func (h *Handler) saveUpdateAction(deployment *DeploymentData) (int, int, error) {
+	tx, err := h.Postgres.Begin()
 	if err != nil {
-		return err
+		return 0, 0, fmt.Errorf("Error starting transaction: %s", err)
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`
+	deploymentId, deploymentActionId, err := h.saveUpdateActionQueries(tx, deployment)
+	if err != nil {
+		return 0, 0, fmt.Errorf("Error inserting deployment records: %s", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, fmt.Errorf("Error committing transaction: %s", err)
+	}
+
+	return deploymentId, deploymentActionId, nil
+}
+
+func (h *Handler) saveUpdateActionQueries(tx *sql.Tx, deployment *DeploymentData) (int, int, error) {
+	var deploymentId int
+	var deploymentActionId int
+
+	_, err := tx.Exec(`
         UPDATE deployment_status
-        SET status = $1, is_pending = FALSE, updated_at = $2
+        SET status = $1, is_pending = TRUE, updated_at = $2
         WHERE deployment_id = (
             SELECT id FROM deployment WHERE name = $3
         )
     `, Updating, time.Now(), deployment.Name)
 	if err != nil {
-		return fmt.Errorf("failed to update status: %v", err)
+		return 0, 0, fmt.Errorf("Failed to update status for deployment: %v", err)
 	}
 
-	var deploymentActionId int
 	err = tx.QueryRow(`
-        INSERT INTO deployment_action (deployment_id, action, created_at, error)
+        INSERT INTO deployment_action (deployment_id, action, created_at)
         VALUES (
             (SELECT id FROM deployment WHERE name = $1),
             $2,
-            $3,
-			$4
+            $3
         )
-        RETURNING id
-    `, deployment.Name, Update, time.Now(), helmError).Scan(&deploymentActionId)
+        RETURNING id, deployment_id
+    `, deployment.Name, Archive, time.Now()).Scan(&deploymentActionId, &deploymentId)
 	if err != nil {
-		return fmt.Errorf("failed to insert new action: %v", err)
+		return 0, 0, fmt.Errorf("Failed to insert new action for deployment %s: %v", deployment.Name, err)
 	}
-	log.Println(deploymentActionId)
 
 	if deployment.ChartVersionOverride != "" {
 		_, err := tx.Exec(`
@@ -130,8 +156,7 @@ func addUpdateAction(db *sql.DB, deployment DeploymentData, links []Link, helmEr
 			VALUES ($1, $2)
 		`, deploymentActionId, deployment.ChartVersionOverride)
 		if err != nil {
-			log.Println(err)
-			return err
+			return 0, 0, fmt.Errorf("Error inserting into deployment_helm_override table: %s", err)
 		}
 	}
 
@@ -141,24 +166,9 @@ func addUpdateAction(db *sql.DB, deployment DeploymentData, links []Link, helmEr
 			VALUES ($1, $2, $3, $4)
 		`, deploymentActionId, override.OverrideAction, override.Name, override.Value)
 		if err != nil {
-			log.Println(err)
-			return err
-		}
-	}
-	for _, link := range links {
-		_, err := tx.Exec(`
-			INSERT INTO deployment_link (deployment_id, name, url)
-			VALUES ((SELECT id FROM deployment WHERE name = $1), $2, $3)
-		`, deployment.Name, link.Name, link.URL)
-		if err != nil {
-			log.Println(err)
-			return err
+			return 0, 0, fmt.Errorf("Error inserting into deployment_helm_values_override table: %s", err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	return nil
+	return deploymentId, deploymentActionId, nil
 }
