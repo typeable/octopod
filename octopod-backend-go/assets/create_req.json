@@ -1,0 +1,10 @@
+{
+    "name": "test-deploy-a",
+    "values_overrides": [
+        {
+            "name": "redis.auth.password",
+            "action": "ValueAdd",
+            "value": "1234"
+        }
+    ]
+}

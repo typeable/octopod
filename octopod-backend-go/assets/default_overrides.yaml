@@ -1,0 +1,326 @@
+air:
+  air:
+    env:
+      AMADEUS_ORIGINATOR: "vault::air/amadeus:originator:"
+      AMADEUS_PASSWORD: "vault::air/amadeus:password:"
+      AMADEUS_WSAP: "vault::air/amadeus:wsap:"
+      ARS_CONFIG: "vault::air/ars:config:"
+      AUTH_ENCRYPTION_KEY: "vault::air/auth-encryption-key:key:"
+      AUTHORIZE_ENDPOINT: "vault::global/authorize:endpoint:"
+      AUTHORIZE_KEY: "vault::global/authorize:key:"
+      AUTHORIZE_LOGIN: "vault::global/authorize:login:"
+      CONNEXPAY_DEVGUID: "vault::air/connexpay:devguid:"
+      CONNEXPAY_ENDPOINT: "vault::air/connexpay:endpoint:"
+      CONNEXPAY_LOGIN: "vault::air/connexpay:login:"
+      CONNEXPAY_PASSWORD: "vault::air/connexpay:password:"
+      DISABLE_CONTRACT_MANAGER: true
+      GHCRTS: -N1
+      KAFKA_BROKERS_INT: kafka.kafka.svc.cluster.local:9092
+      MANDRILL_KEY: "vault::global/mandrill:key:"
+      NDC_BROKER_CERT: "vault::air/ndc-broker:certificate:"
+      PERSEUSS_PASSWORD: "vault::air/perseuss:password:"
+      PERSEUSS_TOKEN: "vault::air/perseuss:token:"
+      PERSEUSS_USERNAME: "vault::air/perseuss:user:"
+      REDASH_API_KEY: "vault::global/redash:key:"
+      SSO_CLIENT_ID: "vault::sso/clients/air:clientId:"
+      SSO_CLIENT_SECRET: "vault::sso/clients/air:clientSecret:"
+      VERTEIL_CONFIG: "vault::air/verteil:config:"
+    ingress:
+      tls:
+        certSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+    resources:
+      limits:
+        memory: 600Mi
+      requests:
+        cpu: 200m
+        memory: 600Mi
+    seed: false
+  cron:
+    resources:
+      limits:
+        memory: 100Mi
+      requests:
+        cpu: 50m
+        memory: 100Mi
+  environment: staging
+  image:
+    pullPolicy: Always
+    tag: master
+  kafka:
+    enabled: false
+  postgres:
+    clone:
+      bucket: stages-pg-backup-ng
+      creds:
+        vault:
+          access_key_id: id
+          mount: staging
+          path: global/pg-backup-aws-creds
+          secret_access_key: secret
+      endpoint: https://s3.us-west-2.amazonaws.com/
+      region: us-west-2
+      source: master-air-pg
+    resources:
+      limits:
+        cpu: 660m
+        memory: 1000Mi
+      requests:
+        cpu: 660m
+        memory: 1000Mi
+  redash:
+    enabled: true
+    host: https://redash.dtt.stage.thebestagent.pro
+    namespace: deployment
+  redis:
+    master:
+      livenessProbe:
+        periodSeconds: 30
+        timeoutSeconds: 20
+      readinessProbe:
+        periodSeconds: 30
+        timeoutSeconds: 20
+    replica:
+      livenessProbe:
+        periodSeconds: 30
+        timeoutSeconds: 20
+      readinessProbe:
+        periodSeconds: 30
+        timeoutSeconds: 20
+  sso:
+    config:
+      clients:
+        - allow_client_credentials: true
+          id_var: AIR_SSO_CLIENT_ID
+          secret_var: AIR_SSO_CLIENT_SECRET
+        - allow_client_credentials: true
+          id_var: HOTELS_SSO_CLIENT_ID
+          secret_var: HOTELS_SSO_CLIENT_SECRET
+        - allow_client_credentials: true
+          id_var: ORDERS_SSO_CLIENT_ID
+          secret_var: ORDERS_SSO_CLIENT_SECRET
+        - allow_client_credentials: true
+          id_var: PACKAGES_SSO_CLIENT_ID
+          secret_var: PACKAGES_SSO_CLIENT_SECRET
+      optional_redirect_uri: true
+    env:
+      AIR_SSO_CLIENT_ID: "vault::sso/clients/air:clientId:"
+      AIR_SSO_CLIENT_SECRET: "vault::sso/clients/air:clientSecret:"
+      AUTHORIZE_ENDPOINT: "vault::global/authorize:endpoint:"
+      AUTHORIZE_KEY: "vault::global/authorize:key:"
+      AUTHORIZE_LOGIN: "vault::global/authorize:login:"
+      HOTELS_SSO_CLIENT_ID: "vault::sso/clients/hotels:clientId:"
+      HOTELS_SSO_CLIENT_SECRET: "vault::sso/clients/hotels:clientSecret:"
+      MANAGEMENT_PANEL_CLIENT_ID: "vault::sso/clients/management-panel:clientId:"
+      MANAGEMENT_PANEL_CLIENT_SECRET: "vault::sso/clients/management-panel:clientSecret:"
+      MANDRILL_KEY: "vault::global/mandrill:key:"
+      ORDERS_SSO_CLIENT_ID: "vault::sso/clients/orders:clientId:"
+      ORDERS_SSO_CLIENT_SECRET: "vault::sso/clients/orders:clientSecret:"
+      PACKAGES_SSO_CLIENT_ID: "vault::sso/clients/packages:clientId:"
+      PACKAGES_SSO_CLIENT_SECRET: "vault::sso/clients/packages:clientSecret:"
+      SSO_CSRF_KEY: "vault::sso/csrf:key:"
+    ingress:
+      auth:
+        enabled: true
+      tls:
+        certSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+    resources:
+      limits:
+        memory: 250Mi
+      requests:
+        cpu: 100m
+        memory: 250Mi
+  ssoTasker:
+    ingress:
+      auth:
+        enabled: true
+      tls:
+        certSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+    resources:
+      limits:
+        memory: 100Mi
+      requests:
+        cpu: 50m
+        memory: 100Mi
+  tasker:
+    ingress:
+      auth:
+        enabled: true
+      tls:
+        certSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+    ndcKafka:
+      brokers: bootstrap.ndc-broker.air.stage.thebestagent.pro:443
+      ssl:
+        enabled: true
+      topic: ndc_test
+    resources:
+      limits:
+        memory: 600Mi
+      requests:
+        cpu: 100m
+        memory: 600Mi
+  vault:
+    clusterName: dtt-stage
+  verteil:
+    enabled: true
+global:
+  baseDomain: b2b-2745.dtt.stage.thebestagent.pro
+  postgres:
+    clone:
+      enabled: true
+hotels:
+  api-proxy:
+    enabled: true
+  apiProxy:
+    disable_tls_check: false
+    timeout: 60
+  config:
+    travolutionary_use_orders_service: false
+  cron:
+    resources:
+      limits:
+        memory: 600Mi
+      requests:
+        cpu: 50m
+        memory: 600Mi
+  hotels:
+    env:
+      AUTHORIZE_ENDPOINT: "vault::global/authorize:endpoint:"
+      AUTHORIZE_KEY: "vault::global/authorize:key:"
+      AUTHORIZE_LOGIN: "vault::global/authorize:login:"
+      CLIENT_ID: "vault::sso/clients/hotels:clientId:"
+      CLIENT_SECRET: "vault::sso/clients/hotels:clientSecret:"
+      GOOGLE_MAPS_KEY: "vault::global/google-maps:key:"
+      MANDRILL_KEY: "vault::global/mandrill:key:"
+      REDASH_API_KEY: "vault::global/redash:key:"
+      RISKIFIED_AUTH_TOKEN: "vault::hotels/riskified:auth_token:"
+      TRAVOLUTIONARY_DYNAMIC_SERVICE: "vault::hotels/travolutionary:endpoint:"
+      TRAVOLUTIONARY_ORDERS_SERVICE: "vault::hotels/travolutionary:ordersService:"
+      TRAVOLUTIONARY_PASSWORD: "vault::hotels/travolutionary:password:"
+      TRAVOLUTIONARY_USERNAME: "vault::hotels/travolutionary:username:"
+      ZENTRUM_ACCOUNT_ID: "vault::hotels/zentrum:account_id:"
+      ZENTRUM_API_KEY: "vault::hotels/zentrum:api_key:"
+    ingress:
+      tls:
+        certSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+    resources:
+      limits:
+        memory: 400Mi
+      requests:
+        cpu: 150m
+        memory: 00Mi
+    vaultEngine: staging
+  image:
+    pullPolicy: Always
+    tag: master
+  postgres:
+    clone:
+      bucket: stages-pg-backup-ng
+      creds:
+        vault:
+          access_key_id: id
+          mount: staging
+          path: global/pg-backup-aws-creds
+          secret_access_key: secret
+      endpoint: https://s3.us-west-2.amazonaws.com/
+      region: us-west-2
+      source: master-hotels-pg
+    persistence:
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 660m
+        memory: 1000Mi
+      requests:
+        cpu: 660m
+        memory: 1000Mi
+  redash:
+    enabled: true
+    host: https://redash.dtt.stage.thebestagent.pro
+    namespace: deployment
+  travData:
+    enabled: false
+    image:
+      tag: 2022-02-23-slim
+  vault:
+    clusterName: dtt-stage
+  zentrum:
+    channel_id: dt-test-channel
+    suggestions_endpoint: https://autosuggest-v2.us.prod.zentrumhub.com/api/locations/locationcontent
+    suggestions_timeout: 3
+    use_hub: true
+  zentrumData:
+    image:
+      tag: "2024-07-23"
+packages:
+  image:
+    pullPolicy: Always
+    tag: master
+  ingress:
+    tls:
+      wildCardCertSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+  packages:
+    env:
+      AUTHORIZE_ENDPOINT: "vault::global/authorize:endpoint:"
+      AUTHORIZE_KEY: "vault::global/authorize:key:"
+      AUTHORIZE_LOGIN: "vault::global/authorize:login:"
+      CLIENT_ID: "vault::sso/clients/packages:clientId:"
+      CLIENT_SECRET: "vault::sso/clients/packages:clientSecret:"
+      DIGESTING_KEY: "vault::packages/digesting-key:key:"
+      GOOGLE_MAPS_API_KEY: "vault::global/google-maps:key:"
+      REDASH_API_KEY: "vault::global/redash:key:"
+    resources:
+      limits:
+        memory: 700Mi
+      requests:
+        cpu: 100m
+        memory: 700Mi
+    vaultEngine: staging
+  postgres:
+    clone:
+      bucket: stages-pg-backup-ng
+      creds:
+        vault:
+          access_key_id: id
+          mount: staging
+          path: global/pg-backup-aws-creds
+          secret_access_key: secret
+      endpoint: https://s3.us-west-2.amazonaws.com/
+      region: us-west-2
+      source: master-packages-pg
+  redash:
+    enabled: true
+    host: https://redash.dtt.stage.thebestagent.pro
+    namespace: deployment
+  tasker:
+    resources:
+      limits:
+        memory: 400Mi
+      requests:
+        cpu: 100m
+        memory: 400Mi
+  vault:
+    clusterName: dtt-stage
+portal:
+  image:
+    pullPolicy: Always
+    tag: master
+  ingress:
+    tls:
+      wildCardCertSecretName: dtt-stage-thebestagent-pro-wildcard-tls
+  portal:
+    env:
+      CLIENT_ID: "vault::sso/clients/orders:clientId:"
+      CLIENT_SECRET: "vault::sso/clients/orders:clientSecret:"
+      USE_PORTAL_AIR_ORDER_DETAILS: true
+    vaultEngine: staging
+  resources:
+    limits:
+      memory: 800Mi
+    requests:
+      cpu: 200m
+      memory: 800Mi
+  vault:
+    clusterName: dtt-stage
+redis:
+  auth:
+    password: uJ6bn3U4sKyJUMR7

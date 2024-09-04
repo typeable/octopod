@@ -3,27 +3,34 @@ package config
 import (
 	"flag"
 	"log"
+	"os"
+
+	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
 	ProjectName             string
 	ReleaseNamespace        string
-	HelmRepo                string
-	HelmRepoUser            string
-	HelmRepoPassword        string
 	Port                    int
 	UIPort                  int
 	WSPort                  int
 	DB                      string
 	DBMaxOpenConnections    int
 	DBMaxIdleConnections    int
-	DefaultHelmValues       string
-	DefaultHelmChart        string
+	HelmRepo                string
+	HelmRepoUser            string
+	HelmRepoPassword        string
+	HelmChart               string
+	DefaultHelmValues       map[interface{}]interface{}
 	DefaultHelmChartVersion string
+	BaseDomain              string
+	BaseDomainKey           string
 }
 
 func LoadConfig() *Config {
 	config := &Config{}
+
+	var defaultHelmValuesFile string
 
 	flag.StringVar(&config.ProjectName, "project-name", "Deployment manager", "Octopod project name")
 	flag.StringVar(&config.ReleaseNamespace, "release-namespace", "default", "Kubernetes namespace for release")
@@ -36,9 +43,11 @@ func LoadConfig() *Config {
 	flag.StringVar(&config.HelmRepo, "helm-repo", "", "Helm repository")
 	flag.StringVar(&config.HelmRepoUser, "helm-repo-user", "", "Helm repository user")
 	flag.StringVar(&config.HelmRepoPassword, "helm-repo-password", "", "Helm repository password")
-	flag.StringVar(&config.DefaultHelmChart, "default-helm-chart", "", "Default helm chart")
-	flag.StringVar(&config.DefaultHelmChartVersion, "default-deployment-overrides", "", "Default helm chart version")
-	flag.StringVar(&config.DefaultHelmValues, "default-values", "", "Default values")
+	flag.StringVar(&config.HelmChart, "default-helm-chart", "", "Default helm chart")
+	flag.StringVar(&config.DefaultHelmChartVersion, "default-helm-chart-version", "", "Default helm chart version")
+	flag.StringVar(&defaultHelmValuesFile, "default-helm-values", "", "Default values")
+	flag.StringVar(&config.BaseDomain, "base-domain", "", "Base domain")
+	flag.StringVar(&config.BaseDomainKey, "base-domain-key", "", "Base domain path in values")
 
 	flag.Parse()
 
@@ -48,20 +57,21 @@ func LoadConfig() *Config {
 	if config.HelmRepo == "" {
 		log.Fatal("Error: --helm-repo is required")
 	}
-	if config.HelmRepoUser == "" {
-		log.Fatal("Error: --helm-repo-user is required")
-	}
-	if config.HelmRepoPassword == "" {
-		log.Fatal("Error: --helm-repo-password is required")
-	}
-	if config.DefaultHelmChart == "" {
+	if config.HelmChart == "" {
 		log.Fatal("Error: --default-helm-chart is required")
 	}
 	if config.DefaultHelmChartVersion == "" {
 		log.Fatal("Error: --default-deployment-overrides is required")
 	}
-	if config.DefaultHelmValues == "" {
-		log.Fatal("Error: --default-values is required")
+	if defaultHelmValuesFile != "" {
+		yamlFile, err := os.ReadFile(defaultHelmValuesFile)
+		if err != nil {
+			log.Fatal("Error: bad default helm values filepath")
+		}
+		err = yaml.Unmarshal([]byte(yamlFile), &config.DefaultHelmValues)
+		if err != nil {
+			log.Fatal("Error: bad default helm values")
+		}
 	}
 
 	return config

@@ -7,6 +7,7 @@ import (
 	"octopod-backend/internal/api"
 	"octopod-backend/internal/config"
 	"octopod-backend/internal/helm"
+	"octopod-backend/internal/k8s"
 	"octopod-backend/internal/postgres"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,7 @@ func main() {
 	cfg := config.LoadConfig()
 
 	helmClient := helm.NewHelmClient(cfg.ReleaseNamespace)
+	k8sClient := k8s.NewK8sClient()
 
 	db := postgres.NewDBConnection(cfg.DB, cfg.DBMaxOpenConnections, cfg.DBMaxIdleConnections)
 	defer func() {
@@ -25,7 +27,7 @@ func main() {
 		}
 	}()
 
-	handler := api.NewHandler(cfg, helmClient, db)
+	handler := api.NewHandler(cfg, helmClient, k8sClient, db)
 
 	r := gin.Default()
 
